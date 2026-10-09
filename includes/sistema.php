@@ -1,9 +1,9 @@
 <?php
 // Configuración general del sistema.
-// BOCETO: se guarda en config/sistema.json hasta que tengamos la base de datos.
+// En el servidor local se guarda en config/*.json; en la nube (Vercel), en la tabla configuracion de Supabase.
+require_once __DIR__ . '/nube.php';
 
 define('ACRI_RAIZ', dirname(__DIR__));
-define('ACRI_CONFIG', ACRI_RAIZ . '/config/sistema.json');
 define('ACRI_UPLOADS', 'uploads/sistema');
 
 // Duración de la sesión (segundos)
@@ -16,9 +16,14 @@ const ACRI_IMG_DEFECTO = [
     'fondo'   => null,
 ];
 
-// Lee / guarda un JSON de config/ (carpeta protegida con .htaccess)
+// Lee / guarda un JSON de config/ (carpeta protegida con .htaccess) o de la tabla configuracion
 function configLeer(string $nombre): array
 {
+    if (ACRI_NUBE) {
+        $datos = nube_consulta('select datos from configuracion where clave = ?', [$nombre])->fetchColumn();
+        $datos = $datos === false ? null : json_decode((string) $datos, true);
+        return is_array($datos) ? $datos : [];
+    }
     $archivo = ACRI_RAIZ . '/config/' . $nombre . '.json';
     if (!is_file($archivo)) return [];
     $datos = json_decode((string) file_get_contents($archivo), true);
@@ -30,6 +35,14 @@ function configGuardar(string $nombre, array $datos): void
     $json = json_encode($datos, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
     // Nunca sobrescribir con un archivo vacío
     if ($json === false) throw new RuntimeException("No se pudo guardar config/$nombre.json: " . json_last_error_msg());
+    if (ACRI_NUBE) {
+        nube_consulta(
+            'insert into configuracion (clave, datos, actualizado_por) values (?, cast(? as jsonb), ?)
+             on conflict (clave) do update set datos = excluded.datos, actualizado_por = excluded.actualizado_por',
+            [$nombre, $json, $_SESSION['usuario'] ?? null]);
+        return;
+    }
+    if (!is_dir(ACRI_RAIZ . '/config')) mkdir(ACRI_RAIZ . '/config', 0775, true);
     file_put_contents(ACRI_RAIZ . '/config/' . $nombre . '.json', $json, LOCK_EX);
 }
 
@@ -48,25 +61,18 @@ function sistemaConfig(): array
         'imagenes' => ['favicon' => null, 'logo' => null, 'fondo' => null],
         'empresa'  => ['nombre' => 'ACRIGLASS VIDRIO Y ALUMINIO', 'rfc' => ''],
     ];
-    if (is_file(ACRI_CONFIG)) {
-        $json = json_decode((string) file_get_contents(ACRI_CONFIG), true);
-        if (is_array($json)) {
-            $cfg = array_replace_recursive($cfg, $json);
-        }
+    try {
+        $cfg = array_replace_recursive($cfg, configLeer('sistema'));
+    } catch (Throwable $e) {
+        // Sin base de datos la pantalla de ingreso se muestra con las imágenes del sistema
+        error_log('AcriGlass sistemaConfig: ' . $e->getMessage());
     }
     return $cfg;
 }
 
 function sistemaGuardar(array $cfg): void
 {
-    if (!is_dir(dirname(ACRI_CONFIG))) {
-        mkdir(dirname(ACRI_CONFIG), 0775, true);
-    }
-    file_put_contents(
-        ACRI_CONFIG,
-        json_encode($cfg, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-        LOCK_EX
-    );
+    configGuardar('sistema', $cfg);
 }
 
 // true si el administrador subió una imagen propia y el archivo existe
@@ -74,7 +80,9 @@ function imagenPropia(string $tipo, ?array $cfg = null): bool
 {
     $cfg = $cfg ?? sistemaConfig();
     $ruta = $cfg['imagenes'][$tipo] ?? null;
-    return $ruta !== null && is_file(ACRI_RAIZ . '/' . $ruta);
+    if ($ruta === null) return false;
+    // En la nube es la URL pública de Supabase Storage
+    return preg_match('#^https?://#', $ruta) || is_file(ACRI_RAIZ . '/' . $ruta);
 }
 
 // Ruta relativa (desde la raíz del sitio) de la imagen vigente

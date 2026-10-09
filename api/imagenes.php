@@ -37,11 +37,26 @@ $accion = $_POST['accion'] ?? '';
 $tipo   = $_POST['tipo'] ?? '';
 $cfg    = sistemaConfig();
 
-// Borra el archivo propio (solo si está dentro de uploads/sistema) y vuelve a la imagen del sistema
+// En la nube Vercel no acepta peticiones de más de 4.5 MB
+if (ACRI_NUBE) {
+    foreach ($reglas as &$r) $r['max'] = min($r['max'], 4 * $mb);
+    unset($r);
+}
+
+// Borra el archivo propio (solo si está dentro de uploads/sistema o del bucket "sistema") y vuelve a la imagen del sistema
 function quitarPropia(array &$cfg, string $tipo): void
 {
     $ruta = $cfg['imagenes'][$tipo] ?? null;
-    if ($ruta && strpos($ruta, ACRI_UPLOADS . '/') === 0 && is_file(ACRI_RAIZ . '/' . $ruta)) {
+    if ($ruta && ACRI_NUBE) {
+        $prefijo = sb_publica('sistema', '');
+        if (strpos($ruta, $prefijo) === 0) {
+            try {
+                sb_borrar('sistema', rawurldecode(substr($ruta, strlen($prefijo))));
+            } catch (Throwable $e) {
+                error_log('AcriGlass quitarPropia: ' . $e->getMessage());
+            }
+        }
+    } elseif ($ruta && strpos($ruta, ACRI_UPLOADS . '/') === 0 && is_file(ACRI_RAIZ . '/' . $ruta)) {
         unlink(ACRI_RAIZ . '/' . $ruta);
     }
     $cfg['imagenes'][$tipo] = null;
@@ -85,17 +100,28 @@ switch ($accion) {
             }
         }
 
-        $carpeta = ACRI_RAIZ . '/' . ACRI_UPLOADS;
-        if (!is_dir($carpeta)) mkdir($carpeta, 0775, true);
-
         // Nombre nuevo en cada subida para que el navegador no use la imagen vieja en caché
         $nombre = $tipo . '-' . date('YmdHis') . '-' . bin2hex(random_bytes(3)) . '.' . $ext;
-        if (!move_uploaded_file($archivo['tmp_name'], $carpeta . '/' . $nombre)) {
-            error('No se pudo guardar el archivo en el servidor.', 500);
+
+        if (ACRI_NUBE) {
+            try {
+                sb_subir('sistema', $nombre, $archivo['tmp_name'], $mime);
+            } catch (Throwable $e) {
+                error_log('AcriGlass api/imagenes: ' . $e->getMessage());
+                error('No se pudo guardar el archivo en Supabase Storage.', 500);
+            }
+            $nueva = sb_publica('sistema', $nombre);
+        } else {
+            $carpeta = ACRI_RAIZ . '/' . ACRI_UPLOADS;
+            if (!is_dir($carpeta)) mkdir($carpeta, 0775, true);
+            if (!move_uploaded_file($archivo['tmp_name'], $carpeta . '/' . $nombre)) {
+                error('No se pudo guardar el archivo en el servidor.', 500);
+            }
+            $nueva = ACRI_UPLOADS . '/' . $nombre;
         }
 
         quitarPropia($cfg, $tipo);
-        $cfg['imagenes'][$tipo] = ACRI_UPLOADS . '/' . $nombre;
+        $cfg['imagenes'][$tipo] = $nueva;
         sistemaGuardar($cfg);
         break;
 

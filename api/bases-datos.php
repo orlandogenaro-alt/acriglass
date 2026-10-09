@@ -24,6 +24,12 @@ session_write_close();
 $todas = bd_conexiones();
 $in = entrada();
 
+// En la nube la conexión a Supabase sale de las variables de entorno de Vercel
+function exigirEditable(array $todas, string $clave): void
+{
+    if (!empty($todas[$clave]['de_entorno'])) error("La conexión $clave se configura con las variables de entorno de Vercel (DB_HOST, DB_USER, DB_PASS…).");
+}
+
 // Lo que ve el navegador: nunca la contraseña
 function publica(string $clave, array $c, array $pruebas): array
 {
@@ -85,19 +91,21 @@ switch ($accion) {
         $nuevo = !empty($in['nuevo']);
         if ($nuevo && isset($todas[$clave])) error("Ya existe una conexión con la clave $clave.");
         if (!$nuevo && !isset($todas[$clave])) error('La conexión ya no existe.', 404);
+        exigirEditable($todas, $clave);
         $actual = $todas[$clave] ?? null;
         $todas[$clave] = desdeFormulario($in, $actual) + [
             'sistema' => !empty($actual['sistema']),
             'activa'  => $actual ? !empty($actual['activa']) : true,
         ];
-        configGuardar('bases-datos', $todas);
+        bd_guardar($todas);
         listar($todas);
 
     case 'activar':
         $clave = $in['clave'] ?? '';
         if (!isset($todas[$clave])) error('La conexión no existe.', 404);
+        exigirEditable($todas, $clave);
         $todas[$clave]['activa'] = empty($todas[$clave]['activa']);
-        configGuardar('bases-datos', $todas);
+        bd_guardar($todas);
         listar($todas);
 
     case 'probar':
@@ -119,7 +127,7 @@ switch ($accion) {
         if (!isset($todas[$clave])) error('La conexión no existe.', 404);
         if (!empty($todas[$clave]['sistema'])) error('Las conexiones del sistema no se pueden eliminar.');
         unset($todas[$clave]);
-        configGuardar('bases-datos', $todas);
+        bd_guardar($todas);
         listar($todas);
 }
 error('Acción no válida.');

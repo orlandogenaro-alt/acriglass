@@ -1,0 +1,5 @@
+# No se publican en Vercel: notas de consultas y archivos del servidor local
+Consultas/
+uploads/
+config/
+.env*

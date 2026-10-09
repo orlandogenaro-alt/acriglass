@@ -538,12 +538,36 @@
             .catch(function (err) { $('adjLista').innerHTML = ''; adjEstado(err.message, true); });
     }
 
+    // En el servidor local los archivos viajan al PHP (accion=subir). En la nube (Vercel) el PHP solo da
+    // URLs firmadas: el navegador sube directo a Supabase Storage y luego se confirma (accion=confirmar)
     function adjSubir(lista) {
         if (!lista || !lista.length) return;
-        var f = adjForm('subir');
-        Array.prototype.forEach.call(lista, function (a) { f.append('archivos[]', a, a.name); });
-        adjEstado('Subiendo ' + lista.length + ' archivo(s)…');
-        adjPedir(null, f).then(function (j) {
+        var archivos = Array.prototype.slice.call(lista);
+        adjEstado('Subiendo ' + archivos.length + ' archivo(s)…');
+        var datos = archivos.map(function (a) { return { nombre: a.name, tamano: a.size }; });
+        adjPedir(null, adjForm('preparar', { archivos: JSON.stringify(datos) })).then(function (p) {
+            if (!p.directo) {
+                var f = adjForm('subir');
+                archivos.forEach(function (a) { f.append('archivos[]', a, a.name); });
+                return adjPedir(null, f);
+            }
+            var errores = p.errores.slice();
+            return Promise.all(p.subidas.map(function (s) {
+                var a = archivos[s.indice];
+                return fetch(s.url, { method: 'PUT', headers: { 'Content-Type': a.type || 'application/octet-stream', 'x-upsert': 'false' }, body: a })
+                    .then(function (r) {
+                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        return { ruta: s.ruta, nombre: a.name };
+                    })
+                    .catch(function (err) { errores.push(a.name + ': no se pudo subir (' + err.message + ').'); return null; });
+            })).then(function (hechas) {
+                hechas = hechas.filter(Boolean);
+                var fin = hechas.length
+                    ? adjPedir(null, adjForm('confirmar', { archivos: JSON.stringify(hechas) }))
+                    : adjPedir('accion=lista&carpeta=' + adjCarpeta + '&tarea=' + encodeURIComponent(adjTarea.clave)).then(function (j) { j.errores = []; return j; });
+                return fin.then(function (j) { j.errores = errores.concat(j.errores); return j; });
+            });
+        }).then(function (j) {
             adjPintar(j.archivos);
             adjEstado(j.errores.length ? 'Algunos archivos no se subieron:\n' + j.errores.join('\n') : 'Archivo(s) adjuntado(s).', j.errores.length > 0);
         }).catch(function (err) { adjEstado(err.message, true); });

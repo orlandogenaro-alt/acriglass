@@ -4,7 +4,7 @@
 // Modo configuración: si la conexión AW aún no tiene contraseña capturada, solo desde el propio
 // servidor se puede entrar para capturarla en Administrador › Bases de datos.
 require_once __DIR__ . '/includes/bd.php';
-session_start();
+sesionIniciar();
 
 $usuario    = trim($_POST['usuario'] ?? '');
 $contrasena = $_POST['contrasena'] ?? '';
@@ -47,6 +47,24 @@ if (!$aw || ($aw['contrasena'] ?? '') === '') {
     $local = in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true);
     if (!$local) volver('config');
     iniciarSesion($usuario, ['ADMIN_USER' => true], true);
+}
+
+// Supabase (nube): contraseña como hash bcrypt y un renglón por permiso
+if (ACRI_NUBE) {
+    try {
+        $u = bd_fila('AW', 'select usuario_id, login, contrasena_hash, estatus from usuarios where upper(trim(login)) = ?', [mb_strtoupper($usuario)]);
+        if (!$u || !password_verify($contrasena, (string) $u['contrasena_hash'])) volver('datos');
+        if (strtoupper((string) $u['estatus']) === 'B') volver('baja');
+        $permisos = [];
+        foreach (bd_filas('AW', 'select permiso from permisos_usuarios where usuario_id = ?', [$u['usuario_id']]) as $p) {
+            $permisos[strtoupper($p['permiso'])] = true;
+        }
+        bd_pdo('AW')->prepare('update usuarios set ultimo_acceso = now() where usuario_id = ?')->execute([$u['usuario_id']]);
+    } catch (Throwable $e) {
+        error_log('AcriGlass login: ' . $e->getMessage());
+        volver('bd');
+    }
+    iniciarSesion($u['login'], $permisos);
 }
 
 try {

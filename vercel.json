@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "api/index.php": { "runtime": "vercel-php@0.7.3", "maxDuration": 60 }
+  },
+  "routes": [
+    { "src": "/(css|js|img)/(.+)", "dest": "/$1/$2" },
+    { "src": "/favicon\\.ico", "dest": "/img/favicon.svg" },
+    { "src": "/(.*)", "dest": "/api/index.php" }
+  ]
+}

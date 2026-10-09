@@ -89,7 +89,7 @@ function insignia(bool $propia): string
     <!-- ============ FONDO DEL LOGIN ============ -->
     <section class="tarjeta" data-tipo="fondo">
         <h2>FONDO DE LA PANTALLA DE INGRESO <span class="ins"><?= insignia($imagenes['fondo']['propia']) ?></span></h2>
-        <p class="ayuda">Fotografía apaisada que cubre toda la pantalla del login (se recorta al centro). Mínimo 1600×900 px; entre más grande, mejor se ve en pantallas amplias. PNG, JPG o WEBP, hasta 8 MB.</p>
+        <p class="ayuda">Fotografía apaisada que cubre toda la pantalla del login (se recorta al centro). Mínimo 1600×900 px; entre más grande, mejor se ve en pantallas amplias. PNG, JPG o WEBP, hasta <?= ACRI_NUBE ? 4 : 8 ?> MB.</p>
 
         <div class="vista vista-fondo">
             <div class="login-mock<?= $imagenes['fondo']['url'] ? '' : ' sin-foto' ?>"

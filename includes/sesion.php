@@ -3,7 +3,7 @@
 // Si se define ACRI_API antes de incluirlo, responde JSON 401 en lugar de redirigir.
 require_once __DIR__ . '/sistema.php';
 
-session_start();
+sesionIniciar();
 
 if (empty($_SESSION['usuario']) || ($_SESSION['expira'] ?? 0) <= time()) {
     session_unset();

@@ -10,19 +10,41 @@
 //
 // Si una conexión no tiene contraseña capturada aquí, se usa la de Easy-Glass Boss
 // (misma clave en su config/bases_datos.config.php). No se copia a config/bases-datos.json.
+//
+// En la nube (Vercel) AW es Supabase: sus datos salen de las variables de entorno (nube_config())
+// y nunca se guardan en la tabla configuracion.
 require_once __DIR__ . '/sistema.php';
 
 const ACRI_MOTORES = [
     'firebird' => 'Firebird / InterBase',
     'odbc'     => 'ODBC (DSN del sistema)',
     'mysql'    => 'MySQL / MariaDB',
+    'pgsql'    => 'PostgreSQL / Supabase',
 ];
 
 define('ACRI_EASYGLASS_BD', dirname(ACRI_RAIZ) . '/Easy-glass php/config/bases_datos.config.php');
 
 function bd_conexiones(): array
 {
-    return configLeer('bases-datos');
+    $todas = configLeer('bases-datos');
+    if (ACRI_NUBE) {
+        $todas['AW'] = nube_config() + [
+            'nombre'  => 'AW-Management (Supabase)',
+            'motor'   => 'pgsql',
+            'charset' => '',
+            'sistema' => true,
+            'activa'  => true,
+            'notas'   => 'Variables de entorno DB_HOST, DB_PORT, DB_NAME, DB_USER y DB_PASS de Vercel.',
+            'de_entorno' => true,
+        ];
+    }
+    return $todas;
+}
+
+// Guarda las conexiones sin las que vienen de variables de entorno
+function bd_guardar(array $todas): void
+{
+    configGuardar('bases-datos', array_filter($todas, fn($c) => empty($c['de_entorno'])));
 }
 
 // Conexiones de Easy-Glass Boss por clave (vacío si no está instalado en este servidor)
@@ -84,6 +106,9 @@ function bd_dsn(array $c): string
         case 'mysql':
             [$host, $puerto] = array_pad(explode(':', $c['servidor'], 2), 2, '3306');
             return "mysql:host=$host;port=$puerto;dbname={$c['base']};charset=utf8mb4";
+        case 'pgsql':
+            [$host, $puerto] = array_pad(explode(':', $c['servidor'], 2), 2, '5432');
+            return "pgsql:host=$host;port=$puerto;dbname={$c['base']};sslmode=require";
     }
     throw new RuntimeException('Motor de base de datos no soportado: ' . ($c['motor'] ?? '(vacío)'));
 }
@@ -91,12 +116,15 @@ function bd_dsn(array $c): string
 // Abre una conexión nueva con la configuración dada (sin caché)
 function bd_abrir(array $c): PDO
 {
-    $pdo = new PDO(bd_dsn($c), $c['usuario'] ?? '', $c['contrasena'] ?? '', [
+    if (!empty($c['de_entorno'])) return nube_pdo();
+    $opciones = [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_CASE               => PDO::CASE_LOWER,
-    ]);
-    return $pdo;
+    ];
+    // El pooler de Supabase (modo transacción) no admite sentencias preparadas del lado del servidor
+    if (($c['motor'] ?? '') === 'pgsql') $opciones[PDO::ATTR_EMULATE_PREPARES] = true;
+    return new PDO(bd_dsn($c), $c['usuario'] ?? '', $c['contrasena'] ?? '', $opciones);
 }
 
 function bd_pdo(string $clave): PDO
@@ -126,6 +154,8 @@ function bd_filas(string $clave, string $sql, array $params = [], array $binaria
     $filas = [];
     while ($f = $st->fetch()) {
         foreach ($f as $k => $v) {
+            // PostgreSQL entrega los bytea como stream
+            if (is_resource($v)) $v = $f[$k] = stream_get_contents($v);
             if (!is_string($v) || in_array($k, $binarias, true)) continue;
             if ($convierte) $v = mb_convert_encoding($v, 'UTF-8', 'Windows-1252');
             $f[$k] = rtrim($v);   // los CHAR de Firebird vienen rellenos de espacios
@@ -156,6 +186,7 @@ function bd_probar(array $c): array
             'firebird' => "select rdb\$get_context('SYSTEM', 'ENGINE_VERSION') from rdb\$database",
             'odbc'     => 'select @@version',
             'mysql'    => 'select version()',
+            'pgsql'    => 'select version()',
         ][$c['motor']];
         $version = trim(strtok((string) $pdo->query($sql)->fetchColumn(), "\n"));
         return ['ok' => true, 'mensaje' => 'Conectado · ' . $version, 'ms' => (int) round((microtime(true) - $inicio) * 1000)];

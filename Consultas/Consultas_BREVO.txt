@@ -1,0 +1,39 @@
+Imports Newtonsoft.Json.Linq
+Imports RestSharp
+Imports System.Net.Mail
+Module Consultas_BREVO
+    Private ReadOnly apiKey As String = "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"
+
+    Public Function send_correo() As String
+        Dim url As String = String.Format("https://api.brevo.com/v3/smtp/email")
+        Dim new_contact = New RestClient(url)
+        Dim solisitud = New RestRequest(Method.POST)
+        solisitud.AddHeader("accept", "application/json")
+        solisitud.AddHeader("application/json", apiKey)
+        solisitud.AddHeader("content-type", "application/json")
+
+        solisitud.AddJsonBody(New With
+        {
+            .sender = New With {
+                .name = "firstname",
+                .email = ""
+            },
+            .key = New Object() {
+                New With {.email = "firstname", .name = ""}
+            }
+        })
+        'New With {.property = "hs_marketable_status", .value = "false"},
+        Dim response As IRestResponse = new_contact.Execute(solisitud)
+        Dim respuesta As JObject = JObject.Parse(response.Content)
+
+        If response.IsSuccessful Then
+            Dim id_huibspot As JToken = respuesta("vid")
+
+        Else
+            Dim sg = respuesta("message").ToString()
+            Throw New EvaluateException(sg)
+        End If
+        Return "Exito"
+    End Function
+
+End Module

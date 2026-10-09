@@ -1,0 +1,205 @@
+:root {
+    --dorado: #d9b36c;
+    --blanco: #ffffff;
+    --texto-suave: rgba(255, 255, 255, 0.78);
+    --azul-btn-1: #3a9bff;
+    --azul-btn-2: #1669e0;
+    --campo-bg: rgba(255, 255, 255, 0.08);
+    --campo-borde: rgba(255, 255, 255, 0.35);
+    --campo-foco: #e8f0fe;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+    font-family: 'Nunito', system-ui, sans-serif;
+    color: var(--blanco);
+    background: #0d1a33;
+    overflow-x: hidden;
+}
+
+/* ---------- Fondo ----------
+   La foto se configura en Administrador › Imagen del Sistema (index.php la inyecta);
+   sin foto se ve la fachada de vidrio dibujada con CSS. */
+.fondo {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+        linear-gradient(90deg, rgba(10, 22, 48, 0.92) 0%, rgba(14, 32, 66, 0.70) 45%, rgba(40, 70, 120, 0.35) 100%),
+        linear-gradient(160deg, #6f8fc4 0%, #3b5f9a 40%, #1a2f57 100%);
+}
+
+.fachada {
+    position: absolute;
+    inset: 0;
+    opacity: 0.55;
+    background:
+        /* reflejo de nubes */
+        radial-gradient(ellipse 30% 18% at 35% 30%, rgba(255, 255, 255, 0.25), transparent 70%),
+        radial-gradient(ellipse 25% 14% at 55% 60%, rgba(255, 255, 255, 0.18), transparent 70%),
+        /* montantes verticales de aluminio */
+        repeating-linear-gradient(90deg, rgba(20, 30, 45, 0.9) 0 3px, transparent 3px 110px),
+        /* travesaños horizontales */
+        repeating-linear-gradient(0deg, rgba(20, 30, 45, 0.9) 0 3px, transparent 3px 120px),
+        /* vidrio */
+        linear-gradient(115deg, #1c3566 0%, #2e5596 35%, #4f7cc0 55%, #1f3c72 80%);
+    -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 55%, transparent 90%);
+            mask-image: linear-gradient(90deg, #000 0%, #000 55%, transparent 90%);
+}
+
+/* ---------- Panel de login ---------- */
+.login {
+    min-height: 100vh;
+    width: 100%;
+    max-width: 390px;
+    margin-left: clamp(16px, 10.5vw, 220px);
+    padding: 40px 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.marca {
+    font-family: 'Exo 2', sans-serif;
+    font-weight: 800;
+    font-size: 2rem;
+    letter-spacing: -0.5px;
+    line-height: 1;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.marca-acri  { color: var(--dorado); margin-right: 6px; }
+.marca-glass { color: var(--blanco); }
+
+.marca-sub {
+    margin-top: 4px;
+    font-family: 'Exo 2', sans-serif;
+    font-size: 0.8rem;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--dorado);
+}
+
+.bienvenida {
+    margin: 26px 0 22px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    line-height: 1.4;
+}
+
+form { display: flex; flex-direction: column; gap: 16px; }
+
+.campo { position: relative; }
+
+.campo input {
+    width: 100%;
+    height: 48px;
+    padding: 0 46px 0 16px;
+    font: inherit;
+    font-size: 0.95rem;
+    color: var(--blanco);
+    background: var(--campo-bg);
+    border: 1px solid var(--campo-borde);
+    border-radius: 10px;
+    outline: none;
+    backdrop-filter: blur(4px);
+    transition: background .2s, border-color .2s, box-shadow .2s;
+}
+.campo input::placeholder { color: rgba(255, 255, 255, 0.6); }
+
+.campo input:focus {
+    background: var(--campo-foco);
+    color: #1b2a44;
+    border-color: #5b9cff;
+    box-shadow: 0 0 0 3px rgba(58, 155, 255, 0.35);
+}
+.campo input:focus::placeholder { color: #7a879c; }
+
+.icono {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    transform: translateY(-50%);
+    fill: #7b5cc4;
+    pointer-events: none;
+}
+.icono.candado { fill: #e0a526; }
+
+.recordar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding-left: 4px;
+}
+.recordar input { width: 16px; height: 16px; accent-color: #1f78ff; }
+
+.btn-login {
+    height: 46px;
+    margin-top: 4px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--blanco);
+    border: none;
+    border-radius: 24px;
+    cursor: pointer;
+    background: linear-gradient(180deg, var(--azul-btn-1), var(--azul-btn-2));
+    box-shadow: 0 6px 18px rgba(22, 105, 224, 0.45);
+    transition: transform .15s, box-shadow .15s, filter .15s;
+}
+.btn-login:hover  { filter: brightness(1.08); box-shadow: 0 8px 22px rgba(22, 105, 224, 0.6); }
+.btn-login:active { transform: translateY(1px); }
+
+.olvido {
+    display: block;
+    margin: 22px 0 30px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--blanco);
+    text-decoration: none;
+}
+.olvido:hover { text-decoration: underline; }
+
+.legal {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--texto-suave);
+}
+.version {
+    margin-top: 8px;
+    text-align: center;
+    font-size: 0.7rem;
+    color: #8fb3ff;
+}
+
+@media (max-width: 600px) {
+    .login { margin: 0 auto; }
+    .fondo {
+        background:
+            linear-gradient(rgba(10, 22, 48, 0.85), rgba(10, 22, 48, 0.85)),
+            linear-gradient(160deg, #3b5f9a, #1a2f57);
+    }
+}
+
+/* Mensaje de error del inicio de sesión */
+.error-login {
+    margin: 0 0 14px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    background: rgba(239, 68, 68, .18);
+    border: 1px solid rgba(248, 113, 113, .6);
+    color: #fecaca;
+    font-size: 13px;
+    font-weight: 600;
+}

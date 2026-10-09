@@ -1,0 +1,1417 @@
+Imports RestSharp
+Imports Newtonsoft.Json
+Imports Newtonsoft.Json.Linq
+Imports System
+Imports System.IO
+Imports System.Windows.Interop
+Imports FirebirdSql.Data
+Imports Google.Apis.Sheets.v4.Data
+Imports System.Windows
+Imports System.Windows.Input
+Imports System.Web.UI
+
+Module Consultas_HB
+
+    'Private clave_api As String = "db3788d8-05ca-4db8-98dd-6becdf9f0e2e"
+    Private pipeline As String = "default"
+    Private etapa As String = "appointmentscheduled"
+    Private id_cuenta As String = "19932894"
+    Private token_acces As String = "Bearer 9aa5ffb8-7ea1-4f85-b011-ec424da95dfc"
+    Private folder_id As String = ""
+
+    Private actualizado As Boolean = False
+
+    Public Function GuardaDeal(ByVal dealName As String, ByVal propietario As String, ByVal total As String, ByVal desc As String, ByVal contacto As String(), ByVal company As String(), ByVal divisa As String, ByVal id_docto As String, ByVal id_cotizador As String, ByVal id_owner_v As String, ByVal new_etapa As String, ByVal tc As String) As String
+
+        '' valida los datos  despues del if hace el rejistro de la infromacion
+        revisa_Tokens()
+
+        '' ////////////////////////////////////
+        '' inica el modulo de envio a hubspot
+
+        Dim id_deal As String = ""
+
+        Dim fe As String = DateTimeOffset.Now.ToUnixTimeMilliseconds.ToString()
+        Dim fe_cr As String = DateTimeOffset.Now.AddDays(30).ToUnixTimeMilliseconds.ToString()
+
+        'Dim fe_to_nx As String = DateAdd() ToUnixTimeMilliseconds.ToString()
+        'Dim fe As String = "1638909080514"
+        Dim etapa_tem As String = etapa
+        Try
+            If new_etapa <> "0" Then
+                etapa_tem = new_etapa
+            End If
+        Catch ex As Exception
+        End Try
+
+
+        Dim url = String.Format("https://api.hubapi.com/deals/v1/deal")
+        Dim client = New RestClient(url)
+        Dim request = New RestRequest(Method.POST)
+
+        request.AddHeader("accept", "application/json")
+        request.AddHeader("authorization", "Bearer " & token_acces)
+
+        request.AddJsonBody(New With {
+               Key .associations = (New With {
+                    .associatedCompanyIds = company,
+                    .associatedVids = contacto
+                }),
+                Key .properties = New Object() {
+                    New With {.name = "dealname", .value = dealName},
+                    New With {.name = "pipeline", .value = pipeline},
+                    New With {.name = "dealstage", .value = etapa_tem},
+                    New With {.name = "description", .value = desc},
+                    New With {.name = "hubspot_owner_id", .value = id_owner_v},
+                    New With {.name = "usuario_creador_easy_glass", .value = propietario},
+                    New With {.name = "createdate", .value = fe},
+                    New With {.name = "closedate", .value = fe_cr},
+                    New With {.name = "amount", .value = total},
+                    New With {.name = "deal_currency_code", .value = divisa},
+                    New With {.name = "folio_easy_glass", .value = id_docto},
+                    New With {.name = "cotizador", .value = id_cotizador},
+                    New With {.name = "dealtype", .value = "newbusiness"}
+                }
+        })
+
+        'New With {.name = "hs_exchange_rate", .value = tc}, ' creo que este es double, ver por que el hubspot agrega el tipo de cambio si la divisa es usd
+
+
+        Dim response As IRestResponse = client.Execute(request)
+        Dim respuesta As JObject = JObject.Parse(response.Content)
+        If response.IsSuccessful Then
+            id_deal = "" & respuesta("dealId").ToString()
+        Else
+            Dim sg = respuesta("message").ToString()
+            Throw New EvaluateException(sg)
+        End If
+
+        Return id_deal
+    End Function
+    Public Function get_coustomers(ByVal nombre As String, ByVal correo As String, ByVal telefono As String, Optional id_relacion As String = "") As DataTable
+
+        ' Buscar el rejistro y si exixste retornar el id  y no hacer la ejecucion 
+        ' validar el correo y el nommbre pero la validacion mas importente es el nombre 
+        ' validar el correo pero si el correo es igual es argumento mas que suficiente para no crear nuevo rejistro 
+        ' dentro de la validacion eliminar espacios en numeros y en nombre convertir a mayusculas y 
+        ' esta misma accion para las empresas 
+
+        Dim telefono_p As String = telefono
+        Dim mail_p As String = correo
+
+        If telefono = "" Then
+            telefono_p = "999999"
+        End If
+        If correo = "" Then
+            mail_p = "test@mega.com"
+        End If
+
+        If nombre = "" Then nombre = "ConsultaContacto"
+
+        revisa_Tokens()
+
+        'correo = correo.Replace(" ", "")
+        mail_p = mail_p.Replace(" ", "")
+        ',
+        '        New With {Key .filters = New Object() {New With {.propertyName = "associations.company", .operator = "EQ", .value = id_relacion}}}
+
+        Dim cad_s_c As String = String.Format("https://api.hubapi.com/crm/v3/objects/contacts/search")
+        Dim serch_contact As RestClient = New RestClient(cad_s_c)
+        Dim request = New RestRequest(Method.POST)
+        request.AddHeader("accept", "application/json")
+        request.AddHeader("authorization", "Bearer " & token_acces)
+        request.AddJsonBody(New With {
+            Key .filterGroups = New Object() {
+                New With {Key .filters = New Object() {New With {.propertyName = "email", .operator = "EQ", .value = mail_p}}},
+                New With {Key .filters = New Object() {New With {.propertyName = "phone", .operator = "EQ", .value = telefono_p}}},
+                New With {Key .filters = New Object() {New With {.propertyName = "firstname", .operator = "EQ", .value = nombre}}}
+            }
+        })
+        Dim respuesta_contact As IRestResponse = serch_contact.Execute(request)
+        'Console.WriteLine(respuesta_contact.Content)
+        Dim clientes_hs = New DataTable
+        clientes_hs.Columns.Add("id_hub")
+        clientes_hs.Columns.Add("Nombre")
+        clientes_hs.Columns.Add("Correo")
+        clientes_hs.Columns.Add("Telefono")
+        'clientes_hs.Columns.Add("estatus")
+
+        If respuesta_contact.IsSuccessful Then
+            Dim get_clientes_hs As JObject = JObject.Parse(respuesta_contact.Content)
+
+            Dim jcliente As JToken = get_clientes_hs("results")
+
+            For Each cli As JToken In jcliente.ToList()
+
+                Dim id_h As String = "" & cli("id").ToString()
+                Dim nombre_h As String = "" & cli("properties")("firstname").ToString() & " " & cli("properties")("lastname").ToString()
+                Dim mail_h As String = "" & cli("properties")("email").ToString()
+                Dim tel_h As String = ""
+                Try
+                    tel_h = cli("properties")("phone").ToString()
+                Catch ex As Exception
+                End Try
+                clientes_hs.Rows.Add(id_h, nombre_h, mail_h, tel_h)
+
+            Next
+
+        End If
+
+        Return clientes_hs
+    End Function
+    Public Function get_empresas(ByVal nombre As String) As DataTable
+
+        revisa_Tokens()
+
+        'New With {Key .filters = New Object() {New With {.propertyName = "email", .operator = "EQ", .value = mail_p}}},
+        'New With {Key .filters = New Object() {New With {.propertyName = "phone", .operator = "EQ", .value = telefono_p}}},
+
+        Dim cad_s_c As String = String.Format("https://api.hubapi.com/crm/v3/objects/companies/search")
+        Dim serch_contact As RestClient = New RestClient(cad_s_c)
+        Dim request = New RestRequest(Method.POST)
+        request.AddHeader("accept", "application/json")
+        request.AddHeader("authorization", "Bearer " & token_acces)
+        request.AddJsonBody(New With {
+            Key .filterGroups = New Object() {
+                New With {Key .filters = New Object() {New With {.propertyName = "name", .operator = "EQ", .value = nombre}}}
+            }
+        })
+        Dim respuesta_contact As IRestResponse = serch_contact.Execute(request)
+        'Console.WriteLine("this is te data")
+        'Console.WriteLine(respuesta_contact.Content)
+        'Console.WriteLine("end of data")
+        Dim empresas_hs = New DataTable
+        empresas_hs.Columns.Add("id_com_hub")
+        empresas_hs.Columns.Add("Nombre")
+        'clientes_hs.Columns.Add("Correo")
+        'clientes_hs.Columns.Add("Telefono")
+        'clientes_hs.Columns.Add("estatus")
+
+        If respuesta_contact.IsSuccessful Then
+            Dim get_clientes_hs As JObject = JObject.Parse(respuesta_contact.Content)
+
+            Dim jcliente As JToken = get_clientes_hs("results")
+
+            For Each cli As JToken In jcliente.ToList()
+
+                Dim id_h As String = "" & cli("id").ToString()
+                Dim nombre_h As String = "" & cli("properties")("name").ToString()
+
+                empresas_hs.Rows.Add(id_h, nombre_h)
+
+            Next
+        End If
+
+        Return empresas_hs
+    End Function
+    Public Function get_nombre_empresa_by_id(ByVal id_empresa As String) As String
+        revisa_Tokens()
+        Dim nom_empresa As String = ""
+
+        Dim str_dir As String = String.Format("https://api.hubapi.com/crm/v3/objects/companies/{0}?archived=false", id_empresa)
+
+        Dim Client = New RestClient(str_dir)
+        Dim request = New RestRequest(Method.GET)
+        request.AddHeader("accept", "application/json")
+        request.AddHeader("authorization", "Bearer " & token_acces)
+        Dim response As IRestResponse = Client.Execute(request)
+
+        Try
+            Dim respuesta As JObject = JObject.Parse(response.Content)
+            If response.IsSuccessful Then
+                Dim id_company_hs As JToken = respuesta("properties")("name")
+                nom_empresa = "" & id_company_hs.ToString()
+            Else
+                Dim sg = respuesta("message").ToString()
+                Throw New EvaluateException(sg)
+            End If
+        Catch ex As Exception
+        End Try
+        Return nom_empresa
+    End Function
+
+    ''' <summary>
+    ''' Con esto consulto a que contacto pertenece una empresa
+    ''' </summary>
+    ''' <param name="id_contact"></param>
+    ''' <returns></returns>
+    Public Function contact_tiene_empresa(id_contact As String) As String
+        revisa_Tokens()
+        Dim id_company As String = "0"
+        Try
+            Dim cad_r_c As String = String.Format("https://api.hubapi.com/crm/v3/objects/contacts/{0}?properties=associatedcompanyid&archived=false", id_contact)
+
+            Dim client As RestClient = New RestClient(cad_r_c)
+            Dim request = New RestRequest(Method.GET)
+            'request.AddHeader("accept", "application/json")
+            'request.AddHeader("content-type", "application/json")
+            request.AddHeader("authorization", "Bearer " & token_acces)
+            'request.AddParameter("application/json", "{\"filterGroups\":[{\"filters\":[{\"value\":\"String\",\"values\":[\"String\"],\"propertyName\":\"String\",\"Operator\":\"EQ\"}]}],\"sorts\":[\"String\"],\"query\":\"String\",\"properties\":[\"String\"],\"limit\":0,\"after\":0}", ParameterType.RequestBody);
+            Dim response As IRestResponse = client.Execute(request)
+            Dim respuesta As JObject = JObject.Parse(response.Content)
+            If response.IsSuccessful Then
+                Dim id_company_hs As JToken = respuesta("properties")("associatedcompanyid")
+                id_company = "" & id_company_hs.ToString()
+            Else
+                Dim sg = respuesta("message").ToString()
+                Throw New EvaluateException(sg)
+            End If
+
+        Catch ex As Exception
+            id_company = 0
+        End Try
+        Return id_company
+    End Function
+
+    ''' <summary>
+    ''' Con esto consulto que contactos asocciados tiene una empresa
+    ''' </summary>
+    ''' <param name="id_empresa"></param>
+    ''' <returns></returns>
+    Public Function get_contacts_assosciados(ByVal id_empresa As String) As DataTable
+
+        revisa_Tokens()
+
+        Dim cad_s_c As String = String.Format("https://api.hubapi.com/crm/v3/objects/contacts/search")
+        Dim serch_contact As RestClient = New RestClient(cad_s_c)
+        Dim request = New RestRequest(Method.POST)
+        request.AddHeader("accept", "application/json")
+        request.AddHeader("authorization", "Bearer " & token_acces)
+        request.AddJsonBody(New With {
+            Key .filterGroups = New Object() {
+                New With {Key .filters = New Object() {New With {.propertyName = "associations.company", .operator = "EQ", .value = id_empresa}}}
+            }
+        })
+        Dim respuesta_contact As IRestResponse = serch_contact.Execute(request)
+        'Console.WriteLine(respuesta_contact.Content)
+        Dim clientes_hs_com = New DataTable
+        clientes_hs_com.Columns.Add("id_hub")
+        clientes_hs_com.Columns.Add("Nombre")
+        clientes_hs_com.Columns.Add("Correo")
+        clientes_hs_com.Columns.Add("Telefono")
+        clientes_hs_com.Columns.Add("id_empresa")
+        'clientes_hs.Columns.Add("estatus")
+
+        If respuesta_contact.IsSuccessful Then
+            Dim get_clientes_hs As JObject = JObject.Parse(respuesta_contact.Content)
+
+            Dim jcliente As JToken = get_clientes_hs("results")
+
+            For Each cli As JToken In jcliente.ToList()
+
+                Dim id_h As String = "" & cli("id").ToString()
+                Dim nombre_h As String = "" & cli("properties")("firstname").ToString() & " " & cli("properties")("lastname").ToString()
+                Dim mail_h As String = "" & cli("properties")("email").ToString()
+                Dim tel_h As String = ""
+                Try
+                    tel_h = cli("properties")("phone").ToString()
+                Catch ex As Exception
+                End Try
+                clientes_hs_com.Rows.Add(id_h, nombre_h, mail_h, tel_h, id_empresa)
+
+            Next
+
+        End If
+
+        Return clientes_hs_com
+    End Function
+
+    Private Sub revisa_Tokens()
+        If Not actualizado Then
+            'conecc_aw()
+            'clave_api = consulta_key()
+            Dim tokes As DataTable = HB_getTokens()
+            Try
+                If (tokes.Rows.Count < 1) Then
+                    Throw New Exception("Error la consulta se retorno vacia")
+                End If
+                pipeline = tokes.Rows(0).ItemArray(0).ToString()
+                etapa = tokes.Rows(0).ItemArray(1).ToString()
+                id_cuenta = tokes.Rows(0).ItemArray(2).ToString()
+                token_acces = tokes.Rows(0).ItemArray(3).ToString()
+                folder_id = tokes.Rows(0).ItemArray(4).ToString()
+                actualizado = True
+            Catch ex As Exception
+            End Try
+        End If
+    End Sub
+    Public Function guarda_contacto(nombre As String, id_ow As String, company_name As String, direccion As String, telefono As String, mail As String) As String
+        Dim id_con As String = ""
+
+        Dim url As String = String.Format("https://api.hubapi.com/contacts/v1/contact/")
+        Dim new_contact = New RestClient(url)
+        Dim solisitud = New RestRequest(Method.POST)
+        solisitud.AddHeader("accept", "application/json")
+        solisitud.AddHeader("content-type", "application/json")
+        solisitud.AddHeader("authorization", "Bearer " & token_acces)
+
+        solisitud.AddJsonBody(New With
+        {
+            .properties = New Object() {
+                New With {.property = "firstname", .value = nombre},
+                New With {.property = "hubspot_owner_id", .value = id_ow},
+                New With {.property = "company", .value = company_name},
+                New With {.property = "address", .value = direccion},
+                New With {.property = "phone", .value = telefono},
+                New With {.property = "email", .value = mail}
+            }
+        })
+        'New With {.property = "hs_marketable_status", .value = "false"},
+        Dim response As IRestResponse = new_contact.Execute(solisitud)
+        Dim respuesta As JObject = JObject.Parse(response.Content)
+
+        If response.IsSuccessful Then
+            Dim id_huibspot As JToken = respuesta("vid")
+            id_con = "" & id_huibspot.ToString()
+        Else
+            Dim sg = respuesta("message").ToString()
+            Throw New EvaluateException(sg)
+        End If
+        Return id_con
+    End Function
+
+    Public Sub open_deal(ByVal id_deal As String)
+
+        revisa_Tokens()
+        'Dim direccion As String = String.Format("https://app.hubspot.com/contacts/{0}/objects/0-3/views/all/list", id_cuenta)
+        Dim direccion = String.Format("https://app.hubspot.com/contacts/{1}/deal/{0}/", id_deal, id_cuenta)
+
+        'System.Diagnostics.Process.Start("chrome.exe", direccion)
+        '' para que se ejecute en el navegador por defecto
+        System.Diagnostics.Process.Start(direccion)
+    End Sub
+
+    Public Sub open_into_hs(ByVal id_object As String, ByVal type As String)
+
+        revisa_Tokens()
+        'Dim direccion As String = String.Format("https://app.hubspot.com/contacts/{0}/objects/0-3/views/all/list", id_cuenta)
+        Dim direccion = String.Format("https://app.hubspot.com/contacts/{1}/{2}/{0}/", id_object, id_cuenta, type)
+
+        'System.Diagnostics.Process.Start("chrome.exe", direccion)
+        '' para que se ejecute en el navegador por defecto
+        System.Diagnostics.Process.Start(direccion)
+    End Sub
+
+    Public Sub hs_Actualiza_deal(iddeal As String, dealName As String, desc As String, total As String, contacto As String(), company As String(), id_repr As String, vendedor As String, cotizador As String, id_ownere_s As String)
+
+
+        Dim fe As String = DateTimeOffset.Now.ToUnixTimeMilliseconds.ToString()
+        revisa_Tokens()
+
+        'Dim url = String.Format("https://api.hubapi.com/deals/v1/deal?hapikey={0}", clave_api)
+        Dim url = String.Format("https://api.hubapi.com/deals/v1/deal/{0}", iddeal)
+        Dim client = New RestClient(url)
+        Dim request = New RestRequest(Method.PUT)
+
+        request.AddHeader("accept", "application/json")
+        request.AddHeader("authorization", "Bearer " & token_acces)
+
+        request.AddJsonBody(New With {
+               Key .associations = (New With {
+                    .associatedCompanyIds = company,
+                    .associatedVids = contacto
+                }),
+                Key .properties = New Object() {
+                    New With {.name = "dealname", .value = dealName},
+                    New With {.name = "description", .value = desc},
+                    New With {.name = "hs_lastmodifieddate", .value = fe},
+                    New With {.name = "amount", .value = total},
+                    New With {.name = "representante", .value = id_repr},
+                    New With {.name = "vendedor", .value = vendedor},
+                    New With {.name = "cotizador", .value = cotizador},
+                    New With {.name = "hubspot_owner_id", .value = id_ownere_s},
+                    New With {.name = "dealtype", .value = "existingbusiness"}
+                }
+        })
+
+        Dim response As IRestResponse = client.Execute(request)
+        Dim respuesta As JObject = JObject.Parse(response.Content)
+        If response.IsSuccessful Then
+            'id_deal = "" & respuesta("dealId").ToString()
+        Else
+            Dim sg = respuesta("message").ToString()
+            Throw New EvaluateException(sg)
+        End If
+
+    End Sub
+
+    Public Function hs_create_note(iddeal As String, owner As String, notas As String) As String
+
+        Dim fecha As String = DateTimeOffset.Now.ToUnixTimeMilliseconds.ToString()
+
+        Dim id_deal As String() = {iddeal}
+
+        Dim url = String.Format("https://api.hubapi.com/engagements/v1/engagements")
+        Dim client = New RestClient(url)
+        Dim request = New RestRequest(Method.POST)
+
+        request.AddHeader("accept", "application/json")
+        request.AddHeader("authorization", "Bearer " & token_acces)
+
+        request.AddJsonBody(New With {
+            Key .engagement = (New With {
+                    .active = True,
+                    .ownerId = owner,
+                    .type = "NOTE",
+                    .timestamp = fecha
+            }),
+            Key .associations = (New With {
+                    .dealIds = id_deal
+            }),
+            Key .metadata = New With {
+                .body = notas
+            }
+        })
+
+        Dim response As IRestResponse = client.Execute(request)
+        Dim respuesta As JObject = JObject.Parse(response.Content)
+
+        Return "" & respuesta("engagement")("id").ToString()
+
+    End Function
+
+    Public Function get_owners(ownner) As DataTable
+        Dim owners As New DataTable()
+        owners.Columns.Add("owner id")
+        owners.Columns.Add("Nombre")
+        owners.Columns.Add("Apellido")
+        owners.Columns.Add("Email")
+        owners.Columns.Add("Tipo")
+        owners.Columns.Add("Estatus")
+        revisa_Tokens()
+
+        Dim url = String.Format("https://api.hubapi.com/crm/v3/owners/{0}", ownner)
+        Dim client = New RestClient(url)
+        Dim request = New RestRequest(Method.GET)
+
+        request.AddHeader("accept", "application/json")
+        request.AddHeader("authorization", "Bearer " & token_acces)
+
+        Dim response As IRestResponse = client.Execute(request)
+
+        If response.IsSuccessful Then
+
+            Console.WriteLine(response.Content)
+
+            Dim respuesta As JToken = JToken.Parse(response.Content)
+            'Dim contact_hs As JToken = respuesta
+            Try
+                Dim resultados As JToken = respuesta("results")
+                For Each contact As JToken In resultados
+                    Dim owner As String = contact("id").ToString()
+                    Dim nombre As String = contact("firstName").ToString()
+                    Dim apellido As String = contact("lastName").ToString()
+                    Dim correo As String = contact("email").ToString()
+                    Dim tipo As String = ""
+                    Dim estatus As String = contact("archived").ToString()
+                    'Try
+                    '    estatus = contact("isActive").ToString()
+                    'Catch ex As Exception
+                    'End Try
+
+                    owners.Rows.Add(owner, nombre, apellido, correo, tipo, estatus)
+                Next
+            Catch ex As Exception
+                MsgBox("No se encontaron usuarios")
+            End Try
+        End If
+
+        Return owners
+    End Function
+    Public Sub hs_actualiza_ganado(ByVal id_suerido As Integer)
+        Try
+            Dim etapa_g As String = "746132"
+            Dim iddeal_g As String = get_id_hs_deal(id_suerido)
+
+            revisa_Tokens()
+
+            'Dim url = String.Format("https://api.hubapi.com/deals/v1/deal?hapikey={0}", clave_api)
+            Dim url = String.Format("https://api.hubapi.com/deals/v1/deal/{0}", iddeal_g)
+            Dim client = New RestClient(url)
+            Dim request = New RestRequest(Method.PUT)
+
+            request.AddHeader("accept", "application/json")
+            request.AddHeader("authorization", "Bearer " & token_acces)
+
+            request.AddJsonBody(New With {
+                    Key .properties = New Object() {
+                        New With {.name = "dealstage", .value = etapa_g},
+                        New With {.name = "dealtype", .value = "existingbusiness"}
+                    }
+            })
+
+            Dim response As IRestResponse = client.Execute(request)
+            Dim respuesta As JObject = JObject.Parse(response.Content)
+            If response.IsSuccessful Then
+                'id_deal = "" & respuesta("dealId").ToString()
+            Else
+                Dim sg = respuesta("message").ToString()
+                Throw New EvaluateException(sg)
+            End If
+
+        Catch ex As Exception
+            MsgBox("Error al hacer seguimiento en Hubspot " & vbCrLf & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Public Sub hs_actualiza_perdido(ByVal id_suerido As Integer, Optional motivo As String = "Perdido desde Esay Glass")
+        Try
+
+            Dim etapa_g As String = "746133"
+            Dim iddeal_g As String = get_id_hs_deal(id_suerido)
+
+            revisa_Tokens()
+
+            'Dim url = String.Format("https://api.hubapi.com/deals/v1/deal?hapikey={0}", clave_api)
+            Dim url = String.Format("https://api.hubapi.com/deals/v1/deal/{0}", iddeal_g)
+            Dim client = New RestClient(url)
+            Dim request = New RestRequest(Method.PUT)
+
+            request.AddHeader("accept", "application/json")
+            request.AddHeader("authorization", "Bearer " & token_acces)
+
+            request.AddJsonBody(New With {
+                    Key .properties = New Object() {
+                        New With {.name = "dealstage", .value = etapa_g},
+                        New With {.name = "closed_lost_reason", .value = motivo},
+                        New With {.name = "dealtype", .value = "existingbusiness"}
+                    }
+            })
+
+            Dim response As IRestResponse = client.Execute(request)
+            Dim respuesta As JObject = JObject.Parse(response.Content)
+            If response.IsSuccessful Then
+                'id_deal = "" & respuesta("dealId").ToString()
+            Else
+                Dim sg = respuesta("message").ToString()
+                Throw New EvaluateException(sg)
+            End If
+
+        Catch ex As Exception
+            MsgBox("Error al hacer seguimiento en Hubspot " & vbCrLf & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' Fincion que retona los datos de los folders de Hubspot para enviar los archivos con el id del folder
+    ''' </summary>
+    Public Sub get_folders()
+
+        revisa_Tokens()
+
+        Dim client = New RestClient("https://api.hubapi.com/files/v3/folders/search")
+        Dim request = New RestRequest(Method.GET)
+        request.AddHeader("accept", "application/json")
+        request.AddHeader("authorization", "Bearer " & token_acces)
+        Dim response As IRestResponse = client.Execute(request)
+
+        'Console.WriteLine(response.Content)
+
+        Dim respuesta As JObject = JObject.Parse(response.Content)
+        If response.IsSuccessful Then
+            ' retorna los datos 
+        Else
+            Dim sg = respuesta("message").ToString()
+            Throw New EvaluateException(sg)
+        End If
+
+    End Sub
+
+    ''' <summary>
+    ''' funcion que carga el archivo a Hubspot 
+    ''' </summary>
+    ''' <param name="path_f">la ruta del archivo a subir </param>
+    ''' <param name="file_name">el nombre del archivo y la extencion</param>
+    ''' <returns>Retorna el id del archivo en hubspot</returns>
+    Public Function carga_archivo(path_f As String, file_name As String) As String
+
+        revisa_Tokens()
+
+        Dim url = String.Format("https://api.hubapi.com/files/v3/files")
+        Dim client = New RestClient(url)
+        Dim request = New RestRequest(Method.POST)
+
+        'request.AddHeader("accept", "application/json")
+        request.AddHeader("Content-Type", "multipart/form-data")
+        request.AddHeader("authorization", "Bearer " & token_acces)
+
+        request.AddParameter("folderId", folder_id)
+        request.AddParameter("options", "{""access"":""PRIVATE"",""overwrite"":""false""}")
+        request.AddFileBytes("file", System.IO.File.ReadAllBytes(path_f), file_name, contentType:="multipart/form-data")
+        Dim response As IRestResponse = client.Execute(request)
+
+        'validar en la prueba que sea correcta
+        'Console.WriteLine(response.Content)
+        'Console.WriteLine(response.StatusCode)
+        'Console.WriteLine(response.IsSuccessful)
+        'Console.WriteLine(response.ErrorException)
+        'Console.WriteLine(response.ErrorMessage)
+        'Console.WriteLine(response.ResponseStatus)
+        'Console.WriteLine(response.Request)
+        'Console.WriteLine(response.Server)
+
+
+        'MsgBox("alto")
+
+        Dim respuesta As JObject = JObject.Parse(response.Content)
+        If response.IsSuccessful Then
+            ' retorna los datos 
+            Return respuesta("id").ToString()
+        Else
+            Dim sg = respuesta("message").ToString()
+            Throw New EvaluateException(sg)
+        End If
+    End Function
+
+    ''' <summary>
+    ''' funcion que agrega una nota pero con un archivo adjunto
+    ''' </summary>
+    ''' <param name="iddeal">el id de un negocio en hubspot</param>
+    ''' <param name="notas">notas o datos a colocar con la nota</param>
+    ''' <param name="file_id">el id del folder en donde se agregara</param>
+    ''' <param name="owner">El id del Propietario</param>
+    ''' <returns>retorna el id de la nota</returns>
+    Public Function add_note_attacment(iddeal As String, notas As String, file_id As String, owner As String, id_company As String(), ids_contacts As String()) As String
+
+        revisa_Tokens()
+
+        Dim fecha As String = DateTimeOffset.Now.ToUnixTimeMilliseconds.ToString()
+
+        Dim id_deal As String() = {iddeal}
+
+        Dim url = String.Format("https://api.hubapi.com/engagements/v1/engagements")
+        Dim client = New RestClient(url)
+        Dim request = New RestRequest(Method.POST)
+
+        request.AddHeader("accept", "application/json")
+        request.AddHeader("authorization", "Bearer " & token_acces)
+
+        request.AddJsonBody(New With {
+            Key .engagement = (New With {
+                    .active = True,
+                    .ownerId = owner,
+                    .type = "NOTE",
+                    .timestamp = fecha
+            }),
+            Key .associations = (New With {
+                    .dealIds = id_deal,
+                    .contactIds = ids_contacts,
+                    .companyIds = id_company
+            }),
+            Key .attachments = (New Object() {
+                     New With {.id = file_id}
+            }),
+            Key .metadata = New With {
+                .body = notas
+            }
+        })
+
+        Dim response As IRestResponse = client.Execute(request)
+        'Console.WriteLine(response.Content)
+        Dim respuesta As JObject = JObject.Parse(response.Content)
+
+        If response.IsSuccessful Then
+            ' retorna los datos 
+            Return "" & respuesta("engagement")("id").ToString()
+        Else
+            Dim sg = respuesta("message").ToString()
+            Throw New Exception(sg)
+        End If
+    End Function
+    Public Function hs_upload_replacement_file(ByVal id_file As String, ByVal path_f As String, ByVal file_name As String) As Boolean
+        revisa_Tokens()
+        Dim url As String = String.Format("https://api.hubapi.com/filemanager/api/v3/files/{0}/replace", id_file)
+
+        'Dim url = String.Format("https://api.hubapi.com/files/v3/files")
+        Dim client = New RestClient(url)
+        Dim request = New RestRequest(Method.POST)
+
+        'request.AddHeader("accept", "application/json")
+        request.AddHeader("Content-Type", "multipart/form-data")
+        request.AddHeader("authorization", "Bearer " & token_acces)
+
+        'request.AddParameter("folderId", folder_id)
+        request.AddParameter("options", "{""access"":""PRIVATE"",""overwrite"":""false""}")
+        request.AddFileBytes("file", System.IO.File.ReadAllBytes(path_f), file_name, contentType:="multipart/form-data")
+        Dim response As IRestResponse = client.Execute(request)
+
+        'validar en la prueba que sea correcta
+        'Console.WriteLine(response.Content)
+        'Console.WriteLine(response.StatusCode)
+        'Console.WriteLine(response.IsSuccessful)
+        'Console.WriteLine(response.ErrorException)
+
+        Dim respuesta As JObject = JObject.Parse(response.Content)
+        If response.IsSuccessful Then
+            ' retorna los datos 
+            Return response.IsSuccessful
+        Else
+            Dim sg = respuesta("message").ToString()
+            Throw New EvaluateException(sg)
+        End If
+    End Function
+
+
+    Public Function GetDealsMes(ByVal fecha1 As DateTime, ByVal fecha2 As DateTime) As DataTable
+
+        'Console.WriteLine(fecha1)
+        'Console.WriteLine(fecha2)
+
+        'Dim fe As String = DateTimeOffset.Now.ToUnixTimeMilliseconds.ToString() 'New DateTimeOffset(fecha_provicional).ToUniversalTime()
+        Dim fe As String = New DateTimeOffset(fecha1).ToUnixTimeMilliseconds.ToString()
+        Dim fe_cr As String = New DateTimeOffset(fecha2).ToUnixTimeMilliseconds.ToString()
+
+        revisa_Tokens()
+
+        Dim client = New RestClient("https://api.hubapi.com/crm/v3/objects/deals/search")
+        Dim request = New RestRequest(Method.POST)
+        request.AddHeader("accept", "application/json")
+        request.AddHeader("content-type", "application/json")
+        request.AddHeader("authorization", "Bearer " & token_acces)
+
+        '        Request.AddParameter("application/json", "{\"objectIdToMerge\":\"String\",\"primaryObjectId\":\"String\"}", ParameterType.RequestBody);
+        'IRestResponse Response = Client.Execute(Request)
+
+        'New With {.propertyName = "hs_v2_date_entered_746132", .operator = "BETWEEN", .highValue = fe_cr .value = fe},
+        'Key.filterGroups = New Object() {
+        '        New With {Key .filters = New Object() {
+        '            New With {.propertyName = "dealstage", .operator = "EQ", .value = "746132"},
+        '            New With {.propertyName = "hs_v2_date_entered_746132", .operator = "GTE", .value = fe},
+        '            New With {.propertyName = "hs_v2_date_entered_746132", .operator = "LTE", .value = fe_cr}
+        '        }
+        '     }},
+        '    Key.sorts = New Object() {
+        '        New With {.propertyName = "folio_easy_glass", .direction = "ASCENDING"}
+        '    },
+        '    Key.properties = New Object() {"id", "dealname", "dealstage", "amount", "dealstage", "hs_v2_date_entered_746132", "folio_easy_glass"},
+        '    Key.limit = 100,
+        '    Key.after = 0
+
+        request.AddJsonBody(New With {
+             Key .filterGroups = New Object() {
+                New With {Key .filters = New Object() {
+                    New With {.propertyName = "dealstage", .operator = "EQ", .value = "746132"},
+                    New With {.propertyName = "hs_v2_date_entered_746132", .operator = "BETWEEN", .highValue = fe_cr, .value = fe}
+                }
+             }},
+            Key .sorts = New Object() {
+                New With {.propertyName = "folio_easy_glass", .direction = "ASCENDING"}
+            },
+            Key .properties = New Object() {"id", "dealname", "dealstage", "amount", "hs_v2_date_entered_746132", "folio_easy_glass", "hs_exchange_rate"},
+            Key .limit = 100,
+            Key .after = 0
+        })
+        'hs_v2_date_entered_746132
+
+        Dim respuesta_deal As IRestResponse = client.Execute(request)
+
+        Dim dt_deals As New DataTable()
+        dt_deals.Columns.Add("id")
+        dt_deals.Columns.Add("dealname")
+        dt_deals.Columns.Add("dealstage")
+        dt_deals.Columns.Add("amount")
+        dt_deals.Columns.Add("fecha_Gaado")
+        dt_deals.Columns.Add("folio_easy_glass")
+        dt_deals.Columns.Add("hs_tc")
+        'dt_deals.Columns.Add()
+
+        'Console.WriteLine("*/**/*//**/*/*/*//*/*/*//**/*//**/*/*/*/*/*/*/*/*/*/*/*/*/*/")
+        'Console.WriteLine(respuesta_deal.Content)
+
+        If respuesta_deal.IsSuccessful Then
+            Dim get_clientes_hs As JObject = JObject.Parse(respuesta_deal.Content)
+            Dim jcliente As JToken = get_clientes_hs("results")
+
+            Dim pop As JToken
+            For Each cli As JToken In jcliente.ToList()
+
+                pop = cli("properties")
+                dt_deals.Rows.Add({cli("id").ToString, pop("dealname").ToString, pop("dealstage").ToString, pop("amount").ToString, pop("hs_v2_date_entered_746132").ToString, pop("folio_easy_glass").ToString, pop("hs_exchange_rate").ToString})
+
+            Next
+        End If
+
+        Return dt_deals
+    End Function
+
+
+
+
+    '*--**------------------------------*-*--**--*-**-*-*-*--**-*-*-*-*--*
+    Public Function ConsultaDealWithoutEnterprice(token As String) As DataTable
+        'Sincronizador.total_Consultas++;
+        Dim ret As DataTable = New DataTable()
+        ret.Columns.Add("id_deal")
+        ret.Columns.Add("nombre")
+        ret.Columns.Add("id_easy_glass")
+        ret.Columns.Add("id_contacto")
+        ret.Columns.Add("id_empresa")
+
+        Try
+
+            Dim cad_s_c As String = String.Format("https://api.hubapi.com/crm/v3/objects/deals/search")
+            Dim serch_contact As RestClient = New RestClient(cad_s_c)
+            Dim request = New RestRequest(Method.POST)
+            request.AddHeader("accept", "application/json")
+            request.AddHeader("authorization", "Bearer " + token)
+
+            Dim propiertyes As String() = New String() {"dealname", "associatedVids", "folio_easy_glass"}
+            Dim sorts As String() = New String() {"folio_easy_glass"} '//createdate 
+
+            ' para Convertirla fecha en milisegundos
+            '//DateTime fecha_provicional = New DateTime(2023, 02, 01);
+            '//DateTimeOffset fecha_unicersal = New DateTimeOffset(fecha_provicional).ToUniversalTime();
+            '//string fecha_inix = fecha_unicersal.ToUnixTimeMilliseconds().ToString();
+            '//,
+
+            ' para buscar en base a una fecha 
+            '//                 New { propertyName = "createdate", @operator = "GT", value = fecha_inix }
+            ' para buscar en base a una etapa
+            '//New { propertyName = "pipeline", @operator = "EQ", value = "746126" },
+            ' con pipeline
+            '//object[] filtro_p = New { propertyName = "pipeline", @operator = "EQ", value = "default" }; //746126
+            '//object[] filtro_NP = New { propertyName = "dealstage", @operator = "EQ", value = "qualifiedtobuy" }; //746133
+            '
+            '
+            '
+            '// New
+            '            //{
+            '            //    filters = New[]
+            '            //    {
+            '            //        New{propertyName="email",@operator="EQ",value=mail_p}
+            '            //    }
+            '            //},
+
+            Dim flitro_a = New With {.propertyName = "associations.company", .Operator = "NOT_HAS_PROPERTY"}
+            Dim flitro_eg = New With {.propertyName = "folio_easy_glass", .Operator = "LT", .value = "4000"}
+
+            ' el Limite de filtros es 3
+            request.AddJsonBody(New With
+                {
+                    Key .filterGroups = New Object() {
+                        New With
+                        {
+                            Key .filters = New Object() {
+                                 flitro_a,
+                                 flitro_eg,
+                                 New With {.propertyName = "dealstage", .operator = "EQ", .value = "746133"}
+                            }
+                         }
+                    },
+                    .properties = propiertyes,
+                    .limit = 99,
+                    .sorts = sorts
+                })
+
+            ' esta linea va en los filtros  despues de filtro eg se comenta ya que est lina excliye a los negocios que estan en perdidos
+            '           New { propertyName = "dealstage", @operator = "NEQ", value = "746133" }
+
+            ' esta espara los negocios que no tienen empresa asosiada
+            'New { propertyName = "associations.company", @operator = "NOT_HAS_PROPERTY" }
+
+            ' esta linea nos sireve para las proiedades que queremos 
+            '   properties = New[] { "associatedcompanyid", "associatedVids", "folio_easy_glass", "associations.contact" }
+
+
+            Dim respuesta_contact As IRestResponse = serch_contact.Execute(request)
+
+            Dim respuesta As JObject = JObject.Parse(respuesta_contact.Content)
+
+            If (respuesta_contact.StatusCode = System.Net.HttpStatusCode.OK) Then
+
+                For Each pocicion As JToken In respuesta("results")
+                    Try
+                        Dim row As DataRow = ret.NewRow()
+
+                        '    row["id_empresa"] = (String)pocicion["properties"]["associatedcompanyid"] ?? "";
+
+                        row("id_deal") = pocicion("id").ToString()
+                        row("nombre") = pocicion("properties")("dealname").ToString()
+                        row("id_easy_glass") = pocicion("properties")("folio_easy_glass")
+                        row("id_contacto") = pocicion("properties")("associatedVids")
+                        row("id_empresa") = pocicion("properties")("associatedcompanyid")
+
+                        If (row("id_easy_glass").ToString() <> "") Then ret.Rows.Add(row)
+                    Catch er As Exception
+                        Throw
+                    End Try
+                Next
+            Else
+                Dim resilt As String = respuesta("message").ToString() '?? "Error respuesta vacía")
+                Throw New Exception(resilt)
+            End If
+        Catch ex As Exception
+            Throw
+        End Try
+        Return ret
+    End Function
+
+
+    Public Sub hsRelacinaEmpresa(token As String, idObject As String, idObject2 As String, Optional fromOIbject As String = "Deals", Optional toOIbject As String = "Companies")
+        'iddeal to companies
+        Dim url As String = String.Format("https://api.hubapi.com/crm/v4/objects/{0}/{1}/associations/default/{2}/{3}", fromOIbject, idObject, toOIbject, idObject2)
+
+        Dim client As RestClient = New RestClient(url)
+        Dim Request As RestRequest = New RestRequest(Method.PUT)
+
+        Request.AddHeader("accept", "application/json")
+        'request.AddHeader("Content-Type", "application/json")
+        Request.AddHeader("authorization", "Bearer " + token)
+
+        Dim respoce As IRestResponse = client.Execute(Request)
+        Dim respuesta As JObject = JObject.Parse(respoce.Content)
+
+        If (respoce.IsSuccessful) Then
+            Dim idDealA As String = "COMPLIT"
+            ' that's ok
+        Else
+            Dim sg As String = respuesta("dealId").ToString()
+            Throw New EvaluateException(sg)
+        End If
+    End Sub
+
+    Public Sub GetAllHubspotCompanies(token As String)
+
+        Dim counter As Integer = 0
+        Dim offset As String = String.Empty
+        Dim hasmore As String = False
+
+        Do
+
+            Dim url As String = String.Format("https://api.hubapi.com/companies/v2/companies/paged?properties=name&properties=website&properties=address&limit=10{0}", offset)
+
+            Dim client As RestClient = New RestClient(url)
+            Dim request As RestRequest = New RestRequest(Method.GET)
+
+            request.AddHeader("accept", "application/json")
+            request.AddHeader("authorization", "Bearer " + token)
+
+
+            Dim respoce As IRestResponse = client.Execute(request)
+
+            Console.WriteLine(respoce.Content)
+            Console.WriteLine("*--*-**-*-*-")
+
+            Dim jobject As JObject = JObject.Parse(respoce.Content)
+            Dim jhasmore As JToken = jobject("has-more")
+            Dim joffset As JToken = jobject("offset")
+            Dim jcompanies As JToken = jobject("companies")
+
+            Try
+                If (jhasmore.ToString().ToLower() = "true") Then
+                    hasmore = True
+                Else
+                    hasmore = False
+                End If
+                'creates offset parameter for next request
+                offset = String.Format("&offset={0}", joffset.ToString())
+
+            Catch ex As Exception
+                hasmore = False
+            End Try
+
+            For Each item As JToken In jcompanies.ToList()
+
+                Dim name As String = item("properties")("name")("value").ToString()
+                Console.WriteLine(name)
+                Try
+                    Dim adress As String = item("properties")("address")("value").ToString()
+                    Console.WriteLine(adress)
+                Catch ex As Exception
+                End Try
+            Next
+        Loop While (hasmore)
+    End Sub
+
+
+    '*/'*/'*/'*//**/*/*/*/*//*/*/*/*/*/*/**//*/*/*/**/  ESTAS SON PRUEBAS *--*-*-*-**-*-*--*-*-*-**-*-*-*-*-*-*-**-*-*-*-*-
+
+    Public Sub prueba_datos()
+        'iddeal to companies
+        ' esto si funciono 
+        'Dim url As String = String.Format("http://192.168.1.228:8020/mega_servicios/modulos/kafer/acciones.php")
+        Dim url As String = String.Format("http://192.168.1.228:8020/dApp/EG/api.php?dat=app&test=hola")
+
+        Dim client As RestClient = New RestClient(url)
+        Dim Request As RestRequest = New RestRequest(Method.GET)
+
+        Request.AddHeader("accept", "application/json")
+        Request.AddHeader("Content-Type", "application/json")
+        'Request.AddHeader("authorization", "Bearer " + token)
+
+
+        '  ''   pruebas  post
+        'Request.AddJsonBody()
+        'Request.AddParameter("folderId", folder_id)
+        'Request.AddParameter("options", "{""access"":""PRIVATE"",""overwrite"":""false""}")
+        ' * * ** * * * * end post
+
+
+
+        ' --- -- - - ---   post
+        '' esto si funciono  con el EG/api.php 
+        'Request.AddJsonBody(New With
+        '{
+        '    .properties = New Object() {
+        '        New With {.property = "firstname", .value = "Test"},
+        '        New With {.property = "hubspot_owner_id", .value = "ID"},
+        '        New With {.property = "company", .value = "Company name"},
+        '        New With {.property = "address", .value = "direccion"},
+        '        New With {.property = "phone", .value = "telefono"},
+        '        New With {.property = "email", .value = "email"}
+        '    }
+        '})
+
+        ' - - -- ---- end post
+
+        ' post 
+        Dim respoce As IRestResponse = client.Execute(Request)
+
+        Console.WriteLine("-..--.-.-.-.-.-.-.-.-..-.-.-.-.-")
+
+        Console.WriteLine(respoce.Content)
+
+        Console.WriteLine("-..--.-.-.-.-.-.-.-.-..-.-.-.-.-")
+
+        Dim respuesta As JObject = JObject.Parse(respoce.Content)
+
+
+
+
+        If (respoce.IsSuccessful) Then
+            Dim idDealA As String = "COMPLIT"
+            ' that's ok
+
+            'MsgBox(respuesta("test").ToString())
+        Else
+            Dim sg As String = respuesta("dealId").ToString()
+            Throw New EvaluateException(sg)
+        End If
+    End Sub
+
+
+    Public Function busca_tareas(ByVal fecha As DateTime, ByVal fechaT As DateTime, ByVal id_us As String) As DataTable
+
+        Dim dt As New DataTable
+
+        revisa_Tokens()
+
+        Dim fe As String = New DateTimeOffset(fecha).ToUnixTimeMilliseconds.ToString()
+        Dim feT As String = New DateTimeOffset(fechaT).ToUnixTimeMilliseconds.ToString()
+
+
+        Dim client = New RestClient("https://api.hubapi.com/crm/v3/objects/tasks/search")
+        Dim request = New RestRequest(Method.POST)
+        request.AddHeader("accept", "application/json")
+        request.AddHeader("content-type", "application/json")
+        request.AddHeader("authorization", "Bearer " + token_acces)
+
+        Dim properties As String() = New String() {"hs_task_status", "hs_task_subject", "hs_task_priority", "hs_task_type"}
+        'Key.sorts = New Object() {
+        '        New With {.propertyName = "folio_easy_glass", .direction = "ASCENDING"}
+        '    },
+        '
+        'Key.properties = New Object() {"id", "dealname", "dealstage", "amount", "hs_v2_date_entered_746132", "folio_easy_glass", "hs_exchange_rate"}, 37071839
+
+        request.AddJsonBody(New With {
+             Key .filterGroups = New Object() {
+                New With {Key .filters = New Object() {
+                    New With {.propertyName = "hubspot_owner_id", .operator = "EQ", .value = id_us},
+                    New With {.propertyName = "hs_createdate", .operator = "BETWEEN", .highValue = feT, .value = fe}
+                }
+             }},
+             Key .properties = properties,
+             Key .limit = 100,
+             Key .after = 0
+        })
+
+        'request.AddParameter("application/json", "{\"query\":\"String\",\"limit\":0,\"after\":\"String\",\"sorts\":[\"String\"],\"properties\":[\"String\"],\"filterGroups\":[{\"filters\":[{\"highValue\":\"String\",\"propertyName\":\"String\",\"values\":[\"String\"],\"value\":\"String\",\"Operator\":\"EQ\"}]}]}", ParameterType.RequestBody);
+        Dim response As IRestResponse = client.Execute(request)
+
+        Try
+            dt.Columns.Add("taskID") ' id 
+            dt.Columns.Add("ContactID") ' asociated id 
+            dt.Columns.Add("nota")
+            dt.Columns.Add("estado")
+            dt.Columns.Add("prioridad")
+            dt.Columns.Add("tipo")
+
+            If response.IsSuccessful Then
+
+                Console.WriteLine(response.Content)
+
+                Dim respuesta As JToken = JToken.Parse(response.Content)
+                'Dim contact_hs As JToken = respuesta
+                Try
+                    Dim resultados As JToken = respuesta("results")
+                    For Each task As JToken In resultados
+                        Dim prop As JToken = task("properties")
+                        Dim id As String = task("id").ToString()
+                        Dim contactid As String = prop("hs_object_id").ToString()
+                        Dim nota As String = prop("hs_task_subject").ToString()
+                        Dim estado As String = prop("hs_task_status").ToString()
+                        Dim prioridad As String = prop("hs_task_priority").ToString()
+                        Dim tipo As String = prop("hs_task_type").ToString()
+                        'Try
+                        '    estatus = contact("isActive").ToString()
+                        'Catch ex As Exception
+                        'End Try
+
+                        dt.Rows.Add(id, contactid, nota, estado, prioridad, tipo)
+                    Next
+                Catch ex As Exception
+                    MsgBox("No se encontaron tareas " & ex.Message)
+                End Try
+            End If
+
+        Catch ex As Exception
+        End Try
+        Return dt
+    End Function
+
+    Public Function Buscar_llamadas(ByVal fecha As DateTime, ByVal fechaT As DateTime, ByVal id_us As String) As DataTable
+
+        'errroazs a 
+        Dim dt As New DataTable
+
+        revisa_Tokens()
+
+        Dim fe As String = New DateTimeOffset(fecha).ToUnixTimeMilliseconds.ToString()
+        Dim feT As String = New DateTimeOffset(fechaT).ToUnixTimeMilliseconds.ToString()
+
+
+        Dim Client = New RestClient("https://api.hubapi.com/crm/v3/objects/calls/search")
+        Dim Request = New RestRequest(Method.POST)
+        Request.AddHeader("accept", "application/json")
+        Request.AddHeader("content-type", "application/json")
+        Request.AddHeader("authorization", "Bearer " + token_acces)
+
+        Dim properties As String() = New String() {"hs_call_status", "hs_call_title", "hs_call_duration", "hs_call_direction", "hs_activity_type", "hs_call_body"}
+        'Key.sorts = New Object() {
+        '        New With {.propertyName = "folio_easy_glass", .direction = "ASCENDING"}
+        '    },
+        '
+        'Key.properties = New Object() {"id", "dealname", "dealstage", "amount", "hs_v2_date_entered_746132", "folio_easy_glass", "hs_exchange_rate"}, 37071839
+
+        Request.AddJsonBody(New With {
+             Key .filterGroups = New Object() {
+                New With {Key .filters = New Object() {
+                    New With {.propertyName = "hubspot_owner_id", .operator = "EQ", .value = id_us},
+                    New With {.propertyName = "hs_createdate", .operator = "BETWEEN", .highValue = feT, .value = fe}
+                }
+             }},
+             Key .properties = properties,
+             Key .limit = 100,
+             Key .after = 0
+        })
+
+        Dim Response As IRestResponse = Client.Execute(Request)
+
+        Try
+            dt.Columns.Add("callID") ' id 
+            dt.Columns.Add("Estatus")
+            dt.Columns.Add("Titulo")
+            dt.Columns.Add("Duracion")
+            dt.Columns.Add("Direccion")
+            dt.Columns.Add("Tipo")
+            dt.Columns.Add("Descripcion")
+
+            If Response.IsSuccessful Then
+
+                Dim respuesta As JToken = JToken.Parse(Response.Content)
+                Console.WriteLine(Response.Content)
+
+                ' id
+                ' duration in milliseconds
+
+                Dim resultados As JToken = respuesta("results")
+                For Each task As JToken In resultados
+                    Dim prop As JToken = task("properties")
+                    Dim id As String = task("id").ToString()
+                    Dim estatus As String = prop("hs_call_status").ToString()
+                    Dim titulo As String = prop("hs_call_title").ToString()
+                    Dim duracion As String = prop("hs_call_duration").ToString()
+                    Dim direccion As String = prop("hs_call_direction").ToString()
+                    Dim tipo As String = prop("hs_activity_type").ToString()
+                    Dim descripcion As String = prop("hs_call_body").ToString()
+                    'Try
+                    '    estatus = contact("isActive").ToString()
+                    'Catch ex As Exception
+                    'End Try
+
+                    dt.Rows.Add(id, titulo, estatus, duracion, direccion, tipo, descripcion)
+                Next
+
+
+
+            End If
+
+        Catch
+        End Try
+        Return dt
+    End Function
+
+    Public Function busca_correos(ByVal fecha As DateTime, ByVal fechaT As DateTime, ByVal id_us As String) As DataTable
+        'erroorasdaas
+        Dim dt As New DataTable
+
+        revisa_Tokens()
+
+        Dim fe As String = New DateTimeOffset(fecha).ToUnixTimeMilliseconds.ToString()
+        Dim feT As String = New DateTimeOffset(fechaT).ToUnixTimeMilliseconds.ToString()
+
+        Dim Client = New RestClient("https://api.hubapi.com/crm/v3/objects/emails/search")
+        Dim Request = New RestRequest(Method.POST)
+        Request.AddHeader("accept", "application/json")
+        Request.AddHeader("content-type", "application/json")
+        Request.AddHeader("authorization", "Bearer " + token_acces)
+
+        Dim properties As String() = New String() {"hs_email_status", "hs_email_subject", "hs_email_text", "hs_email_direction"}
+        'Key.sorts = New Object() {
+        '        New With {.propertyName = "folio_easy_glass", .direction = "ASCENDING"}
+        '    },
+        '
+        'Key.properties = New Object() {"id", "dealname", "dealstage", "amount", "hs_v2_date_entered_746132", "folio_easy_glass", "hs_exchange_rate"}, 37071839
+
+        Request.AddJsonBody(New With {
+             Key .filterGroups = New Object() {
+                New With {Key .filters = New Object() {
+                    New With {.propertyName = "hubspot_owner_id", .operator = "EQ", .value = id_us},
+                    New With {.propertyName = "hs_createdate", .operator = "BETWEEN", .highValue = feT, .value = fe}
+                }
+             }},
+             Key .properties = properties,
+             Key .limit = 100,
+             Key .after = 0
+        })
+
+        Dim Response As IRestResponse = Client.Execute(Request)
+
+        Console.WriteLine(Response.Content)
+
+        Try
+            dt.Columns.Add("mailID") ' id 
+            'dt.Columns.Add("ContactID") ' asociated id 
+            dt.Columns.Add("Asunto")
+            dt.Columns.Add("Descripcion")
+            dt.Columns.Add("Estado")
+            dt.Columns.Add("Direccion")
+
+            If Response.IsSuccessful Then
+
+                Dim respuesta As JToken = JToken.Parse(Response.Content)
+
+
+                ' id
+                ' duration in milliseconds
+
+                Dim resultados As JToken = respuesta("results")
+                For Each task As JToken In resultados
+                    Dim prop As JToken = task("properties")
+                    Dim id As String = task("id").ToString()
+                    'Dim Contacto As String = prop("associatedVids").ToString()
+                    Dim asunto As String = prop("hs_email_subject").ToString()
+                    Dim body As String = prop("hs_email_text").ToString()
+                    Dim estadoo As String = prop("hs_email_status").ToString()
+                    Dim direccion As String = prop("hs_email_direction").ToString()
+                    'Try
+                    '    estatus = contact("isActive").ToString()
+                    'Catch ex As Exception
+                    'End Try
+
+                    dt.Rows.Add(id, asunto, body, estadoo, direccion)
+                Next
+            End If
+
+        Catch
+        End Try
+
+
+
+        Return dt
+    End Function
+
+    Public Function busca_reuniones(ByVal fecha As DateTime, ByVal fechaT As DateTime, ByVal id_us As String) As DataTable
+        'e3rrororrrr
+        Dim dt As New DataTable
+
+        revisa_Tokens()
+
+        Dim fe As String = New DateTimeOffset(fecha).ToUnixTimeMilliseconds.ToString()
+        Dim feT As String = New DateTimeOffset(fechaT).ToUnixTimeMilliseconds.ToString()
+
+        Dim Client = New RestClient("https://api.hubapi.com/crm/v3/objects/meetings/search")
+        Dim Request = New RestRequest(Method.POST)
+        Request.AddHeader("accept", "application/json")
+        Request.AddHeader("content-type", "application/json")
+        Request.AddHeader("authorization", "Bearer " + token_acces)
+
+        Dim properties As String() = New String() {"hs_task_status", "hs_meeting_title", "hs_meeting_body", "hs_activity_type", "hs_meeting_start_time", "hs_meeting_end_time"}
+        'Key.sorts = New Object() {
+        '        New With {.propertyName = "folio_easy_glass", .direction = "ASCENDING"}
+        '    },
+        '
+        'Key.properties = New Object() {"id", "dealname", "dealstage", "amount", "hs_v2_date_entered_746132", "folio_easy_glass", "hs_exchange_rate"}, 37071839
+
+        Request.AddJsonBody(New With {
+             Key .filterGroups = New Object() {
+                New With {Key .filters = New Object() {
+                    New With {.propertyName = "hubspot_owner_id", .operator = "EQ", .value = id_us},
+                    New With {.propertyName = "hs_createdate", .operator = "BETWEEN", .highValue = feT, .value = fe}
+                }
+             }},
+             Key .properties = properties,
+             Key .limit = 100,
+             Key .after = 0
+        })
+        Dim Response As IRestResponse = Client.Execute(Request)
+
+
+        Try
+            dt.Columns.Add("meetingID") ' id 
+            'dt.Columns.Add("ContactID") ' asociated id 
+            dt.Columns.Add("Titulo")
+            dt.Columns.Add("Descripcion")
+            dt.Columns.Add("tipo")
+            dt.Columns.Add("StartTime")
+            dt.Columns.Add("EndTime")
+
+            If Response.IsSuccessful Then
+
+                Console.WriteLine(Response.Content)
+
+                Dim respuesta As JToken = JToken.Parse(Response.Content)
+
+                Dim resultados As JToken = respuesta("results")
+                For Each task As JToken In resultados
+                    Dim prop As JToken = task("properties")
+                    Dim id As String = task("id").ToString()
+                    'Dim Contacto As String = prop("associatedVids").ToString()
+                    Dim Titulo As String = prop("hs_meeting_title").ToString()
+                    Dim body As String = prop("hs_meeting_body").ToString()
+                    Dim tipo As String = prop("hs_activity_type").ToString()
+                    Dim start As String = prop("hs_meeting_start_time").ToString()
+                    Dim endT As String = prop("hs_meeting_end_time").ToString()
+                    'Try
+                    '    estatus = contact("isActive").ToString()
+                    'Catch ex As Exception
+                    'End Try
+
+                    dt.Rows.Add(id, Titulo, body, tipo, start, endT)
+                Next
+
+            End If
+
+        Catch
+        End Try
+
+
+        Return dt
+    End Function
+
+    Public Sub busca_aectiviadesentas()
+        ' pendioentge  
+    End Sub
+
+
+
+End Module

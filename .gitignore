@@ -1,0 +1,12 @@
+# Configuración con credenciales y datos de este servidor (en Vercel van como variables de entorno)
+config/*.json
+config/push_keys.php
+
+# Archivos subidos por los usuarios (en Vercel van a Supabase Storage)
+uploads/*
+!uploads/.htaccess
+
+# Variables de entorno locales
+.env
+.env.*
+.vercel

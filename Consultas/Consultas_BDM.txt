@@ -1,0 +1,85 @@
+Imports System.Net
+Imports System.Runtime.Serialization.Json
+Imports System.Windows.Forms.DataVisualization.Charting
+Imports System
+Imports RestSharp
+Imports Newtonsoft.Json
+Imports Newtonsoft.Json.Linq
+
+Module Consultas_BDM
+    '
+    '
+    'SF46410 
+    'SF46406
+    '
+
+    '
+    '
+    'este puede ser para el juan SF290383  CNY
+    '
+    '
+    'est epuede ser para el tc de doales a pesos   SF43718 
+    ' este es para el de tc de euros as peos SF46410
+    '
+    Public Function ObtenTCBySerie(ByVal Serie As String, ByVal fecha1 As String, fecha2 As String) As Double
+
+        Dim tc As Double = 0
+
+        Dim url As String = String.Format("https://www.banxico.org.mx/SieAPIRest/service/v1/series/{0}/datos/{1}/{2}", Serie, fecha1, fecha2)
+
+        Dim client = New RestClient(url)
+        Dim request = New RestRequest(Method.GET)
+
+        request.AddHeader("Bmx-Token", "5395ac064dfc2abc4484d2d7b3ac5a793d3cdbdb63e099dfd18a4d4e02c20780")
+
+        request.AddHeader("accept", "application/json")
+
+        Dim response As IRestResponse = client.Execute(request)
+
+        'Console.WriteLine(response.Content)
+
+        Dim respuesta As JObject = JObject.Parse(response.Content)
+
+
+        If response.IsSuccessful Then
+            ' retorna los datos 
+            'Return respuesta("id").ToString()
+            Try
+                For Each t As JToken In respuesta("bmx")("series")(0)("datos").Reverse()
+                    'esto es valido 
+                    'MsgBox(t("dato").ToString() & " Con " & t("fecha").ToString())
+                    Try
+                        tc = Double.Parse(t("dato").ToString())
+                        Exit For
+                    Catch ex As Exception
+                    End Try
+                Next
+                'tc = Double.Parse(respuesta("bmx")("series")(0)("datos")(0)("dato").ToString())
+            Catch ex As Exception
+                tc = 0
+            End Try
+            Return Math.Round(tc, 2)
+        Else
+            Dim sg = respuesta("error")("detalle").ToString()
+            tc = 0
+            Throw New EvaluateException(sg)
+        End If
+    End Function
+
+
+
+    '    SF43707  Reservas Internacionales.
+
+    'SF61745  Tasa objetivo
+    'SF60648  TIIE a 28 días.
+    'SF60649  TIIE a 91 días.
+    'SF60633  Cetes a 28 días.
+
+    'SF43718  Pesos por Dólar. FIX.
+    'SF60653  Pesos por Dólar. Fecha de liquidación.
+    'SF46410  Euro.
+    'SF46406  Yen japonés.
+    'SF46407  Libra esterlina.
+    'SF60632  Dólar Canadiense.
+
+End Module

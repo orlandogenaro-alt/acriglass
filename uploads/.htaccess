@@ -1,0 +1,5 @@
+# Aquí solo se guardan imágenes: nunca ejecutar scripts
+Options -ExecCGI -Indexes
+<FilesMatch "\.(php|phtml|phar|php\d|pl|py|cgi|sh|html?|svg)$">
+    Require all denied
+</FilesMatch>

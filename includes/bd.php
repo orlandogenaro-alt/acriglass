@@ -1,0 +1,177 @@
+<?php
+// Conexiones a bases de datos (Administrador › Bases de datos, config/bases-datos.json).
+//
+//   $pdo  = bd_pdo('AW');                                         PDO listo para usar
+//   $rows = bd_filas('AW', 'select ... where obra_id = ?', [$id]); filas en UTF-8, llaves en minúsculas
+//   $row  = bd_fila(...)  ·  $valor = bd_valor(...)
+//
+// Las bases de Firebird de Easy-Glass / AW / Microsip tienen juego de caracteres NONE:
+// el texto se guarda en Windows-1252, así que aquí se convierte de ida y vuelta a UTF-8.
+//
+// Si una conexión no tiene contraseña capturada aquí, se usa la de Easy-Glass Boss
+// (misma clave en su config/bases_datos.config.php). No se copia a config/bases-datos.json.
+require_once __DIR__ . '/sistema.php';
+
+const ACRI_MOTORES = [
+    'firebird' => 'Firebird / InterBase',
+    'odbc'     => 'ODBC (DSN del sistema)',
+    'mysql'    => 'MySQL / MariaDB',
+];
+
+define('ACRI_EASYGLASS_BD', dirname(ACRI_RAIZ) . '/Easy-glass php/config/bases_datos.config.php');
+
+function bd_conexiones(): array
+{
+    return configLeer('bases-datos');
+}
+
+// Conexiones de Easy-Glass Boss por clave (vacío si no está instalado en este servidor)
+function bd_easyglass(): array
+{
+    static $porClave = null;
+    if ($porClave !== null) return $porClave;
+    $porClave = [];
+    if (!is_file(ACRI_EASYGLASS_BD)) return $porClave;
+    try {
+        $raw = include ACRI_EASYGLASS_BD;
+    } catch (Throwable $e) {
+        error_log('AcriGlass bd_easyglass: ' . $e->getMessage());
+        return $porClave;
+    }
+    foreach ($raw['conexiones'] ?? [] as $c) {
+        $porClave[strtoupper(trim((string) ($c['clave'] ?? '')))] = $c;
+    }
+    return $porClave;
+}
+
+// Sin contraseña propia: toma la de Easy-Glass Boss si es el mismo usuario (o no hay usuario)
+function bd_completar(string $clave, array $c): array
+{
+    if (($c['contrasena'] ?? '') !== '') return $c;
+    $eg = bd_easyglass()[strtoupper($clave)] ?? null;
+    if (!$eg || (string) ($eg['password'] ?? '') === '') return $c;
+    $usuario = trim((string) ($c['usuario'] ?? ''));
+    if ($usuario !== '' && strcasecmp($usuario, trim((string) ($eg['usuario'] ?? ''))) !== 0) return $c;
+    $c['usuario']      = $usuario !== '' ? $usuario : (string) $eg['usuario'];
+    $c['contrasena']   = (string) $eg['password'];
+    $c['de_easyglass'] = true;
+    return $c;
+}
+
+function bd_config(string $clave): array
+{
+    $todas = bd_conexiones();
+    if (!isset($todas[$clave])) throw new RuntimeException("No existe la conexión '$clave' (Administrador › Bases de datos).");
+    return bd_completar($clave, $todas[$clave]);
+}
+
+// true cuando el texto viaja en Windows-1252 y hay que convertirlo
+function bd_convierte(array $c): bool
+{
+    return in_array(strtoupper($c['charset'] ?? ''), ['NONE', 'WIN1252', 'ISO8859_1'], true);
+}
+
+function bd_dsn(array $c): string
+{
+    switch ($c['motor'] ?? '') {
+        case 'firebird':
+            [$host, $puerto] = array_pad(explode(':', $c['servidor'], 2), 2, '3050');
+            $dsn = "firebird:dbname={$host}/{$puerto}:{$c['base']}";
+            $cs = strtoupper($c['charset'] ?? '');
+            return $cs !== '' && $cs !== 'NONE' ? "$dsn;charset=$cs" : $dsn;
+        case 'odbc':
+            return 'odbc:' . $c['base'];
+        case 'mysql':
+            [$host, $puerto] = array_pad(explode(':', $c['servidor'], 2), 2, '3306');
+            return "mysql:host=$host;port=$puerto;dbname={$c['base']};charset=utf8mb4";
+    }
+    throw new RuntimeException('Motor de base de datos no soportado: ' . ($c['motor'] ?? '(vacío)'));
+}
+
+// Abre una conexión nueva con la configuración dada (sin caché)
+function bd_abrir(array $c): PDO
+{
+    $pdo = new PDO(bd_dsn($c), $c['usuario'] ?? '', $c['contrasena'] ?? '', [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_CASE               => PDO::CASE_LOWER,
+    ]);
+    return $pdo;
+}
+
+function bd_pdo(string $clave): PDO
+{
+    static $abiertas = [];
+    if (!isset($abiertas[$clave])) {
+        $c = bd_config($clave);
+        if (empty($c['activa'])) throw new RuntimeException("La conexión '$clave' está desactivada.");
+        $abiertas[$clave] = bd_abrir($c);
+    }
+    return $abiertas[$clave];
+}
+
+function bd_texto_entrada(array $c, array $params): array
+{
+    if (!bd_convierte($c)) return $params;
+    return array_map(fn($v) => is_string($v) ? mb_convert_encoding($v, 'Windows-1252', 'UTF-8') : $v, $params);
+}
+
+// $binarias: columnas (en minúsculas) que no se convierten, p. ej. imágenes
+function bd_filas(string $clave, string $sql, array $params = [], array $binarias = []): array
+{
+    $c = bd_config($clave);
+    $st = bd_pdo($clave)->prepare($sql);
+    $st->execute(bd_texto_entrada($c, $params));
+    $convierte = bd_convierte($c);
+    $filas = [];
+    while ($f = $st->fetch()) {
+        foreach ($f as $k => $v) {
+            if (!is_string($v) || in_array($k, $binarias, true)) continue;
+            if ($convierte) $v = mb_convert_encoding($v, 'UTF-8', 'Windows-1252');
+            $f[$k] = rtrim($v);   // los CHAR de Firebird vienen rellenos de espacios
+        }
+        $filas[] = $f;
+    }
+    return $filas;
+}
+
+function bd_fila(string $clave, string $sql, array $params = [], array $binarias = []): ?array
+{
+    return bd_filas($clave, $sql, $params, $binarias)[0] ?? null;
+}
+
+function bd_valor(string $clave, string $sql, array $params = [])
+{
+    $f = bd_fila($clave, $sql, $params);
+    return $f ? reset($f) : null;
+}
+
+// Prueba una configuración: abre la conexión y pide la versión del servidor
+function bd_probar(array $c): array
+{
+    $inicio = microtime(true);
+    try {
+        $pdo = bd_abrir($c);
+        $sql = [
+            'firebird' => "select rdb\$get_context('SYSTEM', 'ENGINE_VERSION') from rdb\$database",
+            'odbc'     => 'select @@version',
+            'mysql'    => 'select version()',
+        ][$c['motor']];
+        $version = trim(strtok((string) $pdo->query($sql)->fetchColumn(), "\n"));
+        return ['ok' => true, 'mensaje' => 'Conectado · ' . $version, 'ms' => (int) round((microtime(true) - $inicio) * 1000)];
+    } catch (Throwable $e) {
+        return ['ok' => false, 'mensaje' => bd_mensaje_error($e), 'ms' => (int) round((microtime(true) - $inicio) * 1000)];
+    }
+}
+
+// Mensaje de error legible (sin la ruta de la contraseña ni basura del driver)
+function bd_mensaje_error(Throwable $e): string
+{
+    $m = $e->getMessage();
+    // Los drivers de Windows (ODBC, Firebird) responden en Windows-1252
+    if (!mb_check_encoding($m, 'UTF-8')) $m = mb_convert_encoding($m, 'UTF-8', 'Windows-1252');
+    $m = preg_replace('/\s+/u', ' ', $m);
+    $m = preg_replace('/^SQLSTATE\[[^\]]*\]:?\s*/', '', $m);
+    if (stripos($m, 'password') !== false || stripos($m, 'login') !== false) return 'Usuario o contraseña incorrectos. ' . $m;
+    return $m;
+}

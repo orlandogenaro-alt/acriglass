@@ -1,0 +1,393 @@
+Imports System.Data
+Imports System.Data.OleDb
+Imports System.Data.SqlClient
+Module Consultas_Sql_Server
+    Public Sub envia_presupuesto_hub_spot(id As Integer, fecha_creacion As Date, fecha_cierre As Date, empresa As String, vendedor As String, importe As Double, id_hubspot As Integer)
+        Try
+            If cnn_aw.State = ConnectionState.Closed Then cnn_aw.Open()
+            Dim sqlcom As New SqlCommand("insert into dbo.APM_OFERTAS_HUBSPOT(ID,FECHA_CREACION,FECHA_CIERRE,EMPRESA,VENDEDOR,FI_BETR_NETTO,ID_HUB) 
+            values (@ID,@FECHA_CREACION,@FECHA_CIERRE,@EMPRESA,@VENDEDOR,@FI_BETR_NETTO,@ID_HUB)", cnn_aw)
+            sqlcom.Parameters.AddWithValue("ID", id)
+            sqlcom.Parameters.AddWithValue("FECHA_CREACION", fecha_creacion)
+            sqlcom.Parameters.AddWithValue("FECHA_CIERRE", fecha_cierre)
+            sqlcom.Parameters.AddWithValue("EMPRESA", empresa)
+            sqlcom.Parameters.AddWithValue("VENDEDOR", vendedor)
+            sqlcom.Parameters.AddWithValue("FI_BETR_NETTO", importe)
+            sqlcom.Parameters.AddWithValue("ID_HUB", id_hubspot)
+            sqlcom.ExecuteNonQuery()
+            cnn_aw.Close()
+        Catch ex As Exception
+            cnn_aw.Close()
+            MsgBox(ex.Message)
+        End Try
+    End Sub
+    Public Function retorna_datos_pedido_aw(id_pedido As Integer) As DataTable
+
+        Try
+                If cnn_aw.State = ConnectionState.Closed Then cnn_aw.Open()
+            Dim sqldat As New SqlDataAdapter("select a.ID,a.AH_NAME1,a.FI_BETR_BRUTTO,a.OR_BEARBEITER,a.FI_WAEHRUNG, sum(t.PP_MENGE) as pzas, a.SU_QM_REAL,a.STATUS from SYSADM.BW_AUFTR_KOPF a
+                inner join SYSADM.BW_AUFTR_POS t on (a.ID =t.ID)  
+                where a.ID ='" & id_pedido & "' group by 
+                a.ID,a.AH_NAME1,a.FI_BETR_BRUTTO,a.OR_BEARBEITER,a.FI_WAEHRUNG,  a.SU_QM_REAL,a.STATUS", cnn_aw)
+            Dim tab As New DataTable
+                sqldat.Fill(tab)
+                cnn_aw.Close()
+                Return tab
+            Catch ex As Exception
+            MsgBox("Error: retorna_datos_pedido_aw " & ex.Message)
+            Return Nothing
+        End Try
+    End Function
+    Public Function retorna_estatus_pedido_aw(id_pedido As Integer) As DataTable
+        Try
+            If cnn_aw.State = ConnectionState.Closed Then cnn_aw.Open()
+            Dim sqldat As New SqlDataAdapter("select r.STATUS,r.fecha_403,r.fecha_entrega,DATEDIFF (hour,r.fecha_502,r.fecha_entrega) as atraso  from (select a.STATUS,SYSADM.DVD_FUN_GEN_FECHA_PROBLABLE_ENTREGA(a.ID) as fecha_entrega,(select max(x.DATUM)  from SYSADM.BW_AUFTR_HIST x where x.ID =a.ID and x.STATUS_ID =403) as fecha_403,
+            coalesce((select max(x.DATUM)  from SYSADM.BW_AUFTR_HIST x where x.ID =a.ID and x.STATUS_ID =520),getdate()) as fecha_502     from SYSADM.BW_AUFTR_KOPF a
+            where a.ID ='" & id_pedido & "' ) r  ", cnn_aw)
+            Dim tab As New DataTable
+            sqldat.Fill(tab)
+            cnn_aw.Close()
+            Return tab
+        Catch ex As Exception
+            cnn_aw.Close()
+            MsgBox("Error: retorna_estatus_pedido_aw" & ex.Message)
+            Return Nothing
+        End Try
+
+    End Function
+    Public Function consulta_tarea(ByVal folio As String) As String
+        Try
+            If cnn_aw.State = ConnectionState.Open Then cnn_aw.Close()
+            cnn_aw.Open()
+            Dim sqldat As New SqlDataAdapter("SELECT distinct(A.JOBNUMBER) FROM [MEGALUMINIO].[SYSADM].[PROD_JOBITEM] A where A.AUFNR='" & folio & "' ", cnn_aw)
+            Dim tab As New DataTable
+            sqldat.Fill(tab)
+            Return "" & tab.Rows(0).Item(0)
+            cnn_aw.Close()
+        Catch ex As Exception
+            Return "0"
+        End Try
+    End Function
+    Public Function consulta_datos(ByVal folio As Integer) As DataTable
+        Try
+            If cnn_aw.State = ConnectionState.Open Then cnn_aw.Close()
+            cnn_aw.Open()
+            Dim fbdat As New SqlDataAdapter("select B.AH_NAME1,A.PROD_ID,A.PROD_BEZ1,A.PP_DICKE,A.PP_ORIG_MENGE,A.PP_BREITE,A.PP_HOEHE,A.POS_NR,C.ID,C.BEZ,B.SU_GEWICHT AS PESO_TOT,B.OR_TOUR,B.OR_LIEFERBED,B.SU_QM_FAKT,B.SU_LFM_REAL,A.PROD_PRODART,COALESCE ((SELECT sum(B.UDS_SURT)  FROM SYSADM.DVD_AUFTR_POS_PARCIAL B WHERE B.ID=A.ID AND B.POS_NR =A.POS_NR),0) AS UDS_SURT,0 AS BOM_ID,(SELECT TOP 1 T.AGG FROM SYSADM.PROD_JOBITEM T WHERE T.AUFNR=A.ID AND T.POSNR =A.POS_NR AND T.BOM_ID =0) AS REG_POINT from megaluminio.SYSADM.BW_AUFTR_POS A  " &
+            "INNER JOIN MEGALUMINIO.SYSADM.BW_AUFTR_KOPF B ON (A.ID=B.ID) inner join MEGALUMINIO.SYSADM.KA_STATUS C on (C.ID=B.STATUS)  WHERE A.ID='" & folio & "' ", cnn_aw)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            cnn_aw.Close()
+            Return tab
+        Catch ex As Exception
+            MsgBox(ex.Message)
+            Return Nothing
+        End Try
+    End Function
+    Public Function consulta_fecha_produccion_pedido(ByVal id As Integer) As String
+        Try
+            If cnn_aw.State = ConnectionState.Closed Then cnn_aw.Open()
+            Dim sqldat As New SqlDataAdapter("select MAX(FORMAT(A.DATUM,'dd-MM-yyyy HH:mm')) from SYSADM.BW_AUFTR_HIST A WHERE A.STATUS_ID=403 AND A.ID='" & id & "'", cnn_aw)
+            Dim tab As New DataTable
+            sqldat.Fill(tab)
+            cnn_aw.Close()
+            If tab.Rows.Count > 0 Then
+                Return tab.Rows(0).Item(0)
+            Else
+                Return ""
+            End If
+        Catch ex As Exception
+            Return ""
+        End Try
+    End Function
+    Public Function consulta_procesos_pedido(ByVal id As Integer) As DataTable
+        Try
+            If cnn_aw.State = ConnectionState.Closed Then cnn_aw.Open()
+            Dim sqldat As New SqlDataAdapter("Select (iif(A.AGG=1010,1000,IIF(A.AGG =2020,2000,IIF(A.AGG=4010,4000, A.AGG)))) as ID_AGG  from SYSADM.PROD_JOBITEM A where A.AUFNR='" & id & "' AND A.AGG IS NOT NULL GROUP BY A.AGG ORDER BY A.AGG", cnn_aw)
+            Dim tab As New DataTable
+            sqldat.Fill(tab)
+            cnn_aw.Close()
+            Return tab
+        Catch ex As Exception
+            Return Nothing
+        End Try
+    End Function
+    Public Function consulta_estatus_liberado(ByVal folio As Integer, ByVal pos As Integer, ByVal reg_point As Integer, ByVal num_piezas As Integer) As Integer
+        Try
+            If cnn_aw.State = ConnectionState.Open Then cnn_aw.Close()
+            cnn_aw.Open()
+            Dim sql As String = "SELECT SUM(A.ANZAHL) FROM MEGALUMINIO.SYSADM.PD_AWBAR A WHERE A.ID='" & folio & "' AND A.POINT='" & reg_point & "' and A.POS_NR='" & pos & "'"
+            If reg_point = 11 Then sql = "SELECT SUM(A.ANZAHL) FROM MEGALUMINIO.SYSADM.PD_AWBAR A WHERE A.ID='" & folio & "' AND A.POINT in (11,24) and A.POS_NR='" & pos & "'"
+            If reg_point = 14 Then sql = "SELECT SUM(A.ANZAHL) FROM MEGALUMINIO.SYSADM.PD_AWBAR A WHERE A.ID='" & folio & "' AND A.POINT in (14,21,29) and A.POS_NR='" & pos & "'"
+            If reg_point = 16 Then sql = "SELECT SUM(A.ANZAHL) FROM MEGALUMINIO.SYSADM.PD_AWBAR A WHERE A.ID='" & folio & "' AND A.POINT in (16,30,31) and A.POS_NR='" & pos & "'"
+            Dim fbdat As New SqlDataAdapter(sql, cnn_aw)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            If Not IsDBNull(tab.Rows(0).Item(0)) Then
+                If tab.Rows(0).Item(0) > num_piezas Then
+                    Return num_piezas
+                Else
+                    Return tab.Rows(0).Item(0)
+                End If
+            Else
+                Return 0
+            End If
+            If Not IsDBNull(tab.Rows(0).Item(0)) Then
+                Return tab.Rows(0).Item(0)
+            Else
+                Return 0
+            End If
+            cnn_aw.Close()
+        Catch ex As Exception
+            MsgBox("Error en posicion: " & pos & " " & ex.Message)
+            Return 0
+        End Try
+    End Function
+    Public Function consulta_uds_producidas_por_proceso(ByVal folio As Integer, ByVal pos As Integer, ByVal reg_point As Integer, ByVal num_piezas As Integer, bom_id As Integer) As Integer
+        Try
+            If cnn_aw.State = ConnectionState.Open Then cnn_aw.Close()
+            cnn_aw.Open()
+            'Dim sql As String = "SELECT SUM(A.ANZAHL) FROM MEGALUMINIO.SYSADM.PD_AWBAR A WHERE A.ID='" & folio & "' AND A.POINT='" & reg_point & "' and A.POS_NR='" & pos & "'"
+            'If reg_point = 11 Then sql = "SELECT SUM(A.ANZAHL) FROM MEGALUMINIO.SYSADM.PD_AWBAR A WHERE A.ID='" & folio & "' AND A.POINT in (11,24) and A.POS_NR='" & pos & "'"
+            'If reg_point = 14 Then sql = "SELECT SUM(A.ANZAHL) FROM MEGALUMINIO.SYSADM.PD_AWBAR A WHERE A.ID='" & folio & "' AND A.POINT in (14,21) and A.POS_NR='" & pos & "'"
+            Dim sql As String = "select SUM(A.AMOUNT)  from SYSADM.FS_BOOK_HISTORY A 
+            INNER JOIN SYSADM.PD_PROD_POINT B ON (A.REG_POINT=B.FREMD_KEY) WHERE A.ID ='" & folio & "' AND B.FREMD_KEY ='" & reg_point & "' AND A.POSNR ='" & pos & "' and A.BOMID='" & bom_id & "'"
+            'MsgBox(sql)
+            If reg_point = 4000 Or reg_point = 4010 Then
+                sql = "select SUM(A.AMOUNT)  from SYSADM.FS_BOOK_HISTORY A 
+            INNER JOIN SYSADM.PD_PROD_POINT B ON (A.REG_POINT=B.FREMD_KEY) WHERE A.ID ='" & folio & "' AND B.FREMD_KEY IN (4000,4010) AND A.POSNR ='" & pos & "' and A.BOMID='" & bom_id & "'"
+            End If
+            Dim fbdat As New SqlDataAdapter(sql, cnn_aw)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            If Not IsDBNull(tab.Rows(0).Item(0)) Then
+
+                Return tab.Rows(0).Item(0)
+            Else
+                Return 0
+            End If
+            cnn_aw.Close()
+        Catch ex As Exception
+            MsgBox("Error en posicion: " & pos & " " & ex.Message)
+            Return 0
+        End Try
+    End Function
+    Public Function retorna_fecha_estatus_520(ByVal pedido As Integer) As DateTime
+        Try
+
+            If cnn_aw.State = ConnectionState.Closed Then cnn_aw.Open()
+            Dim sqldat As New SqlDataAdapter("select TOP 1 (A.DATUM) from SYSADM.BW_AUFTR_HIST A WHERE A.STATUS_ID =520 AND A.ID ='" & pedido & "' ORDER BY A.DATUM DESC ", cnn_aw)
+            Dim tab As New DataTable
+            sqldat.Fill(tab)
+            cnn_aw.Close()
+            If tab.Rows.Count > 0 Then
+                Return tab.Rows(0).Item(0)
+            Else
+                Return Now
+            End If
+
+        Catch ex As Exception
+            Return Nothing
+        End Try
+    End Function
+    Public Function retorna_fecha_prob_entrega_pedido(ByVal pedido As Integer) As String
+        Try
+            If cnn_aw.State = ConnectionState.Closed Then cnn_aw.Open()
+            Dim sqldat As New SqlDataAdapter("SELECT SYSADM.DVD_FUN_GEN_FECHA_PROBLABLE_ENTREGA ('" & pedido & "') ", cnn_aw)
+            Dim tab As New DataTable
+            sqldat.Fill(tab)
+            If tab.Rows.Count > 0 Then
+                Try
+                    Dim f520 As DateTime = retorna_fecha_estatus_520(pedido)
+                    If DateDiff(DateInterval.Hour, tab.Rows(0).Item(0), f520) > 0 Then
+                        Dialog26.paner_semaforo.BackColor = Color.Red
+                    Else
+                        Dialog26.paner_semaforo.BackColor = Color.Green
+                    End If
+                    Dialog26.txt_atraso.Text = DateDiff(DateInterval.Hour, tab.Rows(0).Item(0), f520) & " Hrs"
+                Catch ex As Exception
+                End Try
+                Return tab.Rows(0).Item(0)
+            Else
+                Return ""
+            End If
+
+        Catch ex As Exception
+            Return ""
+        End Try
+    End Function
+    Public Function consulta_detalle_pos(ByVal folio As Integer, ByVal pos As Integer) As DataTable
+        Try
+            If cnn_aw.State = ConnectionState.Open Then cnn_aw.Close()
+            cnn_aw.Open()
+            Dim fbdat As New SqlDataAdapter("SELECT A.STL_BEZ,A.STL_PRODART,A.BOM_PRODUKT,A.POS_NR,A.BOM_ID,coalesce((select TOP 1 R.AGG from SYSADM.PROD_JOBITEM R where R.AUFNR =A.ID AND R.POSNR =A.POS_NR AND R.BOM_ID =A.BOM_ID),0) as reg_point,A.STL_MENGE FROM MEGALUMINIO.SYSADM.BW_AUFTR_STKL A WHERE A.ID='" & folio & "' AND A.POS_NR='" & pos & "' AND (A.PROD_RELEVANT >0 OR A.STL_PRODART =1)", cnn_aw)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            cnn_aw.Close()
+            Return tab
+        Catch ex As Exception
+            MsgBox(ex.Message)
+            Return Nothing
+        End Try
+    End Function
+    Public Function retorna_numero_pila_pos(ByVal pedido As Integer, ByVal posicion As Integer, ByVal grupo_id As Integer, ByVal id_cris As Integer) As String
+        Try
+            If grupo_id = 1 Then
+                If cnn_aw.State = ConnectionState.Closed Then cnn_aw.Open()
+                'MsgBox("select A.RACK  from SYSADM.PROD_JOBITEM A where  A.BOM_PRODUKT ='" & id_cris & "' AND A.POSNR ='" & posicion & "' AND A.AUFNR ='" & pedido & "'")
+                Dim sqldat As New SqlDataAdapter("select A.RACK  from SYSADM.PROD_JOBITEM A where  A.BOM_PRODUKT ='" & id_cris & "' AND A.POSNR ='" & posicion & "' AND A.AUFNR ='" & pedido & "'", cnn_aw)
+                Dim tab As New DataTable
+                sqldat.Fill(tab)
+                If tab.Rows.Count > 0 Then
+                    Return tab.Rows(0).Item(0)
+                Else
+                    Return ""
+                End If
+            Else
+                Return ""
+            End If
+        Catch ex As Exception
+            MsgBox(ex.Message)
+            Return ""
+        End Try
+    End Function
+    Public Function consulta_estatus_liberado2(ByVal folio As Integer, ByVal pos As Integer, ByVal reg_point As Integer, ByVal num_piezas As Integer) As Integer
+        Try
+            If cnn_aw.State = ConnectionState.Open Then cnn_aw.Close()
+            cnn_aw.Open()
+            'Dim sql As String = "SELECT SUM(A.ANZAHL) FROM MEGALUMINIO.SYSADM.PD_AWBAR A WHERE A.ID='" & folio & "' AND A.POINT='" & reg_point & "' and A.POS_NR='" & pos & "'"
+            'If reg_point = 11 Then sql = "SELECT SUM(A.ANZAHL) FROM MEGALUMINIO.SYSADM.PD_AWBAR A WHERE A.ID='" & folio & "' AND A.POINT in (11,24) and A.POS_NR='" & pos & "'"
+            'If reg_point = 14 Then sql = "SELECT SUM(A.ANZAHL) FROM MEGALUMINIO.SYSADM.PD_AWBAR A WHERE A.ID='" & folio & "' AND A.POINT in (14,21) and A.POS_NR='" & pos & "'"
+            Dim sql As String = "select SUM(A.AMOUNT)  from SYSADM.FS_BOOK_HISTORY A 
+            INNER JOIN SYSADM.PD_PROD_POINT B ON (A.REG_POINT=B.FREMD_KEY) WHERE A.ID ='" & folio & "' AND B.NUMMER ='" & reg_point & "' AND A.POSNR ='" & pos & "'"
+            If reg_point = 11 Then sql = "select SUM(A.AMOUNT)  from SYSADM.FS_BOOK_HISTORY A 
+            INNER JOIN SYSADM.PD_PROD_POINT B ON (A.REG_POINT=B.FREMD_KEY) WHERE A.ID ='" & folio & "' AND B.NUMMER  IN (11,24) AND A.POSNR ='" & pos & "'"
+            If reg_point = 20 Then sql = "select SUM(A.AMOUNT)  from SYSADM.FS_BOOK_HISTORY A 
+            INNER JOIN SYSADM.PD_PROD_POINT B ON (A.REG_POINT=B.FREMD_KEY) WHERE A.ID ='" & folio & "' AND B.NUMMER  =20 AND A.POSNR ='" & pos & "' and A.BOMID=0 AND A.WORK_TYPE =9900"
+            If reg_point = 14 Then sql = "select SUM(A.AMOUNT)  from SYSADM.FS_BOOK_HISTORY A 
+            INNER JOIN SYSADM.PD_PROD_POINT B ON (A.REG_POINT=B.FREMD_KEY) WHERE A.ID ='" & folio & "' AND B.NUMMER  IN (14,21) AND A.POSNR ='" & pos & "'"
+            Dim fbdat As New SqlDataAdapter(sql, cnn_aw)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            'If Not IsDBNull(tab.Rows(0).Item(0)) Then
+            '    If tab.Rows(0).Item(0) > num_piezas Then
+            '        Return num_piezas
+            '    Else
+            '        Return tab.Rows(0).Item(0)
+            '    End If
+            'Else
+            '    Return 0
+            'End If
+            If Not IsDBNull(tab.Rows(0).Item(0)) Then
+
+                Return tab.Rows(0).Item(0)
+
+            Else
+                Return 0
+            End If
+            cnn_aw.Close()
+        Catch ex As Exception
+            MsgBox("Error en posicion: " & pos & " " & ex.Message)
+            Return 0
+        End Try
+    End Function
+    Public Function consulta_tiene_reposicion(ByVal folio As String) As DataTable
+        Try
+            If cnn_aw.State = ConnectionState.Open Then cnn_aw.Close()
+            cnn_aw.Open()
+            Dim sqldat As New SqlDataAdapter("select A.ID,A.STATUS,A.DATUM_ERF,A.SU_QM_REAL,A.FI_BETR_EK1,B.FI_BETR_NETTO from megaluminio.SYSADM.BW_AUFTR_KOPF A  
+            inner join SYSADM.BW_AUFTR_KOPF B on (A.AH_HAUPT_AUFTR =B.ID )
+            WHERE A.AH_HAUPT_AUFTR='" & folio & "' and A.STATUS < 995", cnn_aw)
+            Dim tab As New DataTable
+            sqldat.Fill(tab)
+            cnn_aw.Close()
+            Return tab
+        Catch ex As Exception
+            Return Nothing
+        End Try
+    End Function
+    Public Function consulta_pedido() As Integer
+        Try
+            Dialog26.txt_tarea.Text = consulta_tarea(Dialog26.txt_folio.Text)
+            Dialog26.grid_datos.Rows.Clear()
+            Dim tab As New DataTable
+            tab = consulta_datos(Dialog26.txt_folio.Text)
+            Dim pos_row As Integer = 0
+            Dialog26.lbl_fecha_prod.Text = consulta_fecha_produccion_pedido(Dialog26.txt_folio.Text)
+            For Each x As DataRow In tab.Rows
+                Dialog26.est_ped = x("ID")
+                Dialog26.txt_estatus.Text = x("ID") & " " & x("BEZ")
+                Dialog26.txt_cliente.Text = x("AH_NAME1")
+                Dialog26.txt_ruta.Text = x("OR_TOUR")
+                Dialog26.txt_con_expe.Text = x("OR_LIEFERBED")
+                Dialog26.txt_peso.Text = Math.Round(x("PESO_TOT"), 2)
+                Dialog26.txt_m2.Text = Math.Round(x("SU_QM_FAKT"), 2)
+                Dialog26.txt_mlin.Text = Math.Round(x("SU_LFM_REAL"), 2)
+                Dialog26.grid_datos.Rows.Add(x("POS_NR"), x("PROD_ID"), x("PROD_BEZ1"), Math.Round(x("PP_DICKE"), 2), Math.Round(x("PP_ORIG_MENGE"), 2), Math.Round(x("PP_BREITE"), 0) & " x " & Math.Round(x("PP_HOEHE"), 0), consulta_estatus_liberado(Dialog26.txt_folio.Text, x("POS_NR"), 7, x("PP_ORIG_MENGE")), consulta_estatus_liberado(Dialog26.txt_folio.Text, x("POS_NR"), 11, x("PP_ORIG_MENGE")), consulta_estatus_liberado(Dialog26.txt_folio.Text, x("POS_NR"), 14, x("PP_ORIG_MENGE")), consulta_estatus_liberado(Dialog26.txt_folio.Text, x("POS_NR"), 21, x("PP_ORIG_MENGE")), consulta_estatus_liberado(Dialog26.txt_folio.Text, x("POS_NR"), 27, x("PP_ORIG_MENGE")), consulta_estatus_liberado(Dialog26.txt_folio.Text, x("POS_NR"), 19, x("PP_ORIG_MENGE")), consulta_estatus_liberado(Dialog26.txt_folio.Text, x("POS_NR"), 23, x("PP_ORIG_MENGE")), consulta_estatus_liberado(Dialog26.txt_folio.Text, x("POS_NR"), 22, x("PP_ORIG_MENGE")), consulta_estatus_liberado(Dialog26.txt_folio.Text, x("POS_NR"), 16, x("PP_ORIG_MENGE")), consulta_estatus_liberado(Dialog26.txt_folio.Text, x("POS_NR"), 18, x("PP_ORIG_MENGE")), consulta_estatus_liberado(Dialog26.txt_folio.Text, x("POS_NR"), 17, x("PP_ORIG_MENGE")), consulta_estatus_liberado(Dialog26.txt_folio.Text, x("POS_NR"), 20, x("PP_ORIG_MENGE")), x("PROD_PRODART"), retorna_numero_pila_pos(Dialog26.txt_folio.Text, x("POS_NR"), x("PROD_PRODART"), x("PROD_ID")), x("UDS_SURT"), x("BOM_ID"), x("REG_POINT"))
+                'grid_datos.Rows.Add(x("POS_NR"), x("PROD_ID"), x("PROD_BEZ1"), Math.Round(x("PP_DICKE"), 2), Math.Round(x("PP_ORIG_MENGE"), 2), Math.Round(x("PP_BREITE"), 0) & " x " & Math.Round(x("PP_HOEHE"), 0), consulta_estatus_liberado(txt_folio.Text, x("POS_NR"), 7, x("PP_ORIG_MENGE")), consulta_uds_producidas_por_proceso(txt_folio.Text, x("pos_nr"), x("reg_point"), 0, x("bom_id")), consulta_estatus_liberado(txt_folio.Text, x("POS_NR"), 14, x("PP_ORIG_MENGE")), consulta_estatus_liberado(txt_folio.Text, x("POS_NR"), 21, x("PP_ORIG_MENGE")), consulta_estatus_liberado(txt_folio.Text, x("POS_NR"), 27, x("PP_ORIG_MENGE")), consulta_estatus_liberado(txt_folio.Text, x("POS_NR"), 19, x("PP_ORIG_MENGE")), consulta_estatus_liberado(txt_folio.Text, x("POS_NR"), 23, x("PP_ORIG_MENGE")), consulta_estatus_liberado(txt_folio.Text, x("POS_NR"), 22, x("PP_ORIG_MENGE")), consulta_uds_producidas_por_proceso(txt_folio.Text, x("pos_nr"), x("reg_point"), 0, x("bom_id")), consulta_estatus_liberado(txt_folio.Text, x("POS_NR"), 18, x("PP_ORIG_MENGE")), consulta_estatus_liberado(txt_folio.Text, x("POS_NR"), 17, x("PP_ORIG_MENGE")), consulta_estatus_liberado2(txt_folio.Text, x("POS_NR"), 20, x("PP_ORIG_MENGE")), x("PROD_PRODART"), retorna_numero_pila_pos(txt_folio.Text, x("POS_NR"), x("PROD_PRODART"), x("PROD_ID")), x("UDS_SURT"), x("BOM_ID"), x("REG_POINT"))
+                For rg = 0 To 17
+                    Dialog26.grid_datos.Rows(pos_row).Cells(rg).Style.BackColor = Color.LightSteelBlue
+                Next
+                pos_row += 1
+                Dim ban As Integer = 0
+                For Each y As DataRow In consulta_detalle_pos(Dialog26.txt_folio.Text, x("POS_NR")).Rows
+                    If ban = 0 Then
+                        Dialog26.grid_datos.Rows.Add("-", y("BOM_PRODUKT"), y("STL_BEZ"), y("STL_MENGE"), Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, y("STL_PRODART"), retorna_numero_pila_pos(Dialog26.txt_folio.Text, x("pos_nr"), y("STL_PRODART"), y("BOM_PRODUKT")), Nothing, y("BOM_ID"), y("REG_POINT"))
+                    Else
+                        Dialog26.grid_datos.Rows.Add("", y("BOM_PRODUKT"), y("STL_BEZ"), y("STL_MENGE"), Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, y("STL_PRODART"), retorna_numero_pila_pos(Dialog26.txt_folio.Text, x("pos_nr"), y("STL_PRODART"), y("BOM_PRODUKT")), Nothing, y("BOM_ID"), y("REG_POINT"))
+                    End If
+                    ban += 1
+                    pos_row += 1
+                Next
+            Next
+            Return pos_row
+        Catch ex As Exception
+            Return 0
+            MsgBox(ex.Message)
+        End Try
+    End Function
+    Public Function consulta_key() As String
+        Try
+            If cnn_aw.State = ConnectionState.Open Then cnn_aw.Close()
+            cnn_aw.Open()
+            Dim sqldat As New SqlDataAdapter("select clave from dbo.dmz_key where activa = 1", cnn_aw)
+            Dim tab As New DataTable
+            sqldat.Fill(tab)
+            Return "" & tab.Rows(0).Item(0)
+            cnn_aw.Close()
+        Catch ex As Exception
+            Throw New DataException()
+        End Try
+    End Function
+    Public Function consulta_piezas_totales(ByVal folios As String) As DataTable
+        Try
+            If cnn_aw.State = ConnectionState.Open Then cnn_aw.Close()
+            cnn_aw.Open()
+            Dim consulta As String = String.Format("select sum(B.MENGE) as total, B.AGG from SYSADM.PROD_JOBITEM B where B.AUFNR in ({0}) and B.AGG is not null group by B.AGG", folios)
+            Dim sqldat As New SqlDataAdapter(consulta, cnn_aw)
+            Dim tab As New DataTable
+            sqldat.Fill(tab)
+            Return tab
+            cnn_aw.Close()
+        Catch ex As Exception
+            Throw New DataException()
+        End Try
+    End Function
+    Public Function consulta_piezas_Producidas(ByVal folios As String) As DataTable
+        Try
+            If cnn_aw.State = ConnectionState.Open Then cnn_aw.Close()
+            cnn_aw.Open()
+            Dim consulta As String = String.Format("select sum(C.AMOUNT) as total,C.REG_POINT from SYSADM.FS_BOOK_HISTORY C where C.ID in ({0}) group by C.REG_POINT", folios)
+            Dim sqldat As New SqlDataAdapter(consulta, cnn_aw)
+            Dim tab As New DataTable
+            sqldat.Fill(tab)
+            Return tab
+            cnn_aw.Close()
+        Catch ex As Exception
+            MsgBox(ex.ToString)
+            Throw New DataException()
+        End Try
+    End Function
+
+
+
+End Module

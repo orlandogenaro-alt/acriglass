@@ -1,0 +1,72 @@
+Imports FirebirdSql.Data.FirebirdClient
+
+Module Consultas_db_aw_Management
+    Public Function retorna_parametros_sug_megaglass() As DataTable
+        Try
+            Dim fbdat As New FbDataAdapter("select a.parametro_id,a.clave,a.descripcion,a.signo,a.valor from parametros_costos_sug A order by a.clave", cnn_prod_aw)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            Return tab
+        Catch ex As Exception
+            MsgBox(ex.Message)
+            Return Nothing
+        End Try
+    End Function
+    Public Function lista_cristales_sugeridos_vtas_megaglass() As DataTable
+        Try
+            Dim fbcdat As New FbDataAdapter("select a.cristal_id,a.descripcion,a.espesor,a.costo,a.moneda_id from  costos_cristales_presupuestos A", cnn_prod_aw)
+            Dim tab As New DataTable
+            fbcdat.Fill(tab)
+            Return tab
+        Catch ex As Exception
+            MsgBox(ex.Message)
+            Return Nothing
+        End Try
+    End Function
+    Public Function lista_rellenos_sugeridos_vtas_megaglass() As DataTable
+        Try
+            Dim fbcdat As New FbDataAdapter("select a.relleno_id,a.descripcion,a.espesor,a.costo,a.moneda_id,a.es_perfil,a.estatus from rellenos A", cnn_prod_aw)
+            Dim tab As New DataTable
+            fbcdat.Fill(tab)
+            Return tab
+        Catch ex As Exception
+            MsgBox(ex.Message)
+            Return Nothing
+        End Try
+    End Function
+    Public Function get_InfoSueridoAW(folio As Integer, tbl As String) As DataTable
+        Try
+            Dim fbcdat As New FbDataAdapter("select suerido_id,coalesce(proyecto,'indf') as proy,coalesce(estatus,'Pendiente') as estatus,tc,oferta,mts_solicitados,importe_con_iva from " & tbl & " where folio = " & folio, cnn_prod_aw)
+            Dim tab As New DataTable
+            fbcdat.Fill(tab)
+            Return tab
+        Catch ex As Exception
+            MsgBox(ex.Message)
+            Return Nothing
+        End Try
+    End Function
+    Public Function get_dtFoliosSugerido(folios As String, tbl As String) As DataTable
+        Try
+            Dim fbcdat As New FbDataAdapter("select suerido_id,folio,coalesce(proyecto,'indf') as proy,coalesce(estatus,'Pendiente') as estatus,tc,oferta,mts_solicitados,importe_con_iva from " & tbl & " where suerido_id in (" & folios & ")", cnn_prod_aw)
+            Dim tab As New DataTable
+            fbcdat.Fill(tab)
+            Return tab
+        Catch ex As Exception
+            MsgBox(ex.Message)
+            Return Nothing
+        End Try
+    End Function
+
+    Public Function get_sumaFoliosSugerido(folios As String, tbl As String) As DataTable
+        Try
+            Dim fbcdat As New FbDataAdapter("Select sum(importe_con_iva) As importe, sum(importe_con_iva / tc) As importe_dls from " & tbl & " where suerido_id in (" & folios & ")", cnn_prod_aw)
+            Dim tab As New DataTable
+            fbcdat.Fill(tab)
+            Return tab
+        Catch ex As Exception
+            MsgBox(ex.Message)
+            Return Nothing
+        End Try
+    End Function
+
+End Module

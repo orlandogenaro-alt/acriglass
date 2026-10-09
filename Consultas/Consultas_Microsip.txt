@@ -1,0 +1,292 @@
+Imports FirebirdSql.Data.FirebirdClient
+
+Module Consultas_Microsip
+    Public Function retorna_historial_cambiaria(fecha_ini As Date, fecha_fin As Date) As DataTable
+        Dim fbtran As FbTransaction
+        fbtran = cnn_micro.BeginTransaction(IsolationLevel.Snapshot)
+        Try
+            Dim fbcom As New FbCommand("SELECT A.moneda_id,A.fecha, A.tipo_cambio FROM historia_cambiaria A WHERE A.fecha between @F_INI AND @F_FIN and A.moneda_id=87148 ", cnn_micro, fbtran)
+            fbcom.Parameters.AddWithValue("F_INI", Format(fecha_ini, "dd.MM.yyyy"))
+            fbcom.Parameters.AddWithValue("F_FIN", Format(fecha_fin, "dd.MM.yyyy"))
+            Dim fbdat As New FbDataAdapter(fbcom)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            fbtran.Commit()
+            Return tab
+        Catch ex As Exception
+            fbtran.Rollback()
+            MsgBox("retorna_historial_cambiaria " & ex.Message)
+            Return Nothing
+        End Try
+    End Function
+    Public Function consulta_cliente_por_id(ByVal id_cli As Integer) As DataTable
+        Try
+            Dim fbdat As New FbDataAdapter("select a.cliente_id,a.nombre,a.rfc,a.contacto,d.nombre as zonas_clientes, e.nombre as vendedor,a.telefono,
+            a.email,b.nombre as cond_pago,c.nombre as tipo_cliente,a.calle,a.colonia,a.num_exterior,a.num_interior,
+            a.poblacion,a.codigo_postal,f.nombre as ciudad,a.referencia,a.clave_cliente,a.CONDICIONES_COM,a.direccion
+            ,coalesce(g.nombre,'') as sistema_met,coalesce(h.nombre,'') as moneda
+            from clientes A
+            left join condiciones_pago B on (a.cond_pago_id=b.cond_pago_id)
+            left join tipos_clientes C on (a.tipo_cliente_id =c.tipo_cliente_id)
+            left join zonas_clientes D on (d.zona_cliente_id=a.zona_cliente_id)
+            left join vendedores E on (e.vendedor_id=a.vendedor_id)
+            left join ciudades F on (f.ciudad_id=a.ciudad_id)
+            left join sistema_dimenciones G on (g.sistema_dim_id=a.sistema_dim_id)
+            left join tipos_moneda H on (h.moneda_id=a.moneda_id)
+            where a.cliente_id='" & id_cli & "'", cnn_prod)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            Return tab
+        Catch ex As Exception
+            Return Nothing
+        End Try
+    End Function
+    Public Function retorna_datos_articulos(articulo_id) As DataTable
+        Dim fbtran As FbTransaction
+        fbtran = cnn_micro.BeginTransaction(IsolationLevel.Snapshot)
+        Try
+            Dim fbcom As New FbCommand("select r.articulo_id,(select first 1 t.clave_articulo from claves_articulos T where t.articulo_id=r.articulo_id order by t.rol_clave_art_id), r.nombre,r.unidad_venta from articulos R where r.articulo_id=@articulo_id", cnn_micro, fbtran)
+            fbcom.Parameters.AddWithValue("articulo_id", articulo_id)
+            Dim fbdat As New FbDataAdapter(fbcom)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            fbtran.Commit()
+            Return tab
+        Catch ex As Exception
+            fbtran.Rollback()
+            MsgBox("retorna_datos_articulos " & ex.Message)
+            Return Nothing
+        End Try
+    End Function
+    Public Function retorna_datos_articulos_busqueda(texto_bus As String, tipo As Integer) As DataTable
+        Dim sql As String = "select r.articulo_id,(select first 1 t.clave_articulo from claves_articulos T
+        where t.articulo_id=r.articulo_id order by t.rol_clave_art_id) as clave_articulo , r.nombre,r.unidad_venta from articulos R where R.nombre containing @TEXTO_BUS"
+        If tipo = 2 Then
+            sql = "select a.articulo_id,a.clave_articulo, b.nombre,b.unidad_venta from claves_articulos A
+            inner join articulos B on (a.articulo_id=b.articulo_id) where a.clave_articulo like @TEXTO_BUS"
+        ElseIf tipo = 3 Then
+            sql = "select a.articulo_id,a.clave_articulo, b.nombre,b.unidad_venta from claves_articulos A
+            inner join articulos B on (a.articulo_id=b.articulo_id) where a.clave_articulo = @TEXTO_BUS"
+        End If
+        Dim fbtran As FbTransaction
+        fbtran = cnn_micro.BeginTransaction(IsolationLevel.Snapshot)
+        Try
+            Dim fbcom As New FbCommand(sql, cnn_micro, fbtran)
+            fbcom.Parameters.AddWithValue("TEXTO_BUS", texto_bus)
+            Dim fbdat As New FbDataAdapter(fbcom)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            fbtran.Commit()
+            Return tab
+        Catch ex As Exception
+            fbtran.Rollback()
+            MsgBox("retorna_datos_articulos " & ex.Message)
+            Return Nothing
+        End Try
+    End Function
+    Public Function retorna_vendedores_mic()
+        Try
+            Dim fbdat As New FbDataAdapter("select a.vendedor_id,a.nombre from vendedores A", cnn_micro)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            Return tab
+        Catch ex As Exception
+            Return Nothing
+        End Try
+    End Function
+    Public Function retorna_almacenes_mic()
+        Try
+            Dim fbdat As New FbDataAdapter("select a.almacen_id,a.nombre from almacenes A order by a.nombre", cnn_micro)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            Return tab
+        Catch ex As Exception
+            Return Nothing
+        End Try
+    End Function
+    Public Function retorna_datos_clientes(texto_bus As String, tipo As Integer) As DataTable
+        Dim sql As String = "select A.cliente_id,(SELECT FIRST 1 T.clave_cliente FROM claves_clientes T WHERE T.cliente_id=A.cliente_id) as clave_cliente, A.nombre,b.nombre as moneda from clientes A
+            inner join monedas b on (a.moneda_id=b.moneda_id)
+            where  a.nombre containing  @texto_bus"
+        If tipo = 2 Then
+            sql = "select t.cliente_id,t.clave_cliente,z.nombre,B.nombre AS moneda from claves_clientes T
+            inner join clientes z on (t.cliente_id=z.cliente_id)
+            inner join monedas b on (Z.moneda_id=b.moneda_id)
+            where t.clave_cliente containing @texto_bus"
+        ElseIf tipo = 3 Then
+            sql = "select t.cliente_id,t.clave_cliente,z.nombre,B.nombre AS moneda from claves_clientes T
+            inner join clientes z on (t.cliente_id=z.cliente_id)
+            inner join monedas b on (Z.moneda_id=b.moneda_id)
+            where t.clave_cliente = @texto_bus"
+        End If
+        Dim fbtran As FbTransaction
+        fbtran = cnn_micro.BeginTransaction(IsolationLevel.Snapshot)
+        Try
+            Dim fbcom As New FbCommand(sql, cnn_micro, fbtran)
+            fbcom.Parameters.AddWithValue("texto_bus", texto_bus)
+            Dim fbdat As New FbDataAdapter(fbcom)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            fbtran.Commit()
+            Return tab
+        Catch ex As Exception
+            fbtran.Rollback()
+            MsgBox("retorna_datos_articulos " & ex.Message)
+            Return Nothing
+        End Try
+    End Function
+    Public Function retorna_datos_proveedores(texto_bus As String, tipo As Integer) As DataTable
+        Dim sql As String = "select A.proveedor_id,(SELECT FIRST 1 T.clave_prov FROM claves_proveedores T WHERE T.proveedor_id=A.proveedor_id) as clave_prov, A.nombre,b.nombre as moneda from proveedores A
+            inner join monedas b on (a.moneda_id=b.moneda_id)
+            where  a.nombre containing  @texto_bus"
+        If tipo = 2 Then
+            sql = "select t.proveedor_id,t.clave_prov,z.nombre,B.nombre AS moneda from claves_proveedores T
+            inner join proveedores z on (t.proveedor_id=z.proveedor_id)
+            inner join monedas b on (Z.moneda_id=b.moneda_id)
+            where t.clave_prov containing @texto_bus"
+        ElseIf tipo = 3 Then
+            sql = "select t.proveedor_id,t.clave_prov,z.nombre,B.nombre AS moneda from claves_proveedores T
+            inner join proveedores z on (t.proveedor_id=z.proveedor_id)
+            inner join monedas b on (Z.moneda_id=b.moneda_id)
+            where t.clave_prov= @texto_bus"
+        End If
+        Dim fbtran As FbTransaction
+        fbtran = cnn_micro.BeginTransaction(IsolationLevel.Snapshot)
+        Try
+            Dim fbcom As New FbCommand(sql, cnn_micro, fbtran)
+            fbcom.Parameters.AddWithValue("texto_bus", texto_bus)
+            Dim fbdat As New FbDataAdapter(fbcom)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            fbtran.Commit()
+            Return tab
+        Catch ex As Exception
+            fbtran.Rollback()
+            MsgBox("retorna_datos_articulos " & ex.Message)
+            Return Nothing
+        End Try
+    End Function
+
+    Public Function retorna_folio_factura(easyglass As Integer) As DataTable
+        Try
+            Dim fbdat As New FbDataAdapter("select a.folio,a.estatus,(a.importe_neto + a.total_impuestos) as importe_neto, b.folio_easy_glass from doctos_ve A
+                                            inner join libres_fac_ve B on (a.docto_ve_id = b.docto_ve_id)
+                                            where b.folio_easy_glass =" & easyglass, cnn_micro)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            Return tab
+        Catch ex As Exception
+            Return Nothing
+        End Try
+    End Function
+
+    Public Function retorna_folio_compras(easyglass As Integer) As DataTable
+        Try
+            'Dim fbdat As New FbDataAdapter("select a.folio, a.folio_prov,(a.importe_neto + a.total_impuestos) as importe,a.estatus from doctos_cm A
+            '                                inner join libres_com_cm B on (a.docto_cm_id = b.docto_cm_id)
+            '                                where b.folio_easy_glass =" & easyglass, cnn_micro)
+            Dim sql_q As String = String.Format("select a.folio, a.folio_prov,(a.importe_neto + a.total_impuestos) as importe,a.estatus from doctos_cm A
+                                            inner join libres_com_cm B on (a.docto_cm_id = b.docto_cm_id)
+                                            where (b.folio_easy_glass  = {0}) or (trim(b.otros_folios_easy_glass) || ',' like '%{0},%')", easyglass)
+            Dim fbdat As New FbDataAdapter(sql_q, cnn_micro)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            Return tab
+        Catch ex As Exception
+            Return Nothing
+        End Try
+    End Function
+
+    Public Function consilta_folios_cargos(folio_easy As Integer) As DataTable
+        Try
+            'Dim fbdat As New FbDataAdapter("select A.docto_cc_id from libres_cargos_cc A where A.folio_easy_glass = '" & folio_easy & "'
+            '        union
+            '        select B.docto_cc_id from libres_creditos_cc B where B.folio_easy_glass = '" & folio_easy & "'", cnn_micro)
+
+            'Dim sql As String = String.Format("select A.docto_cc_id from libres_cargos_cc A where (A.folio_easy_glass = '{0}') or (TRIM(varios_folios_easy_glass) || ',' like '%{0},%')
+            '        union
+            '        select B.docto_cc_id from libres_creditos_cc B where (B.folio_easy_glass = '{0}') or (TRIM(varios_folios_easy_glass) || ',' like '%{0},%')", folio_easy)
+            Dim sql As String = String.Format("select A.docto_cc_id,coalesce(A.varios_folios_easy_glass,'') as folios from libres_cargos_cc A where (A.folio_easy_glass = '{0}') or (TRIM(varios_folios_easy_glass) || ',' like '%{0},%')
+                    union
+                    select B.docto_cc_id,coalesce(B.varios_folios_easy_glass,'') as folios from libres_creditos_cc B where (B.folio_easy_glass = '{0}') or (TRIM(varios_folios_easy_glass) || ',' like '%{0},%')", folio_easy)
+
+            Dim fbdat As New FbDataAdapter(sql, cnn_micro)
+
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            Return tab
+        Catch ex As Exception
+            Return New DataTable
+        End Try
+    End Function
+
+    Public Function consulta_cc_folio_cc(id_docto_cc As Integer) As DataTable
+        Try
+            'Dim fbdat As New FbDataAdapter("select B.nombre, A.folio, (D.importe + D.impuesto) as importe from doctos_cc A
+            '        inner join importes_doctos_cc D on (A.docto_cc_id = D.docto_cc_id)
+            '        inner join conceptos_cc B on (A.concepto_cc_id = B.concepto_cc_id)
+            '        inner join clientes C on (A.cliente_id = C.cliente_id)
+            '        where A.docto_cc_id = '" & id_docto_cc & "'", cnn_prod)
+            ' ' ' 'cabio de jesus alvino para que sume los folios
+            Dim fbdat As New FbDataAdapter("select B.nombre, A.folio, (D.importe + D.impuesto) as importe, A.cancelado, A.fecha from doctos_cc A
+                    inner join importes_doctos_cc D on (A.docto_cc_id = D.docto_cc_id)
+                    inner join conceptos_cc B on (A.concepto_cc_id = B.concepto_cc_id)
+                    where A.docto_cc_id = '" & id_docto_cc & "'", cnn_micro) ' se ele quito el order by B.nombre, A.folio, A.cancelado"
+            ' ' ' ' ' '  con esta se agupan de manera automatica
+            'Dim fbdat As New FbDataAdapter("select B.nombre, A.folio, sum(D.importe + D.impuesto) as importe, A.cancelado from doctos_cc A
+            '        inner join importes_doctos_cc D on (A.docto_cc_id = D.docto_cc_id)
+            '        inner join conceptos_cc B on (A.concepto_cc_id = B.concepto_cc_id)
+            '        where A.docto_cc_id = '" & id_docto_cc & "' group by B.nombre, A.folio, A.cancelado", cnn_micro)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            Return tab
+        Catch ex As Exception
+            Return New DataTable
+        End Try
+    End Function
+    Public Function consulta_creditos_cp_folio_cp(id_easy_glass As Integer) As DataTable
+        Try
+            Dim sql_q As String = String.Format("select 'Credito' as nombre, B.folio,(C.importe + C.impuesto) as importe from libres_creditos_cp A
+                inner join doctos_cp B on (B.docto_cp_id = A.docto_cp_id and B.cancelado = 'N')
+                inner join importes_doctos_cp C on (C.docto_cp_id = A.docto_cp_id)
+                where (A.folio_easy_glass = '{0}') or (trim(A.otros_folios_easy_glass) || ',' like '%{0},%')", id_easy_glass)
+            Dim fbdat As New FbDataAdapter(sql_q, cnn_micro)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            Return tab
+        Catch ex As Exception
+            Return New DataTable
+        End Try
+    End Function
+
+    Public Function retorna_monto_factura(folio As String) As DataTable
+        Try
+            Dim fbdat As New FbDataAdapter("select a.docto_cm_id,a.folio as folio_cm,a.importe_neto,a.tipo_cambio,b.docto_cp_id,b.folio,b.descripcion,c.nombre,(SELECT SUM(IMPORTE+IMPUESTO-IVA_RETENIDO-ISR_RETENIDO)
+                                            FROM IMPORTES_DOCTOS_CP
+                                            WHERE DOCTO_CP_ID = b.docto_cp_id) as importe_credito from doctos_cp B
+                                            inner join doctos_entre_sis D on (d.docto_dest_id = b.docto_cp_id)
+                                            inner join doctos_cm A on (a.docto_cm_id = d.docto_fte_id)
+                                            inner join proveedores C on (c.proveedor_id =a.proveedor_id)
+                                            where b.folio like '" & folio & "'", cnn_micro)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            Return tab
+        Catch ex As Exception
+            Return Nothing
+        End Try
+    End Function
+    Public Function retorna_facturas_material(folio As Integer) As DataTable
+        Try
+            Dim sql As String
+            sql = "select a.folio, a.folio_prov,(a.importe_neto + a.total_impuestos) as importe,a.tipo_cambio,(select sum(unidades) from doctos_cm_det where docto_cm_id = a.docto_cm_id and umed = 'Pieza') as piezas from doctos_cm A
+                                            inner join libres_com_cm B on (b.docto_cm_id = a.docto_cm_id)
+                                            where b.folio_easy_glass =" & folio & " and a.estatus='N' and a.proveedor_id in (2813,2830,3221,13628,13674)"
+            Dim fbdat As New FbDataAdapter(sql, cnn_micro)
+            Dim tab As New DataTable
+            fbdat.Fill(tab)
+            Return tab
+        Catch ex As Exception
+            Return Nothing
+        End Try
+    End Function
+End Module

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 100">
+  <!-- Ventana de vidrio con marco de aluminio -->
+  <g transform="translate(10 12)">
+    <rect x="0" y="0" width="60" height="76" rx="3" fill="#dce9f7" stroke="#8a97a8" stroke-width="4"/>
+    <path d="M30 0v76M0 38h60" stroke="#8a97a8" stroke-width="4"/>
+    <path d="M6 8l16-4v26L6 34zM36 8l18-4v26l-18 4z" fill="#5aa0e6" opacity=".85"/>
+    <path d="M6 46l16-4v26L6 72zM36 46l18-4v26l-18 4z" fill="#3b7dc4" opacity=".85"/>
+    <path d="M10 14l6-2M40 14l8-2" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <text x="84" y="58" font-family="'Exo 2', 'Segoe UI', Arial, sans-serif" font-size="44" font-weight="800" letter-spacing="-1">
+    <tspan fill="#c9a24e">ACRI</tspan><tspan fill="#1c3566" dx="6">GLASS</tspan>
+  </text>
+  <text x="86" y="84" font-family="'Segoe UI', Arial, sans-serif" font-size="14.5" font-weight="700" letter-spacing="5.2" fill="#3b7dc4">VIDRIO Y ALUMINIO</text>
+</svg>

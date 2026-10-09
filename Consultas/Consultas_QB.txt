@@ -1,0 +1,1103 @@
+Imports RestSharp
+Imports Newtonsoft.Json.Linq
+Imports System.Security.Cryptography
+Imports System.Text
+Imports System.Threading.Tasks
+Imports System.Net
+Imports System.Net.Sockets
+Imports System.Xml
+
+Imports System.IO
+Imports Google.Apis.Auth.OAuth2.Requests
+Imports Newtonsoft.Json
+Imports Google.Apis.Sheets.v4.Data
+Imports System.Diagnostics.Eventing
+
+
+'Para ver la documentación entrar en la siguiente liga https://developer.intuit.com/app/developer/qbo/docs/api/accounting/most-commonly-used/payment
+
+Module Consultas_QB
+
+    Private Const AppID As String = "4c135fa2-1092-4ddd-abcd-ca856924702d"
+    Private Const ClientId As String = "ABKak7tvfoIum3qST4rfqPUPQrxjvwScA8fy59rJcmDDI1ocDO"
+    Private Const ClientSecret As String = "k9ZiE7eFOkMMfVGYNAuBpd896ditD9tTqFQHfduE"
+
+    Private Const AuthorizationEndPoint As String = "https://appcenter.intuit.com/connect/oauth2"
+    Private Const TokienEndPoint As String = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"
+    Private Const UserInfoEndPoint As String = "https://accounts.platform.intuit.com/v1/openid_connect/userinfo"
+
+    Private ReadOnly baseURL As String = "https://quickbooks.api.intuit.com"
+
+    Private RelamId As String = String.Empty
+    Private IdToken As String = String.Empty
+    Private RefreshToken As String = String.Empty
+    Private AccessToken As String = String.Empty
+    Private TokenType As String = String.Empty
+    Private RefeshTokenExpiresin As Integer
+    Private ExpiresIn As Integer
+    Private FechaTokenSave
+
+    ''' <summary>
+    ''' <remarks>
+    ''' Procedimiento que guarda las facturas dentro de QuickBooks solicitando 2 parámetros un <code>DataTable</code> y un <code>String</code>
+    ''' </remarks>
+    ''' <para>
+    ''' <item><description>Id del articulo <c>Int</c></description></item>
+    ''' </para>
+    ''' <item><description>Cantidad de Articulos <c>Int</c></description></item>
+    ''' <para>
+    ''' <item><description>Precio por Articulo Individual <c>Float</c></description></item>
+    ''' </para>
+    ''' <item><description>Descripcion del articulo <c>String</c></description></item>
+    ''' </summary>
+    ''' <exception cref="Exception"></exception>
+    ''' <exception cref="ArgumentNullException"></exception>
+    ''' <param name="articulos">DataTable que espera 4 valores -> Id del articulo, -> Cantidad de Articulos, -> Precio individual por Articulo, -> Descripción del Articulo</param>
+    ''' <param name="id_cliente">String Id del cliente</param>
+    ''' <returns>ID de la Factura</returns>
+    Public Function GuardaInvoiceQB(ByVal articulos As DataTable, ByVal id_cliente As String, ByVal invoice As Integer) As String
+        'Dim invoice As Integer = retorna_invoice_id()
+        Dim factura As String = "A" & invoice
+        HayTokensAsync()
+
+        Dim uri = String.Format("{0}/v3/company/{1}/invoice", baseURL, RelamId)
+        System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12
+
+        Dim cliente = New RestClient(uri)
+        Dim solicitud = New RestRequest(Method.POST)
+        solicitud.AddHeader("Accept", "application/json")
+        solicitud.AddHeader("Authorization", String.Concat("Bearer ", AccessToken))
+        solicitud.AddHeader("Content-Type", "application/json")
+
+        If articulos.Rows.Count < 1 Then
+            Throw New Exception("No se han detectado articulos")
+            Exit Function
+        End If
+        If articulos.Columns.Count <> 4 Then
+            Throw New Exception("No las Columnas solicitados no son correctas")
+            Exit Function
+        End If
+        'itemid  ---  cantidad  --- prtecio_unitario ---- descripciomn
+
+        Dim lineObjct As New Collection()
+        For Each art As DataRow In articulos.Rows
+            lineObjct.Add(New With {.DetailType = "SalesItemLineDetail", .Amount = (art.ItemArray(1) * art.ItemArray(2)), .Description = art.ItemArray(3), .SalesItemLineDetail = New With {.ItemRef = New With {.value = art.ItemArray(0)}, .Qty = art.ItemArray(1), .UnitPrice = art.ItemArray(2)}})
+        Next
+
+        Dim jsonObject = New With {
+                Key .DocNumber = factura,
+                Key .Line = lineObjct,
+                Key .CustomerRef = New With {
+                    .value = id_cliente
+                }
+        }
+
+        solicitud.AddJsonBody(jsonObject)
+
+        Dim respuestas As IRestResponse = cliente.Execute(solicitud)
+
+        Dim resp As JObject = JObject.Parse(respuestas.Content)
+        Dim id_invoice As String = ""
+        If respuestas.StatusCode = 200 Then
+            'Console.WriteLine("Mensaje de quickbooks.")
+            id_invoice = resp("Invoice")("Id").ToString()
+            'Console.WriteLine(id_invoice)
+            'incrementa_invoice_id(invoice + 1)
+        Else
+            Dim err = resp("Fault")("Error")(0)("Message").ToString()
+            Dim detalle = resp("Fault")("Error")(0)("Detail").ToString()
+            Throw New Exception(err & " Detalle: " & detalle)
+            Return ""
+        End If
+        Return id_invoice
+    End Function
+
+    ''' <summary>
+    ''' Funcion que retorna un DataTable que contiene la Informacion Principal del Producto
+    ''' </summary>
+    ''' <example>
+    ''' parm = "where Active=true"
+    ''' articulos = GetProducts(parm)
+    ''' </example>
+    ''' <exception cref="Exception"></exception>
+    ''' <exception cref="ArgumentNullException"></exception>
+    ''' <param name="consulta">Parametro Opcional que recibe la parte del WHERE</param>
+    ''' <returns>DataTable con los Productos</returns>
+    Public Function GetProductsQB(Optional ByVal consulta As String = "where Active=true") As DataTable
+
+        HayTokensAsync()
+
+        Dim uri = String.Format("{0}/v3/company/{1}/query?query=select * from Item {2}", baseURL, RelamId, consulta)
+
+        System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12
+
+        Dim cliente = New RestClient(uri)
+        Dim solicitud = New RestRequest(Method.GET)
+        solicitud.AddHeader("Accept", "application/json")
+        solicitud.AddHeader("Authorization", String.Concat("Bearer ", AccessToken))
+        solicitud.AddHeader("Content-Type", "text/plain")
+        Try
+            Dim respuestas As IRestResponse = cliente.Execute(solicitud)
+
+            Dim articulos As New DataTable
+            articulos.Columns.Add("Id")
+            articulos.Columns.Add("Nombre")
+            articulos.Columns.Add("Nombre Completo")
+            articulos.Columns.Add("Descripcion")
+            articulos.Columns.Add("Tipo")
+            articulos.Columns.Add("Precio Unitario")
+            articulos.Columns.Add("Precio Compra")
+            articulos.Columns.Add("Activo")
+            articulos.Columns.Add("Escaso")
+
+            Dim QueryResponse As JObject = JObject.Parse(respuestas.Content)
+
+            If respuestas.StatusCode = 200 Then
+                Dim items As JToken = QueryResponse("QueryResponse")("Item")
+                For Each item As JToken In items
+
+                    articulos.Rows.Add({item("Id").ToString(), item("Name").ToString(), item.SelectToken("FullyQualifiedName"), item.SelectToken("Description"), item.SelectToken("Type"), item.SelectToken("UnitPrice"), item.SelectToken("PurchaseCost"), item("Active").ToString(), item("sparse").ToString()})
+
+                Next
+            Else
+                Dim err = QueryResponse("Fault")("Error")(0)("Message").ToString()
+                Dim detalle = QueryResponse("Fault")("Error")(0)("Detail").ToString()
+                Throw New Exception(err & " Detalle: " & detalle)
+            End If
+            Return articulos
+        Catch ex As Newtonsoft.Json.JsonReaderException
+            MsgBox("error" & Convert.ToString(ex))
+            Return Nothing
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' Funcion que retorna un DataTable con Articulos
+    ''' </summary>
+    ''' <param name="consulta">Parametro Opcional que ecibe el WHERE</param>
+    ''' <exception cref="Exception"></exception>
+    ''' <exception cref="ArgumentNullException"></exception>
+    ''' <returns>DataTable con los Clientes</returns>
+    Public Function GetClientsQB(Optional ByVal consulta As String = "where Active=true") As DataTable
+
+        HayTokensAsync()
+
+        Dim uri = String.Format("{0}/v3/company/{1}/query?query=select * from Customer {2}", baseURL, RelamId, consulta)
+        System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12
+
+        Dim cliente = New RestClient(uri)
+        Dim solicitud = New RestRequest(Method.GET)
+        solicitud.AddHeader("Accept", "application/json")
+        solicitud.AddHeader("Authorization", String.Concat("Bearer ", AccessToken))
+        solicitud.AddHeader("Content-Type", "text/plain")
+
+        Dim respuestas As IRestResponse = cliente.Execute(solicitud)
+
+        Dim Clientes As New DataTable
+        Clientes.Columns.Add("Id")
+        Clientes.Columns.Add("Nombre")
+        Clientes.Columns.Add("Nombre pila")
+        Clientes.Columns.Add("Family Name")
+        Clientes.Columns.Add("Company name")
+        Clientes.Columns.Add("Active")
+
+        Try
+            Dim QueryResponse As JObject = JObject.Parse(respuestas.Content)
+
+            If respuestas.StatusCode = 200 Then
+                Dim items As JToken = QueryResponse("QueryResponse")("Customer")
+                For Each item As JToken In items
+
+                    Clientes.Rows.Add({item("Id").ToString(), item("DisplayName").ToString(), item.SelectToken("GivenName"), item.SelectToken("FamilyName"), item.SelectToken("CompanyName"), item.SelectToken("Active")})
+
+                Next
+            Else
+                Dim err = QueryResponse("Fault")("Error")(0)("Message").ToString()
+                Dim detalle = QueryResponse("Fault")("Error")(0)("Detail").ToString()
+                Throw New Exception(err & " Detalle: " & detalle)
+            End If
+        Catch ex As Newtonsoft.Json.JsonReaderException
+        Catch er As System.NullReferenceException
+        End Try
+
+        Return Clientes
+    End Function
+
+    ''' <summary>
+    ''' Funcion abierta que permite hacer cualquier Consulta
+    '''  Para mayor informacion revisar el link: https://developer.intuit.com/app/developer/qbo/docs/develop/explore-the-quickbooks-online-api/data-queries
+    ''' </summary>
+    ''' <exception cref="Exception"></exception>
+    ''' <exception cref="ArgumentNullException"></exception>
+    ''' <param name="consulta">consulta de QuickBooks</param>
+    ''' <returns>JObject con la carga de datos</returns>
+    Public Function GetByQueryQB(ByVal consulta As String) As JObject
+
+        HayTokensAsync()
+
+        Dim uri = String.Format("{0}/v3/company/{1}/query?query={2}", baseURL, RelamId, consulta)
+        System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12
+
+        Dim cliente = New RestClient(uri)
+        Dim solicitud = New RestRequest(Method.GET)
+        solicitud.AddHeader("Accept", "application/json")
+        solicitud.AddHeader("Authorization", String.Concat("Bearer ", AccessToken))
+        solicitud.AddHeader("Content-Type", "text/plain")
+
+        Dim respuestas As IRestResponse = cliente.Execute(solicitud)
+
+        Return JObject.Parse(respuestas.Content)
+    End Function
+
+    ''' <summary>
+    ''' Funcion que busca la informacion de un cliente espesifico los datos que Retorna
+    ''' <para>
+    ''' -> Id, -> Nombre, -> Apellido, -> CompanyName, -> Estus, -> Telefono, -> Correo
+    ''' </para>
+    ''' </summary>
+    ''' <exception cref="Exception"></exception>
+    ''' <exception cref="ArgumentNullException"></exception>
+    ''' <param name="id_cli"></param>
+    ''' <returns>String() con los datos</returns>
+    Public Function GetClientByIdQB(ByVal id_cli As Integer) As String()
+
+        HayTokensAsync()
+
+        Dim uri = String.Format("{0}/v3/company/{1}/customer/{2}", baseURL, RelamId, id_cli)
+        System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12
+
+        Dim cliente = New RestClient(uri)
+        Dim solicitud = New RestRequest(Method.GET)
+        solicitud.AddHeader("Accept", "application/json")
+        solicitud.AddHeader("Authorization", String.Concat("Bearer ", AccessToken))
+        solicitud.AddHeader("Content-Type", "application/json")
+
+        Dim respuestas As IRestResponse = cliente.Execute(solicitud)
+
+        Dim QueryResponse As JObject = JObject.Parse(respuestas.Content)
+
+        Dim Id As String
+        Dim name As String
+        Dim namePila As String
+        Dim FamilyName As String
+        Dim CompanyName As String
+        Dim active As String
+        Dim Telefono As String
+        Dim Correo As String
+
+        If respuestas.StatusCode = 200 Then
+
+            Dim client As JToken = QueryResponse("Customer")
+
+            Id = client("Id").ToString()
+            name = client("DisplayName").ToString()
+            namePila = client("GivenName").ToString()
+            FamilyName = client.SelectToken("FamilyName")
+            CompanyName = client.SelectToken("CompanyName")
+            active = client.SelectToken("Active")
+
+            Try
+                Telefono = client.SelectToken("PrimaryPhone")("FreeFormNumber")
+            Catch ex As Exception
+                Telefono = ""
+            End Try
+            Try
+                Correo = client.SelectToken("PrimaryEmailAddr")("Address")
+            Catch ex As Exception
+                Correo = ""
+            End Try
+
+        Else
+            Dim err = QueryResponse("Fault")("Error")(0)("Message").ToString()
+            Dim detalle = QueryResponse("Fault")("Error")(0)("Detail").ToString()
+            Throw New Exception(err & " Detalle: " & detalle)
+        End If
+
+        Return {Id, name, namePila, FamilyName, CompanyName, active, Telefono, Correo}
+    End Function
+
+    ''' <summary>
+    ''' Funcion que Retorna informacion de un Producto por el id
+    ''' <para>
+    ''' -> Id, -> Nombre, -> Descripcion, -> Tipo, -> Precio, -> Precio Compra, -> Estatus, -> Escaso
+    ''' </para>
+    ''' </summary>
+    ''' <param name="id_art">Id del Articulo</param>
+    ''' <exception cref="Exception"></exception>
+    ''' <exception cref="ArgumentNullException"></exception>
+    ''' <returns></returns>
+    Public Function GetProductByIdQB(ByVal id_art As Integer) As String()
+
+        HayTokensAsync()
+
+        'Dim uri = String.Format("{0}/v3/company/{1}/item/{2}?minorversion=4", baseURL, RelamId, id_art)
+
+        ' despues del 31 de junio la vercio de a rriba dejara de funcionar por lo que ahora esta sera la prueba, las que he realizado si funcionan
+        Dim uri = String.Format("{0}/v3/company/{1}/item/{2}", baseURL, RelamId, id_art)
+        System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12
+
+        Dim cliente = New RestClient(uri)
+        Dim solicitud = New RestRequest(Method.GET)
+        solicitud.AddHeader("Accept", "application/json")
+        solicitud.AddHeader("Authorization", String.Concat("Bearer ", AccessToken))
+        solicitud.AddHeader("Content-Type", "application/json")
+
+        Dim respuestas As IRestResponse = cliente.Execute(solicitud)
+
+        Dim QueryResponse As JObject = JObject.Parse(respuestas.Content)
+        Dim Id As String
+        Dim name As String
+        Dim NameCompleto As String
+        Dim descipcion As String
+        Dim type As String
+        Dim precio As String
+        Dim purchase As String
+        Dim estatus As String
+        Dim isescaso As String
+
+        If respuestas.StatusCode = 200 Then
+
+            Dim item As JToken = QueryResponse("Item")
+
+            Id = item("Id").ToString()
+            name = item("Name").ToString()
+            NameCompleto = item.SelectToken("FullyQualifiedName")
+            descipcion = item.SelectToken("Description")
+            type = item.SelectToken("Type")
+            precio = item.SelectToken("UnitPrice")
+            purchase = item.SelectToken("PurchaseCost")
+            estatus = item("Active").ToString()
+            isescaso = item("sparse").ToString()
+        Else
+            Dim err = QueryResponse("Fault")("Error")(0)("Message").ToString()
+            Dim detalle = QueryResponse("Fault")("Error")(0)("Detail").ToString()
+            Throw New Exception(err & " Detalle: " & detalle)
+        End If
+
+        Return {Id, name, NameCompleto, descipcion, type, precio, purchase, estatus, isescaso}
+    End Function
+    ''' <summary>
+    ''' Funcion que se encarga de obtener los pagos de algun invoise de quickbooks
+    ''' </summary>
+    ''' <param name="folios"></param>
+    ''' <returns></returns>
+    Public Function GetPaymentsQB(folios As String) As DataTable
+
+        HayTokensAsync()
+
+        Dim uri = String.Format("{0}/v3/company/{1}/query?query=select Id,CustomerRef,TotalAmt,CurrencyRef,TxnDate from Payment Where Id IN ({2})", baseURL, RelamId, folios)
+        System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12
+
+        Dim cliente = New RestClient(uri)
+        Dim solicitud = New RestRequest(Method.GET)
+        solicitud.AddHeader("Accept", "application/json")
+        solicitud.AddHeader("Authorization", String.Concat("Bearer ", AccessToken))
+        solicitud.AddHeader("Content-Type", "text/plain")
+
+        Dim respuestas As IRestResponse = cliente.Execute(solicitud)
+
+        'Console.WriteLine(respuestas.Content)
+
+        Dim pagos As New DataTable
+        pagos.Columns.Add("Id")
+        pagos.Columns.Add("id_cienteQB")
+        pagos.Columns.Add("nameClienteQB")
+        pagos.Columns.Add("Fecha")
+        pagos.Columns.Add("Total")
+        pagos.Columns.Add("Moneda")
+
+
+        Try
+            Dim QueryResponse As JObject = JObject.Parse(respuestas.Content)
+
+            If respuestas.StatusCode = 200 Then
+                Dim items As JToken = QueryResponse("QueryResponse")("Payment")
+
+                For Each item As JToken In items
+                    Dim rpago As DataRow = pagos.NewRow()
+                    'Dim id = item("Id")?.ToString()
+                    'Dim idCliente = item("CustomerRef")("value")?.ToString()
+                    'Dim nameCliente = item("CustomerRef")("name")?.ToString()
+                    Dim total = item("TotalAmt")?.ToString()
+                    'Dim moneda = item("CurrencyRef")("value")?.ToString()
+                    Dim fecha = item("TxnDate")?.ToString()
+                    'tronarlo con un token que no exista a ver que retorna
+
+                    If total Is Nothing Then total = 0
+
+                    If fecha Is Nothing Then fecha = DateTime.Now()
+
+
+                    Dim f As Date = Date.Parse(fecha)
+                    'Dim sf = Format(f, "dd/MM/yyyy")
+                    'Console.WriteLine(f)
+                    'Console.WriteLine(sf)
+
+                    rpago.Item(0) = item("Id")?.ToString()
+                    rpago.Item(1) = item("CustomerRef")("value")?.ToString()
+                    rpago.Item(2) = item("CustomerRef")("name")?.ToString()
+                    rpago.Item(3) = Format(f, "dd/MM/yyyy")
+                    rpago.Item(4) = FormatCurrency(Double.Parse(total))
+                    rpago.Item(5) = item("CurrencyRef")("value")?.ToString()
+
+
+                    pagos.Rows.Add(rpago)
+                    ' la ideas con item.SelectToken("Active")  se supone que retorna el token o null if token is null then no hacer validacion 
+                    'Clientes.Rows.Add({item("Id").ToString(), item("DisplayName").ToString(), item.SelectToken("GivenName"), item.SelectToken("FamilyName"), item.SelectToken("CompanyName"), item.SelectToken("Active")})
+                Next
+            Else
+                Dim err = QueryResponse("Fault")("Error")(0)("Message").ToString()
+                Dim detalle = QueryResponse("Fault")("Error")(0)("Detail").ToString()
+                Throw New Exception(err & " Detalle: " & detalle)
+            End If
+        Catch ex As Newtonsoft.Json.JsonReaderException
+        Catch er As System.NullReferenceException
+        End Try
+
+        Return pagos
+    End Function
+
+    ''' <summary>
+    ''' Funcion no disponible Funciona pero no esta Terminada
+    ''' </summary>
+    ''' <returns>Undefined</returns>
+    Public Function GetInfoAcountQB() As String()
+
+        HayTokensAsync()
+
+
+        Dim uri = String.Format("{0}/v3/company/{1}/companyinfo/{1}", baseURL, RelamId)
+        System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12
+
+        Dim cliente = New RestClient(uri)
+        Dim solicitud = New RestRequest(Method.GET)
+        solicitud.AddHeader("Accept", "application/json")
+        solicitud.AddHeader("Authorization", String.Concat("Bearer ", AccessToken))
+
+        solicitud.AddHeader("Content-Type", "aplicación/json")
+
+
+        Dim respuestas As IRestResponse = cliente.Execute(solicitud)
+
+        'Console.WriteLine("--------------------------------------------")
+        'Console.WriteLine(respuestas.Content)
+        'Console.WriteLine("--------------------------------------------")
+        'Console.WriteLine(respuestas.StatusCode)
+        'Console.WriteLine(respuestas.ErrorMessage)
+        'Console.WriteLine(respuestas.ErrorException)
+
+        Return {"a", "b", "c"}
+    End Function
+
+    ''' <summary>
+    ''' Funcion asincrona que valida que los tokes esten Activos de lo Contrario los conectara  ' se quito el async de asincrono ya que no se ocupara para Await ConectToQB()
+    ''' </summary>
+    Private Async Sub HayTokensAsync()
+
+        '
+        '
+        ' comentar esta parte o eliminar de la base datos para que busque nuvos tokens 
+        If AccessToken = String.Empty Then
+            GetTokensBD()
+        End If
+
+        If AccessToken = String.Empty Then
+            ' 
+            ' para conectar el ap ir al developer playground de la aplicaccion https://developer.intuit.com/app/developer/playground
+            ' esta funcion es parcial 
+            '
+            Await ConectToQB()
+
+            '    Dim con As ConectToQB = New ConectToQB()
+            '    Await con.Conecta()
+            '    MsgBox("Ver como se conecta y activar el guardado ", MsgBoxStyle.Information)1
+            GuardaActulizaBD(1)
+        End If
+
+        If DateTime.Compare(Date.Now.AddHours(-1).ToString("dd.MM.yyyy HH:mm:ss"), FechaTokenSave) > 0 Then
+            ' este es en caso de que algun otro usuario hay hecho el cambio de tokens y no se catualizaron entra esta funcion de validadion 
+            GetTokensBD()
+            If DateTime.Compare(Date.Now.AddHours(-1).ToString("dd.MM.yyyy HH:mm:ss"), FechaTokenSave) > 0 Then
+                RefrshToken()
+                GuardaActulizaBD(2)
+            End If
+        End If
+
+    End Sub
+
+    Private Function RandomDataBase64url(lenigth As UInteger) As String
+        Dim rng As RNGCryptoServiceProvider = New RNGCryptoServiceProvider()
+        Dim bytes(lenigth) As Byte
+        rng.GetBytes(bytes)
+
+        Return Base64urlencodeNoPadding(bytes)
+    End Function
+
+    Private Function Base64urlencodeNoPadding(buffer As Byte()) As String
+        Dim base64 As String = Convert.ToBase64String(buffer)
+        base64 = base64.Replace("+", "-")
+        base64 = base64.Replace("/", "_")
+        base64 = base64.Replace("=", "")
+
+        Return base64
+    End Function
+
+    Private Function sha256(input As String) As Byte()
+        Dim bytes As Byte() = Encoding.ASCII.GetBytes(input)
+        Dim sha As SHA256Managed = New SHA256Managed()
+        Return sha.ComputeHash(bytes)
+    End Function
+
+    Private Function EncodeBase64ToString(ByVal valor As String) As String
+        Return Convert.ToBase64String(Encoding.UTF8.GetBytes(valor))
+    End Function
+
+    Private Async Function ConectToQB() As Task
+
+        Dim state As String = RandomDataBase64url(32)
+        Dim verifierCode As String = RandomDataBase64url(32)
+        Dim CodeChallenge As String = Base64urlencodeNoPadding(sha256(verifierCode))
+        Const codeCHallengMethod As String = "S256"
+
+        Dim redictUri As String = String.Format("http://{0}:{1}/", "localhost", 60256)
+
+        'netsh http add urlacl url=http:    //+:60256/EasuGlass/ user=User
+
+
+        'Dim redictUri As String = String.Format("http://megaglass.com/")
+
+        Dim http = New HttpListener()
+
+        If http.IsListening Then
+            MsgBox("El servidor ya se enecuentra en ejecucion", MsgBoxStyle.Critical)
+        End If
+
+
+        http.Prefixes.Clear()
+        http.Prefixes.Add(redictUri)
+        http.Start()
+
+        'Try
+        '    http.Start()
+        'Catch ex As Exception
+        '    'Dim startinfo = New ProcessStartInfo(redictUri) With {.Verb = "runas"}
+        '    Process.Start(redictUri)
+        '    Environment.Exit(0)
+        'End Try
+
+        Dim authRequest = String.Format("{0}?response_type=code&scope=com.intuit.quickbooks.accounting%20openid%20profile&redirect_uri={1}&client_id={2}&state={3}&code_challenge={4}&code_challenge_method={5}",
+                                                 AuthorizationEndPoint, Uri.EscapeDataString(redictUri), ClientId, state, CodeChallenge, codeCHallengMethod)
+
+        System.Diagnostics.Process.Start(authRequest)
+
+        Dim context = Await http.GetContextAsync()
+
+        'intento fallido de mostar el Active
+        'Me.Activate()
+
+        Dim response = context.Response
+        Dim resposeString As String = String.Format("<html><head><meta http-equiv='refresh' content='10;url=https://google.com'></head><body>Please return to the app.</body></html>")
+        Dim bufer = System.Text.Encoding.UTF8.GetBytes(resposeString)
+        response.ContentLength64 = bufer.Length
+        Dim responseOut = response.OutputStream
+
+
+        Dim responseTask As Task = responseOut.WriteAsync(bufer, 0, bufer.Length).ContinueWith(Sub(task)
+                                                                                                   responseOut.Close()
+                                                                                                   http.Stop()
+                                                                                               End Sub)
+
+
+        If context.Request.QueryString.Get("error") IsNot Nothing Then
+            Throw New Exception(String.Format("OAuth authorization error: {0}.", context.Request.QueryString.Get("error")))
+            Return
+        End If
+
+        If context.Request.QueryString.Get("code") Is Nothing Or context.Request.QueryString.Get("state") Is Nothing Then
+            Throw New Exception("Malformed authorization response. " + context.Request.QueryString.ToString)
+            Return
+        End If
+
+        Dim code = context.Request.QueryString.Get("code")
+        Dim incoming_state = context.Request.QueryString.Get("state")
+        RelamId = context.Request.QueryString.Get("realmId")
+
+        If incoming_state <> state Then
+            Throw New Exception(String.Format("Received request with invalid state ({0})", incoming_state))
+            Return
+        End If
+
+        'GetTokens(code, redictUri)
+
+        performCodeExcnahge(code, verifierCode, redictUri)
+
+    End Function
+
+
+    Public Async Sub performCodeExcnahge(code As String, code_verifer As String, redicturi As String)
+
+        ' creo que no llebaa el Barrirer
+        Dim tokenRquestUri As String = TokienEndPoint
+
+        Dim tokenReuestBody As String = String.Format("code={0}&redirect_uri={1}&client_id={2}&code_verifier={3}&client_secret={4}&scope=&grant_type=authorization_code",
+                code,
+                System.Uri.EscapeDataString(redicturi),
+                ClientId,
+                code_verifer,
+                ClientSecret
+                )
+        ' enviar la respues
+        Dim tokenRequest As HttpWebRequest = CType(WebRequest.Create(tokenRquestUri), HttpWebRequest)
+        tokenRequest.Method = "POST"
+        tokenRequest.ContentType = "application/x-www-form-urlencoded"
+        tokenRequest.Accept = "Accept=text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        Dim _byteVersion As Byte() = Encoding.ASCII.GetBytes(tokenReuestBody)
+        tokenRequest.ContentLength = _byteVersion.Length
+        Dim stream As Stream = tokenRequest.GetRequestStream()
+        Await stream.WriteAsync(_byteVersion, 0, _byteVersion.Length)
+        stream.Close()
+
+        Try
+            Dim tokenResponse As WebResponse = Await tokenRequest.GetResponseAsync()
+            Using reader As StreamReader = New StreamReader(tokenResponse.GetResponseStream())
+
+                Dim responceText As String = Await reader.ReadToEndAsync()
+                Console.WriteLine(responceText)
+
+
+                ''Connverts to dictionary
+                'Dim tokenEndpointDecoded As Dictionary(Of String, String) = JsonConvert.DeserializeObject(Of Dictionary(Of String, String))(responseText)
+                'Dim tokenEndpointDecoded As Dictionary(Of String, String) = JsonConvert.DeserializeAnonymousType(responseText, Dictionary(Of String, String))
+                Dim tokenEndpointDecoded As Dictionary(Of String, String) = JsonConvert.DeserializeObject(Of Dictionary(Of String, String))(responceText) ' (responseText, Dictionary(Of String, String))
+
+                Dim access_token = tokenEndpointDecoded("access_token")
+                userinfoCall(access_token)
+
+            End Using
+
+        Catch ex As WebException
+
+
+            If (ex.Status = WebExceptionStatus.ProtocolError) Then
+
+                Dim Response As HttpWebResponse = DirectCast(ex.Response, HttpWebResponse)
+
+                If (Response Is Nothing) Then
+                    Console.WriteLine("HTTP: " + Response.StatusCode)
+                    'output("HTTP: " + Response.StatusCode)
+                    Using reader As StreamReader = New StreamReader(Response.GetResponseStream())
+
+                        Dim responseText As String = reader.ReadToEndAsync().ToString()
+
+                        Console.WriteLine(responseText)
+                        'output(responseText)
+                    End Using
+
+                End If
+            End If
+        End Try
+    End Sub
+
+    Public Async Sub userinfoCall(access_token As String)
+
+
+
+        ' builds the  request
+        Dim userinfoRequestURI = UserInfoEndPoint
+
+        ' sends the request
+        Dim userinfoRequest As HttpWebRequest = CType(WebRequest.Create(userinfoRequestURI), HttpWebRequest)
+        userinfoRequest.Method = "GET"
+        userinfoRequest.Headers.Add(String.Format("Authorization: Bearer {0}", access_token))
+        userinfoRequest.ContentType = "application/x-www-form-urlencoded"
+        userinfoRequest.Accept = "Accept=text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+
+        ' gets the response
+        Dim userinfoResponse As WebResponse = Await userinfoRequest.GetResponseAsync()
+        Using userinfoResponseReader As StreamReader = New StreamReader(userinfoResponse.GetResponseStream())
+            ' reads response body
+            Dim userinfoResponseText As String = Await userinfoResponseReader.ReadToEndAsync()
+            Console.WriteLine(userinfoResponseText)
+
+        End Using
+
+
+    End Sub
+
+
+
+    Private Sub GetTokens(ByVal auth_Code As String, ByVal reduri As String)
+
+        Dim client = New RestClient(TokienEndPoint)
+
+        Dim request = New RestRequest(Method.POST)
+        request.AddHeader("Content-Type", "application/x-www-form-urlencoded")
+        request.AddHeader("Authorization", String.Concat("Basic ", EncodeBase64ToString(ClientId + ":" + ClientSecret)))
+        request.AddParameter("code", auth_Code, ParameterType.GetOrPost)
+        request.AddParameter("redirect_uri", reduri, ParameterType.GetOrPost)
+        request.AddParameter("grant_type", "authorization_code", ParameterType.GetOrPost)
+        request.AddParameter("response_type", "aplicación/json", ParameterType.GetOrPost)
+
+        Dim respuesta As IRestResponse = client.Execute(request)
+
+        If respuesta.StatusCode = HttpStatusCode.OK Then
+
+            Dim resp As JObject = JObject.Parse(respuesta.Content)
+
+            IdToken = resp("id_token").ToString()
+            RefreshToken = resp("refresh_token").ToString()
+            AccessToken = resp("access_token").ToString()
+            TokenType = resp("token_type").ToString()
+            RefeshTokenExpiresin = Integer.Parse(resp("x_refresh_token_expires_in").ToString())
+            ExpiresIn = Integer.Parse(resp("expires_in").ToString())
+
+        Else
+            Throw New Exception("Imposible obtener Tokens " & respuesta.StatusCode)
+        End If
+
+    End Sub
+
+    'Private Async Function ConectarNewToQB() As Task
+
+
+    '    ' ' esto esta ioncompleto 
+
+
+
+    '    'Dim state As String = RandomDataBase64url(32)
+    '    'Dim verifierCode As String = RandomDataBase64url(32)
+    '    'Dim CodeChallenge As String = Base64urlencodeNoPadding(sha256(verifierCode))
+    '    'Const codeCHallengMethod As String = "S256"
+
+    '    'Dim redictUri As String = String.Format("http://{0}:{1}/", "localhost.com", 60256)
+
+    '    'Dim listern = New TcpListener(IPAddress.Loopback, 0)
+    '    'listern.Start()
+
+    '    'Dim rdirect As String = String.Format("http://{0}:{1}/", IPAddress.Loopback, CType(listern.LocalEndpoint, IPEndPoint).Port)
+
+    '    'Dim authRequest = String.Format("{0}?response_type=code&scope=com.intuit.quickbooks.accounting openid profile&redirect_uri={1}&client_id={2}&state={3}&code_challenge={4}&code_challenge_method={5}",
+    '    '                                        AuthorizationEndPoint, Uri.EscapeDataString(redictUri), ClientId, state, CodeChallenge, codeCHallengMethod)
+
+    '    'System.Diagnostics.Process.Start(authRequest)
+
+    '    ''im context = Await Http.GetContextAsync()
+    '    'Dim client As TcpClient = Await listern.AcceptTcpClientAsync()
+
+
+    '    'Using stream As NetworkStream = client.GetStream()
+
+    '    '    Dim buffer = New Byte(1_024)
+    '    '    Dim received As Integer = Await stream.ReadAsync(buffer)
+
+    '    '    Dim message = Encoding.UTF8.GetString(buffer, 0, received)
+    '    '    Console.WriteLine($"Message received: {message}")
+
+
+
+    '    'End Using
+
+
+
+
+    '    ''Dim response = ReadString(client)
+
+    '    ''Me.Activate()   '  ' esta no se puede supongo que por el nivel y el metodo 
+
+
+    '    'Dim respueta = ReadString(client)
+
+
+    '    'Dim resposeString As String = String.Format("<html><head><meta http-equiv='refresh' content='10;url=https://google.com'></head><body>Please return to the app.</body></html>")
+    '    'Dim bufer = System.Text.Encoding.UTF8.GetBytes(resposeString)
+    '    'response.ContentLength64 = bufer.Length
+    '    'Dim responseOut = response.OutputStream
+
+    '    'client.Dispose()
+    '    'listern.Stop()
+
+
+    '    'Dim responseTask As Task = responseOut.WriteAsync(bufer, 0, bufer.Length).ContinueWith(Sub(task)
+    '    '                                                                                           responseOut.Close()
+    '    '                                                                                           Http.Stop()
+    '    '                                                                                       End Sub)
+
+
+    '    'If context.Request.QueryString.Get("error") IsNot Nothing Then
+    '    '    Throw New Exception(String.Format("OAuth authorization error: {0}.", context.Request.QueryString.Get("error")))
+    '    '    Return
+    '    'End If
+
+    '    'If context.Request.QueryString.Get("code") Is Nothing Then
+    '    '    Throw New Exception("Malformed authorization response. " + context.Request.QueryString.ToString)
+    '    '    Return
+    '    'End If
+
+    '    'Dim code = context.Request.QueryString.Get("code")
+    '    'Dim incoming_state = context.Request.QueryString.Get("state")
+    '    'RelamId = context.Request.QueryString.Get("realmId")
+
+    '    'If incoming_state <> state Then
+    '    '    Throw New Exception(String.Format("Received request with invalid state ({0})", incoming_state))
+    '    '    Return
+    '    'End If
+
+    '    'GetTokens(code, redictUri)
+
+
+
+
+
+    'End Function
+
+
+    Private Sub RefrshToken()
+
+        Dim client = New RestClient(TokienEndPoint)
+
+        Dim request = New RestRequest(Method.POST)
+        request.AddHeader("Content-Type", "application/x-www-form-urlencoded")
+        request.AddHeader("Accept", "application/json")
+        request.AddHeader("Authorization", String.Concat("Basic ", EncodeBase64ToString(ClientId + ":" + ClientSecret)))
+        request.AddParameter("grant_type", "refresh_token")
+        request.AddParameter("response_type", "aplicación/json", ParameterType.GetOrPost)
+        request.AddParameter("refresh_token", RefreshToken, ParameterType.GetOrPost)
+
+
+        Dim respuesta As IRestResponse = client.Execute(request)
+
+        Console.WriteLine(respuesta.Content)
+
+        Dim resp As JObject = JObject.Parse(respuesta.Content)
+
+        If respuesta.StatusCode = HttpStatusCode.OK Then
+            RefreshToken = resp("refresh_token").ToString()
+            AccessToken = resp("access_token").ToString()
+            TokenType = resp("token_type").ToString()
+            RefeshTokenExpiresin = Integer.Parse(resp("x_refresh_token_expires_in").ToString())
+            ExpiresIn = Integer.Parse(resp("expires_in").ToString())
+        Else
+            'Console.WriteLine(respuesta.StatusCode)
+            'Console.WriteLine(respuesta.IsSuccessful)
+            'Console.WriteLine(respuesta.ErrorMessage)
+
+            Throw New Exception("Imposible actualizar Tokens:  " & resp("error").ToString())
+        End If
+
+    End Sub
+
+    ''' <summary>
+    ''' Funcion que Deconecta la aplicacion de QuickBooks
+    ''' </summary>
+    Public Sub DesconectToQB()
+
+
+        Dim client = New RestClient("https://developer.api.intuit.com/v2/oauth2/tokens/revoke")
+
+        Dim request = New RestRequest(Method.POST)
+        request.AddHeader("Content-Type", "application/json")
+        request.AddHeader("Accept", "application/json")
+        request.AddHeader("Authorization", String.Concat("Basic ", EncodeBase64ToString(ClientId + ":" + ClientSecret)))
+
+        request.AddJsonBody(New With {
+            Key .token = RefreshToken
+        })
+        Dim respuesta As IRestResponse = client.Execute(request)
+        If respuesta.StatusCode = 200 Then
+            DeconectDB()
+            AccessToken = String.Empty
+        Else
+            MsgBox("Error al Desconectar", MsgBoxStyle.Critical)
+        End If
+
+    End Sub
+
+    Private Sub GetTokensBD()
+        Dim tbl As DataTable = getTokensDB()
+        If tbl.Rows.Count > 0 Then
+            ' hay informacion +
+            'IdToken = tab.Rows(0).Item(0)
+            RefreshToken = tbl.Rows(0).Item(1)
+            AccessToken = tbl.Rows(0).Item(2)
+            TokenType = tbl.Rows(0).Item(3)
+            FechaTokenSave = tbl.Rows(0).Item(7)
+            RefeshTokenExpiresin = Integer.Parse(tbl.Rows(0).Item(4))
+            ExpiresIn = Integer.Parse(tbl.Rows(0).Item(5))
+            RelamId = tbl.Rows(0).Item(8)
+        End If
+    End Sub
+
+    Private Sub GuardaActulizaBD(tipo As Integer)
+        FechaTokenSave = Date.Now.ToString("dd.MM.yyyy HH:mm:ss")
+        GuardaActuliza(tipo, FechaTokenSave, IdToken, RefreshToken, AccessToken, TokenType, RefeshTokenExpiresin, ExpiresIn, "SYSDBA", RelamId)
+    End Sub
+
+    Public Function query_qb(id_suerido As Integer)
+        Dim folio_qb As Integer = retorna_Id_QB(id_suerido)
+        If folio_qb > 2 Then
+            Dim folio As String = "'" & folio_qb & "'"
+            'Console.WriteLine(folio)
+            HayTokensAsync()
+            '  SELECT inv.DocNumber, inv.Balance, inv.TotalAmt, inv.TxnDate, inv.LinkedTxn FROM Invoice inv Where inv.id ='10'
+            Dim uri = String.Format("{0}/v3/company/{1}/query?query=select DocNumber,Balance,TotalAmt, LinkedTxn from Invoice where id = {2}", baseURL, RelamId, folio)
+            'Console.WriteLine(uri)
+            System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12
+
+            Dim cliente = New RestClient(uri)
+            Dim solicitud = New RestRequest(Method.GET)
+            solicitud.AddHeader("Accept", "application/json")
+            solicitud.AddHeader("Authorization", String.Concat("Bearer ", AccessToken))
+            solicitud.AddHeader("Content-Type", "application/json")
+
+            Dim respuestas As IRestResponse = cliente.Execute(solicitud)
+            Dim QueryResponse As JObject = JObject.Parse(respuestas.Content)
+            Dim DocNumber As String
+            Dim Balance As String
+            Dim Amount As String
+            Dim pamentsLinkTxn As String
+            If respuestas.StatusCode = 200 Then
+                Dim Invoice As JToken = QueryResponse("QueryResponse")("Invoice")
+                DocNumber = Invoice(0)("DocNumber").ToString
+                Amount = Invoice(0)("TotalAmt").ToString
+                Balance = Invoice(0)("Balance").ToString
+
+                Try
+                    Dim lit As New List(Of String)
+                    Dim items As JToken = Invoice(0)("LinkedTxn")
+                    For Each itPya As JToken In items
+                        If itPya("TxnType").ToString() = "Payment" Then
+                            'lit.Add(itPya("TxnId").ToString())
+                            lit.Add("'" & itPya("TxnId").ToString() & "'")
+                        End If
+                    Next
+
+                    pamentsLinkTxn = String.Join(",", lit.ToArray())
+                Catch ex As Exception
+                    pamentsLinkTxn = ""
+                End Try
+                'Console.WriteLine(DocNumber & " " & Amount & " " & Balance)
+                Return {DocNumber, Amount, Balance, pamentsLinkTxn}
+            Else
+                Dim err = QueryResponse("Fault")("Error")(0)("Message").ToString()
+                Dim detalle = QueryResponse("Fault")("Error")(0)("Detail").ToString()
+                Throw New Exception(err & " Detalle: " & detalle)
+            End If
+        End If
+        Return {""}
+    End Function
+
+    ''' <summary>
+    ''' 
+    ''' para este tratar de eliminar en qb con la funcion
+    ''' 
+    '''  ' ' funcion incompleta
+    ''' 
+    ''' </summary>
+    ''' <returns></returns>
+    Public Function EliminarInvoiceInQB(ByVal id_suerido As String) As Boolean
+        Try
+            Dim folio_qb As Integer = retorna_Id_QB(id_suerido)
+            If folio_qb > 2 Then
+                Dim folio As String = "'" & folio_qb & "'"
+
+
+
+                HayTokensAsync()
+
+                Dim uri = String.Format("{0}/v3/company/{1}/invoice?operation=delete", baseURL, RelamId)
+                System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12
+
+                Dim cliente = New RestClient(uri)
+                Dim solicitud = New RestRequest(Method.POST)
+                solicitud.AddHeader("Accept", "application/json")
+                solicitud.AddHeader("Authorization", String.Concat("Bearer ", AccessToken))
+                solicitud.AddHeader("Content-Type", "application/json")
+
+
+                '                {
+                '  "SyncToken": "3", 
+                '  "Id": "33"
+                '}
+
+
+
+                ' if estatus =
+                ' {
+                '  "Invoice" {
+                '    "status": "Deleted", 
+                '    "domain": "QBO", 
+                '    "Id": "33"
+                '  }, 
+                '  "time": "2013-03-15T00:18:15.322-07:00"
+                '}
+                'Else
+                '   throw new Exeption("no se elimino")
+                'end if
+
+            Else
+                Throw New Exception("No se encontro un folio valido")
+            End If
+            Return True
+        Catch ex As Exception
+            Return False
+        End Try
+    End Function
+
+    Public Sub PonTokensExterno(Relaid As String, IdToke As String, refreshToke As String, Accestoken As String, tokenTyp As String, refresTokenExpireuin As Integer, _expiresin As Integer)
+
+        RelamId = Relaid
+        IdToken = IdToke
+        RefreshToken = refreshToke
+        AccessToken = Accestoken
+        TokenType = tokenTyp
+        RefeshTokenExpiresin = refresTokenExpireuin
+        ExpiresIn = _expiresin
+
+    End Sub
+
+
+
+
+    ' - - - - New Type Conection
+    Public Function GetRandomUnusedPort()
+
+        Dim listener = New TcpListener(IPAddress.Loopback, 0)
+        listener.Start()
+        Dim port = CType(listener.LocalEndpoint, IPEndPoint).Port
+        listener.Stop()
+        Return port
+    End Function
+
+    Private Async Sub conect()
+
+        Dim state As String = RandomDataBase64url(32)
+        Dim verifierCode As String = RandomDataBase64url(32)
+        Dim CodeChallenge As String = Base64urlencodeNoPadding(sha256(verifierCode))
+        Const codeCHallengMethod As String = "S256"
+
+        Dim redictUri As String = String.Format("http://{0}:{1}/", IPAddress.Loopback, GetRandomUnusedPort())
+
+        'output("redirect URI: " + redirectURI);
+        Console.WriteLine("redirect URI: " + redictUri)
+
+        ' Crear El HTTPListener para los request
+        Dim http = New HttpListener()
+        http.Prefixes.Clear()
+        http.Prefixes.Add(redictUri)
+        Console.WriteLine("Esperanmdo......")
+        http.Start()
+
+
+        Dim authRequest = String.Format("{0}?response_type=code&scope=com.intuit.quickbooks.accounting openid profile&redirect_uri={1}&client_id={2}&state={3}&code_challenge={4}&code_challenge_method={5}",
+                                                AuthorizationEndPoint, Uri.EscapeDataString(redictUri), ClientId, state, CodeChallenge, codeCHallengMethod)
+
+        System.Diagnostics.Process.Start(authRequest)
+
+        Dim context = Await http.GetContextAsync()
+    End Sub
+
+
+
+
+
+End Module

@@ -10,6 +10,8 @@ const ACRI_PERMISOS = [
     'NUEVO_OBRA'              => 'Registrar obras',
     'MODIFICAR_OBRA'          => 'Modificar obras',
     'CERRAR_OBRA'             => 'Cerrar obras',
+    'NUEVO_EMPLEADOS_OBRA'    => 'Alta y cambios de empleados de obra',
+    'NUEVO_TIPO_EMPLEADO'     => 'Alta y cambios de tipos de empleado',
 ];
 
 // Solo los permisos conocidos, en mayúsculas y sin repetir

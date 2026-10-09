@@ -1153,6 +1153,13 @@
     window.addEventListener('beforeprint', function () { if (!impresionLista) prepararImpresion(false); });
     window.addEventListener('afterprint', function () { impresionLista = false; });
 
+    // Obra registrada del presupuesto (doctos_sugerido_obra.obra_id)
+    var obraId = 0;
+    function abrirObra(id, nombre) {
+        if (enPestana) window.parent.postMessage({ tipo: 'abrir', modulo: 'Obras', id: id, titulo: 'Obra · ' + (nombre || id) }, location.origin);
+        else window.open('obra.php?id=' + encodeURIComponent(id), '_blank');
+    }
+
     var acciones = {
         'guardar': function () {
             if (soloLectura && !cambios) { alert('No hay cambios que guardar. Presiona «Modificar» para cambiar el presupuesto.'); return; }
@@ -1187,6 +1194,7 @@
             presupuestoId = 0;
             document.body.dataset.presupuesto = 0;
             $('folio').value = 0;
+            obraId = 0;
             $('obra').textContent = '';
             pintarEstatus('Pendiente');
             creador = '';
@@ -1196,8 +1204,26 @@
             alert('Se creó una copia. Presiona Guardar para asignarle folio.');
         },
         'registrar-obra': function () {
-            var nombre = prompt('Nombre de la obra:', $('proyecto').value);
-            if (nombre) { $('obra').textContent = nombre; marcarCambio(); }
+            if (obraId) { abrirObra(obraId, $('obra').textContent); return; }
+            if (guardando) return;
+            // La obra se liga a un presupuesto guardado: si es nuevo o tiene cambios, primero se guarda
+            var listo = Promise.resolve(true);
+            if (!presupuestoId || cambios) {
+                if (!confirm('Para registrar la obra primero se guardará el presupuesto. ¿Continuar?')) return;
+                listo = guardar();
+            }
+            listo.then(function (ok) {
+                if (!ok) return;
+                var nombre = prompt('Nombre de la obra:', $('proyecto').value.trim() || $('cliente').value.trim());
+                if (nombre === null) return;
+                return pedirPresupuestos('registrar_obra', { id: presupuestoId, nom_obra: nombre.trim() }).then(function (j) {
+                    obraId = j.obra_id;
+                    $('obra').textContent = j.nom_obra || 'Obra ' + j.obra_id;
+                    if (enPestana) window.parent.postMessage({ tipo: 'guardado', id: presupuestoId }, location.origin);
+                    if (j.nueva) alert('Obra «' + $('obra').textContent + '» registrada. Se abrirá en Obras.');
+                    abrirObra(j.obra_id, $('obra').textContent);
+                });
+            }).catch(function (err) { alert('No se pudo registrar la obra: ' + err.message); });
         },
         'cancelar': function () {
             if (confirm('¿Cancelar este presupuesto?')) ponerEstatus('Cancelado');
@@ -1224,6 +1250,8 @@
         var b = document.querySelector('.tb[data-accion="' + a + '"]');
         if (b) b.addEventListener('click', acciones[a]);
     });
+    // El nombre de la obra registrada abre la obra
+    $('obra').addEventListener('click', function () { if (obraId) abrirObra(obraId, this.textContent); });
 
     window.addEventListener('beforeunload', function (e) {
         if (cambios) { e.preventDefault(); e.returnValue = ''; }
@@ -1250,7 +1278,8 @@
                 }
                 sel.value = p.vendedor;
             }
-            $('obra').textContent = p.obra_id ? (p.nom_obra || 'Obra ' + p.obra_id) : '';
+            obraId = parseInt(p.obra_id, 10) || 0;
+            $('obra').textContent = obraId ? (p.nom_obra || 'Obra ' + obraId) : '';
             $('descripcion').value = p.notas || '';
             ponerNegocio(p.id_hs && p.id_hs !== '0' ? p.id_hs : '0');
             if (p.estatus) pintarEstatus(String(p.estatus).trim());

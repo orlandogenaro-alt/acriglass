@@ -11,10 +11,16 @@
         'Obras':                { url: 'obra.php',        titulo: 'Registro de Obra' }
     };
 
-    // Módulos que ya leen datos reales (api/obras.php?accion=…)
+    // Módulos que ya leen datos reales
+    //   api: listado · fecha: se consulta por periodo · filtros: columnas con filtro de valores
+    //   ficha: tipo de ficha (js/fichas.js) que abren «Nuevo» y el doble clic
     var fuentes = {
-        'Presupuestos de Obra': 'presupuestos',
-        'Obras': 'obras'
+        'Presupuestos de Obra': { api: 'api/obras.php?accion=presupuestos', fecha: true, origen: 'AW-Management' },
+        'Obras':                { api: 'api/obras.php?accion=obras',        fecha: true, origen: 'AW-Management' },
+        'Clientes':             { api: 'api/clientes.php?accion=listar', ficha: 'clientes', filtros: ['CIUDAD', 'VENDEDOR'], origen: 'Easy-Glass' },
+        'Vendedores de Obra':   { api: 'api/catalogos.php?tipo=vendedores&accion=listar', ficha: 'vendedores', filtros: ['ESTATUS'], origen: 'AW-Management' },
+        'Empleados':            { api: 'api/catalogos.php?tipo=empleados&accion=listar', ficha: 'empleados', filtros: ['TIPO_EMPLEADO', 'ESTATUS'], origen: 'AW-Management' },
+        'Tipos de Empleados':   { api: 'api/catalogos.php?tipo=tipos&accion=listar', ficha: 'tipos', filtros: [], origen: 'AW-Management' }
     };
 
     function pendiente() { alert('Función pendiente: se activará al conectar la base de datos.'); }
@@ -24,8 +30,10 @@
     }
 
     function pedirDatos(accion, ini, fin) {
-        var q = 'accion=' + accion + '&ini=' + ini + '&fin=' + fin;
-        return fetch('api/obras.php?' + q).then(function (r) {
+        return pedirUrl('api/obras.php?accion=' + accion + '&ini=' + ini + '&fin=' + fin);
+    }
+    function pedirUrl(url) {
+        return fetch(url).then(function (r) {
             if (r.status === 401) { location.href = 'index.php'; throw new Error('Sesión expirada'); }
             return r.json().catch(function () { throw new Error('Respuesta no válida del servidor (HTTP ' + r.status + ').'); });
         }).then(function (j) {
@@ -215,7 +223,6 @@
                 item: d.id,
                 recargar: function (p) { dibujarListado(p.panel, d.nombre, JSON.parse(d.columnas || '[]')); }
             });
-            p.fuente = fuentes[d.nombre] || null;
         } else if (d.tipo === 'pagina') {
             abrirPestana('pag-' + d.id, d.nombre, { item: d.id, url: d.url, oscuro: true });
         } else {
@@ -232,10 +239,13 @@
         if (!columnas.length) columnas = ['ID', 'FOLIO', 'FECHA', 'DESCRIPCION'];
         var f = formularios[nombre];
         var fuente = fuentes[nombre];
+        var ficha = fuente && fuente.ficha;
+        var conFecha = !!(fuente && fuente.fecha);
         var datos = [];   // filas recibidas del servidor
 
         // Filtros: fecha (se consulta al servidor) y valores de columna (se filtran aquí)
-        var filtrables = columnas.filter(function (c) { return c !== 'FOLIO' && c !== 'FECHA' && !/_ID$|^(IMPORTE|COSTO)$/.test(c); });
+        var filtrables = fuente && fuente.filtros ? fuente.filtros
+            : columnas.filter(function (c) { return c !== 'FOLIO' && c !== 'FECHA' && !/_ID$|^(IMPORTE|COSTO)$/.test(c); });
         var claveF = 'acri_filtros_' + window.ACRI.usuario + '_' + nombre;
         var est = leerLocal(claveF, {});
         if (!est.fecha) est.fecha = 'mes';
@@ -253,9 +263,9 @@
             '<button class="btn-borde" data-l="excel">📗 Exportar a Excel</button>' +
             '<button class="btn-borde" data-l="excel-sel">📗 Exportar seleccionados</button>' +
             '<button class="btn-borde" data-l="consultar">🔎 Consultar</button>' +
-            (f ? '<button class="btn-azul" data-l="nuevo">＋ Nuevo</button>' : '') +
+            (f || ficha ? '<button class="btn-azul" data-l="nuevo">＋ Nuevo</button>' : '') +
             (fuente ? '<div class="l-filtros">' +
-                '<button class="chip" data-f="FECHA"><span></span><i>▼</i></button>' +
+                (conFecha ? '<button class="chip" data-f="FECHA"><span></span><i>▼</i></button>' : '') +
                 filtrables.map(function (c) { return '<button class="chip" data-f="' + esc(c) + '"><span></span><i>▼</i></button>'; }).join('') +
                 '<button class="l-limpiar" data-l="limpiar" hidden>Limpiar filtros</button>' +
                 '</div>' : '') +
@@ -284,7 +294,7 @@
         }
         function pintarFiltros() {
             if (!fuente) return;
-            var hay = est.fecha !== 'mes';
+            var hay = conFecha && est.fecha !== 'mes';
             panel.querySelectorAll('.chip').forEach(function (ch) {
                 var c = ch.dataset.f, texto, activo;
                 if (c === 'FECHA') {
@@ -318,16 +328,19 @@
             }).join('') : '<tr><td colspan="' + columnas.length + '">' + (datos.length ? 'Nada coincide con el filtro.' : 'Sin registros en el periodo.') + '</td></tr>';
             var r = rango();
             nota.textContent = filas.length + ' de ' + datos.length + ' registros · ' +
-                (est.fecha === 'todo' ? 'cualquier fecha' : 'periodo ' + dmy(r[0]) + ' al ' + dmy(r[1])) + ' · AW-Management';
+                (!conFecha ? '' : (est.fecha === 'todo' ? 'cualquier fecha' : 'periodo ' + dmy(r[0]) + ' al ' + dmy(r[1])) + ' · ') + fuente.origen +
+                (ficha && filas.length ? ' · doble clic para abrir la ficha' : '');
         }
         function consultar() {
             if (!fuente) { pintar(); return; }
             pintarFiltros();
             nota.textContent = 'Consultando…';
             var r = rango();
-            pedirDatos(fuente, r[0], r[1]).then(function (j) { datos = j.filas; pintar(); })
+            pedirUrl(fuente.api + (conFecha ? '&ini=' + r[0] + '&fin=' + r[1] : '')).then(function (j) { datos = j.filas; pintar(); })
                 .catch(function (err) { datos = []; pintar(); nota.textContent = '⚠ ' + err.message; });
         }
+        // Para refrescar el listado cuando se guarda algo en otra pestaña
+        panel.acriConsultar = consultar;
 
         // Desplegable de fecha: periodos rápidos o rango personalizado
         function popFecha(chip) {
@@ -395,7 +408,7 @@
         }
 
         function limpiarFiltros() {
-            var cambiaFecha = est.fecha !== 'mes';
+            var cambiaFecha = conFecha && est.fecha !== 'mes';
             est = { fecha: 'mes', sel: {} };
             guardarFiltros();
             if (cambiaFecha) consultar(); else pintar();
@@ -414,7 +427,7 @@
             var a = document.createElement('a');
             a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
             var r = rango();
-            a.download = nombre.replace(/\s+/g, '_') + (est.fecha === 'todo' ? '' : '_' + r[0] + '_' + r[1]) + '.csv';
+            a.download = nombre.replace(/\s+/g, '_') + (!conFecha || est.fecha === 'todo' ? '' : '_' + r[0] + '_' + r[1]) + '.csv';
             a.click();
             setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
         }
@@ -425,7 +438,7 @@
             if (b.dataset.f) { if (b.dataset.f === 'FECHA') popFecha(b); else popValores(b, b.dataset.f); return; }
             var accion = b.dataset.l;
             if (accion === 'limpiar') limpiarFiltros();
-            else if (accion === 'nuevo') abrirFormulario(nombre);
+            else if (accion === 'nuevo') { if (ficha) Fichas.abrir(ficha, 0, consultar); else abrirFormulario(nombre); }
             else if (accion === 'consultar') consultar();
             else if (accion === 'excel') exportar(false);
             else if (accion === 'excel-sel') exportar(true);
@@ -436,8 +449,9 @@
             if (tr) tr.classList.toggle('sel');
         });
         tbody.addEventListener('dblclick', function (e) {
-            if (!f) return;
             var tr = e.target.closest('tr[data-i]');
+            if (ficha) { if (tr) Fichas.abrir(ficha, datos[tr.dataset.i].id, consultar); return; }
+            if (!f) return;
             if (!fuente) { abrirFormulario(nombre); return; }
             if (!tr) return;
             var r = datos[tr.dataset.i];
@@ -647,9 +661,24 @@
         if (!id) return;
 
         if (e.data.tipo === 'cerrar') cerrarPestana(id, true);
+        // Presupuesto u obra guardados: se refrescan los listados abiertos
+        if (e.data.tipo === 'guardado') refrescarListados(['Presupuestos de Obra', 'Obras']);
+        // Abrir otro documento desde una pestaña (p. ej. la obra recién registrada desde el presupuesto)
+        if (e.data.tipo === 'abrir' && formularios[e.data.modulo] && e.data.id) {
+            refrescarListados(['Presupuestos de Obra', 'Obras']);
+            abrirFormulario(e.data.modulo, e.data.id, e.data.titulo);
+        }
         if (e.data.tipo === 'titulo') renombrar(id, e.data.texto);
         if (e.data.tipo === 'imagenes') aplicarImagenes(e.data.imagenes);
     });
+
+    function refrescarListados(modulos) {
+        modulos.forEach(function (m) {
+            var it = menu.querySelector('.grupo[data-grupo] .item[data-nombre="' + m + '"]');
+            var p = it && pestanas['mod-' + it.dataset.id];
+            if (p && p.panel.acriConsultar) p.panel.acriConsultar();
+        });
+    }
 
     // Actualiza logo y favicon al momento cuando se cambian en Imagen del Sistema
     function aplicarImagenes(img) {

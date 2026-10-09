@@ -403,6 +403,8 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
     border: 1px dashed var(--borde-2); border-radius: 4px; background: var(--sub);
     color: var(--enfasis); font-weight: 600;
 }
+.obra span:not(:empty) { cursor: pointer; }
+.obra span:not(:empty):hover { text-decoration: underline; }
 .obra span:empty::before { content: 'Sin obra registrada'; color: var(--texto-3); font-weight: 400; font-style: italic; }
 
 /* ---------- Conceptos ---------- */

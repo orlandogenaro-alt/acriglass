@@ -1,6 +1,7 @@
 <?php
 // Altas y cambios de presupuestos de obra (AW-Management en el servidor local, Supabase en la nube)
 // POST ?accion=guardar     cuerpo JSON con encabezado y conceptos; regresa { id, folio }
+// POST ?accion=registrar_obra { id, nom_obra }  crea la obra del presupuesto; regresa { obra_id, nom_obra, nueva }
 // POST ?accion=eliminar    { id }
 // Los ids nuevos salen de GEN_ID(ID_CATALOGOS) en Firebird (igual que los triggers de AW)
 // y de las columnas identity en Supabase. El folio lo asigna la base (trigger / secuencia).
@@ -157,6 +158,60 @@ function guardar(array $d): array
     return ['id' => $id, 'folio' => (int) bd_valor('AW', 'select folio from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id])];
 }
 
+// Registra la obra del presupuesto (reg_obras) y la liga al presupuesto (doctos_sugerido_obra.obra_id).
+// Si ya tiene obra, regresa la existente. El vendedor del presupuesto queda como responsable.
+function registrarObra(array $d): array
+{
+    if (!tienePermiso('NUEVO_OBRA', 'ADMIN_USER')) error('No tienes permiso para registrar obras (NUEVO_OBRA).', 403);
+    $id = (int) ($d['id'] ?? 0);
+    if (!$id) error('Guarda el presupuesto antes de registrar la obra.');
+    $p = bd_fila('AW', 'select docto_sugerido_obra_id, folio, cliente, proyecto, ubicacion, vendedor_obra_id, estatus, obra_id
+                          from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]);
+    if (!$p) error('El presupuesto ya no existe (¿lo eliminaron?).', 404);
+    if (strcasecmp(trim((string) $p['estatus']), 'Cancelado') === 0) error('El presupuesto está cancelado: no se puede registrar la obra.');
+
+    // Ya registrada (por obra_id o por una obra que apunte al presupuesto)
+    $obraId = (int) $p['obra_id'];
+    if ($obraId && !bd_valor('AW', 'select count(*) from reg_obras where obra_id = ?', [$obraId])) $obraId = 0;
+    if (!$obraId) $obraId = (int) bd_valor('AW', 'select min(obra_id) from reg_obras where sugerido_id = ?', [$id]);
+    if ($obraId) {
+        if ((int) $p['obra_id'] !== $obraId) bd_ejecutar('AW', 'update doctos_sugerido_obra set obra_id = ? where docto_sugerido_obra_id = ?', [$obraId, $id]);
+        $nom = (string) bd_valor('AW', 'select nom_obra from reg_obras where obra_id = ?', [$obraId]);
+        return ['obra_id' => $obraId, 'nom_obra' => $nom, 'nueva' => false];
+    }
+
+    $nombre = texto($d['nom_obra'] ?? '', 200) ?? texto($p['proyecto'], 200) ?? texto($p['cliente'], 200);
+    $obra = [
+        'sugerido_id'      => $id,
+        'nom_obra'         => $nombre,
+        'direccion'        => texto($p['ubicacion'], 200),
+        'contacto'         => texto($p['cliente'], 150),
+        'fecha_ini'        => date('Y-m-d'),
+        'estatus'          => 'Planificacion',
+        'fecha_creacion'   => date('Y-m-d H:i:s'),
+        'usuario_creacion' => mb_substr((string) ($_SESSION['usuario'] ?? ''), 0, 50),
+    ];
+    if (bd_tiene_columna('AW', 'reg_obras', 'gasto_administrativo')) $obra['gasto_administrativo'] = 26;
+    if (bd_tiene_columna('AW', 'reg_obras', 'avance_obra')) $obra['avance_obra'] = 0;
+
+    $pdo = bd_pdo('AW');
+    $pdo->beginTransaction();
+    try {
+        $obraId = bd_insertar('AW', 'reg_obras', 'obra_id', $obra);
+        bd_ejecutar('AW', 'update doctos_sugerido_obra set obra_id = ? where docto_sugerido_obra_id = ?', [$obraId, $id]);
+        if ((int) $p['vendedor_obra_id']) {
+            bd_insertar('AW', 'responsables_de_obra', 'res_obra_id', [
+                'obra_id' => $obraId, 'vendedor_obra_id' => (int) $p['vendedor_obra_id'], 'fecha_hora_asig' => date('Y-m-d H:i:s'),
+            ], 'id_elementos');   // mismo generador que el trigger RESPONSABLES_DE_OBRA_BI
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+    return ['obra_id' => $obraId, 'nom_obra' => $nombre, 'nueva' => true];
+}
+
 function eliminar(int $id): void
 {
     if (!$id) error('Falta el presupuesto a eliminar.');
@@ -181,6 +236,8 @@ try {
     switch ($_GET['accion'] ?? '') {
         case 'guardar':
             responder(['ok' => true] + guardar(entrada()));
+        case 'registrar_obra':
+            responder(['ok' => true] + registrarObra(entrada()));
         case 'eliminar':
             eliminar((int) (entrada()['id'] ?? 0));
             responder(['ok' => true]);

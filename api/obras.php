@@ -151,9 +151,11 @@ try {
     switch ($accion) {
         case 'presupuestos':
             responder(['ok' => true, 'filas' => bd_filas('AW',
-                'select a.docto_sugerido_obra_id, a.folio, a.estatus, a.fecha, a.cliente, a.proyecto, v.nombre as vendedor
+                'select a.docto_sugerido_obra_id, a.folio, a.estatus, a.fecha, a.cliente, a.proyecto, v.nombre as vendedor,
+                        a.obra_id, o.nom_obra as obra
                    from doctos_sugerido_obra a
                    left join vendedores_obras v on v.vendedor_obra_id = a.vendedor_obra_id
+                   left join reg_obras o on o.obra_id = a.obra_id
                   where a.fecha between ? and ?
                   order by a.folio desc', [$ini, $fin])]);
 

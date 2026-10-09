@@ -15,7 +15,7 @@ $menu = [
     [
         'id' => 'documentos', 'titulo' => 'Documentos', 'icono' => '📁', 'abierto' => true,
         'items' => [
-            ['Presupuestos de Obra',         '🧾', 'modulo', ['DOCTO_SUGERIDO_OBRA_ID', 'FOLIO', 'ESTATUS', 'FECHA', 'CLIENTE', 'PROYECTO', 'VENDEDOR']],
+            ['Presupuestos de Obra',         '🧾', 'modulo', ['DOCTO_SUGERIDO_OBRA_ID', 'FOLIO', 'ESTATUS', 'FECHA', 'CLIENTE', 'PROYECTO', 'VENDEDOR', 'OBRA']],
             ['Obras',                        '🏗️', 'modulo', ['OBRA_ID', 'FOLIO', 'ESTATUS', 'FECHA', 'CLIENTE', 'PROYECTO', 'UBICACION']],
             ['Orden de Fabricacion',         '⚙️', 'modulo', ['ORDEN_FABRICACION_ID', 'FOLIO', 'ESTATUS', 'FECHA', 'OBRA', 'CLIENTE']],
             ['Gastos de Obra',               '💵', 'modulo', ['GASTO_OBRA_ID', 'FOLIO', 'FECHA', 'OBRA', 'CONCEPTO', 'IMPORTE']],
@@ -27,9 +27,10 @@ $menu = [
     [
         'id' => 'catalogos', 'titulo' => 'Catalogos', 'icono' => '🗂️',
         'items' => [
-            ['Vendedores de Obra', '🏢', 'modulo', ['VENDEDOR_ID', 'NOMBRE', 'EMAIL', 'TELEFONO', 'ESTATUS']],
-            ['Empleados',          '🧑‍🔧', 'modulo', ['EMPLEADO_ID', 'NOMBRE', 'TIPO_EMPLEADO', 'TELEFONO', 'ESTATUS']],
-            ['Tipos de Empleados', '🪪', 'modulo', ['TIPO_EMPLEADO_ID', 'NOMBRE', 'DESCRIPCION']],
+            ['Clientes',           '🤝', 'modulo', ['CLAVE_CLIENTE', 'NOMBRE', 'CONTACTO', 'TELEFONO', 'EMAIL', 'CIUDAD', 'VENDEDOR']],
+            ['Vendedores de Obra', '🏢', 'modulo', ['VENDEDOR_OBRA_ID', 'NOMBRE', 'ESTATUS']],
+            ['Empleados',          '🧑‍🔧', 'modulo', ['NUMERO_EMPLEADO', 'NOMBRE', 'TIPO_EMPLEADO', 'TELEFONO', 'SUELDO_DIARIO', 'ESTATUS']],
+            ['Tipos de Empleados', '🪪', 'modulo', ['TIPO_EMPLEADO_ID', 'CLAVE', 'NOMBRE', 'PORCENTAJE']],
         ],
     ],
     [
@@ -76,6 +77,7 @@ function idItem(string $nombre): string
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= recurso('css/principal.css') ?>">
+    <link rel="stylesheet" href="<?= recurso('css/fichas.css') ?>">
 </head>
 <body>
 
@@ -215,8 +217,12 @@ function idItem(string $nombre): string
 </div>
 
 <script>
-    window.ACRI = { usuario: <?= json_encode($usuarioSesion, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?> };
+    window.ACRI = {
+        usuario: <?= json_encode($usuarioSesion, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+        token: <?= json_encode($_SESSION['csrf']) ?>
+    };
 </script>
+<script src="<?= recurso('js/fichas.js') ?>"></script>
 <script src="<?= recurso('js/principal.js') ?>"></script>
 </body>
 </html>

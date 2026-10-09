@@ -2,6 +2,7 @@
 require __DIR__ . '/includes/sesion.php';
 require __DIR__ . '/includes/servicios.php';
 require __DIR__ . '/includes/conceptos.php';
+require __DIR__ . '/includes/estatus.php';
 
 // Presupuesto existente a abrir (sin id = nuevo)
 $presupuestoId = max(0, (int) ($_GET['id'] ?? 0));
@@ -30,6 +31,14 @@ if (!modoConfiguracion()) {
     } catch (Throwable $e) {
         error_log('AcriGlass presupuesto conceptos: ' . $e->getMessage());
     }
+}
+
+// Estatus del menú «Actualizar Estatus» (Administrador › Estatus de Presupuestos)
+try {
+    $estatus = estatusPresupuesto();
+} catch (Throwable $e) {
+    error_log('AcriGlass presupuesto estatus: ' . $e->getMessage());
+    $estatus = array_map(fn($d) => $d + ['sistema' => false], ACRI_ESTATUS_DEFECTO);
 }
 
 // Secciones del presupuesto (pestañas verticales)
@@ -88,9 +97,11 @@ $secciones = [
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 0 1-14.3 4.9M4 12a8 8 0 0 1 14.3-4.9"/><path d="M18.5 3v4h-4M5.5 21v-4h4"/></svg>
             <span>Actualizar Estatus <small>▾</small></span>
         </button>
-        <div class="menu">
-            <?php foreach (['Pendiente', 'Seguimiento', 'Aprobado', 'Rechazado', 'Cancelado'] as $e): ?>
-            <button data-estatus="<?= $e ?>"><?= $e ?></button>
+        <div class="menu menu-estatus">
+            <?php foreach ($estatus as $e): if (!$e['activo']) continue; ?>
+            <button data-estatus="<?= e($e['nombre']) ?>" class="c-<?= e($e['color']) ?>"<?= $e['descripcion'] !== '' ? ' title="' . e($e['descripcion']) . '"' : '' ?>>
+                <i></i><?= e($e['descripcion'] !== '' ? $e['descripcion'] : $e['nombre']) ?>
+            </button>
             <?php endforeach; ?>
         </div>
     </div>
@@ -113,7 +124,7 @@ $secciones = [
         <span>Cerrar</span>
     </button>
 
-    <div class="estatus Pendiente" id="estatus">Pendiente</div>
+    <div class="estatus c-<?= e(array_column($estatus, 'color', 'nombre')['Pendiente'] ?? 'ambar') ?>" id="estatus">Pendiente</div>
     <span class="sep"></span>
     <button type="button" class="tb" data-tema="auto">
         <svg class="i-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>
@@ -413,6 +424,7 @@ $secciones = [
 </dialog>
 
 <script>
+    window.ACRI_ESTATUS = <?= json_encode(array_column($estatus, 'color', 'nombre'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_CONCEPTOS = <?= json_encode($conceptos, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <script src="<?= recurso('js/presupuesto.js') ?>"></script>

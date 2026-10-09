@@ -49,6 +49,7 @@ $menu = [
             ['Conceptos de Materia Prima',       '🧱', 'pagina', 'conceptos.php?tipo=mp'],
             ['Conceptos de Mano de Obra',        '👷', 'pagina', 'conceptos.php?tipo=mo'],
             ['Conceptos de Gastos de Operacion', '💲', 'pagina', 'conceptos.php?tipo=go'],
+            ['Estatus de Presupuestos',          '🔄', 'pagina', 'estatus.php'],
             ['Empresa',            '🏢', 'pendiente'],
         ],
     ],

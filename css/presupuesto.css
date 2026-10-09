@@ -261,10 +261,19 @@ select option { background: var(--tarjeta); color: var(--texto); }
     vertical-align: middle;
     position: relative; top: -1px;
 }
-.estatus.Seguimiento { color: var(--azul-texto); background: var(--azul-suave); border-color: var(--azul-borde); }
-.estatus.Aprobado    { color: var(--verde); background: var(--verde-suave); border-color: var(--verde-borde); }
-.estatus.Rechazado,
-.estatus.Cancelado   { color: var(--rojo); background: var(--rojo-suave); border-color: var(--rojo-borde); }
+/* Colores de Administrador › Estatus de Presupuestos (c-ambar es el de la insignia por omisión) */
+.estatus.c-azul  { color: var(--azul-texto); background: var(--azul-suave); border-color: var(--azul-borde); }
+.estatus.c-verde { color: var(--verde); background: var(--verde-suave); border-color: var(--verde-borde); }
+.estatus.c-rojo  { color: var(--rojo); background: var(--rojo-suave); border-color: var(--rojo-borde); }
+.estatus.c-gris  { color: var(--texto-2); background: transparent; border-color: var(--borde); }
+
+/* Menú Actualizar Estatus: punto de color antes de cada opción */
+.menu-estatus button { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.menu-estatus i { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; background: var(--ambar); }
+.menu-estatus .c-azul i  { background: var(--azul); }
+.menu-estatus .c-verde i { background: var(--verde); }
+.menu-estatus .c-rojo i  { background: var(--rojo); }
+.menu-estatus .c-gris i  { background: var(--texto-2); }
 
 /* ---------- Pestañas del documento ---------- */
 .doc-tabs {

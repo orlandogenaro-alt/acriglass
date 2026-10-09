@@ -900,9 +900,13 @@
     });
 
     // ---------- Barra de herramientas ----------
-    function ponerEstatus(e) {
+    // Color del estatus según Administrador › Estatus de Presupuestos
+    function pintarEstatus(e) {
         $('estatus').textContent = e;
-        $('estatus').className = 'estatus ' + e;
+        $('estatus').className = 'estatus c-' + ((window.ACRI_ESTATUS || {})[e] || 'gris');
+    }
+    function ponerEstatus(e) {
+        pintarEstatus(e);
         marcarCambio();
     }
 
@@ -1065,8 +1069,7 @@
             document.body.dataset.presupuesto = 0;
             $('folio').value = 0;
             $('obra').textContent = '';
-            $('estatus').textContent = 'Pendiente';
-            $('estatus').className = 'estatus Pendiente';
+            pintarEstatus('Pendiente');
             marcarCambio();
             alert('Se creó una copia. Presiona Guardar para asignarle folio.');
         },
@@ -1128,7 +1131,7 @@
             $('obra').textContent = p.obra_id ? (p.nom_obra || 'Obra ' + p.obra_id) : '';
             $('descripcion').value = p.notas || '';
             ponerNegocio(p.id_hs && p.id_hs !== '0' ? p.id_hs : '0');
-            if (p.estatus) { $('estatus').textContent = p.estatus; $('estatus').className = 'estatus ' + p.estatus; }
+            if (p.estatus) pintarEstatus(String(p.estatus).trim());
             if (p.utilidad_neta_por !== null && p.utilidad_neta_por !== undefined) $('pctUtilidad').value = num(p.utilidad_neta_por);
 
             avisoDescripciones = p.aviso_descripciones || '';

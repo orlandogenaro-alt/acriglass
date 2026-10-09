@@ -7,6 +7,7 @@
 define('ACRI_API', true);
 require __DIR__ . '/../includes/sesion.php';
 require __DIR__ . '/../includes/bd.php';
+require __DIR__ . '/../includes/estatus.php';
 require __DIR__ . '/../includes/respuesta.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') error('Método no permitido.', 405);
@@ -21,7 +22,6 @@ const CATALOGOS = [
     'MO' => ['conceptos_mano_obra', 'concepto_mano_obra_id'],
     'GO' => ['conceptos_gas_operacion_obra', 'concepto_gas_operacion_obra_id'],
 ];
-const ESTATUS = ['Pendiente', 'Aceptado', 'Rechazado', 'Cancelado'];
 
 function texto($v, int $largo): ?string
 {
@@ -57,7 +57,7 @@ function guardar(array $d): array
 {
     $id = (int) ($d['id'] ?? 0);
     $fecha = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($d['fecha'] ?? '')) ? $d['fecha'] : date('Y-m-d');
-    $estatus = in_array($d['estatus'] ?? '', ESTATUS, true) ? $d['estatus'] : 'Pendiente';
+    $estatus = estatusValido($d['estatus'] ?? '') ?? 'Pendiente';   // Administrador › Estatus de Presupuestos
     $cliente = texto($d['cliente'] ?? '', 150);
     if ($cliente === null) error('Captura el cliente antes de guardar.');
 

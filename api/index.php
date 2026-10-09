@@ -5,7 +5,7 @@
 const ACRI_RUTAS = [
     'index.php', 'login.php', 'logout.php', 'principal.php', 'obra.php', 'presupuesto.php',
     'imagen-sistema.php', 'bases-datos.php', 'servicios.php',
-    'api/obras.php', 'api/adjuntos.php', 'api/imagenes.php', 'api/bases-datos.php', 'api/servicios.php', 'api/hubspot.php',
+    'api/obras.php', 'api/presupuestos.php', 'api/adjuntos.php', 'api/imagenes.php', 'api/bases-datos.php', 'api/servicios.php', 'api/hubspot.php',
 ];
 
 $ruta = ltrim(rawurldecode((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH)), '/');

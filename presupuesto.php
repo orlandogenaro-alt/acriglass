@@ -1,11 +1,25 @@
 <?php
 require __DIR__ . '/includes/sesion.php';
+require __DIR__ . '/includes/servicios.php';
 
 // Presupuesto existente a abrir (sin id = nuevo)
 $presupuestoId = max(0, (int) ($_GET['id'] ?? 0));
 
-// BOCETO: vendedores fijos hasta tener la base de datos
-$vendedores = ['ALFREDO MARTINEZ', 'VENDEDOR 2', 'VENDEDOR 3'];
+// Vendedores de obra de AW; si no hay, los vendedores activos de Easy-Glass (API v1)
+$vendedores = [];
+if (!modoConfiguracion()) {
+    try {
+        $vendedores = array_column(bd_filas('AW', "select nombre from vendedores_obras where estatus = 'A' order by nombre"), 'nombre');
+    } catch (Throwable $e) {
+        error_log('AcriGlass presupuesto vendedores: ' . $e->getMessage());
+    }
+}
+if (!$vendedores) {
+    $r = api_http('EASYGLASS', 'GET', '/vendedores');
+    if ($r['ok']) $vendedores = array_column($r['datos']['datos'] ?? [], 'nombre');
+}
+$vendedores = array_values(array_unique(array_filter(array_map('trim', $vendedores))));
+if (!$vendedores) $vendedores = ['ALFREDO MARTINEZ'];
 
 // Secciones del presupuesto (pestañas verticales)
 $secciones = [
@@ -21,6 +35,7 @@ $secciones = [
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Presupuesto de Obra · AcriGlass</title>
+    <meta name="acri-token" content="<?= e($_SESSION['csrf']) ?>">
     <link rel="icon" href="<?= e(imagenSistema('favicon')) ?>">
     <link rel="stylesheet" href="<?= recurso('css/presupuesto.css') ?>">
     <script src="<?= recurso('js/tema.js') ?>"></script>

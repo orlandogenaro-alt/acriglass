@@ -176,6 +176,43 @@ function bd_valor(string $clave, string $sql, array $params = [])
     return $f ? reset($f) : null;
 }
 
+// insert / update / delete; regresa los renglones afectados
+function bd_ejecutar(string $clave, string $sql, array $params = []): int
+{
+    $st = bd_pdo($clave)->prepare($sql);
+    $st->execute(bd_texto_entrada(bd_config($clave), $params));
+    return $st->rowCount();
+}
+
+// Motor de la conexión ('firebird', 'pgsql', …); en la nube AW es Supabase
+function bd_motor(string $clave): string
+{
+    $c = bd_config($clave);
+    return !empty($c['de_entorno']) ? 'pgsql' : (string) ($c['motor'] ?? '');
+}
+
+// true si la tabla tiene la columna (las bases de AW y Supabase no son idénticas)
+function bd_tiene_columna(string $clave, string $tabla, string $columna): bool
+{
+    static $cache = [];
+    $k = "$clave.$tabla.$columna";
+    if (isset($cache[$k])) return $cache[$k];
+    switch (bd_motor($clave)) {
+        case 'firebird':
+            $sql = 'select count(*) from rdb$relation_fields where rdb$relation_name = ? and rdb$field_name = ?';
+            $p = [strtoupper($tabla), strtoupper($columna)];
+            break;
+        case 'pgsql':
+            $sql = 'select count(*) from information_schema.columns where table_name = ? and column_name = ?';
+            $p = [strtolower($tabla), strtolower($columna)];
+            break;
+        default:
+            $sql = 'select count(*) from information_schema.columns where table_name = ? and column_name = ?';
+            $p = [$tabla, $columna];
+    }
+    return $cache[$k] = (int) bd_valor($clave, $sql, $p) > 0;
+}
+
 // Prueba una configuración: abre la conexión y pide la versión del servidor
 function bd_probar(array $c): array
 {

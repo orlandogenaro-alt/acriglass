@@ -206,6 +206,8 @@ try {
                    left join reg_obras o on o.obra_id = a.obra_id
                   where a.docto_sugerido_obra_id = ?', [$id]);
             if (!$p) error('El presupuesto no existe.', 404);
+            $p['correo'] = bd_tiene_columna('AW', 'doctos_sugerido_obra', 'correo_electronico')
+                ? bd_valor('AW', 'select correo_electronico from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]) : null;
             // Renglones de Materia Prima / Mano de Obra / Gastos de Operacion con el nombre de su concepto
             $p['conceptos'] = bd_filas('AW',
                 "select d.docto_sugerido_obra_det_id, d.tipo_concepto, d.concepto_id, d.presupuesto, d.docto_imp_id, d.folio, d.notas,

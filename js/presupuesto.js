@@ -918,6 +918,97 @@
 
     function pendiente() { alert('Función pendiente: se activará al conectar la base de datos.'); }
 
+    // ---------- Guardar en AW-Management (api/presupuestos.php) ----------
+    var presupuestoId = parseInt(document.body.dataset.presupuesto, 10) || 0;
+    var guardando = false;
+    var token = (document.querySelector('meta[name="acri-token"]') || {}).content || '';
+
+    function pedirPresupuestos(accion, cuerpo) {
+        return fetch('api/presupuestos.php?accion=' + accion, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Acri-Token': token },
+            body: JSON.stringify(cuerpo)
+        }).then(function (r) {
+            if (r.status === 401) { (window.top || window).location.href = 'index.php'; throw new Error('Sesión expirada'); }
+            return r.json().catch(function () { throw new Error('Respuesta no válida del servidor (HTTP ' + r.status + ').'); });
+        }).then(function (j) {
+            if (!j.ok) throw new Error(j.error || 'Error desconocido.');
+            return j;
+        });
+    }
+
+    function documentoActual() {
+        var subtotal = calcularTotales();
+        var mp = suma(datos.mp), mo = suma(datos.mo), go = suma(datos.go);
+        var conceptos = [];
+        ['mp', 'mo', 'go'].forEach(function (sec) {
+            datos[sec].forEach(function (r) {
+                conceptos.push({
+                    tipo: SIGLAS[sec],
+                    concepto: r.concepto,
+                    presupuesto: num(r.presupuesto),
+                    porcentaje: subtotal > 0 ? num(r.presupuesto) / subtotal * 100 : 0,
+                    importar: !!r.importar,
+                    docto_imp_id: r.docto_imp_id || 0,
+                    folio: r.folio || '',
+                    notas: r.notas || '',
+                    articulos: r.articulos || []
+                });
+            });
+        });
+        return {
+            id: presupuestoId,
+            fecha: $('fecha').value,
+            cliente: $('cliente').value,
+            email: $('email').value,
+            proyecto: $('proyecto').value,
+            ubicacion: $('ubicacion').value,
+            vendedor: $('vendedor').value,
+            estatus: $('estatus').textContent.trim(),
+            id_hs: $('idNegocio').textContent.trim(),
+            notas: $('descripcion').value,
+            utilidad_por: num($('pctUtilidad').value),
+            totales: {
+                cos_primo: mp + mo,
+                gas_operacion: go,
+                utilidad_neta: subtotal - (mp + mo + go),
+                subtotal: subtotal,
+                iva: subtotal * IVA,
+                total: subtotal * (1 + IVA)
+            },
+            conceptos: conceptos
+        };
+    }
+
+    // Regresa una promesa que se resuelve con true si se guardó
+    function guardar() {
+        if (guardando) return Promise.resolve(false);
+        if (!$('cliente').value.trim()) {
+            alert('Captura el cliente antes de guardar.');
+            $('cliente').focus();
+            return Promise.resolve(false);
+        }
+        guardando = true;
+        document.body.classList.add('guardando');
+        return pedirPresupuestos('guardar', documentoActual()).then(function (j) {
+            var nuevo = !presupuestoId;
+            presupuestoId = j.id;
+            document.body.dataset.presupuesto = j.id;
+            $('folio').value = j.folio;
+            cambios = false;
+            if (nuevo && !enPestana && history.replaceState) history.replaceState(null, '', 'presupuesto.php?id=' + j.id);
+            if (enPestana) window.parent.postMessage({ tipo: 'guardado', id: j.id, folio: j.folio }, location.origin);
+            return true;
+        }).catch(function (err) {
+            alert('No se pudo guardar el presupuesto: ' + err.message);
+            return false;
+        }).then(function (ok) {
+            guardando = false;
+            document.body.classList.remove('guardando');
+            return ok;
+        });
+    }
+
     // Menús desplegables
     document.querySelectorAll('.tb-drop > .tb').forEach(function (b) {
         b.addEventListener('click', function (e) {
@@ -940,10 +1031,27 @@
     });
 
     var acciones = {
-        'guardar': pendiente,
-        'guardar-cerrar': function () { pendiente(); cambios = false; cerrarVentana(); },
+        'guardar': function () {
+            guardar().then(function (ok) { if (ok) alert('Presupuesto guardado con folio ' + $('folio').value + '.'); });
+        },
+        'guardar-cerrar': function () {
+            // Solo se cierra si se guardó; si falla, lo capturado sigue en pantalla
+            guardar().then(function (ok) { if (ok) cerrarVentana(); });
+        },
         'modificar': pendiente,
-        'duplicar': pendiente,
+        'duplicar': function () {
+            if (!presupuestoId) { alert('Este presupuesto todavía no se ha guardado.'); return; }
+            if (cambios && !confirm('Hay cambios sin guardar; la copia los incluirá. ¿Continuar?')) return;
+            // La copia se queda en pantalla como presupuesto nuevo hasta que se guarde
+            presupuestoId = 0;
+            document.body.dataset.presupuesto = 0;
+            $('folio').value = 0;
+            $('obra').textContent = '';
+            $('estatus').textContent = 'Pendiente';
+            $('estatus').className = 'estatus Pendiente';
+            marcarCambio();
+            alert('Se creó una copia. Presiona Guardar para asignarle folio.');
+        },
         'registrar-obra': function () {
             var nombre = prompt('Nombre de la obra:', $('proyecto').value);
             if (nombre) { $('obra').textContent = nombre; marcarCambio(); }
@@ -952,7 +1060,15 @@
             if (confirm('¿Cancelar este presupuesto?')) ponerEstatus('Cancelado');
         },
         'eliminar': function () {
-            if (confirm('¿Eliminar este presupuesto?')) pendiente();
+            if (!presupuestoId) {
+                if (confirm('Este presupuesto no se ha guardado. ¿Descartarlo?')) { cambios = false; cerrarVentana(); }
+                return;
+            }
+            if (!confirm('¿Eliminar el presupuesto folio ' + $('folio').value + '? No se puede deshacer.')) return;
+            pedirPresupuestos('eliminar', { id: presupuestoId }).then(function () {
+                cambios = false;
+                cerrarVentana();
+            }).catch(function (err) { alert('No se pudo eliminar el presupuesto: ' + err.message); });
         },
         'cerrar': function () {
             if (!cambios || confirm('Hay cambios sin guardar. ¿Cerrar de todos modos?')) {
@@ -981,6 +1097,7 @@
             $('cliente').value = p.cliente || '';
             $('proyecto').value = p.proyecto || '';
             $('ubicacion').value = p.ubicacion || '';
+            if (p.correo) $('email').value = p.correo;
             $('folio').value = p.folio || 0;
             if (p.fecha) $('fecha').value = String(p.fecha).substr(0, 10);
             if (p.vendedor) {
@@ -1006,6 +1123,7 @@
                     concepto: c.concepto || '',
                     presupuesto: num(c.presupuesto),
                     importar: !!c.docto_imp_id,
+                    docto_imp_id: parseInt(c.docto_imp_id, 10) || 0,
                     folio: c.folio || '',
                     notas: c.notas || '',
                     articulos: c.articulos || []

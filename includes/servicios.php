@@ -16,16 +16,39 @@ const ACRI_AUTENTICACION = [
     'oauth2'  => 'OAuth 2 (tokens en base de datos)',
 ];
 
+// API v1 de Easy-Glass Boss (solo lectura): catálogos, clientes, presupuestos y Microsip.
+// La llave se genera en Easy-Glass Boss › API; aquí se captura en Administrador › APIs y servicios
+// o en la variable de entorno API_EASYGLASS_TOKEN (Vercel).
+const ACRI_SERVICIO_EASYGLASS = [
+    'nombre'      => 'Easy-Glass · API v1 (presupuestos)',
+    'proveedor'   => 'Easy-Glass · Cotizador MegaGlass',
+    'url'         => 'http://cotizador.megaglass.us:8010/api/v1.php',
+    'auth'        => 'bearer',
+    'auth_campo'  => '',
+    'credencial'  => '',
+    'extra'       => [],
+    'espera'      => 30,
+    'ruta_prueba' => '/presupuestos?limite=1',
+    'sistema'     => true,
+    'activa'      => true,
+    'notas'       => "Uso: api_http('EASYGLASS', 'GET', '/presupuestos?limite=5')",
+];
+
 function api_servicios(): array
 {
-    return configLeer('servicios');
+    $todos = configLeer('servicios');
+    if (!isset($todos['EASYGLASS'])) $todos['EASYGLASS'] = ACRI_SERVICIO_EASYGLASS;
+    return $todos;
 }
 
 function api_config(string $clave): array
 {
     $todos = api_servicios();
     if (!isset($todos[$clave])) throw new RuntimeException("No existe el servicio '$clave' (Administrador › APIs y servicios).");
-    return $todos[$clave];
+    $s = $todos[$clave];
+    // Sin credencial capturada: la de la variable de entorno API_<CLAVE>_TOKEN
+    if (($s['credencial'] ?? '') === '') $s['credencial'] = acri_env('API_' . $clave . '_TOKEN');
+    return $s;
 }
 
 // Une la URL base con la ruta sin duplicar ni perder diagonales

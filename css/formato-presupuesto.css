@@ -1,0 +1,122 @@
+/* Formato impreso del Presupuesto por Proyecto (js/formato-presupuesto.js). Siempre blanco y negro. */
+@page {
+    size: letter;
+    margin: 10mm 10mm 12mm;
+    @bottom-right { content: 'Pagina ' counter(page) ' de ' counter(pages); font: 9px Arial, sans-serif; }
+}
+
+.fp {
+    --fp-color: #000;
+    width: 100%;
+    max-width: 196mm;
+    margin: 0 auto;
+    color: #000;
+    background: #fff;
+    font: 11px/1.25 Arial, Helvetica, sans-serif;
+    color-scheme: light;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+.fp * { box-sizing: border-box; }
+.fp table { border-collapse: collapse; width: 100%; }
+.fp-hoja > thead > tr > td, .fp-hoja > tbody > tr > td, .fp-hoja > tfoot > tr > td { padding: 0; vertical-align: top; }
+.fp .num { text-align: right; white-space: nowrap; }
+
+/* Encabezado: logo | título y folio / código | revisión | elaboró */
+.fp-enc {
+    display: grid;
+    grid-template-columns: 26% 1fr 1fr 1.3fr;
+    grid-template-rows: auto auto;
+    border: 1px solid var(--fp-color);
+}
+.fp-logo {
+    grid-row: 1 / span 2;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    padding: 4px;
+    border-right: 1px solid var(--fp-color);
+    text-align: center;
+}
+.fp-logo img { max-width: 100%; max-height: 62px; object-fit: contain; }
+.fp-logo b { font-size: 8.5px; line-height: 1.2; }
+.fp-logo small { font-size: 7.5px; line-height: 1.2; }
+.fp-titulo { grid-column: 2 / span 3; display: flex; align-items: center; padding: 4px 6px; border-bottom: 1px solid var(--fp-color); }
+.fp-titulo h1 { flex: 1; margin: 0; text-align: center; font-size: 15px; font-weight: 700; letter-spacing: .02em; }
+.fp-folio { text-align: right; font-size: 11px; }
+.fp-folio small { display: block; font-size: 7.5px; font-weight: 700; }
+.fp-codigo, .fp-rev, .fp-elaboro { padding: 4px 6px; border-right: 1px solid var(--fp-color); }
+.fp-elaboro { border-right: none; font-size: 10px; }
+
+/* Datos: estatus | cliente | fecha | totales */
+.fp-datos {
+    display: grid;
+    grid-template-columns: 17% 1fr 12% 30%;
+    border: 1px solid var(--fp-color);
+    border-top: none;
+    margin-bottom: 4px;
+}
+.fp-datos > div { padding: 2px 5px; border-right: 1px solid var(--fp-color); }
+.fp-datos > .fp-r1 { border-bottom: 1px solid var(--fp-color); }
+.fp-proyecto { grid-column: 2 / span 2; }
+.fp-totales {
+    grid-column: 4; grid-row: 1 / span 2;
+    display: grid; grid-template-columns: auto 1fr; align-content: center; column-gap: 8px;
+    border-right: none !important;
+    font-size: 14px; font-weight: 700;
+}
+.fp-totales b { text-align: right; }
+.fp-totales span { font-weight: 700; }
+
+/* Secciones */
+.fp-sec { margin-top: 2px; }
+.fp-sec th, .fp-sec td { padding: 0 4px; text-align: left; }
+.fp-sec > thead th {
+    border-top: 1px solid var(--fp-color);
+    border-bottom: 1px solid var(--fp-color);
+    color: var(--fp-color);
+    font-size: 11.5px;
+}
+.fp-sec > thead th:first-child { width: 42%; }
+.fp-sec > thead th.num { width: 15%; }
+.fp-pres { padding-left: 24px !important; }
+.fp-sec > tfoot td { padding-left: 18%; font-weight: 700; color: var(--fp-color); }
+.fp-vacio { color: #666; font-style: italic; }
+.fp-sec tr { break-inside: avoid; }
+
+/* Desglose (Imprimir Detalle) */
+.fp-det > td { padding: 0 0 2px 18px !important; }
+.fp-det table { width: 100%; font-size: 10px; }
+.fp-det th { font-weight: 400; text-align: left; padding: 0 4px; }
+.fp-det th.num { text-align: right; }
+.fp-det td { padding: 0 4px; }
+.fp-det th:first-child, .fp-det td:first-child { width: 64%; }
+
+/* Costo total */
+.fp-resumen {
+    display: grid;
+    grid-template-columns: auto 30mm;
+    column-gap: 10px;
+    width: max-content;
+    margin: 2px 0 0 auto;
+    margin-right: 30mm;
+    padding-top: 2px;
+    border-top: 1px solid var(--fp-color);
+    font-weight: 700;
+    font-size: 11.5px;
+}
+.fp-resumen b { text-align: right; }
+
+/* Notas y firmas al final de la última hoja */
+.fp-final { margin-top: 14mm; break-inside: avoid; }
+.fp-notas { min-height: 12mm; margin-bottom: 4px; font-size: 10px; }
+.fp-firmas { table-layout: fixed; }
+.fp-firmas th { border: 1px solid var(--fp-color); padding: 1px; font-size: 10px; text-align: center; }
+.fp-firmas td {
+    border: 1px solid var(--fp-color);
+    height: 22mm;
+    vertical-align: bottom;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    padding-bottom: 3mm;
+}
+.fp-pie { margin-top: 4px; padding-top: 2px; border-top: 1px solid var(--fp-color); text-align: center; font-size: 8.5px; }

@@ -200,7 +200,7 @@ try {
             $id = (int) ($_GET['id'] ?? 0);
             $p = bd_fila('AW',
                 'select a.docto_sugerido_obra_id, a.folio, a.fecha, a.cliente, a.proyecto, a.ubicacion, a.estatus, a.id_hs,
-                        a.utilidad_neta_por, a.subtotal, a.notas, a.obra_id, v.nombre as vendedor, o.nom_obra
+                        a.utilidad_neta_por, a.subtotal, a.notas, a.obra_id, a.usuario_creador, v.nombre as vendedor, o.nom_obra
                    from doctos_sugerido_obra a
                    left join vendedores_obras v on v.vendedor_obra_id = a.vendedor_obra_id
                    left join reg_obras o on o.obra_id = a.obra_id

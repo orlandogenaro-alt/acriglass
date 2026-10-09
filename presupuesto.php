@@ -3,6 +3,7 @@ require __DIR__ . '/includes/sesion.php';
 require __DIR__ . '/includes/servicios.php';
 require __DIR__ . '/includes/conceptos.php';
 require __DIR__ . '/includes/estatus.php';
+require __DIR__ . '/includes/membrete.php';
 
 // Presupuesto existente a abrir (sin id = nuevo)
 $presupuestoId = max(0, (int) ($_GET['id'] ?? 0));
@@ -41,6 +42,17 @@ try {
     $estatus = array_map(fn($d) => $d + ['sistema' => false], ACRI_ESTATUS_DEFECTO);
 }
 
+// Hoja membretada de Imprimir / Imprimir Detalle (Administrador › Hoja Membretada)
+try {
+    $membrete = membreteImpresion();
+} catch (Throwable $e) {
+    error_log('AcriGlass presupuesto membrete: ' . $e->getMessage());
+    $membrete = ACRI_MEMBRETE_DEFECTO + ['logo' => imagenSistema('logo'), 'logo_propio' => false];
+}
+
+// Un presupuesto guardado se abre en solo lectura; «Modificar» lo habilita con este permiso
+$puedeModificar = tienePermiso('MODIFICAR_SUGERIDO_OBRA', 'ADMIN_USER');
+
 // Secciones del presupuesto (pestañas verticales)
 $secciones = [
     'mp' => 'Materia Prima',
@@ -58,6 +70,7 @@ $secciones = [
     <meta name="acri-token" content="<?= e($_SESSION['csrf']) ?>">
     <link rel="icon" href="<?= e(imagenSistema('favicon')) ?>">
     <link rel="stylesheet" href="<?= recurso('css/presupuesto.css') ?>">
+    <link rel="stylesheet" href="<?= recurso('css/formato-presupuesto.css') ?>">
     <script src="<?= recurso('js/tema.js') ?>"></script>
 </head>
 <body data-presupuesto="<?= $presupuestoId ?>">
@@ -79,8 +92,8 @@ $secciones = [
             <span>Imprimir <small>▾</small></span>
         </button>
         <div class="menu">
-            <button data-imprimir="presupuesto">Presupuesto</button>
-            <button data-imprimir="resumen">Resumen de costos</button>
+            <button data-imprimir="normal">Imprimir</button>
+            <button data-imprimir="detalle">Imprimir Detalle</button>
         </div>
     </div>
     <button class="tb" data-accion="modificar">
@@ -124,6 +137,7 @@ $secciones = [
         <span>Cerrar</span>
     </button>
 
+    <span class="modo" id="modo" hidden title="Presiona «Modificar» para cambiar el presupuesto">🔒 Solo lectura</span>
     <div class="estatus c-<?= e(array_column($estatus, 'color', 'nombre')['Pendiente'] ?? 'ambar') ?>" id="estatus">Pendiente</div>
     <span class="sep"></span>
     <button type="button" class="tb" data-tema="auto">
@@ -423,10 +437,17 @@ $secciones = [
     </div>
 </dialog>
 
+<!-- Formato impreso (Imprimir / Imprimir Detalle): solo se ve al imprimir -->
+<div id="formatoImpresion"></div>
+
 <script>
+    window.ACRI_MEMBRETE = <?= json_encode($membrete, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.ACRI_USUARIO = <?= json_encode($usuarioSesion, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.ACRI_PUEDE_MODIFICAR = <?= $puedeModificar ? 'true' : 'false' ?>;
     window.ACRI_ESTATUS = <?= json_encode(array_column($estatus, 'color', 'nombre'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_CONCEPTOS = <?= json_encode($conceptos, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
+<script src="<?= recurso('js/formato-presupuesto.js') ?>"></script>
 <script src="<?= recurso('js/presupuesto.js') ?>"></script>
 </body>
 </html>

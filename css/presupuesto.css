@@ -219,7 +219,7 @@ select option { background: var(--tarjeta); color: var(--texto); }
 .tb[data-tema="claro"] .i-sol, .tb[data-tema="oscuro"] .i-luna { display: block; }
 
 .tb-drop { position: relative; display: flex; }
-/* fixed: la barra tiene overflow-x y recortaría un menú absolute; la posición la pone presupuesto.js */
+/* Al abrirse, presupuesto.js pasa el menú al <body> (la barra tiene overflow y lo recortaría) y lo coloca bajo su botón */
 .menu {
     display: none;
     position: fixed;
@@ -233,8 +233,33 @@ select option { background: var(--tarjeta); color: var(--texto); }
     box-shadow: var(--sombra-flot);
     padding: 4px;
 }
-.tb-drop.abierto .menu { display: block; }
+.menu.abierto { display: block; }
 .menu button { display: block; width: 100%; text-align: left; padding: 7px 12px; border-radius: 4px; color: var(--texto); }
+.toolbar { overflow-y: hidden; }
+
+/* Solo lectura: presupuesto guardado sin presionar «Modificar» */
+.tb.activo { background: var(--azul-suave); color: var(--azul-texto); border-color: var(--azul-borde); }
+.modo {
+    align-self: center;
+    margin-left: auto;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--texto-2);
+    border: 1px dashed var(--borde-2, var(--borde));
+    white-space: nowrap;
+}
+.modo:not([hidden]) + .estatus { margin-left: 8px; }
+body.solo-lectura .encabezado input:disabled, body.solo-lectura .encabezado select:disabled,
+body.solo-lectura .grid input:disabled, body.solo-lectura .grid select:disabled,
+body.solo-lectura .pie input:disabled, body.solo-lectura .pie textarea:disabled {
+    opacity: 1; color: var(--texto); -webkit-text-fill-color: var(--texto); cursor: default;
+}
+body.solo-lectura .grid .borrar, body.solo-lectura #editarSubtotal,
+body.solo-lectura #ctAgregar, body.solo-lectura #ctImportar,
+body.solo-lectura .ct-orden button, body.solo-lectura .ct-acciones .b-sub, body.solo-lectura .ct-acciones .b-edit,
+body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { display: none; }
 .menu button:hover { background: var(--azul-suave); color: var(--azul-texto); }
 
 /* Estatus como insignia */
@@ -714,14 +739,10 @@ output, #tSUB, .pct {
     .ct-rejilla .ancho, .ct-rejilla .ancho2 { grid-column: auto; }
 }
 
-/* ---------- Impresión (siempre en claro) ---------- */
+/* ---------- Impresión: solo el formato de la hoja membretada (css/formato-presupuesto.css) ---------- */
+#formatoImpresion { display: none; }
 @media print {
-    :root { color-scheme: light; }
-    .toolbar, .doc-tabs, .sec-tabs, .c-del, .grid td:last-child, .mini { display: none !important; }
-    body, .vista, .encabezado, .conceptos, .pie, .grid-caja, .grid td { background: #fff !important; color: #000 !important; }
-    .vista { padding: 0; }
-    .encabezado, .conceptos, .pie { box-shadow: none; border-color: #ccc; }
-    .grid-caja { overflow: visible; border: none; }
-    .grid th { background: #e5e9f0 !important; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .fuerte { background: #fff !important; color: #000 !important; border-color: #000 !important; }
+    html, body { height: auto; min-height: 0; background: #fff !important; display: block; }
+    body > *:not(#formatoImpresion) { display: none !important; }
+    #formatoImpresion { display: block; }
 }

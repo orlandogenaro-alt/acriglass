@@ -44,6 +44,7 @@ $menu = [
             ['Bases de datos',     '🗄️', 'pagina', 'bases-datos.php'],
             ['APIs y servicios',   '🔌', 'pagina', 'servicios.php'],
             ['Imagen del Sistema', '🖼️', 'pagina', 'imagen-sistema.php'],
+            ['Hoja Membretada',    '📄', 'pagina', 'hoja-membretada.php'],
             ['Usuarios',           '👥', 'pagina', 'usuarios.php'],
             ['Roles',              '🔐', 'pagina', 'roles.php'],
             ['Conceptos de Materia Prima',       '🧱', 'pagina', 'conceptos.php?tipo=mp'],

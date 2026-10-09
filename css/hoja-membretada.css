@@ -1,0 +1,39 @@
+/* Administrador › Hoja Membretada (sobre catalogo.css) */
+.hm { display: flex; gap: 18px; align-items: flex-start; }
+.hm-form { width: 430px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; }
+.hm-form .c-seccion { margin-top: 6px; }
+.hm-firmas { grid-template-columns: 1fr 1fr; }
+.hm-botones { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.hm-botones .c-espacio { flex: 1; }
+.hm-botones .c-accion { width: 140px; }
+
+.hm-logo { display: flex; gap: 12px; align-items: center; }
+.hm-logo-vista {
+    width: 150px; height: 70px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #fff; border-radius: 6px; padding: 6px;
+}
+.hm-logo-vista img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.hm-logo p { margin-bottom: 6px; color: var(--texto-suave); }
+.hm-logo small { display: block; margin-top: 6px; color: var(--texto-suave); font-size: 11.5px; }
+.hm-subir { display: inline-flex; align-items: center; }
+.c-btn:disabled { opacity: .5; cursor: default; }
+
+.hm-previa { flex: 1; min-width: 0; position: sticky; top: 10px; }
+.hm-previa-barra { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; font-weight: 700; }
+.hm-previa-barra span { color: var(--texto-suave); text-transform: uppercase; font-size: 11px; letter-spacing: .06em; }
+.hm-previa-barra label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+.hm-papel {
+    background: #fff;
+    border-radius: 4px;
+    padding: 10mm;
+    max-height: calc(100vh - 150px);
+    overflow: auto;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .4);
+}
+
+@media (max-width: 1100px) {
+    .hm { flex-direction: column; }
+    .hm-form { width: 100%; }
+    .hm-previa { position: static; width: 100%; }
+}

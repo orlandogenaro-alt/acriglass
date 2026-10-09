@@ -1,6 +1,6 @@
 <?php
-// Subir / quitar / restablecer las imágenes del sistema (favicon, logo, fondo del login).
-// POST accion=subir&tipo=favicon|logo|fondo + archivo
+// Subir / quitar / restablecer las imágenes del sistema (favicon, logo, fondo del login, logo de la hoja membretada).
+// POST accion=subir&tipo=favicon|logo|fondo|membrete + archivo
 // POST accion=quitar&tipo=...
 // POST accion=restablecer
 define('ACRI_API', true);
@@ -31,6 +31,7 @@ $reglas = [
     'favicon' => ['max' => 1 * $mb, 'tipos' => ['image/png' => 'png', 'image/x-icon' => 'ico', 'image/vnd.microsoft.icon' => 'ico']],
     'logo'    => ['max' => 2 * $mb, 'tipos' => ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp']],
     'fondo'   => ['max' => 8 * $mb, 'tipos' => ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp']],
+    'membrete' => ['max' => 2 * $mb, 'tipos' => ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp']],
 ];
 
 $accion = $_POST['accion'] ?? '';
@@ -132,7 +133,8 @@ switch ($accion) {
         break;
 
     case 'restablecer':
-        foreach (array_keys($reglas) as $t) quitarPropia($cfg, $t);
+        // Solo las tres de Imagen del Sistema; el logo del membrete se quita desde Hoja Membretada
+        foreach (['favicon', 'logo', 'fondo'] as $t) quitarPropia($cfg, $t);
         sistemaGuardar($cfg);
         break;
 

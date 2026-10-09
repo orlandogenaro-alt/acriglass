@@ -14,6 +14,7 @@ const ACRI_IMG_DEFECTO = [
     'favicon' => 'img/favicon.svg',
     'logo'    => 'img/logo-acriglass.svg',
     'fondo'   => null,
+    'membrete' => null,   // logo de la hoja membretada; sin imagen propia se usa el logo
 ];
 
 // Lee / guarda un JSON de config/ (carpeta protegida con .htaccess) o de la tabla configuracion
@@ -58,7 +59,7 @@ function pruebaGuardar(string $clave, array $resultado): array
 function sistemaConfig(): array
 {
     $cfg = [
-        'imagenes' => ['favicon' => null, 'logo' => null, 'fondo' => null],
+        'imagenes' => ['favicon' => null, 'logo' => null, 'fondo' => null, 'membrete' => null],
         'empresa'  => ['nombre' => 'ACRIGLASS VIDRIO Y ALUMINIO', 'rfc' => ''],
     ];
     try {

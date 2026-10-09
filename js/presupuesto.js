@@ -14,6 +14,9 @@
     var seccion = 'mp';
     var subtotalManual = false;
     var cambios = false;
+    // Un presupuesto guardado se abre en solo lectura hasta presionar «Modificar»
+    var soloLectura = false;
+    var creador = '';   // usuario que capturó el presupuesto («Elaboro» en la impresión)
 
     var $ = function (id) { return document.getElementById(id); };
     var tbody = document.querySelector('#grid tbody');
@@ -34,17 +37,18 @@
             calcularTotales();
             return;
         }
+        var dis = soloLectura ? ' disabled' : '';
         tbody.innerHTML = filas.map(function (r, i) {
             return '<tr data-i="' + i + '">' +
                 '<td class="sel-col"></td>' +
                 '<td class="id">' + r.id + '</td>' +
                 '<td>' + campoConcepto(r.concepto) + '</td>' +
-                '<td><input type="number" step="0.01" class="num" data-campo="presupuesto" value="' + (r.presupuesto || '') + '"></td>' +
+                '<td><input type="number" step="0.01" class="num" data-campo="presupuesto" value="' + (r.presupuesto || '') + '"' + dis + '></td>' +
                 '<td class="ro" data-calc="subtotal"></td>' +
                 '<td class="ro" data-calc="total"></td>' +
                 '<td class="ro" data-calc="pct"></td>' +
-                '<td class="chk"><input type="checkbox" data-campo="importar"' + (r.importar ? ' checked' : '') + '></td>' +
-                '<td><input type="text" data-campo="folio" value="' + escapar(r.folio) + '"></td>' +
+                '<td class="chk"><input type="checkbox" data-campo="importar"' + (r.importar ? ' checked' : '') + dis + '></td>' +
+                '<td><input type="text" data-campo="folio" value="' + escapar(r.folio) + '"' + dis + '></td>' +
                 '<td><button class="borrar" title="Quitar concepto">✕</button></td>' +
                 '</tr>';
         }).join('');
@@ -55,7 +59,8 @@
     // Un concepto dado de baja (o que ya no está en el catálogo) se conserva en los presupuestos que lo usan.
     function campoConcepto(actual) {
         var lista = CATALOGO[seccion] || [];
-        if (!lista.length) return '<input type="text" data-campo="concepto" value="' + escapar(actual) + '">';
+        var dis = soloLectura ? ' disabled' : '';
+        if (!lista.length) return '<input type="text" data-campo="concepto" value="' + escapar(actual) + '"' + dis + '>';
         var hay = false;
         var opciones = lista.map(function (c) {
             var es = c.nombre.trim().toUpperCase() === String(actual || '').trim().toUpperCase();
@@ -64,7 +69,7 @@
             return '<option' + (es ? ' selected' : '') + '>' + escapar(c.nombre) + '</option>';
         }).join('');
         if (actual && !hay) opciones = '<option selected>' + escapar(actual) + '</option>' + opciones;
-        return '<select data-campo="concepto"><option value=""' + (actual ? '' : ' selected') + '>— Selecciona —</option>' + opciones + '</select>';
+        return '<select data-campo="concepto"' + dis + '><option value=""' + (actual ? '' : ' selected') + '>— Selecciona —</option>' + opciones + '</select>';
     }
 
     function escapar(s) {
@@ -85,6 +90,7 @@
     }
 
     function agregarConcepto() {
+        if (soloLectura) { avisoSoloLectura(); return; }
         if (seccion === 'ct') { if (!$('ctDialogo').open) abrirDialogo(null); return; }
         datos[seccion].push({ id: ++consecutivo, concepto: '', presupuesto: 0, importar: false, folio: '' });
         marcarCambio();
@@ -649,6 +655,7 @@
         var b = e.target.closest('[data-ct-acc]');
         if (!b) return;
         var t = buscarTarea(b.closest('.ct-fila').dataset.uid);
+        if (soloLectura && b.dataset.ctAcc !== 'ver' && b.dataset.ctAcc !== 'adjuntar') { avisoSoloLectura(); return; }
         switch (b.dataset.ctAcc) {
             case 'subir':  mover(t, -1); break;
             case 'bajar':  mover(t, 1); break;
@@ -882,7 +889,7 @@
     $('idNegocio').addEventListener('click', function (e) {
         e.preventDefault();
         var id = this.textContent.trim();
-        if (!id || id === '0') { $('buscarHubspot').click(); return; }
+        if (!id || id === '0') { if (!soloLectura) $('buscarHubspot').click(); return; }
         if (hs.urlNegocio) { window.open(hs.urlNegocio, '_blank', 'noopener'); return; }
         hsPedir('accion=liga&deal=' + encodeURIComponent(id)).then(function (j) {
             if (j.url) window.open(j.url, '_blank', 'noopener');
@@ -905,9 +912,33 @@
         $('estatus').textContent = e;
         $('estatus').className = 'estatus c-' + ((window.ACRI_ESTATUS || {})[e] || 'gris');
     }
+    // En solo lectura el cambio de estatus se guarda al momento (como en el sistema de escritorio)
     function ponerEstatus(e) {
+        var antes = $('estatus').textContent.trim();
+        if (e === antes) return;
         pintarEstatus(e);
         marcarCambio();
+        if (!soloLectura || !presupuestoId) return;
+        guardar().then(function (ok) {
+            if (!ok) { pintarEstatus(antes); cambios = false; }
+        });
+    }
+
+    // ---------- Solo lectura / Modificar ----------
+    function avisoSoloLectura() {
+        alert(window.ACRI_PUEDE_MODIFICAR
+            ? 'El presupuesto está en solo lectura. Presiona «Modificar» para cambiarlo.'
+            : 'El presupuesto está en solo lectura: no tienes permiso para modificar presupuestos.');
+    }
+
+    function aplicarModo() {
+        document.body.classList.toggle('solo-lectura', soloLectura);
+        document.querySelectorAll('.encabezado input, .encabezado select, #descripcion, #pctUtilidad, #tSUB, #buscarHubspot')
+            .forEach(function (el) { el.disabled = soloLectura; });
+        $('modo').hidden = !soloLectura;
+        var b = document.querySelector('.tb[data-accion="modificar"]');
+        if (b) b.classList.toggle('activo', !soloLectura && !!presupuestoId);
+        render();
     }
 
     var enPestana = window.parent !== window;
@@ -937,8 +968,6 @@
             }, location.origin);
         });
     }
-
-    function pendiente() { alert('Función pendiente: se activará al conectar la base de datos.'); }
 
     // ---------- Guardar en AW-Management (api/presupuestos.php) ----------
     var presupuestoId = parseInt(document.body.dataset.presupuesto, 10) || 0;
@@ -1018,6 +1047,9 @@
             document.body.dataset.presupuesto = j.id;
             $('folio').value = j.folio;
             cambios = false;
+            // Ya guardado vuelve a solo lectura: para otro cambio se presiona «Modificar»
+            soloLectura = true;
+            aplicarModo();
             if (nuevo && !enPestana && history.replaceState) history.replaceState(null, '', 'presupuesto.php?id=' + j.id);
             if (enPestana) window.parent.postMessage({ tipo: 'guardado', id: j.id, folio: j.folio }, location.origin);
             return true;
@@ -1031,21 +1063,32 @@
         });
     }
 
-    // Menús desplegables (position: fixed bajo su botón, sin salirse de la ventana)
+    // Menús desplegables: al abrirse pasan al <body> (la barra de herramientas tiene overflow y los
+    // recortaría) y se colocan bajo su botón sin salirse de la ventana; al cerrarse regresan a su lugar
+    var menus = [];
+    document.querySelectorAll('.tb-drop').forEach(function (drop) {
+        menus.push({ drop: drop, menu: drop.querySelector('.menu') });
+    });
     function cerrarMenus() {
-        document.querySelectorAll('.tb-drop').forEach(function (d) { d.classList.remove('abierto'); });
+        menus.forEach(function (x) {
+            if (!x.menu.classList.contains('abierto')) return;
+            x.menu.classList.remove('abierto');
+            x.drop.classList.remove('abierto');
+            x.drop.appendChild(x.menu);
+        });
     }
-    document.querySelectorAll('.tb-drop > .tb').forEach(function (b) {
+    menus.forEach(function (x) {
+        var b = x.drop.querySelector('.tb'), menu = x.menu;
         b.addEventListener('click', function (e) {
             e.stopPropagation();
-            var drop = b.parentElement;
-            var abierto = drop.classList.contains('abierto');
+            var abierto = menu.classList.contains('abierto');
             cerrarMenus();
             if (abierto) return;
-            var menu = drop.querySelector('.menu');
             var actual = $('estatus').textContent.trim();
             menu.querySelectorAll('[data-estatus]').forEach(function (o) { o.classList.toggle('actual', o.dataset.estatus === actual); });
-            drop.classList.add('abierto');
+            document.body.appendChild(menu);
+            menu.classList.add('abierto');
+            x.drop.classList.add('abierto');
             var r = b.getBoundingClientRect();
             var izq = Math.min(r.left, window.innerWidth - menu.offsetWidth - 8);
             var arriba = r.bottom + 4;
@@ -1063,19 +1106,80 @@
     document.querySelectorAll('[data-estatus]').forEach(function (b) {
         b.addEventListener('click', function () { ponerEstatus(b.dataset.estatus); });
     });
+    // ---------- Imprimir / Imprimir Detalle (hoja membretada, js/formato-presupuesto.js) ----------
+    function documentoImpresion() {
+        var subtotal = calcularTotales();
+        return {
+            folio: $('folio').value,
+            fecha: $('fecha').value,
+            estatus: $('estatus').textContent.trim(),
+            cliente: $('cliente').value,
+            proyecto: $('proyecto').value,
+            ubicacion: $('ubicacion').value,
+            vendedor: $('vendedor').value,
+            elaboro: creador || window.ACRI_USUARIO || '',
+            notas: $('descripcion').value,
+            utilidad_pct: num($('pctUtilidad').value),
+            subtotal: subtotal,
+            iva_pct: IVA * 100,
+            secciones: ['mp', 'mo', 'go'].map(function (sec) {
+                return {
+                    titulo: NOMBRES[sec].toUpperCase(),
+                    conceptos: datos[sec].filter(function (r) { return String(r.concepto || '').trim() || num(r.presupuesto); })
+                        .map(function (r) {
+                            return {
+                                concepto: r.concepto, importe: num(r.presupuesto), folio: r.folio || '',
+                                articulos: (r.articulos || []).map(function (a) {
+                                    return { nombre: txt(a.nom_articulo) || txt(a.clave_articulo), unidades: a.unidades, um: a.unid_medida, total: a.precio_total };
+                                })
+                            };
+                        })
+                };
+            })
+        };
+    }
+    var impresionLista = false;
+    function prepararImpresion(detalle) {
+        $('formatoImpresion').innerHTML = FormatoPresupuesto(documentoImpresion(), window.ACRI_MEMBRETE || {}, detalle);
+        impresionLista = true;
+    }
     document.querySelectorAll('[data-imprimir]').forEach(function (b) {
-        b.addEventListener('click', function () { window.print(); });
+        b.addEventListener('click', function () {
+            prepararImpresion(b.dataset.imprimir === 'detalle');
+            window.print();
+        });
     });
+    // Ctrl + P imprime el formato normal
+    window.addEventListener('beforeprint', function () { if (!impresionLista) prepararImpresion(false); });
+    window.addEventListener('afterprint', function () { impresionLista = false; });
 
     var acciones = {
         'guardar': function () {
+            if (soloLectura && !cambios) { alert('No hay cambios que guardar. Presiona «Modificar» para cambiar el presupuesto.'); return; }
             guardar().then(function (ok) { if (ok) alert('Presupuesto guardado con folio ' + $('folio').value + '.'); });
         },
         'guardar-cerrar': function () {
+            if (soloLectura && !cambios) { cerrarVentana(); return; }
             // Solo se cierra si se guardó; si falla, lo capturado sigue en pantalla
             guardar().then(function (ok) { if (ok) cerrarVentana(); });
         },
-        'modificar': pendiente,
+        'modificar': function () {
+            if (!presupuestoId) { alert('El presupuesto todavía no se guarda: ya puedes capturarlo.'); return; }
+            if (!window.ACRI_PUEDE_MODIFICAR) { avisoSoloLectura(); return; }
+            if (soloLectura) {
+                soloLectura = false;
+                aplicarModo();
+                $('cliente').focus();
+                return;
+            }
+            // Dejar de modificar: si hay cambios se descartan volviendo a abrir el presupuesto
+            if (cambios) {
+                if (confirm('¿Descartar los cambios sin guardar?')) cargarPresupuesto(presupuestoId);
+                return;
+            }
+            soloLectura = true;
+            aplicarModo();
+        },
         'duplicar': function () {
             if (!presupuestoId) { alert('Este presupuesto todavía no se ha guardado.'); return; }
             if (cambios && !confirm('Hay cambios sin guardar; la copia los incluirá. ¿Continuar?')) return;
@@ -1085,6 +1189,9 @@
             $('folio').value = 0;
             $('obra').textContent = '';
             pintarEstatus('Pendiente');
+            creador = '';
+            soloLectura = false;
+            aplicarModo();
             marcarCambio();
             alert('Se creó una copia. Presiona Guardar para asignarle folio.');
         },
@@ -1165,15 +1272,22 @@
                     articulos: c.articulos || []
                 });
             });
+            creador = txt(p.usuario_creador);
             if (enPestana && p.cliente) {
                 window.parent.postMessage({ tipo: 'titulo', texto: 'Presupuesto · ' + p.cliente }, location.origin);
             }
             cambios = false;
-            render();
+            soloLectura = true;
+            aplicarModo();
         }).catch(function (err) { alert('No se pudo abrir el presupuesto: ' + err.message); });
     }
 
     render();
     var idInicial = parseInt(document.body.dataset.presupuesto, 10) || 0;
-    if (idInicial) cargarPresupuesto(idInicial);
+    if (idInicial) {
+        // Bloqueado desde el inicio para que no se capture nada mientras carga
+        soloLectura = true;
+        aplicarModo();
+        cargarPresupuesto(idInicial);
+    }
 })();

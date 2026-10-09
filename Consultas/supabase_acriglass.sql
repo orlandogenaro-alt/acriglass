@@ -17,6 +17,8 @@
 /****                                                                       ****/
 /****  Como correrlo: Supabase > SQL Editor > New query > pegar todo > Run  ****/
 /****  Se corre una sola vez en un proyecto vacio.                          ****/
+/****  Despues corre supabase_roles_conceptos.sql (roles de usuario,      ****/
+/****  estatus y conceptos iniciales de los catalogos de obra).           ****/
 /******************************************************************************/
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;   /* crypt() / gen_salt() para las contrasenas */

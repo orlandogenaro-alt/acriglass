@@ -34,20 +34,6 @@ function numero($v, int $decimales = 2): float
     return round(is_numeric($v) ? (float) $v : 0.0, $decimales);
 }
 
-// Inserta un renglón y regresa su id
-function insertar(string $tabla, string $colId, array $campos): int
-{
-    if (bd_motor('AW') === 'firebird') {
-        $id = (int) bd_valor('AW', 'select gen_id(id_catalogos, 1) from rdb$database');
-        $campos = [$colId => $id] + $campos;
-        bd_ejecutar('AW', "insert into $tabla (" . implode(', ', array_keys($campos)) . ') values ('
-            . implode(', ', array_fill(0, count($campos), '?')) . ')', array_values($campos));
-        return $id;
-    }
-    return (int) bd_valor('AW', "insert into $tabla (" . implode(', ', array_keys($campos)) . ') values ('
-        . implode(', ', array_fill(0, count($campos), '?')) . ") returning $colId", array_values($campos));
-}
-
 // Id del concepto por su descripción; si no está en el catálogo se da de alta
 function conceptoId(string $tipo, string $descripcion, array &$cache): int
 {
@@ -55,7 +41,7 @@ function conceptoId(string $tipo, string $descripcion, array &$cache): int
     if (isset($cache[$k])) return $cache[$k];
     [$tabla, $col] = CATALOGOS[$tipo];
     $id = (int) bd_valor('AW', "select min($col) from $tabla where upper(trim(descripcion)) = ?", [mb_strtoupper($descripcion)]);
-    if (!$id) $id = insertar($tabla, $col, ['descripcion' => mb_substr($descripcion, 0, 80)]);
+    if (!$id) $id = bd_insertar('AW', $tabla, $col, ['descripcion' => mb_substr($descripcion, 0, 80)]);
     return $cache[$k] = $id;
 }
 
@@ -64,7 +50,7 @@ function vendedorId(?string $nombre): ?int
 {
     if ($nombre === null) return null;
     $id = (int) bd_valor('AW', 'select min(vendedor_obra_id) from vendedores_obras where upper(trim(nombre)) = ?', [mb_strtoupper($nombre)]);
-    return $id ?: insertar('vendedores_obras', 'vendedor_obra_id', ['nombre' => $nombre, 'estatus' => 'A']);
+    return $id ?: bd_insertar('AW', 'vendedores_obras', 'vendedor_obra_id', ['nombre' => $nombre, 'estatus' => 'A']);
 }
 
 function guardar(array $d): array
@@ -129,13 +115,13 @@ function guardar(array $d): array
             // folio 0 / sin folio: lo asigna el trigger (Firebird) o la secuencia (Supabase)
             $enc['usuario_creador'] = mb_substr((string) ($_SESSION['usuario'] ?? ''), 0, 50);
             if (bd_motor('AW') === 'firebird') $enc['folio'] = 0;
-            $id = insertar('doctos_sugerido_obra', 'docto_sugerido_obra_id', $enc);
+            $id = bd_insertar('AW', 'doctos_sugerido_obra', 'docto_sugerido_obra_id', $enc);
         }
 
         $cache = [];
         foreach ($conceptos as $c) {
             $docto = (int) ($c['docto_imp_id'] ?? 0);
-            $detId = insertar('doctos_sugerido_obra_det', 'docto_sugerido_obra_det_id', [
+            $detId = bd_insertar('AW', 'doctos_sugerido_obra_det', 'docto_sugerido_obra_det_id', [
                 'docto_sugerido_obra_id' => $id,
                 'concepto_id'            => conceptoId($c['tipo'], $c['concepto'], $cache),
                 'presupuesto'            => numero($c['presupuesto'] ?? 0),
@@ -148,7 +134,7 @@ function guardar(array $d): array
                 'tipo_concepto'          => $c['tipo'],
             ]);
             foreach ($c['articulos'] ?? [] as $a) {
-                insertar('doctos_suge_obra_det_mat', 'docto_suge_obra_det_mat_id', [
+                bd_insertar('AW', 'doctos_suge_obra_det_mat', 'docto_suge_obra_det_mat_id', [
                     'docto_sugerido_obra_det_id' => $detId,
                     'docto_id'       => (int) ($a['docto_id'] ?? 0) ?: null,
                     'folio'          => texto($a['folio'] ?? '', 10),

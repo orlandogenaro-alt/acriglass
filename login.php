@@ -49,14 +49,19 @@ if (!$aw || ($aw['contrasena'] ?? '') === '') {
     iniciarSesion($usuario, ['ADMIN_USER' => true], true);
 }
 
-// Supabase (nube): contraseña como hash bcrypt y un renglón por permiso
+// Supabase (nube): contraseña como hash bcrypt y un renglón por permiso.
+// Permisos = los de su rol (permisos_roles) más los sueltos del usuario (permisos_usuarios).
 if (ACRI_NUBE) {
     try {
         $u = bd_fila('AW', 'select usuario_id, login, contrasena_hash, estatus from usuarios where upper(trim(login)) = ?', [mb_strtoupper($usuario)]);
         if (!$u || !password_verify($contrasena, (string) $u['contrasena_hash'])) volver('datos');
         if (strtoupper((string) $u['estatus']) === 'B') volver('baja');
+        $sql = 'select permiso from permisos_usuarios where usuario_id = ?';
+        if (bd_tiene_columna('AW', 'usuarios', 'rol_id')) {
+            $sql .= ' union select pr.permiso from permisos_roles pr join usuarios x on x.rol_id = pr.rol_id where x.usuario_id = ?';
+        }
         $permisos = [];
-        foreach (bd_filas('AW', 'select permiso from permisos_usuarios where usuario_id = ?', [$u['usuario_id']]) as $p) {
+        foreach (bd_filas('AW', $sql, array_fill(0, substr_count($sql, '?'), $u['usuario_id'])) as $p) {
             $permisos[strtoupper($p['permiso'])] = true;
         }
         bd_pdo('AW')->prepare('update usuarios set ultimo_acceso = now() where usuario_id = ?')->execute([$u['usuario_id']]);

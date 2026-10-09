@@ -184,6 +184,21 @@ function bd_ejecutar(string $clave, string $sql, array $params = []): int
     return $st->rowCount();
 }
 
+// Inserta un renglón y regresa su id. En Firebird el id sale de GEN_ID(ID_CATALOGOS) (igual que los
+// triggers de AW); en Supabase, de la columna identity.
+function bd_insertar(string $clave, string $tabla, string $colId, array $campos): int
+{
+    if (bd_motor($clave) === 'firebird') {
+        $id = (int) bd_valor($clave, 'select gen_id(id_catalogos, 1) from rdb$database');
+        $campos = [$colId => $id] + $campos;
+        bd_ejecutar($clave, "insert into $tabla (" . implode(', ', array_keys($campos)) . ') values ('
+            . implode(', ', array_fill(0, count($campos), '?')) . ')', array_values($campos));
+        return $id;
+    }
+    return (int) bd_valor($clave, "insert into $tabla (" . implode(', ', array_keys($campos)) . ') values ('
+        . implode(', ', array_fill(0, count($campos), '?')) . ") returning $colId", array_values($campos));
+}
+
 // Motor de la conexión ('firebird', 'pgsql', …); en la nube AW es Supabase
 function bd_motor(string $clave): string
 {

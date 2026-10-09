@@ -429,10 +429,12 @@ select option { background: var(--tarjeta); color: var(--texto); }
 .c-imp { width: 80px; }
 .c-folio { width: 120px; }
 .c-del { width: 34px; }
-.grid td input[type=text], .grid td input[type=number] {
+.grid td input[type=text], .grid td input[type=number], .grid td select {
     width: 100%; height: 32px; border: none; padding: 0 8px; background: transparent; outline: none;
 }
-.grid td input:focus { background: var(--input); box-shadow: inset 0 0 0 2px var(--azul); }
+.grid td select { cursor: pointer; }
+.grid td select option { background: var(--input); color: var(--texto); }
+.grid td input:focus, .grid td select:focus { background: var(--input); box-shadow: inset 0 0 0 2px var(--azul); }
 .grid td.ro { padding: 0 8px; text-align: right; color: var(--texto-2); font-variant-numeric: tabular-nums; }
 .grid td.id { padding: 0 8px; color: var(--texto-3); font-weight: 600; }
 .grid td.chk { text-align: center; }

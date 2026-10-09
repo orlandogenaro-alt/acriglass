@@ -8,6 +8,8 @@
 
     // Conceptos por sección (en memoria hasta tener base de datos)
     var datos = { mp: [], mo: [], go: [] };
+    // Catálogos de conceptos (Administrador › Conceptos de …): { mp: [{nombre, activo}], … }
+    var CATALOGO = window.ACRI_CONCEPTOS || {};
     var consecutivo = 0;
     var seccion = 'mp';
     var subtotalManual = false;
@@ -36,7 +38,7 @@
             return '<tr data-i="' + i + '">' +
                 '<td class="sel-col"></td>' +
                 '<td class="id">' + r.id + '</td>' +
-                '<td><input type="text" data-campo="concepto" value="' + escapar(r.concepto) + '"></td>' +
+                '<td>' + campoConcepto(r.concepto) + '</td>' +
                 '<td><input type="number" step="0.01" class="num" data-campo="presupuesto" value="' + (r.presupuesto || '') + '"></td>' +
                 '<td class="ro" data-calc="subtotal"></td>' +
                 '<td class="ro" data-calc="total"></td>' +
@@ -47,6 +49,22 @@
                 '</tr>';
         }).join('');
         refrescarCalculados();
+    }
+
+    // Lista desplegable con el catálogo de la sección; sin catálogo, texto libre.
+    // Un concepto dado de baja (o que ya no está en el catálogo) se conserva en los presupuestos que lo usan.
+    function campoConcepto(actual) {
+        var lista = CATALOGO[seccion] || [];
+        if (!lista.length) return '<input type="text" data-campo="concepto" value="' + escapar(actual) + '">';
+        var hay = false;
+        var opciones = lista.map(function (c) {
+            var es = c.nombre.trim().toUpperCase() === String(actual || '').trim().toUpperCase();
+            if (es) hay = true;
+            if (!c.activo && !es) return '';
+            return '<option' + (es ? ' selected' : '') + '>' + escapar(c.nombre) + '</option>';
+        }).join('');
+        if (actual && !hay) opciones = '<option selected>' + escapar(actual) + '</option>' + opciones;
+        return '<select data-campo="concepto"><option value=""' + (actual ? '' : ' selected') + '>— Selecciona —</option>' + opciones + '</select>';
     }
 
     function escapar(s) {
@@ -71,7 +89,7 @@
         datos[seccion].push({ id: ++consecutivo, concepto: '', presupuesto: 0, importar: false, folio: '' });
         marcarCambio();
         render();
-        var ultimo = tbody.querySelector('tr:last-child input[data-campo="concepto"]');
+        var ultimo = tbody.querySelector('tr:last-child [data-campo="concepto"]');
         if (ultimo) ultimo.focus();
     }
 

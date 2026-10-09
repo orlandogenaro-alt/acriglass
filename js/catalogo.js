@@ -1,5 +1,6 @@
-// Motor de las pantallas tipo catálogo (Bases de datos, APIs y servicios).
-// Cada página llama a Catalogo({ columnas, formulario, acciones, alCargar }).
+// Motor de las pantallas tipo catálogo (Bases de datos, APIs y servicios, Usuarios, Roles, Conceptos).
+// Cada página llama a Catalogo({ columnas, formulario, acciones, alCargar, nombre }).
+// nombre(fila) = cómo se menciona un renglón en los mensajes (por omisión, su clave).
 window.Catalogo = function (cfg) {
     var $ = function (id) { return document.getElementById(id); };
     var cuerpo = document.body;
@@ -10,6 +11,7 @@ window.Catalogo = function (cfg) {
     var filas = [];          // lo que regresó el servidor
     var catalogos = {};      // datos auxiliares (motores, autenticación…)
     var seleccion = null;    // clave de la fila seleccionada
+    var nombre = cfg.nombre || function (f) { return String(f.clave).toUpperCase(); };
 
     // ================= Utilidades =================
     function esc(s) {
@@ -41,7 +43,7 @@ window.Catalogo = function (cfg) {
             op.headers['Content-Type'] = 'application/json';
             op.body = JSON.stringify(datos);
         }
-        return fetch(api + '?accion=' + accion, op).then(function (r) {
+        return fetch(api + (api.indexOf('?') < 0 ? '?' : '&') + 'accion=' + accion, op).then(function (r) {
             if (r.status === 401) { (window.top || window).location.href = 'index.php'; throw new Error('Sesión expirada'); }
             return r.json().catch(function () { throw new Error('Respuesta no válida del servidor (HTTP ' + r.status + ').'); });
         }).then(function (j) {
@@ -216,7 +218,8 @@ window.Catalogo = function (cfg) {
 
     function valoresFormulario() {
         var v = {};
-        $('campos').querySelectorAll('[name]').forEach(function (el) {
+        // Los deshabilitados solo informan (p. ej. permisos que ya da el rol): no se envían
+        $('campos').querySelectorAll('[name]:not(:disabled)').forEach(function (el) {
             v[el.name] = el.type === 'checkbox' ? el.checked : el.value;
         });
         return v;
@@ -228,16 +231,19 @@ window.Catalogo = function (cfg) {
             var val = valores[c.id] == null ? '' : valores[c.id];
             var attrs = ' name="' + c.id + '"' + (c.soloLectura ? ' readonly' : '') + (c.placeholder ? ' placeholder="' + esc(c.placeholder) + '"' : '');
             var control;
-            if (c.tipo === 'select') {
+            if (c.tipo === 'titulo') {
+                return '<div class="c-seccion">' + esc(c.etiqueta) + (c.ayuda ? '<small>' + esc(c.ayuda) + '</small>' : '') + '</div>';
+            } else if (c.tipo === 'select') {
                 control = '<select' + attrs + '>' + Object.keys(c.opciones).map(function (k) {
                     return '<option value="' + esc(k) + '"' + (String(val) === k ? ' selected' : '') + '>' + esc(c.opciones[k]) + '</option>';
                 }).join('') + '</select>';
             } else if (c.tipo === 'textarea') {
                 control = '<textarea' + attrs + '>' + esc(val) + '</textarea>';
             } else if (c.tipo === 'check') {
-                return '<label class="c-campo check completo"><input type="checkbox"' + attrs + (val ? ' checked' : '') + '> ' + esc(c.etiqueta) + '</label>';
+                return '<label class="c-campo check' + (c.medio ? '' : ' completo') + '"' + (c.titulo ? ' title="' + esc(c.titulo) + '"' : '') + '>' +
+                    '<input type="checkbox"' + attrs + (val ? ' checked' : '') + (c.soloLectura ? ' disabled' : '') + '> ' + esc(c.etiqueta) + '</label>';
             } else {
-                control = '<input type="' + (c.tipo || 'text') + '"' + attrs + ' value="' + esc(val) + '"' +
+                control = '<input type="' + (c.tipo || 'text') + '"' + attrs + ' value="' + esc(val) + '"' + (c.tipo === 'number' ? ' step="any"' : '') +
                     (c.tipo === 'password' ? ' autocomplete="new-password"' : ' autocomplete="off"') + '>';
             }
             return '<label class="c-campo' + (c.completo ? ' completo' : '') + '"><span>' + esc(c.etiqueta) + '</span>' + control +
@@ -280,10 +286,10 @@ window.Catalogo = function (cfg) {
         if (editando) datos.clave = editando.clave;
         ocupado($('dlgGuardar'), true);
         pedir('guardar', datos).then(function (j) {
-            seleccion = datos.clave.toUpperCase();
+            if (datos.clave) seleccion = String(datos.clave).toUpperCase();
             recibir(j);
             dlg.close();
-            mensaje('Se guardó ' + seleccion + '.', 'ok');
+            mensaje('Se guardó ' + nombre(datos) + '.', 'ok');
         }).catch(function (err) { resultadoDialogo(err.message, false); })
           .finally(function () { ocupado($('dlgGuardar'), false); });
     });
@@ -291,11 +297,12 @@ window.Catalogo = function (cfg) {
     $('dlgCancelar').addEventListener('click', function () { dlg.close(); });
 
     $('dlgEliminar').addEventListener('click', function () {
-        if (!editando || !confirm('¿Eliminar ' + editando.clave + '? Esta acción no se puede deshacer.')) return;
+        if (!editando || !confirm('¿Eliminar ' + nombre(editando) + '? Esta acción no se puede deshacer.')) return;
+        var eliminado = nombre(editando);
         pedir('eliminar', { clave: editando.clave }).then(function (j) {
             recibir(j);
             dlg.close();
-            mensaje('Se eliminó ' + editando.clave + '.', 'ok');
+            mensaje('Se eliminó ' + eliminado + '.', 'ok');
         }).catch(function (err) { resultadoDialogo(err.message, false); });
     });
 
@@ -326,7 +333,7 @@ window.Catalogo = function (cfg) {
             if (!f) return;
             return pedir('activar', { clave: f.clave }).then(function (j) {
                 recibir(j);
-                mensaje(f.clave + (f.activa ? ' quedó desactivada.' : ' quedó activa.'), 'ok');
+                mensaje((f.activa ? 'Se desactivó ' : 'Se activó ') + nombre(f) + '.', 'ok');
             });
         }
     }, cfg.acciones || {});

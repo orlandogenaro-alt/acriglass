@@ -4,8 +4,9 @@
 // Solo se ejecutan los scripts de esta lista: includes/, config/, Consultas/ y uploads/ nunca se exponen.
 const ACRI_RUTAS = [
     'index.php', 'login.php', 'logout.php', 'principal.php', 'obra.php', 'presupuesto.php',
-    'imagen-sistema.php', 'bases-datos.php', 'servicios.php',
+    'imagen-sistema.php', 'bases-datos.php', 'servicios.php', 'usuarios.php', 'roles.php', 'conceptos.php',
     'api/obras.php', 'api/presupuestos.php', 'api/adjuntos.php', 'api/imagenes.php', 'api/bases-datos.php', 'api/servicios.php', 'api/hubspot.php',
+    'api/usuarios.php', 'api/roles.php', 'api/conceptos.php',
 ];
 
 $ruta = ltrim(rawurldecode((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH)), '/');

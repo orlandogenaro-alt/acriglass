@@ -1,4 +1,4 @@
-/* Pantallas tipo catálogo: Bases de datos, APIs y servicios */
+/* Pantallas tipo catálogo: Bases de datos, APIs y servicios, Usuarios, Roles, Conceptos */
 :root {
     --fondo: #0f1623;
     --tarjeta: #172133;
@@ -182,6 +182,14 @@ td .chip + .chip, td span + .chip { margin-left: 6px; }
 .c-campo select { color-scheme: dark; }
 .c-campo small { color: var(--texto-suave); font-size: 11.5px; }
 .c-campo.check { flex-direction: row; align-items: center; gap: 8px; }
+.c-campo.check:has(input:disabled) { color: var(--texto-suave); }
+.c-seccion {
+    grid-column: 1 / -1;
+    margin-top: 6px; padding-top: 10px;
+    border-top: 1px solid var(--borde);
+    font-weight: 800; color: #fff;
+}
+.c-seccion small { display: block; margin-top: 2px; font-weight: 600; font-size: 11.5px; color: var(--texto-suave); }
 .c-resultado { min-height: 18px; margin-top: 12px; font-weight: 700; word-break: break-word; }
 .c-resultado.ok { color: #4ade80; }
 .c-resultado.error { color: #f87171; }

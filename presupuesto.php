@@ -1,6 +1,7 @@
 <?php
 require __DIR__ . '/includes/sesion.php';
 require __DIR__ . '/includes/servicios.php';
+require __DIR__ . '/includes/conceptos.php';
 
 // Presupuesto existente a abrir (sin id = nuevo)
 $presupuestoId = max(0, (int) ($_GET['id'] ?? 0));
@@ -20,6 +21,16 @@ if (!$vendedores) {
 }
 $vendedores = array_values(array_unique(array_filter(array_map('trim', $vendedores))));
 if (!$vendedores) $vendedores = ['ALFREDO MARTINEZ'];
+
+// Conceptos de Materia Prima / Mano de Obra / Gastos de Operacion (Administrador › Conceptos de …)
+$conceptos = ['mp' => [], 'mo' => [], 'go' => []];
+if (!modoConfiguracion()) {
+    try {
+        $conceptos = conceptosPresupuesto();
+    } catch (Throwable $e) {
+        error_log('AcriGlass presupuesto conceptos: ' . $e->getMessage());
+    }
+}
 
 // Secciones del presupuesto (pestañas verticales)
 $secciones = [
@@ -401,6 +412,9 @@ $secciones = [
     </div>
 </dialog>
 
+<script>
+    window.ACRI_CONCEPTOS = <?= json_encode($conceptos, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+</script>
 <script src="<?= recurso('js/presupuesto.js') ?>"></script>
 </body>
 </html>

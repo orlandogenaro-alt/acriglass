@@ -9,7 +9,6 @@ $inicial  = mb_strtoupper(mb_substr($usuarioSesion, 0, 1));
 // Menú lateral.
 // tipo: modulo = listado en pestaña (4º dato = columnas del listado)
 //       pagina = página en pestaña (4º dato = url) · pendiente = aún no existe
-$colsConcepto = ['CONCEPTO_ID', 'CLAVE', 'NOMBRE', 'UNIDAD', 'COSTO', 'ESTATUS'];
 $colsGasto    = ['CONCEPTO_ID', 'CLAVE', 'NOMBRE', 'DESCRIPCION', 'ESTATUS'];
 
 $menu = [
@@ -36,9 +35,6 @@ $menu = [
     [
         'id' => 'conceptos', 'titulo' => 'Conceptos', 'icono' => '📋',
         'items' => [
-            ['Conceptos de Mat.Prima',     '🧱', 'modulo', $colsConcepto],
-            ['Conceptos Mano de Obra',     '👷', 'modulo', $colsConcepto],
-            ['Conceptos Gastos Operac',    '💲', 'modulo', $colsGasto],
             ['Conceptos Gastos en Obra',   '💰', 'modulo', $colsGasto],
         ],
     ],
@@ -48,7 +44,11 @@ $menu = [
             ['Bases de datos',     '🗄️', 'pagina', 'bases-datos.php'],
             ['APIs y servicios',   '🔌', 'pagina', 'servicios.php'],
             ['Imagen del Sistema', '🖼️', 'pagina', 'imagen-sistema.php'],
-            ['Usuarios',           '🔐', 'pendiente'],
+            ['Usuarios',           '👥', 'pagina', 'usuarios.php'],
+            ['Roles',              '🔐', 'pagina', 'roles.php'],
+            ['Conceptos de Materia Prima',       '🧱', 'pagina', 'conceptos.php?tipo=mp'],
+            ['Conceptos de Mano de Obra',        '👷', 'pagina', 'conceptos.php?tipo=mo'],
+            ['Conceptos de Gastos de Operacion', '💲', 'pagina', 'conceptos.php?tipo=go'],
             ['Empresa',            '🏢', 'pendiente'],
         ],
     ],

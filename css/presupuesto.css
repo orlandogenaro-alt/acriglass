@@ -219,12 +219,13 @@ select option { background: var(--tarjeta); color: var(--texto); }
 .tb[data-tema="claro"] .i-sol, .tb[data-tema="oscuro"] .i-luna { display: block; }
 
 .tb-drop { position: relative; display: flex; }
+/* fixed: la barra tiene overflow-x y recortaría un menú absolute; la posición la pone presupuesto.js */
 .menu {
     display: none;
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    z-index: 10;
+    position: fixed;
+    z-index: 100;
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
     min-width: 170px;
     background: var(--tarjeta);
     border: 1px solid var(--borde);
@@ -274,6 +275,8 @@ select option { background: var(--tarjeta); color: var(--texto); }
 .menu-estatus .c-verde i { background: var(--verde); }
 .menu-estatus .c-rojo i  { background: var(--rojo); }
 .menu-estatus .c-gris i  { background: var(--texto-2); }
+.menu-estatus button.actual { font-weight: 700; }
+.menu-estatus button.actual::after { content: '✓'; margin-left: auto; padding-left: 12px; color: var(--azul-texto); }
 
 /* ---------- Pestañas del documento ---------- */
 .doc-tabs {

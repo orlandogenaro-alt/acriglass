@@ -1031,19 +1031,34 @@
         });
     }
 
-    // Menús desplegables
+    // Menús desplegables (position: fixed bajo su botón, sin salirse de la ventana)
+    function cerrarMenus() {
+        document.querySelectorAll('.tb-drop').forEach(function (d) { d.classList.remove('abierto'); });
+    }
     document.querySelectorAll('.tb-drop > .tb').forEach(function (b) {
         b.addEventListener('click', function (e) {
             e.stopPropagation();
             var drop = b.parentElement;
             var abierto = drop.classList.contains('abierto');
-            document.querySelectorAll('.tb-drop').forEach(function (d) { d.classList.remove('abierto'); });
-            if (!abierto) drop.classList.add('abierto');
+            cerrarMenus();
+            if (abierto) return;
+            var menu = drop.querySelector('.menu');
+            var actual = $('estatus').textContent.trim();
+            menu.querySelectorAll('[data-estatus]').forEach(function (o) { o.classList.toggle('actual', o.dataset.estatus === actual); });
+            drop.classList.add('abierto');
+            var r = b.getBoundingClientRect();
+            var izq = Math.min(r.left, window.innerWidth - menu.offsetWidth - 8);
+            var arriba = r.bottom + 4;
+            if (arriba + menu.offsetHeight > window.innerHeight - 8) arriba = Math.max(8, r.top - menu.offsetHeight - 4);
+            menu.style.left = Math.max(8, izq) + 'px';
+            menu.style.top = arriba + 'px';
         });
     });
-    document.addEventListener('click', function () {
-        document.querySelectorAll('.tb-drop').forEach(function (d) { d.classList.remove('abierto'); });
-    });
+    document.addEventListener('click', cerrarMenus);
+    window.addEventListener('resize', cerrarMenus);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') cerrarMenus(); });
+    // Si la barra se desplaza de lado, el menú se quedaría flotando fuera de su botón
+    document.querySelector('.toolbar').addEventListener('scroll', cerrarMenus);
 
     document.querySelectorAll('[data-estatus]').forEach(function (b) {
         b.addEventListener('click', function () { ponerEstatus(b.dataset.estatus); });

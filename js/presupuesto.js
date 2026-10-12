@@ -288,7 +288,7 @@
                 unidad: txt(a.unid_medida) || 'Pieza'
             };
             AUTOMATICOS.forEach(function (k) { if (!t.manual[k]) t[k] = auto[k]; });
-            t.monto = num(a.precio_total);
+            if (!t.manual.monto) t.monto = num(a.precio_total);
         });
     }
 
@@ -312,7 +312,7 @@
                 }
                 var auto = detalleAuto(sec, r, nombre);
                 AUTOMATICOS.forEach(function (k) { if (!t.manual[k]) t[k] = auto[k]; });
-                t.monto = num(r.presupuesto);
+                if (!t.manual.monto) t.monto = num(r.presupuesto);
                 sincronizarPartidas(sec, r, t, vivos);
             });
         });
@@ -645,6 +645,12 @@
         Object.keys(v).forEach(function (k) {
             if (!(t.origen && v[k] === '' && AUTOMATICOS.indexOf(k) >= 0)) t[k] = v[k];
         });
+        // Costo: si se captura a mano ya no se toma de su sección; si se borra, vuelve a ser automático
+        var monto = $('ctMonto').value.trim();
+        if (monto !== (t.monto ? fmt(t.monto) : '')) {
+            if (t.origen) t.manual.monto = monto !== '';
+            if (!(t.origen && monto === '')) t.monto = num(monto.replace(/[^\d.-]/g, ''));
+        }
         if (!t.origen) completarManual(t);
         marcarCambio();
         $('ctDialogo').close();

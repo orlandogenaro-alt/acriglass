@@ -10,6 +10,7 @@
 // POST ?accion=eliminar_adjunto { id, archivo, autoriza? }
 // POST ?accion=eliminar_explosion { id, partidas: [explocion_mat_obra_id], autoriza? }
 // POST ?accion=asignar_cot      { id, folio }   cotización / pedido de Microsip (por la API de Easy-Glass) a la obra
+// POST ?accion=enviar_microsip { id, folio, simular? }  folio de Easy-Glass → Pedido y OC en Microsip (ENVIAR_MICROSIP_OBRA)
 // POST ?accion=guardar_cot / quitar_cot           cotización de facturación capturada / quitar una asignada
 // POST ?accion=guardar_cobro / cancelar_cobro     pago en efectivo, nota de cargo o anticipo (Dialog279)
 // POST ?accion=guardar_orden / estatus_orden      orden de trabajo y sus partidas (Dialog242)
@@ -700,6 +701,37 @@ function asignarCotizacion(array $d): array
     return ['docto_id' => $docId, 'folio' => $p['folio'], 'cliente' => $p['cliente'] ?? ''];
 }
 
+// «Enviar a Facturacion» de Easy-Glass por la API (POST /microsip-enviar/{folio}): Pedido de venta y Orden de
+// compra en Microsip. Solo folios de la obra (asignados en 2-Facturación o del mismo negocio de HubSpot).
+// simular = 1 solo valida; Easy-Glass revisa estatus, tareas y documentos y no duplica folios.
+function enviarMicrosip(array $d): array
+{
+    $obra = (int) ($d['id'] ?? 0);
+    validaEstatusObra($obra);
+    $num = preg_match('/^(EG)?0*(\d{1,7})$/i', trim((string) ($d['folio'] ?? '')), $mm) ? (int) $mm[2] : 0;
+    if (!$num) error('Folio de Easy-Glass no válido.');
+    $simular = !empty($d['simular']);
+    if (!$simular) exigirOAutorizar($d, 'ENVIAR_MICROSIP_OBRA');
+
+    $folioEg = 'EG' . str_pad((string) $num, 7, '0', STR_PAD_LEFT);
+    $deObra = (int) bd_valor('AW', 'select count(*) from doctos_microsip_obra where obra_id = ? and folio = ?', [$obra, $folioEg]) > 0;
+    if (!$deObra) {
+        $deal = trim((string) bd_valor('AW', 'select b.id_hs from reg_obras a join doctos_sugerido_obra b on b.docto_sugerido_obra_id = a.sugerido_id where a.obra_id = ?', [$obra]));
+        $deObra = ctype_digit($deal) && $deal !== '0' && (int) bd_valor('EG',
+            'select count(*) from hs_deals h join doctos_sueridos s on s.suerido_id = h.id_docto_easy where h.id_deal_hubspot = ? and s.folio = ?', [$deal, $num]) > 0;
+    }
+    if (!$deObra) error("El folio $folioEg no pertenece a esta obra.");
+
+    $r = api_http('EASYGLASS', 'POST', '/microsip-enviar/' . $num . ($simular ? '?simular=1' : ''), ['simular' => $simular ? 1 : 0]);
+    $datos = is_array($r['datos']) ? $r['datos'] : [];
+    if (!$r['ok'] || (isset($datos['ok']) && !$datos['ok'])) {
+        $msg = $datos['error'] ?? $datos['mensaje'] ?? $datos['datos']['error'] ?? null;
+        error($msg ? (string) (is_array($msg) ? implode(' · ', $msg) : $msg) : 'Easy-Glass no pudo enviar a Microsip: ' . ($r['error'] ?: 'sin respuesta'), 502);
+    }
+    if (!$simular) error_log("AcriGlass enviar a Microsip: obra $obra folio $folioEg por " . usuario());
+    return ['folio' => $folioEg, 'simular' => $simular, 'resultado' => $datos['datos'] ?? $datos];
+}
+
 try {
     switch ($_GET['accion'] ?? '') {
         case 'guardar':
@@ -730,6 +762,8 @@ try {
             responder(['ok' => true] + eliminarExplosion(entrada()));
         case 'asignar_cot':
             responder(['ok' => true] + asignarCotizacion(entrada()));
+        case 'enviar_microsip':
+            responder(['ok' => true] + enviarMicrosip(entrada()));
         case 'guardar_cot':
             responder(['ok' => true] + guardarCotizacion(entrada()));
         case 'quitar_cot':

@@ -12,6 +12,7 @@ const ACRI_PERMISOS = [
     'CERRAR_OBRA'             => 'Cerrar obras',
     'MODIFICAR_ASIGNAR_MO'    => 'Modificar mano de obra asignada a la obra',
     'CANCELAR_ASIGNAR_MO'     => 'Cancelar mano de obra asignada a la obra',
+    'ENVIAR_MICROSIP_OBRA'    => 'Enviar presupuestos de Easy-Glass a Microsip (Pedido y Orden de compra)',
     'NUEVO_EMPLEADOS_OBRA'    => 'Alta y cambios de empleados de obra',
     'NUEVO_TIPO_EMPLEADO'     => 'Alta y cambios de tipos de empleado',
 ];

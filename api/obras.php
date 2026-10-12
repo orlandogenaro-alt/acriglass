@@ -416,7 +416,8 @@ function facturacion(int $obraId): array
         if ($m && !empty($m['encontrado'])) { $filas[] = filaMicrosip($m, $base); return; }
         // Sin documentos en Microsip: no facturado, el saldo es el importe
         $imp = (float) $base['importe'];
-        $filas[] = $base + ['factura' => 'NO FACTUR', 'imp_factura' => 0, 'cargos' => $imp, 'creditos' => 0, 'saldo' => $imp, 'detalle' => []];
+        // eg_folio: folio de Easy-Glass que aún no está en Microsip (se puede «Enviar a Microsip»)
+        $filas[] = $base + ['eg_folio' => ($k && !$err) ? $k : 0, 'factura' => 'NO FACTUR','imp_factura' => 0, 'cargos' => $imp, 'creditos' => 0, 'saldo' => $imp, 'detalle' => []];
     };
 
     try {

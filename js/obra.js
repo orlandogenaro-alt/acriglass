@@ -1170,6 +1170,39 @@
         });
     });
 
+    // Respuesta de la API de Easy-Glass en líneas legibles (texto y valores sueltos, sin el JSON completo)
+    function resumenEnvio(d, prefijo) {
+        if (d == null || typeof d !== 'object') return d == null || d === '' ? [] : [String(d)];
+        var lineas = [];
+        Object.keys(d).forEach(function (k) {
+            var v = d[k], et = (prefijo ? prefijo + ' › ' : '') + k.replace(/_/g, ' ');
+            if (v == null || v === '') return;
+            if (typeof v !== 'object') lineas.push(et + ': ' + v);
+            else if (Array.isArray(v) && v.every(function (x) { return typeof x !== 'object'; })) { if (v.length) lineas.push(et + ': ' + v.join(', ')); }
+            else if (!Array.isArray(v)) lineas = lineas.concat(resumenEnvio(v, et));
+            else lineas.push(et + ': ' + v.length + ' renglón(es)');
+        });
+        return lineas.slice(0, 25);
+    }
+    // «Enviar a Facturacion» de Easy-Glass: primero simula (valida sin escribir), luego confirma y envía
+    function enviarMicrosip(f) {
+        var folio = 'EG' + ('0000000' + f.eg_folio).slice(-7);
+        enviar('enviar_microsip', { id: obraId, folio: f.eg_folio, simular: 1 }).then(function (j) {
+            var res = resumenEnvio(j.resultado);
+            if (!confirm('Validación correcta del folio ' + folio + (res.length ? ':\n\n' + res.join('\n') : '.') +
+                '\n\n¿Enviar a Microsip? Se dará de alta el Pedido de venta y la Orden de compra, y el presupuesto pasará a Facturación.')) return;
+            return conAutorizacion(function (a) {
+                return enviar('enviar_microsip', { id: obraId, folio: f.eg_folio, autoriza: a });
+            }, 'Enviar a Microsip requiere el permiso «Enviar presupuestos de Easy-Glass a Microsip».').then(function (r) {
+                var lin = resumenEnvio(r.resultado);
+                alert('Se envió a Microsip el folio ' + folio + '.' + (lin.length ? '\n\n' + lin.join('\n') : ''));
+                cargarFacturacion();
+            });
+        }).catch(function (err) {
+            if (!err.cancelado) alert('No se puede enviar el folio ' + folio + ' a Microsip:\n\n' + err.message);
+        });
+    }
+
     // 2-Facturacion: clic derecho en un renglón → Ver / Eliminar de la obra (cotización) o Cancelar (documento de cobro)
     var menuFac = document.createElement('div');
     menuFac.className = 'menu';
@@ -1196,6 +1229,7 @@
                 guardarCon('cancelar_cobro', { docto_id: f.id }).then(cargarFacturacion).catch(avisarError);
             }]);
         }
+        if (f.eg_folio && obraAbierta()) opciones.push(['📤 Enviar a Microsip', function () { enviarMicrosip(f); }]);
         if (!opciones.length) return;
         e.preventDefault();
         menuFac.innerHTML = '';

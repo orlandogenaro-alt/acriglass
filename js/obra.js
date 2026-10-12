@@ -1010,6 +1010,47 @@
         });
     });
 
+    // 2-Facturacion: clic derecho en un renglón → Ver / Eliminar de la obra (cotización) o Cancelar (documento de cobro)
+    var menuFac = document.createElement('div');
+    menuFac.className = 'menu';
+    document.body.appendChild(menuFac);
+    function cerrarMenuFac() { menuFac.classList.remove('abierto'); }
+    document.addEventListener('click', cerrarMenuFac);
+    document.addEventListener('scroll', cerrarMenuFac, true);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') cerrarMenuFac(); });
+    vistaDe('facturacion').addEventListener('contextmenu', function (e) {
+        var tr = e.target.closest('tbody tr[data-i]');
+        var f = tr && (datosListado.facturacion || [])[tr.dataset.i];
+        if (!f) return;
+        var opciones = [];
+        if (f.tipo === -1) {
+            opciones.push(['Ver cotización', function () { dialogoCotizacion(f); }]);
+            if (obraAbierta()) opciones.push(['🗑 Eliminar de la obra', function () {
+                if (!confirm('¿Eliminar el folio ' + f.folio + ' de esta obra?')) return;
+                guardarCon('quitar_cot', { docto_id: f.id }).then(cargarFacturacion).catch(avisarError);
+            }]);
+        } else if (f.tipo >= 0 && f.tipo <= 2) {
+            opciones.push(['Ver documento', function () { dialogoCobro(f); }]);
+            if (obraAbierta() && String(f.estatus).trim() !== 'Cancelado') opciones.push(['✕ Cancelar documento', function () {
+                if (!confirm('¿Cancelar el documento ' + f.folio + '?')) return;
+                guardarCon('cancelar_cobro', { docto_id: f.id }).then(cargarFacturacion).catch(avisarError);
+            }]);
+        }
+        if (!opciones.length) return;
+        e.preventDefault();
+        menuFac.innerHTML = '';
+        opciones.forEach(function (o) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.textContent = o[0];
+            b.addEventListener('click', function () { cerrarMenuFac(); o[1](); });
+            menuFac.appendChild(b);
+        });
+        menuFac.classList.add('abierto');
+        menuFac.style.left = Math.min(e.clientX, window.innerWidth - menuFac.offsetWidth - 8) + 'px';
+        menuFac.style.top = Math.min(e.clientY, window.innerHeight - menuFac.offsetHeight - 8) + 'px';
+    });
+
     // ---------- 9-Adjuntos ----------
     var archivoAdjunto = null;
     function cargarAdjuntos() {

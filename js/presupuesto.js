@@ -1179,7 +1179,7 @@
             };
             // Conceptos/Tareas guardados (fechas, responsable, avance…); los conceptos de MP/MO/GO se sincronizan al pintar
             ct.cargar(p.tareas || []);
-            creador = txt(p.usuario_creador);
+            creador = String(p.usuario_creador || '').trim();
             if (enPestana && p.cliente) {
                 window.parent.postMessage({ tipo: 'titulo', texto: 'Presupuesto · ' + p.cliente }, location.origin);
             }

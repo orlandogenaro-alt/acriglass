@@ -487,17 +487,18 @@ function guardarManoObra(array $d): array
 }
 
 // ToolStripButton1 (Dialog275): CANCELAR_ASIGNAR_MO y el motivo queda en la bitácora
-function cancelarManoObra(array $d): void
+// También ToolStripButton1 de Dialog274 (gasto adicional) con ELIMINAR_GASTO_DE_OBRA
+function cancelarConMotivo(array $d, string $tabla, string $colId, string $permiso, string $que): void
 {
     $obra = (int) ($d['id'] ?? 0);
     validaEstatusObra($obra);
-    exigirOAutorizar($d, 'CANCELAR_ASIGNAR_MO');
-    $moId = (int) ($d['doc_id'] ?? 0);
-    if (estatusLetraDoc(documentoDeObra('empleados_asignados_a_obra', 'empleado_asignado_obra_id', $moId, $obra, 'La asignación de mano de obra')) === 'C') {
+    exigirOAutorizar($d, $permiso);
+    $docId = (int) ($d['doc_id'] ?? 0);
+    if (estatusLetraDoc(documentoDeObra($tabla, $colId, $docId, $obra, $que)) === 'C') {
         error('El documento ya está cancelado.');
     }
-    bd_ejecutar('AW', "update empleados_asignados_a_obra set estatus = 'C' where empleado_asignado_obra_id = ? and obra_id = ?", [$moId, $obra]);
-    bitacora($moId, 'Estatus: Cancelado Motivo: ' . trim((string) ($d['motivo'] ?? '')));
+    bd_ejecutar('AW', "update $tabla set estatus = 'C' where $colId = ? and obra_id = ?", [$docId, $obra]);
+    bitacora($docId, 'Estatus: Cancelado Motivo: ' . trim((string) ($d['motivo'] ?? '')));
 }
 
 // guarda_bitacora_costos_prod: si falla no detiene la captura (igual que en VB)
@@ -528,13 +529,15 @@ function guardarGasto(array $d): array
 {
     $obra = (int) ($d['id'] ?? 0);
     validaEstatusObra($obra);
-    exigirOAutorizar($d, 'MODIFICAR_OBRA');
     $gastoId = (int) ($d['gasto_id'] ?? 0);
+    // Nuevo: como las demás capturas de la obra · Modificar: MODIFICAR_GASTO_OBRA (tool_modificar)
+    exigirOAutorizar($d, $gastoId ? 'MODIFICAR_GASTO_OBRA' : 'MODIFICAR_OBRA');
     if ($gastoId && estatusLetraDoc(documentoDeObra('gastos_adicionales_obra', 'gasto_adicional_id', $gastoId, $obra, 'El gasto')) === 'C') {
-        error('El gasto está cancelado.');
+        error('No es posible modificar un documento cancelado');
     }
-    $concepto = texto($d['concepto'] ?? '', 60);
-    if ($concepto === null) error('Selecciona el concepto del gasto.');
+    // Fecha y hora del gasto (cal_fecha): AAAA-MM-DDTHH:MM
+    $fh = preg_match('/^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}:\d{2}))?/', (string) ($d['fecha'] ?? ''), $mf) ? $mf : null;
+    $fechaHora = $fh ? $fh[1] . ' ' . (($fh[2] ?? '') !== '' ? $fh[2] . ':00' : date('H:i:s')) : date('Y-m-d H:i:s');
 
     $pdo = bd_pdo('AW');
     $pdo->beginTransaction();
@@ -545,14 +548,17 @@ function guardarGasto(array $d): array
             if ($c === null) continue;
             $det[] = ['concepto_gasto_id' => conceptoGastoId($c), 'imp_presupuestado' => numero($r['imp_presupuestado'] ?? 0), 'imp_real' => numero($r['imp_real'] ?? 0)];
         }
-        if (!$det) error('Agrega al menos un renglón de importe al gasto.');
+        $importe = numero(array_sum(array_column($det, 'imp_presupuestado')));
+        if (!$det || $importe <= 0) error('No se agregaron gastos a la obra. Agregue los conceptos para poder guardar los cambios.');
+        // El encabezado lleva el concepto del primer renglón (en VB iba fijo)
         $enc = [
-            'concepto_gasto_id' => conceptoGastoId($concepto),
+            'concepto_gasto_id' => $det[0]['concepto_gasto_id'],
             'docto_orden_obra_id' => (int) ($d['docto_orden_obra_id'] ?? 0) ?: null,
+            'unidad_transporte_id' => (int) ($d['unidad_transporte_id'] ?? 0),
             'nom_unidad' => texto($d['nom_unidad'] ?? '', 100),
-            'importe' => numero(array_sum(array_column($det, 'imp_presupuestado'))),
+            'importe' => $importe,
             'notas' => texto($d['notas'] ?? '', 300),
-            'fecha_creacion' => (fecha($d['fecha'] ?? '') ?? date('Y-m-d')) . ' ' . date('H:i:s'),
+            'fecha_creacion' => $fechaHora,
         ];
         if ($gastoId) {
             bd_ejecutar('AW', 'update gastos_adicionales_obra set ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($enc))) . ' where gasto_adicional_id = ?',
@@ -573,18 +579,8 @@ function guardarGasto(array $d): array
         if ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
+    bitacora($gastoId, 'Estatus:Normal Importe: $' . number_format($importe, 2));
     return ['gasto_id' => $gastoId];
-}
-
-// Cancelar un gasto adicional (no suma en los totales)
-function cancelarDocumento(array $d, string $tabla, string $colId): void
-{
-    $obra = (int) ($d['id'] ?? 0);
-    validaEstatusObra($obra);
-    exigirOAutorizar($d, 'MODIFICAR_OBRA');
-    if (!bd_ejecutar('AW', "update $tabla set estatus = 'C' where $colId = ? and obra_id = ?", [(int) ($d['doc_id'] ?? 0), $obra])) {
-        error('El documento ya no existe.', 404);
-    }
 }
 
 // Imagen de la obra (Button2 / pic_img): se guarda en REG_OBRAS.IMAGEN
@@ -785,12 +781,12 @@ try {
         case 'guardar_mo':
             responder(['ok' => true] + guardarManoObra(entrada()));
         case 'cancelar_mo':
-            cancelarManoObra(entrada());
+            cancelarConMotivo(entrada(), 'empleados_asignados_a_obra', 'empleado_asignado_obra_id', 'CANCELAR_ASIGNAR_MO', 'La asignación de mano de obra');
             responder(['ok' => true]);
         case 'guardar_gasto':
             responder(['ok' => true] + guardarGasto(entrada()));
         case 'cancelar_gasto':
-            cancelarDocumento(entrada(), 'gastos_adicionales_obra', 'gasto_adicional_id');
+            cancelarConMotivo(entrada(), 'gastos_adicionales_obra', 'gasto_adicional_id', 'ELIMINAR_GASTO_DE_OBRA', 'El gasto');
             responder(['ok' => true]);
     }
     error('Acción no válida.');

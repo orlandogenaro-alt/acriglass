@@ -267,6 +267,17 @@ function listado(string $tipo, int $id): array
 }
 
 // Un documento de la obra con su detalle, para abrirlo en su diálogo (doble clic en la pestaña)
+// Bitácora del documento (consulta_bitacora_mov_t): la tabla puede no existir aún en la base en línea
+function bitacoraDocumento(int $id): array
+{
+    try {
+        return array_map(fn($b) => trim($b['usuario'] . ' ' . substr((string) $b['fecha_hora'], 0, 19) . ' ' . $b['notas']), bd_filas('AW',
+            'select usuario, fecha_hora, notas from bitacora_movimientos_sis_costos where id_optimizacion = ? order by fecha_hora', [$id]));
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
 function documento(string $tipo, int $obra, int $id): array
 {
     switch ($tipo) {
@@ -287,27 +298,22 @@ function documento(string $tipo, int $obra, int $id): array
             $m['estatus'] = estatusLetra($m['estatus']);
             $m['empleados'] = bd_filas('AW', 'select id_empleado, nombre, costo_x_hrs, hrs_trabajo, hrs_trabajo_real
                                                 from empleados_asignados_a_obra_det where empleado_asignado_obra_id = ? order by empleado_asignado_a_obra_det_id', [$id]);
-            // Bitácora (consulta_bitacora_mov_t): la tabla puede no existir aún en la base en línea
-            try {
-                $m['bitacora'] = array_map(fn($b) => trim($b['usuario'] . ' ' . substr((string) $b['fecha_hora'], 0, 19) . ' ' . $b['notas']), bd_filas('AW',
-                    'select usuario, fecha_hora, notas from bitacora_movimientos_sis_costos where id_optimizacion = ? order by fecha_hora', [$id]));
-            } catch (Throwable $e) {
-                $m['bitacora'] = [];
-            }
+            $m['bitacora'] = bitacoraDocumento($id);
             return $m;
 
         case 'gasto':
-            $g = bd_fila('AW', 'select g.gasto_adicional_id as id, c.nombre as concepto, g.estatus, g.docto_orden_obra_id, g.nom_unidad, g.importe, g.notas, g.fecha_creacion
+            $g = bd_fila('AW', 'select g.gasto_adicional_id as id, c.nombre as concepto, g.estatus, g.docto_orden_obra_id, g.unidad_transporte_id, g.nom_unidad, g.importe, g.notas, g.fecha_creacion
                                   from gastos_adicionales_obra g left join conceptos_gastos_obra c on c.concepto_gasto_id = g.concepto_gasto_id
                                  where g.gasto_adicional_id = ? and g.obra_id = ?', [$id, $obra]);
             if (!$g) break;
             $g['estatus'] = estatusLetra($g['estatus']);
-            $g['fecha'] = substr((string) $g['fecha_creacion'], 0, 10);
+            $g['fecha'] = str_replace(' ', 'T', substr((string) $g['fecha_creacion'], 0, 16));   // cal_fecha con hora
             $g['detalle'] = bd_filas('AW', 'select c.nombre as concepto, d.imp_presupuestado, d.imp_real
                                               from gastos_adicionales_obra_det d left join conceptos_gastos_obra c on c.concepto_gasto_id = d.concepto_gasto_id
                                              where d.gasto_adicional_id = ? order by d.gasto_adicional_obra_det_id', [$id]);
             $g['personal'] = bd_filas('AW', 'select id_empleado, nombre_empleado as nombre from personal_consumo_en_obra
                                               where consumo_material_obra_id = ? order by personal_consumo_obra_id', [$id]);
+            $g['bitacora'] = bitacoraDocumento($id);
             return $g;
     }
     error('El documento ya no existe.', 404);

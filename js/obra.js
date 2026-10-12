@@ -698,11 +698,6 @@
             return enviar(accion, Object.assign({ id: obraId, autoriza: a }, cuerpo));
         }, 'Esta captura requiere el permiso «Modificar obras».');
     }
-    function opcionesOrdenes(cat) {
-        return [{ v: '', t: '(sin orden de trabajo)' }].concat(cat.ordenes.map(function (o) { return { v: o.id, t: o.folio + ' · ' + (o.descripcion || '') }; }));
-    }
-    function listaEmpleados(cat) { return cat.empleados.map(function (e) { return { t: e.nombre, id: e.id, sueldo: num(e.sueldo_diario) }; }); }
-    function listaNombres(items) { return items.map(function (x) { return { t: x.nombre }; }); }
     // Antes de una captura nueva: obra guardada y con estatus abierto (valida_estatus_obra)
     function puedeCapturar(msg) { return validaEstatusObra() && requiereObra(msg); }
 
@@ -1008,20 +1003,20 @@
         }).catch(avisarError);
     }
 
-    // ToolStripButton6: bitácora del documento (Dialog58)
-    function moBitacora() {
+    // ToolStripButton6: bitácora del documento (Dialog58); tipo = mo | gasto
+    function verBitacora(tipo, id) {
         var mostrar = function (lineas) { $('moBitTexto').value = lineas.join('\n'); $('moBitacora').showModal(); };
-        if (!mo.id) { mostrar([]); return; }
-        pedir('accion=documento&tipo=mo&id=' + encodeURIComponent(obraId) + '&doc=' + encodeURIComponent(mo.id))
+        if (!id) { mostrar([]); return; }
+        pedir('accion=documento&tipo=' + tipo + '&id=' + encodeURIComponent(obraId) + '&doc=' + encodeURIComponent(id))
             .then(function (j) { mostrar(j.documento.bitacora || []); }).catch(avisarError);
     }
 
-    // imprime_salida_de_personal_a_obra (CN-REG-35)
-    function moImprimir() {
-        if (!mo.id) { alert('Guarda el documento para poder imprimirlo.'); return; }
+    // Formato impreso de los documentos de la obra (CN-REG-35)
+    // o = { titulo, id, folioOt, fecha, concepto, estatus, unidad, cuerpo (html), total, descripcion }
+    function imprimirFormato(o) {
         var m = window.ACRI_MEMBRETE || {};
         var logo = m.logo ? '<img src="' + escapar(new URL(m.logo, location.href).href) + '">' : '';
-        var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Salida de Personal a Obra ' + mo.id + '</title><style>' +
+        var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escapar(o.titulo) + ' ' + o.id + '</title><style>' +
             '@page{size:letter;margin:12mm}body{font:13px Arial,sans-serif;color:#000;margin:0}' +
             '.hoja{border:1px solid #000;min-height:250mm;position:relative}' +
             '.cab{display:grid;grid-template-columns:170px 1fr;border-bottom:1px solid #000}' +
@@ -1029,19 +1024,20 @@
             '.r1{display:flex;justify-content:space-between;padding:4px 10px;border-bottom:1px solid #000}.r1 b{font-size:16px}' +
             '.r2{display:grid;grid-template-columns:1fr 1fr 1.2fr}.r2>div{padding:4px 10px;font-weight:bold;font-size:12px}.r2>div+div{border-left:1px solid #000}' +
             '.sec{padding:6px 10px}.obra{font-size:15px;font-weight:bold}.est{float:right;text-align:center;font-weight:bold;margin-right:60px}.est b{display:block;font-size:20px}' +
-            '.barra{border-top:8px solid #000;margin:10px 0 6px}.per{padding:4px 10px}.per div{padding:3px 10px}' +
+            '.barra{border-top:8px solid #000;margin:10px 0 6px}.per{padding:4px 10px}.per div{padding:3px 10px}.per td{padding:2px 10px}' +
+            '.total{float:right;font-size:34px;margin:10px 40px 0 0}' +
             '.firmas{position:absolute;left:10px;right:150px;top:110mm;display:flex;gap:16px}.firmas div{flex:1;border-top:1px solid #000;padding:2px 0 0 10px}' +
             '</style></head><body><div class="hoja"><div class="cab"><div class="logo">' + logo + '</div><div>' +
-            '<div class="r1"><div><b>' + escapar(m.empresa || 'MEGALUMINIO SERVICIOS SA DE CV') + '</b><br>SALIDA DE PERSONAL A OBRA</div>' +
-            '<div style="text-align:right"><b>Docto_id: ' + mo.id + '</b><br><small>Fecha Imp. ' + escapar(new Date().toLocaleString('es-MX')) + '</small></div></div>' +
-            '<div class="r2"><div>Codigo: CN-REG-35</div><div>FOLIO OT:<br>&nbsp;&nbsp;' + escapar(moTextoSel($('moOrden'))) + '</div>' +
-            '<div>Fecha: ' + escapar(fechaDMY($('moFecha').value)) + '</div></div></div></div>' +
-            '<div class="sec"><div class="est">ESTATUS:<b>' + escapar(mo.estatus) + '</b></div>' +
+            '<div class="r1"><div><b>' + escapar(m.empresa || 'MEGALUMINIO SERVICIOS SA DE CV') + '</b><br>' + escapar(o.titulo) + '</div>' +
+            '<div style="text-align:right"><b>Docto_id: ' + o.id + '</b><br><small>Fecha Imp. ' + escapar(new Date().toLocaleString('es-MX')) + '</small></div></div>' +
+            '<div class="r2"><div>Codigo: CN-REG-35</div><div>FOLIO OT:<br>&nbsp;&nbsp;' + escapar(o.folioOt) + '</div>' +
+            '<div>Fecha: ' + escapar(o.fecha) + (o.concepto ? '<br><span style="font-weight:400">Concepto: ' + escapar(o.concepto) + '</span>' : '') + '</div></div></div></div>' +
+            '<div class="sec"><div class="est">ESTATUS:<b>' + escapar(o.estatus) + '</b></div>' +
             '<div class="obra">Obra: ' + escapar($('nombreObra').value) + '</div><br>' +
-            '<b>Unidad de Transporte: ' + escapar(moTextoSel($('moUnidad'))) + '</b></div>' +
-            '<div class="barra"></div><div class="per"><b>PERSONAL ASIGNADO A TRABAJAR EN OBRA: </b>' +
-            mo.filas.map(function (f) { return '<div>' + escapar(f.nombre) + '</div>'; }).join('') + '</div>' +
-            '<div class="sec">Descripcion: ' + escapar($('moNotas').value) + '</div>' +
+            '<b>Unidad de Transporte: ' + escapar(o.unidad) + '</b></div>' +
+            '<div class="barra"></div>' + (o.total ? '<div class="total">Total: ' + escapar(o.total) + '</div>' : '') +
+            '<div class="per">' + o.cuerpo + '</div>' +
+            '<div class="sec">Descripcion: ' + escapar(o.descripcion) + '</div>' +
             '<div class="firmas"><div>REALIZO</div><div>RECIBIO</div><div>REVISO</div><div>AUTORIZO</div></div>' +
             '</div></body></html>';
         var w = window.open('', '_blank');
@@ -1051,13 +1047,23 @@
         w.onload = function () { w.focus(); w.print(); };
     }
 
+    // imprime_salida_de_personal_a_obra
+    function moImprimir() {
+        if (!mo.id) { alert('Guarda el documento para poder imprimirlo.'); return; }
+        imprimirFormato({
+            titulo: 'SALIDA DE PERSONAL A OBRA', id: mo.id, folioOt: moTextoSel($('moOrden')), fecha: fechaDMY($('moFecha').value),
+            estatus: mo.estatus, unidad: moTextoSel($('moUnidad')), descripcion: $('moNotas').value,
+            cuerpo: '<b>PERSONAL ASIGNADO A TRABAJAR EN OBRA: </b>' + mo.filas.map(function (f) { return '<div>' + escapar(f.nombre) + '</div>'; }).join('')
+        });
+    }
+
     var MO_BOTONES = {
         'guardar': function () { moGuardar(false); },
         'guardar-salir': function () { moGuardar(true); },
         'imprimir': moImprimir,
         'modificar': moModificar,
         'cancelar': moCancelar,
-        'bitacora': moBitacora,
+        'bitacora': function () { verBitacora('mo', mo.id); },
         'cerrar': function () { $('moDialogo').close(); }
     };
     $('moDialogo').addEventListener('click', function (e) {
@@ -1068,43 +1074,182 @@
         b.addEventListener('click', function () { $('moBitacora').close(); });
     });
 
-    // 8-Gastos adicionales (Dialog274)
-    function dialogoGasto(g) {
+    // 8-Gastos adicionales: Gastos de Obra (Dialog274)
+    var ga = { id: 0, personal: [], conceptos: [], estatus: 'Normal', editable: true, cat: null };
+
+    function gaHabilita(val) {
+        ga.editable = val;
+        $('gaDialogo').querySelectorAll('.mo-edit, [data-mo="guardar"], [data-mo="guardar-salir"]').forEach(function (el) { el.disabled = !val; });
+        gaPintar();
+    }
+    function gaPonerEstatus(e) {
+        ga.estatus = e;
+        $('gaEstatus').textContent = e;
+        $('gaEstatus').classList.toggle('cancelado', e === 'Cancelado');
+    }
+    // grid_responsables y grid_gas_det
+    function gaPintar() {
+        var dis = ga.editable ? '' : ' disabled';
+        var quitar = ga.editable ? '<button type="button" class="quitar" title="Quitar">🗑</button>' : '';
+        $('gaPersonalFilas').innerHTML = ga.personal.length ? ga.personal.map(function (f, i) {
+            return '<tr data-i="' + i + '"><td>' + escapar(f.nombre) + '</td><td style="width:26px">' + quitar + '</td></tr>';
+        }).join('') : '<tr class="vacio"><td colspan="2">Elija al personal de obra y presione +</td></tr>';
+        $('gaConceptos').innerHTML = ga.conceptos.length ? ga.conceptos.map(function (f, i) {
+            return '<tr data-i="' + i + '"><td><input class="txt" list="gaListaConceptos" autocomplete="off" data-col="concepto" value="' + escapar(f.concepto) + '"' + dis + '></td>' +
+                ['imp_presupuestado', 'imp_real'].map(function (c) {
+                    return '<td style="width:120px"><input type="number" step="any" data-col="' + c + '" value="' + escapar(f[c]) + '"' + dis + '></td>';
+                }).join('') + '<td style="width:26px">' + quitar + '</td></tr>';
+        }).join('') : '<tr class="vacio"><td colspan="4">Agregue los conceptos del gasto con el botón +</td></tr>';
+        gaTotales();
+    }
+    // calcula_tot_grid_gastos
+    function gaTotales() {
+        var t1 = 0, t2 = 0;
+        ga.conceptos.forEach(function (f) { t1 += num(f.imp_presupuestado); t2 += num(f.imp_real); });
+        $('gaImporte').value = dinero(t1) || '$0.00';
+        $('gaImpReal').value = dinero(t2) || '$0.00';
+        return t1;
+    }
+    function ahoraLocal() {
+        var d = new Date();
+        return hoy() + 'T' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    }
+
+    // carga_inicial; doc = gasto guardado (doble clic en 8-Gastos): se consulta y se desbloquea con Modificar
+    function dialogoGasto(doc) {
         catalogosObra().then(function (cat) {
-            var cancelado = g && g.estatus === 'Cancelado';
-            var conceptos = listaNombres(cat.conceptos_gasto);
-            formulario({
-                titulo: g ? 'Gasto Adicional · ' + (g.concepto || '') + (cancelado ? ' · Cancelado' : '') : 'Nuevo Gasto Adicional',
-                soloLectura: cancelado || !obraAbierta(),
-                campos: [
-                    { id: 'concepto', etiqueta: 'Concepto', tipo: 'lista', opciones: conceptos, valor: g ? g.concepto : '' },
-                    { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: g ? dia(g.fecha) : hoy() },
-                    { id: 'docto_orden_obra_id', etiqueta: 'Orden de trabajo', tipo: 'select', opciones: opcionesOrdenes(cat), valor: g ? g.docto_orden_obra_id : '' },
-                    { id: 'nom_unidad', etiqueta: 'Unidad', tipo: 'lista', opciones: listaNombres(cat.unidades), valor: g ? g.nom_unidad : '' },
-                    { id: 'notas', etiqueta: 'Notas', tipo: 'textarea', valor: g ? g.notas : '' }
-                ],
-                grids: [{
-                    id: 'detalle', titulo: 'Importes', filas: g ? g.detalle : [{}],
-                    columnas: [
-                        { id: 'concepto', etiqueta: 'Concepto', tipo: 'lista', opciones: conceptos },
-                        { id: 'imp_presupuestado', etiqueta: 'Importe presupuestado', tipo: 'number', ancho: '170px', total: true },
-                        { id: 'imp_real', etiqueta: 'Importe real', tipo: 'number', ancho: '150px', total: true }
-                    ]
-                }, {
-                    id: 'personal', titulo: 'Personal', filas: g ? g.personal : [],
-                    columnas: [{ id: 'nombre', etiqueta: 'Empleado', tipo: 'lista', opciones: listaEmpleados(cat), alElegir: function (f, e) { f.id_empleado = e ? e.id : ''; } }]
-                }],
-                acciones: g && !cancelado && obraAbierta() ? [{ texto: '✕ Cancelar gasto', fn: function () {
-                    if (!confirm('¿Cancelar este gasto adicional?')) return Promise.resolve(false);
-                    return guardarCon('cancelar_gasto', { doc_id: g.id }).then(function () { cargarListado('gastos', 'gastos'); });
-                } }] : [],
-                guardar: function (d) {
-                    d.gasto_id = g ? g.id : 0;
-                    return guardarCon('guardar_gasto', d).then(function () { catObra = null; cargarListado('gastos', 'gastos'); });
-                }
-            });
+            ga.cat = cat;
+            ga.id = doc ? doc.id : 0;
+            ga.personal = doc ? doc.personal.map(function (p) { return Object.assign({}, p); }) : [];
+            ga.conceptos = doc ? doc.detalle.map(function (p) { return Object.assign({}, p); }) : [{ concepto: '', imp_presupuestado: 0, imp_real: 0 }];
+            moOpciones($('gaOrden'), [{ v: '', t: '' }].concat(cat.ordenes.map(function (o) { return { v: o.id, t: o.folio }; })),
+                doc ? (doc.docto_orden_obra_id || '') : (cat.ordenes[0] ? cat.ordenes[0].id : ''));
+            var unidad = 0;
+            if (doc) unidad = num(doc.unidad_transporte_id) || (cat.unidades.filter(function (u) { return u.nombre === doc.nom_unidad; })[0] || { id: 0 }).id;
+            moOpciones($('gaUnidad'), [{ v: 0, t: SIN_UNIDAD }].concat(cat.unidades.map(function (u) { return { v: u.id, t: u.nombre }; })), unidad);
+            moOpciones($('gaPersonal'), cat.empleados.map(function (e) { return { v: e.id, t: e.nombre }; }), '');
+            $('gaListaConceptos').innerHTML = cat.conceptos_gasto.map(function (c) { return '<option value="' + escapar(c.nombre) + '">'; }).join('');
+            $('gaFecha').value = doc && doc.fecha ? String(doc.fecha).substr(0, 16) : ahoraLocal();
+            $('gaNotas').value = doc ? (doc.notas || '') : '';
+            gaPonerEstatus(doc && doc.estatus === 'Cancelado' ? 'Cancelado' : 'Normal');
+            gaHabilita(!doc && obraAbierta());
+            $('gaDialogo').showModal();
         }).catch(avisarError);
     }
+
+    // Button2 (+): personal que solicita el recurso
+    $('gaAgregar').addEventListener('click', function () {
+        var sel = $('gaPersonal');
+        if (!sel.value) return;
+        if (ga.personal.some(function (f) { return String(f.id_empleado) === sel.value; })) {
+            alert('El empleado seleccionado ya se encuentra en el gasto');
+            return;
+        }
+        ga.personal.push({ id_empleado: +sel.value, nombre: moTextoSel(sel) });
+        gaPintar();
+    });
+    $('gaAgregarConcepto').addEventListener('click', function () {
+        ga.conceptos.push({ concepto: '', imp_presupuestado: 0, imp_real: 0 });
+        gaPintar();
+    });
+    // CellEndEdit: recalcula los importes
+    $('gaConceptos').addEventListener('input', function (e) {
+        var tr = e.target.closest('tr[data-i]');
+        if (!tr || !e.target.dataset.col) return;
+        ga.conceptos[tr.dataset.i][e.target.dataset.col] = e.target.value;
+        gaTotales();
+    });
+    // EliminarArchivoToolStripMenuItem / ToolStripMenuItem1: quitar un concepto o un empleado
+    $('gaConceptos').addEventListener('click', function (e) {
+        if (!e.target.closest('.quitar')) return;
+        if (!confirm('¿Deseas archivar como eliminado el concepto seleccionado?')) return;
+        ga.conceptos.splice(e.target.closest('tr').dataset.i, 1);
+        gaPintar();
+    });
+    $('gaPersonalFilas').addEventListener('click', function (e) {
+        if (!e.target.closest('.quitar')) return;
+        if (!confirm('¿Deseas archivar como eliminado el empleado seleccionado?')) return;
+        ga.personal.splice(e.target.closest('tr').dataset.i, 1);
+        gaPintar();
+    });
+
+    // toll_guardar2 (Guardar: queda bloqueado) y tol_guardar (Guardar y Salir)
+    function gaGuardar(salir) {
+        if (gaTotales() <= 0) {
+            alert('No se agregaron gastos a la obra. Agregue los conceptos para poder guardar los cambios.');
+            return;
+        }
+        var d = {
+            id: obraId, gasto_id: ga.id, fecha: $('gaFecha').value, docto_orden_obra_id: $('gaOrden').value,
+            unidad_transporte_id: $('gaUnidad').value, nom_unidad: moTextoSel($('gaUnidad')),
+            notas: $('gaNotas').value, detalle: ga.conceptos, personal: ga.personal
+        };
+        conAutorizacion(function (a) {
+            return enviar('guardar_gasto', Object.assign({ autoriza: a }, d));
+        }, ga.id ? 'Modificar el gasto requiere el permiso «Modificar gastos adicionales de la obra».'
+                 : 'Esta captura requiere el permiso «Modificar obras».').then(function (j) {
+            ga.id = j.gasto_id;
+            catObra = null;   // pudo darse de alta un concepto nuevo
+            cargarListado('gastos', 'gastos');
+            if (salir) $('gaDialogo').close();
+            else gaHabilita(false);
+        }).catch(avisarError);
+    }
+
+    // tool_modificar
+    function gaModificar() {
+        if (!validaEstatusObra()) return;
+        if (ga.estatus === 'Cancelado') { alert('No es posible modificar un documento cancelado'); return; }
+        gaHabilita(true);
+    }
+
+    // ToolStripButton1: archivar como cancelado con su motivo
+    function gaCancelar() {
+        if (!validaEstatusObra()) return;
+        if (!ga.id) { alert('El documento aún no se ha guardado.'); return; }
+        if (ga.estatus === 'Cancelado') { alert('El documento ya está cancelado.'); return; }
+        if (!confirm('¿Deseas archivar como cancelado este documento?')) return;
+        var motivo = prompt('INGRESA EL MOTIVO DE CANCELACION: ', '');
+        if (motivo === null) return;
+        conAutorizacion(function (a) {
+            return enviar('cancelar_gasto', { id: obraId, doc_id: ga.id, motivo: motivo, autoriza: a });
+        }, 'Cancelar el gasto requiere el permiso «Cancelar gastos adicionales de la obra».').then(function () {
+            gaPonerEstatus('Cancelado');
+            gaHabilita(false);
+            cargarListado('gastos', 'gastos');
+        }).catch(avisarError);
+    }
+
+    // imprime_gasto_adicional_obra: RECIBO DE GASTO PARA OBRA
+    function gaImprimir() {
+        if (!ga.id) { alert('Guarda el documento para poder imprimirlo.'); return; }
+        var conceptos = ga.conceptos.filter(function (c) { return String(c.concepto || '').trim(); });
+        var f = $('gaFecha').value;
+        imprimirFormato({
+            titulo: 'RECIBO DE GASTO PARA OBRA', id: ga.id, folioOt: moTextoSel($('gaOrden')),
+            fecha: fechaDMY(f.substr(0, 10)) + (f.length > 10 ? ' ' + f.substr(11, 5) : ''),
+            concepto: conceptos[0] ? conceptos[0].concepto : '', estatus: ga.estatus, unidad: moTextoSel($('gaUnidad')),
+            descripcion: $('gaNotas').value, total: dinero(gaTotales()) || '$0.00',
+            cuerpo: (ga.personal.length ? '<b>PERSONAL QUE SOLICITA RECURSO: </b>' + ga.personal.map(function (p) { return '<div>' + escapar(p.nombre) + '</div>'; }).join('') : '') +
+                (conceptos.length ? '<br><b>CONCEPTOS: </b><table>' + conceptos.map(function (c) {
+                    return '<tr><td>' + escapar(c.concepto) + '</td><td>' + escapar(dinero(num(c.imp_presupuestado)) || '$0.00') + '</td></tr>';
+                }).join('') + '</table>' : '')
+        });
+    }
+
+    var GA_BOTONES = {
+        'guardar': function () { gaGuardar(false); },
+        'guardar-salir': function () { gaGuardar(true); },
+        'imprimir': gaImprimir,
+        'modificar': gaModificar,
+        'cancelar': gaCancelar,
+        'bitacora': function () { verBitacora('gasto', ga.id); },
+        'cerrar': function () { $('gaDialogo').close(); }
+    };
+    $('gaDialogo').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-mo]');
+        if (b && !b.disabled) GA_BOTONES[b.dataset.mo]();
+    });
 
     function abrirDocumento(tipo, id, dialogo) {
         pedir('accion=documento&tipo=' + tipo + '&id=' + encodeURIComponent(obraId) + '&doc=' + encodeURIComponent(id))

@@ -80,6 +80,44 @@ try {
 // Permisos que la pantalla revisa antes de pedir la autorización de otro usuario
 $permisos = array_values(array_filter(['NUEVO_OBRA', 'MODIFICAR_OBRA', 'CERRAR_OBRA', 'ADMIN_USER'], fn($p) => tienePermiso($p)));
 
+// Barra de los documentos de la obra (Dialog274 / Dialog275): los botones se atienden por data-mo en js/obra.js
+function barraDocumento() {
+    return <<<'HTML'
+<div class="toolbar mo-toolbar">
+    <button type="button" class="tb" data-mo="guardar">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#3b7dc4"/><rect x="7" y="3" width="10" height="7" fill="#dfeefc"/><rect x="7" y="14" width="10" height="7" fill="#fff"/></svg>
+        <span>Guardar</span>
+    </button>
+    <button type="button" class="tb" data-mo="guardar-salir">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#333"/><rect x="7" y="3" width="10" height="7" fill="#dfeefc"/></svg>
+        <span>Guardar y Salir</span>
+    </button>
+    <span class="sep"></span>
+    <button type="button" class="tb" data-mo="imprimir">
+        <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="7" fill="#fff" stroke="#666"/><rect x="2" y="9" width="20" height="9" rx="2" fill="#8a8a8a"/><rect x="6" y="14" width="12" height="8" fill="#fff" stroke="#666"/></svg>
+        <span>Imprimir</span>
+    </button>
+    <button type="button" class="tb" data-mo="modificar">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="16" height="18" fill="#dfeefc" stroke="#3b7dc4"/><path d="M8 20l1-4 9-9 3 3-9 9z" fill="#f5c542" stroke="#8a6d1e"/></svg>
+        <span>Modificar</span>
+    </button>
+    <button type="button" class="tb" data-mo="cancelar">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#fff" stroke="#d32f2f" stroke-width="2"/><path d="M6 6l12 12" stroke="#d32f2f" stroke-width="2"/></svg>
+        <span>Cancelar</span>
+    </button>
+    <span class="sep"></span>
+    <button type="button" class="tb" data-mo="bitacora">
+        <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="1" fill="#6d9e3a" stroke="#4a6e26"/><rect x="8" y="5" width="8" height="4" fill="#f5c542"/><path d="M8 13h8M8 16h8" stroke="#fff"/></svg>
+        <span>Bitacora</span>
+    </button>
+    <button type="button" class="tb" data-mo="cerrar">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="#e53935" stroke-width="2.5" stroke-linecap="round"/></svg>
+        <span>Cerrar</span>
+    </button>
+</div>
+HTML;
+}
+
 function iconoPestana() {
     return '<svg viewBox="0 0 16 16"><rect x="3" y="1" width="10" height="14" fill="#fff" stroke="#3b7dc4"/><path d="M5 5h6M5 8h6M5 11h4" stroke="#3b7dc4"/></svg>';
 }
@@ -376,38 +414,7 @@ function iconoPestana() {
         <strong>Costo de Mano de Obra</strong>
         <button type="button" class="hs-cerrar" data-mo="cerrar" title="Cerrar">✕</button>
     </div>
-    <div class="toolbar mo-toolbar">
-        <button type="button" class="tb" data-mo="guardar">
-            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#3b7dc4"/><rect x="7" y="3" width="10" height="7" fill="#dfeefc"/><rect x="7" y="14" width="10" height="7" fill="#fff"/></svg>
-            <span>Guardar</span>
-        </button>
-        <button type="button" class="tb" data-mo="guardar-salir">
-            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#333"/><rect x="7" y="3" width="10" height="7" fill="#dfeefc"/></svg>
-            <span>Guardar y Salir</span>
-        </button>
-        <span class="sep"></span>
-        <button type="button" class="tb" data-mo="imprimir">
-            <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="7" fill="#fff" stroke="#666"/><rect x="2" y="9" width="20" height="9" rx="2" fill="#8a8a8a"/><rect x="6" y="14" width="12" height="8" fill="#fff" stroke="#666"/></svg>
-            <span>Imprimir</span>
-        </button>
-        <button type="button" class="tb" data-mo="modificar">
-            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="16" height="18" fill="#dfeefc" stroke="#3b7dc4"/><path d="M8 20l1-4 9-9 3 3-9 9z" fill="#f5c542" stroke="#8a6d1e"/></svg>
-            <span>Modificar</span>
-        </button>
-        <button type="button" class="tb" data-mo="cancelar">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#fff" stroke="#d32f2f" stroke-width="2"/><path d="M6 6l12 12" stroke="#d32f2f" stroke-width="2"/></svg>
-            <span>Cancelar</span>
-        </button>
-        <span class="sep"></span>
-        <button type="button" class="tb" data-mo="bitacora">
-            <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="1" fill="#6d9e3a" stroke="#4a6e26"/><rect x="8" y="5" width="8" height="4" fill="#f5c542"/><path d="M8 13h8M8 16h8" stroke="#fff"/></svg>
-            <span>Bitacora</span>
-        </button>
-        <button type="button" class="tb" data-mo="cerrar">
-            <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="#e53935" stroke-width="2.5" stroke-linecap="round"/></svg>
-            <span>Cerrar</span>
-        </button>
-    </div>
+    <?= barraDocumento() ?>
     <div class="mo-cuerpo">
         <div class="mo-fila">
             <label>Folio de la OT <select id="moOrden" class="mo-edit"></select></label>
@@ -429,6 +436,48 @@ function iconoPestana() {
         </div>
         <div class="mo-importe">Importe: <input id="moImporte" readonly> <input id="moImpReal" readonly></div>
         <label class="mo-notas">Notas: <textarea id="moNotas" rows="5" maxlength="300" class="mo-edit"></textarea></label>
+    </div>
+</dialog>
+
+<!-- ============ GASTOS DE OBRA (Dialog274) ============ -->
+<dialog class="hs-dialogo mo-dialogo" id="gaDialogo">
+    <div class="hs-cabecera">
+        <strong>Gastos de Obra</strong>
+        <button type="button" class="hs-cerrar" data-mo="cerrar" title="Cerrar">✕</button>
+    </div>
+    <?= barraDocumento() ?>
+    <div class="mo-cuerpo">
+        <div class="mo-fila">
+            <label>Folio de la OT <select id="gaOrden" class="mo-edit"></select></label>
+            <div class="mo-der ga-der">
+                <div class="ga-estatus"><span>Estatus:</span> <b id="gaEstatus">Normal</b></div>
+                <label>Fecha: <input type="datetime-local" id="gaFecha" class="mo-edit"></label>
+            </div>
+        </div>
+        <div class="mo-fila">
+            <label class="mo-largo">Unidad: <select id="gaUnidad" class="mo-edit"></select></label>
+        </div>
+        <div class="mo-fila">
+            <label class="mo-largo">Personal de Obra: <select id="gaPersonal" class="mo-edit"></select></label>
+            <button type="button" class="hs-btn mo-mas mo-edit" id="gaAgregar" title="Agregar al personal">+</button>
+        </div>
+        <div class="mo-grid mo-grid-chico">
+            <table>
+                <thead><tr><th>Nombre</th><th></th></tr></thead>
+                <tbody id="gaPersonalFilas"></tbody>
+            </table>
+        </div>
+        <div class="mo-fila"><span class="mo-etq">Concepto:</span>
+            <button type="button" class="hs-btn mo-mas mo-edit" id="gaAgregarConcepto" title="Agregar concepto">+</button></div>
+        <div class="mo-grid">
+            <table>
+                <thead><tr><th>Concepto</th><th>Imp.Presupuestado</th><th>Imp.Real</th><th></th></tr></thead>
+                <tbody id="gaConceptos"></tbody>
+            </table>
+            <datalist id="gaListaConceptos"></datalist>
+        </div>
+        <div class="mo-importe">Importe: <input id="gaImporte" readonly> <input id="gaImpReal" readonly></div>
+        <label class="mo-notas">Notas: <textarea id="gaNotas" rows="5" maxlength="300" class="mo-edit"></textarea></label>
     </div>
 </dialog>
 

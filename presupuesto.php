@@ -337,6 +337,10 @@ $secciones = [
             <strong id="ctDlgTitulo">Agregar Concepto/Tarea</strong>
             <button type="button" class="hs-cerrar" data-ct-cerrar title="Cerrar">✕</button>
         </div>
+        <div class="ct-barra">
+            <button type="button" class="hs-btn" id="ctModificar" hidden>Modificar</button>
+            <button type="submit" class="hs-btn principal" id="ctGuardar">Guardar Concepto/Tarea</button>
+        </div>
         <fieldset class="ct-campos" id="ctCampos">
             <section class="ct-grupo">
                 <h3>Datos del Concepto/Tarea</h3>
@@ -395,8 +399,6 @@ $secciones = [
         <div class="hs-pie">
             <span></span>
             <button type="button" class="hs-btn" data-ct-cerrar>Cancelar</button>
-            <button type="button" class="hs-btn" id="ctModificar" hidden>Modificar</button>
-            <button type="submit" class="hs-btn principal" id="ctGuardar">Guardar Concepto/Tarea</button>
         </div>
     </form>
     <datalist id="ctAgrupadores"></datalist>

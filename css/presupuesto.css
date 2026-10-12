@@ -704,6 +704,7 @@ output, #tSUB, .pct {
 
 /* Diálogo Agregar Concepto/Tarea */
 .ct-dialogo { width: min(1100px, calc(100vw - 24px)); max-height: calc(100vh - 30px); }
+.ct-barra { display: flex; gap: 8px; padding: 10px 16px; background: var(--cab); border-top: 1px solid rgba(255, 255, 255, .08); }
 .ct-campos { border: none; padding: 14px 16px 2px; background: var(--fondo); }
 .ct-grupo { background: var(--tarjeta); padding: 14px 16px 16px; margin-bottom: 12px; border: 1px solid var(--borde); border-radius: var(--radio); }
 .ct-grupo h3 { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--enfasis); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--borde); }

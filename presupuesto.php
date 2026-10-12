@@ -395,6 +395,7 @@ $secciones = [
         <div class="hs-pie">
             <span></span>
             <button type="button" class="hs-btn" data-ct-cerrar>Cancelar</button>
+            <button type="button" class="hs-btn" id="ctModificar" hidden>Modificar</button>
             <button type="submit" class="hs-btn principal" id="ctGuardar">Guardar Concepto/Tarea</button>
         </div>
     </form>

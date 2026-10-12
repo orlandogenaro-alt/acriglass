@@ -485,8 +485,11 @@
         Object.keys(CAMPOS).forEach(function (k) { $(CAMPOS[k]).value = d[k] || (k === 'color' ? COLOR_BASE : ''); });
         $('ctMonto').value = t && t.monto ? fmt(t.monto) : '';
         $('ctClave').value = t ? t.clave : '';
+        // En "Ver" se muestran Modificar y Guardar; Guardar se habilita al pulsar Modificar
         $('ctCampos').disabled = !!soloVer;
-        $('ctGuardar').hidden = !!soloVer;
+        $('ctModificar').hidden = !soloVer;
+        $('ctModificar').disabled = false;
+        $('ctGuardar').disabled = !!soloVer;
         refrescarDialogo();
         $('ctDialogo').showModal();
         ajustarAlto($('ctDescripcion'));
@@ -646,6 +649,14 @@
         marcarCambio();
         $('ctDialogo').close();
         renderCt();
+    });
+    $('ctModificar').addEventListener('click', function () {
+        if (soloLectura) { avisoSoloLectura(); return; }
+        $('ctDlgTitulo').textContent = 'Modificar Concepto/Tarea';
+        $('ctCampos').disabled = false;
+        $('ctGuardar').disabled = false;
+        this.disabled = true;
+        $('ctNombre').focus();
     });
     document.querySelectorAll('[data-ct-cerrar]').forEach(function (b) {
         b.addEventListener('click', function () { $('ctDialogo').close(); });

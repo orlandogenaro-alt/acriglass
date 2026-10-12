@@ -1,0 +1,2446 @@
+Imports System.IO
+Imports System.Security.Cryptography.X509Certificates
+Imports System.Windows.Controls
+Imports System.Windows.Forms
+Imports System.Windows.Forms.DataVisualization.Charting
+Imports System.Windows.Input
+Public Class Dialog243
+    Public obra_id As Integer
+    Public sugerido_id_rel As Integer
+    Private Sub OK_Button_Click(ByVal sender As System.Object, ByVal e As System.EventArgs)
+        Me.DialogResult = System.Windows.Forms.DialogResult.OK
+        Me.Close()
+    End Sub
+
+    Private Sub Cancel_Button_Click(ByVal sender As System.Object, ByVal e As System.EventArgs)
+        Me.DialogResult = System.Windows.Forms.DialogResult.Cancel
+        Me.Close()
+    End Sub
+
+    Private Sub ToolStripButton3_Click(sender As Object, e As EventArgs) Handles ToolStripButton3.Click
+        Me.Dispose()
+    End Sub
+    Public Function guarda_obra() As Integer
+        Try
+            Dim res As String = ""
+            If Len(txt_nombre.Text) = 0 Then res = "No se a indicado el nombre de la Obra"
+            If Len(txt_direccion.Text) = 0 Then res = "No se a indicado la direccion de la Obra"
+            If Len(txt_contacto.Text) = 0 Then res = "El nombre del contacto no fue indicado"
+            If grid_responsables.Rows.Count = 0 Then res = "No se a seleccionado un responsable de Obra"
+            If Len(res) = 0 Then
+                REGISTRA_OBRAS(obra_id, sugerido_id_rel, txt_nombre.Text, txt_direccion.Text, txt_contacto.Text, txt_notas.Text, cal_ini.Value, cal_fin.Value, cmb_estatus.Text, grid_responsables, convierte_img_to_array(pic_img.Image), txt_gas_admin_obr.Text, lbl_avance.Text)
+                actualiza_estatus_sugerido_obra(sugerido_id_rel, "Aceptado")
+                Form46.lbl_estatus.Text = "Aceptado"
+                If cmb_estatus.Text = "Finalizacion" Then
+                    actualiza_estatus_obra(obra_id, "Finalizacion")
+                    lbl_estatus.Text = "Finalizacion"
+                End If
+                Return 1
+            Else
+                MsgBox(res, MsgBoxStyle.Information)
+                Return 0
+            End If
+        Catch ex As Exception
+            MsgBox("Error:guarda_obra " & ex.Message, MsgBoxStyle.Critical)
+            Return 0
+        End Try
+    End Function
+    Private Sub toll_guardar2_Click(sender As Object, e As EventArgs) Handles toll_guardar2.Click
+        If guarda_obra() = 1 Then habilita_contrales(False)
+
+    End Sub
+    Public Sub habilita_contrales(val As Boolean)
+        Try
+            txt_contacto.Enabled = val
+            txt_direccion.Enabled = val
+            txt_direccion.Enabled = val
+            txt_notas.Enabled = val
+            cmb_estatus.Enabled = val
+            cal_ini.Enabled = val
+            cal_fin.Enabled = val
+            cmb_responsable.Enabled = val
+            toll_guardar2.Enabled = val
+            tol_guardar.Enabled = val
+            txt_nombre.Enabled = val
+            Button1.Enabled = val
+            txt_gas_admin_obr.Enabled = val
+            Button2.Enabled = val
+        Catch ex As Exception
+
+        End Try
+    End Sub
+    Public Sub carga_inicial()
+        Dim tab As New DataTable
+        tab = retorna_vendedores_obra("A")
+        cmb_responsable.DataSource = tab
+        cmb_responsable.DisplayMember = tab.Columns(1).ToString
+        cmb_responsable.ValueMember = tab.Columns(0).ToString
+        Dim tab3 As New DataTable
+        tab3 = retorna_conceptos_gastos_de_operacion(0)
+        cmb_con_gas_oper.DataSource = tab3
+        cmb_con_gas_oper.DataSource = tab3
+        cmb_con_gas_oper.ValueMember = tab3.Columns(0).ToString
+        cmb_con_gas_oper.DisplayMember = tab3.Columns(2).ToString
+    End Sub
+    Private Sub tool_modificar_Click(sender As Object, e As EventArgs) Handles tool_modificar.Click
+        Try
+            If tab_per.Rows(203).Item(1) = "T" Then
+                modifica_obra()
+            Else
+                Dim res2 As Object = MsgBox("No tiene el permiso para " & tab_per.Rows(203).Item(0) & " ¿Deseas que lo autorice otro usuario?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question)
+                If res2 = vbOK Then
+                    Dialog225.Dispose()
+                    Dim tab3 As New DataTable
+                    tab3 = CONSULTA_USUARIOS_ASIG_DE_UN_PERMISO("MODIFICAR_OBRA")
+                    If tab3.Rows.Count > 0 Then
+                        Dialog225.cmb_usuario.DataSource = tab3
+                        Dialog225.cmb_usuario.DisplayMember = tab3.Columns(1).ToString
+                        Dialog225.cmb_usuario.ValueMember = tab3.Columns(0).ToString
+                        Dialog225.ShowDialog()
+                    Else
+                        MsgBox("No Existen usuarios con este permiso asignado", MsgBoxStyle.Information)
+                    End If
+                    If Dialog225.ban_autor = 1 Then
+                        modifica_obra()
+                    End If
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Public Sub modifica_obra()
+        If Trim(lbl_estatus.Text) <> "Finalizacion" Then
+            habilita_contrales(True)
+        Else
+            MsgBox("No es posible modificar una obra que su estatus es: Finalizacion", MsgBoxStyle.Information)
+        End If
+    End Sub
+    Private Sub tol_guardar_Click(sender As Object, e As EventArgs) Handles tol_guardar.Click
+        If guarda_obra() = 1 Then Me.Dispose()
+    End Sub
+
+    Private Sub Dialog243_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+
+    End Sub
+
+    Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
+        grid_responsables.Rows.Add(0, cmb_responsable.SelectedValue.ToString, cmb_responsable.Text)
+    End Sub
+
+    Private Sub ToolStripButton1_Click(sender As Object, e As EventArgs)
+
+
+    End Sub
+
+    Private Sub ToolStripButton7_Click(sender As Object, e As EventArgs)
+
+    End Sub
+    Public Sub genera_total_grid()
+        Try
+            Dim subtotal, imp_cred, imp_cargos, saldo As Double
+            For Each x As DataGridViewRow In grid_cot.Rows
+                subtotal += x.Cells(6).Value
+                imp_cargos += x.Cells(9).Value
+                imp_cred += x.Cells(10).Value
+                x.Cells(11).Value = x.Cells(9).Value - x.Cells(10).Value
+                saldo += x.Cells(11).Value
+            Next
+            txt_imp_cot.Text = FormatCurrency(subtotal)
+            txt_tot_cargos.Text = FormatCurrency(imp_cargos)
+            txt_tot_cred.Text = FormatCurrency(imp_cred)
+            txt_saldo.Text = FormatCurrency(saldo)
+        Catch ex As Exception
+            MsgBox("Error:genera_total_grid " & ex.Message, MsgBoxStyle.Critical)
+            txttotal.Text = 0
+        End Try
+    End Sub
+    Private Sub grid_ordenes_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_ordenes.CellContentClick
+
+    End Sub
+    Public Sub nuevo_orden_trabajo()
+        Try
+            If obra_id > 0 Then
+                Dialog242.Dispose()
+                Dialog242.lbl_obra.Text = txt_nombre.Text
+                Dialog242.obra_id242 = obra_id
+                Dialog242.ShowDialog()
+            Else
+                MsgBox("Es nesesario guardar la obra para registrar una orden de trabajo", MsgBoxStyle.Information)
+            End If
+        Catch ex As Exception
+            MsgBox("Error:nuevo_orden_trabajo " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Private Sub ToolStripButton8_Click(sender As Object, e As EventArgs)
+
+    End Sub
+    Private Sub grid_ordenes_CellDoubleClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_ordenes.CellDoubleClick
+        Try
+            Dialog242.Dispose()
+            Dialog242.habilita_controles(False)
+            Form21.abre_docto_orden_trabajo(grid_ordenes.Item(0, grid_ordenes.CurrentCell.RowIndex).Value)
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton23_Click(sender As Object, e As EventArgs) Handles ToolStripButton23.Click
+        Try
+            Dim tab As New DataTable
+            Dim tot_sal As Double = 0
+            grid_salidas_mat.Refresh()
+            grid_salidas_mat.Columns(1).HeaderText = "Folio"
+            grid_salidas_mat.Columns(2).HeaderText = "OT"
+            grid_salidas_mat.Columns(2).Width = 60
+            grid_salidas_mat.Columns(3).HeaderText = "Fecha"
+            grid_salidas_mat.Columns(3).Width = 120
+            grid_salidas_mat.Columns(4).HeaderText = "Estatus"
+            grid_salidas_mat.Columns(4).Width = 90
+            grid_salidas_mat.Columns(5).HeaderText = "Concepto"
+            grid_salidas_mat.Columns(5).Width = 100
+            grid_salidas_mat.Rows.Clear()
+            tab = retorna_doctos_salidas_por_obra(obra_id)
+            If tab.Rows.Count > 0 Then
+                For Each x As DataRow In tab.Rows
+                    grid_salidas_mat.Rows.Add(x("docto_solicitud_id"), "" & x("folio_microsip"), x("OT"), x("fecha"), x("estatus"), x("nom_concepto"), x("nom_almacen"), x("COS_TOT"))
+                    If "" & x("folio_microsip") = "0" Then grid_salidas_mat.Item(4, grid_salidas_mat.Rows.Count - 1).Style.BackColor = Color.Red
+                    tot_sal += x("COS_TOT")
+                Next
+                txt_tot_sal.Text = FormatCurrency(tot_sal)
+            End If
+        Catch ex As Exception
+            MsgBox("Error:lista salidas de materiales " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub grid_salidas_mat_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_salidas_mat.CellContentClick
+
+    End Sub
+
+    Private Sub grid_salidas_mat_CellDoubleClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_salidas_mat.CellDoubleClick
+        Try
+            Dialog244.Dispose()
+            Dialog244.carga_inicial_todo("S")
+            Form21.abre_salida_materiales(grid_salidas_mat.Item(0, grid_salidas_mat.CurrentCell.RowIndex).Value)
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Public Function genera_salida_almacen_prod_proceso_mat_obra(obra_id As Integer) As Integer
+        Try
+            Dim tab As New DataTable
+            tab = retorna_doctos_salidas_por_obra_det(obra_id, 37309)
+            Dim docto_salida_id_pt As Integer = 0
+            If tab.Rows.Count > 0 Then
+                Dim tab1, tab2 As New DataTable
+                tab1 = consulta_parametros_configuracion_saca("Concepto salida Prod.proceso", "PT")
+                Dim con_sal As Integer = 0
+                If tab1.Rows.Count > 0 Then con_sal = tab1.Rows(0).Item(0)
+                tab2 = consulta_parametros_configuracion_saca("Almacen de Prod.proceso", "AT")
+                Dim alm_pp As Integer = 0
+                If tab2.Rows.Count > 0 Then alm_pp = tab2.Rows(0).Item(0)
+                Dim docto_id_sal As Integer = 0
+                'Realizamos la salida de la materia prima del almacen de produccion en proceso            
+                If con_sal > 0 And alm_pp > 0 Then
+                    docto_id_sal = valida_no_exista_mov_microsip_sali(obra_id, con_sal, 0, "F", cal_fin.Value, obra_id)
+                    If docto_id_sal = 0 Then docto_id_sal = genera_mov_salida_proceso_por_mts(alm_pp, 0, obra_id, con_sal, tab, "S", txt_nombre.Text & " Salida de material de produccion en proceso de la Obra", tab2.Rows(0).Item(1), obra_id, "F", obra_id, 0, 0)
+                    If docto_id_sal > 0 Then
+                        'Genera entrada de producto Terminado
+                        Dim docto_entrad_id As Integer = 0
+                        Dim tab11, tab22 As New DataTable
+                        tab11 = consulta_parametros_configuracion_saca("Concepto Entrada Producto Terminado", "ET")
+                        Dim con_ept As Integer = 0
+                        If tab11.Rows.Count > 0 Then con_ept = tab11.Rows(0).Item(0)
+                        tab22 = consulta_parametros_configuracion_saca("Almacen de Producto Terminado", "AP")
+                        Dim alm_ept As Integer = 0
+                        If tab22.Rows.Count > 0 Then alm_ept = tab22.Rows(0).Item(0)
+                        docto_entrad_id = valida_no_exista_mov_microsip_entrada(obra_id, con_ept, 0, "F", cal_fin.Value, obra_id)
+                        Dim tab5 As New DataTable
+                        tab5 = consulta_parametros_configuracion_saca("Articulo de Producto Terminado", "AR")
+                        Dim art_id_pt As Integer = 0
+                        If tab5.Rows.Count > 0 Then art_id_pt = tab5.Rows(0).Item(0)
+                        Dim tab_art As New DataTable
+                        If art_id_pt > 0 Then
+                            'realizamos la entrada del producto terminado
+                            Dim cost_prod As Double = Consultas_microsip.consulta_costo_tot_mov_microsip(docto_id_sal)
+                            tab_art.Columns.Add("articulo_id", GetType(Integer))
+                            tab_art.Columns.Add("uds", GetType(Double))
+                            tab_art.Columns.Add("costo_unit", GetType(Double))
+                            tab_art.Rows.Add(art_id_pt, 1, cost_prod)
+                        End If
+                        If docto_entrad_id = 0 Then
+                            docto_entrad_id = genera_entrada_salida_producto_terminado_saca(obra_id, alm_ept, con_ept, "E", txt_nombre.Text & " Entrada de producto terminado de Obra ", tab_art)
+                        End If
+                        If docto_entrad_id > 0 Then
+                            'Realizamos la salida del producto terminado
+                            Dim tab13 As New DataTable
+                            tab13 = consulta_parametros_configuracion_saca("Concepto Salida Producto Terminado", "ST")
+                            Dim con_spt As Integer = 0
+                            If tab13.Rows.Count > 0 Then con_spt = tab13.Rows(0).Item(0)
+                            If con_spt > 0 Then
+                                docto_salida_id_pt = valida_no_exista_mov_microsip_sali(obra_id, con_spt, 0, "F", cal_fin.Value, obra_id)
+                                If docto_salida_id_pt = 0 Then
+                                    docto_salida_id_pt = genera_entrada_salida_producto_terminado_saca(obra_id, alm_ept, con_spt, "S", txt_nombre.Text & " Salida del Costo de producto terminado de Obra ", tab_art)
+                                End If
+                            End If
+                        End If
+                    End If
+                End If
+            End If
+            Return docto_salida_id_pt
+        Catch ex As Exception
+            MsgBox("Error:genera_salida_almacen_prod_proceso_mat_obra  " & ex.Message, MsgBoxStyle.Critical)
+            Return 0
+        End Try
+    End Function
+    Public Sub cerrar_obra()
+        Try
+            If Trim(lbl_estatus.Text) = "Obra Terminada" Then
+                If (MsgBox("Al cerrar la Obra, todas las ordenes que se encuentran en produccion se enviaran a Fin de Produccion, las que no se liberan a produccion se estaran Cancelando, No sera posible agregar mas ordenes de trabajo o materiales, ¿Deseas Continuar? ", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question) = vbOK) Then
+                    Dim tab As New DataTable
+                    tab = retorna_ordenes_por_obra(obra_id, "C")
+                    For Each x As DataRow In tab.Rows
+                        If x("estatus_2") = "P" Then
+                            actualiza_estatus_orden_obra(x("docto_orden_obra_id"), "F")
+                            guarda_bitacora_costos_prod(x("docto_orden_obra_id"), x("docto_orden_obra_id"), usuario_gl, "Estatus: " & "Fin Produccion: Por cierre de Obra ")
+                        ElseIf x("estatus_2") = "O" Then
+                            actualiza_estatus_orden_obra(x("docto_orden_obra_id"), "C")
+                            guarda_bitacora_costos_prod(x("docto_orden_obra_id"), x("docto_orden_obra_id"), usuario_gl, "Estatus: " & "Cancelado: Por cierre de Obra ")
+                        End If
+                    Next
+                    Dim tab2 As New DataTable
+                    tab2 = retorna_doctos_salidas_por_obra(obra_id)
+                    For Each x As DataRow In tab2.Rows
+                        If Trim(x("estatus")) = "Pendiente" Then
+                            actualiza_movimiento_solicitud_material(x("docto_solicitud_id"), 0, "Cancelado", x("folio_microsip"))
+                            guarda_bitacora_costos_prod(x("docto_solicitud_id"), x("docto_solicitud_id"), usr_gl, "Documento Cancelado")
+                        End If
+                    Next
+                    'Genera los movimientos en sistema Microsip
+                    If genera_salida_almacen_prod_proceso_mat_obra(obra_id) > 0 Then
+                        MsgBox("Los movimientos en el sistema Microsip se realizaron Correctamente!!", MsgBoxStyle.Information)
+                    End If
+                    actualiza_estatus_obra(obra_id, "Finalizacion")
+                    lbl_estatus.Text = "Finalizacion"
+                    cmb_estatus.Text = "Finalizacion"
+                End If
+            Else
+                MsgBox("Para finalizar la obra, es necesario que su estatus sea Obra Terminada. Actualice el estatus para poder continuar.", MsgBoxStyle.Information)
+            End If
+        Catch ex As Exception
+            MsgBox("Error:cerrar_obra  " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Private Sub ToolStripButton5_Click(sender As Object, e As EventArgs) Handles ToolStripButton5.Click
+        If tab_per.Rows(204).Item(1) = "T" Then
+            cerrar_obra()
+        Else
+            Dim res2 As Object = MsgBox("No tiene el permiso para " & tab_per.Rows(204).Item(0) & " ¿Deseas que lo autorice otro usuario?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question)
+            If res2 = vbOK Then
+                Dialog225.Dispose()
+                Dim tab3 As New DataTable
+                tab3 = CONSULTA_USUARIOS_ASIG_DE_UN_PERMISO("CERRAR_OBRA")
+                If tab3.Rows.Count > 0 Then
+                    Dialog225.cmb_usuario.DataSource = tab3
+                    Dialog225.cmb_usuario.DisplayMember = tab3.Columns(1).ToString
+                    Dialog225.cmb_usuario.ValueMember = tab3.Columns(0).ToString
+                    Dialog225.ShowDialog()
+                Else
+                    MsgBox("No Existen usuarios con este permiso asignado", MsgBoxStyle.Information)
+                End If
+                If Dialog225.ban_autor = 1 Then
+                    cerrar_obra()
+                End If
+            End If
+        End If
+    End Sub
+
+    Private Sub ToolStripButton1_Click_1(sender As Object, e As EventArgs) Handles ToolStripButton1.Click
+        Try
+            Dim tab As New DataTable
+            Dim tot_sal As Double = 0
+            grid_salidas_mat.Refresh()
+            grid_salidas_mat.Rows.Clear()
+            grid_salidas_mat.Columns(1).HeaderText = "Estatus"
+            grid_salidas_mat.Columns(2).HeaderText = "Clave"
+            grid_salidas_mat.Columns(2).Width = 120
+            grid_salidas_mat.Columns(3).HeaderText = "Nombre"
+            grid_salidas_mat.Columns(3).Width = 250
+            grid_salidas_mat.Columns(4).HeaderText = "Uds"
+            grid_salidas_mat.Columns(4).Width = 60
+            grid_salidas_mat.Columns(5).HeaderText = "Uni.Med"
+            grid_salidas_mat.Columns(5).Width = 60
+            tab = retorna_doctos_salidas_por_obra_det(obra_id, 0)
+            If tab.Rows.Count > 0 Then
+                For Each x As DataRow In tab.Rows
+                    grid_salidas_mat.Rows.Add(0, "" & x("estatus"), x("clave_art"), x("nom_art"), x("uds"), x("unid_med"), x("nom_almacen"), x("COSTO_TOT"))
+                    'If "" & x("folio_microsip") = "0" Then grid_salidas_mat.Item(4, grid_salidas_mat.Rows.Count - 1).Style.BackColor = Color.Red
+                    tot_sal += x("COSTO_TOT")
+                Next
+                txt_tot_sal.Text = FormatCurrency(tot_sal)
+            End If
+        Catch ex As Exception
+            MsgBox("Error:lista salidas de materiales " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton6_Click(sender As Object, e As EventArgs) Handles ToolStripButton6.Click
+        exporta_excel_grid(grid_salidas_mat, "Materiales de Obra:" & txt_nombre.Text, "")
+    End Sub
+
+    Private Sub ToolStripButton2_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub ToolStripButton4_Click(sender As Object, e As EventArgs) Handles ToolStripButton4.Click
+        Try
+            If tab_per.Rows(247).Item(1) = "T" Then
+                Dim tab As New DataTable
+                tab = retorna_salidas_consumos_obra(obra_id, 0)
+                grid_consum.Rows.Clear()
+                For Each x As DataRow In tab.Rows
+                    grid_consum.Rows.Add(x("consumo_material_obra_id"), x("folio_orden"), x("folio"), x("estatus"), Mid(x("fecha"), 1, 10), x("uds_salida"))
+                Next
+            Else
+                MsgBox("No tiene el permiso para " & tab_per.Rows(247).Item(0), MsgBoxStyle.Information)
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub grid_consum_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_consum.CellContentClick
+
+    End Sub
+
+    Private Sub grid_consum_CellDoubleClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_consum.CellDoubleClick
+        Try
+            Form21.abre_consumo_material_en_obra(grid_consum.Item(0, grid_consum.CurrentCell.RowIndex).Value)
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub Button5_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub Button6_Click(sender As Object, e As EventArgs) Handles Button6.Click
+        Try
+            If obra_id > 0 Then
+                If Len(txt_desc.Text) > 0 Then
+                    Dim arg_gu() As Byte
+                    arg_gu = File.ReadAllBytes(Trim(txt_ruta.Text))
+                    guarda_archivo_adjunto(0, txt_nombre.Text, 0, arg_gu, obra_id, Mid(txt_desc.Text, 1, 49))
+                    txt_ruta.Text = ""
+                    txt_nombre.Text = ""
+                    txt_desc.Text = ""
+                Else
+                    MsgBox("Ingresar una descripcion corta maximo 50 caracteres", MsgBoxStyle.Information)
+                End If
+            Else
+                MsgBox("Es nesesario guardar el documento para que se permita adjuntar archivos", MsgBoxStyle.Information)
+            End If
+        Catch ex As Exception
+            MsgBox("Error al adjuntar el archivo " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton13_Click(sender As Object, e As EventArgs) Handles ToolStripButton13.Click
+        Try
+            grid_adjuntos.Rows.Clear()
+            Dim tab As New DataTable
+            tab = retorna_archivos_adjuntos(obra_id)
+            Dim row As Integer = 0
+            If tab.Rows.Count > 0 Then
+                For Each x As DataRow In tab.Rows
+                    grid_adjuntos.Rows.Add(x("archivo_id"), x("nombre_archivo"), x("descripcion_corta"), Format(x("fecha_creacion"), "dd/MM/yyyy HH:mm:ss"), x("usuario_creacion"))
+                    grid_adjuntos.Item(5, row).Value = "Abrir"
+                    row += 1
+                Next
+            Else
+                MsgBox("No existen documentos adjuntos para mostrar", MsgBoxStyle.Information)
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub grid_adjuntos_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_adjuntos.CellContentClick
+
+    End Sub
+
+    Private Sub grid_adjuntos_CellClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_adjuntos.CellClick
+        Try
+            If grid_adjuntos.CurrentCell.ColumnIndex = 5 Then
+                abre_archivo_adjunto_bd(grid_adjuntos.Item(0, grid_adjuntos.CurrentCell.RowIndex).Value)
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton12_Click(sender As Object, e As EventArgs) Handles ToolStripButton12.Click
+        If dial_sav.ShowDialog = System.Windows.Forms.DialogResult.OK Then
+            txt_ruta.Text = dial_sav.FileName
+            txt_nombre.Text = dial_sav.SafeFileName
+        End If
+    End Sub
+
+    Private Sub EliminarArchivoToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles EliminarArchivoToolStripMenuItem.Click
+        Try
+            If tab_per.Rows(250).Item(1) = "T" Then
+                Dim res As Object = MsgBox("Deseas eliminar el archivo seleccionado", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question)
+                If res = vbOK Then
+                    elimina_archivo_adjunto(grid_adjuntos.Item(0, grid_adjuntos.CurrentCell.RowIndex).Value, obra_id)
+                    grid_adjuntos.Rows.RemoveAt(grid_adjuntos.CurrentCell.RowIndex)
+                End If
+            Else
+                MsgBox("No tiene el permiso para " & tab_per.Rows(250).Item(0), MsgBoxStyle.Information)
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Public Sub nuevo_cotizacion_microsip()
+        Try
+            If obra_id > 0 Then
+                Dialog242.Dispose()
+                Dialog242.lbl_obra.Text = txt_nombre.Text
+                Dialog242.obra_id242 = obra_id
+                Dialog242.carga_ini_cot(True)
+                Dialog242.ShowDialog()
+            Else
+                MsgBox("Es nesesario guardar la obra para registrar una Cotizacion para Facturacion", MsgBoxStyle.Information)
+            End If
+        Catch ex As Exception
+            MsgBox("Error:nuevo_cotizacion_microsip " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Public Function valida_estatus_obra(obra As Integer)
+        Dim estatus As String = retorna_estatus_obra(obra)
+        Try
+            If estatus = "Ejecucion" Or estatus = "Planificacion" Or estatus = "Obra Terminada" Then
+                Return 0
+            Else
+                MsgBox("El estatus actual de la obra no permite agregar más elementos. Actualice el estatus para poder incorporar documentos adicionales a la obra.", MsgBoxStyle.Information)
+                Return 1
+            End If
+        Catch ex As Exception
+            Return 1
+        End Try
+    End Function
+    Private Sub ToolStripButton2_Click_1(sender As Object, e As EventArgs) Handles ToolStripButton2.Click
+        Try
+            If valida_estatus_obra(obra_id) = 0 Then
+                If valida_tiene_permiso(258, "NUEVA_COT_FAC_OBRA") = 1 Then
+                    nuevo_cotizacion_microsip()
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+
+    End Sub
+    Private Sub ToolStripButton9_Click(sender As Object, e As EventArgs) Handles ToolStripButton9.Click
+        Try
+            grid_cot.Rows.Clear()
+            Dim tab As New DataTable
+            tab = retorna_cotizaciones_microsip_por_obra2(obra_id)
+            If tab.Rows.Count > 0 Then
+                For Each x As DataRow In tab.Rows
+                    If x("tipo") = -1 Then
+                        'Facturas Microsip
+                        Dim tab_m As New DataTable
+                        tab_m = retorna_saldo_ord_obra(x("folio"))
+                        If Trim(tab_m.Rows(0).Item(0)) = "NO FACTUR" Then
+                            grid_cot.Rows.Add(x("docto_orden_obra_id"), x("folio"), x("tipo_docto"), x("estatus"), "" & x("nom_cliente"), x("fecha"), x("importe_neto"), "", 0, x("importe_neto"), 0, x("importe_neto"), x("tipo"))
+                        Else
+                            grid_cot.Rows.Add(x("docto_orden_obra_id"), x("folio"), x("tipo_docto"), x("estatus"), "" & x("nom_cliente"), x("fecha"), x("importe_neto"), "" & tab_m.Rows(0).Item(0), tab_m.Rows(0).Item(1), IIf(tab_m.Rows(0).Item(1) > 0, tab_m.Rows(0).Item(1), tab_m.Rows(0).Item(2)), IIf(tab_m.Rows(0).Item(1) > 0, (tab_m.Rows(0).Item(1) - tab_m.Rows(0).Item(2)), 0), tab_m.Rows(0).Item(2), x("tipo"))
+                        End If
+                    ElseIf x("tipo") = 1 Then
+                        'Nota de Cargo
+                        grid_cot.Rows.Add(x("docto_orden_obra_id"), x("folio"), x("tipo_docto"), x("estatus"), "" & x("nom_cliente"), x("fecha"), x("importe_neto"), "", 0, x("importe_neto"), 0, x("importe_neto"), x("tipo"))
+                    ElseIf x("tipo") = 0 Then
+                        'Pago en Efectivo
+                        grid_cot.Rows.Add(x("docto_orden_obra_id"), x("folio"), x("tipo_docto"), x("estatus"), "" & x("nom_cliente"), x("fecha"), x("importe_neto"), "DEP.EFECTIVO", 0, 0, x("importe_neto"), x("importe_neto"), x("tipo"))
+                    ElseIf x("tipo") = 2 Then
+                        'Anticipo
+                        grid_cot.Rows.Add(x("docto_orden_obra_id"), x("folio"), x("tipo_docto"), x("estatus"), "" & x("nom_cliente"), x("fecha"), x("importe_neto"), "ANTICIPO", 0, 0, x("importe_neto"), x("importe_neto"), x("tipo"))
+                    End If
+                Next
+            Else
+                MsgBox("No existen Cotizaciones asignadas a esta obra", MsgBoxStyle.Information)
+            End If
+            genera_total_grid()
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub grid_cot_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_cot.CellContentClick
+
+    End Sub
+    Public Sub abre_docto_adic_obra(id As Integer)
+        Try
+            Dim tab As New DataTable
+            tab = retorna_datos_docto_adicional_obra(id)
+            If tab.Rows.Count > 0 Then
+                Dialog279.Dispose()
+                Dialog279.docto_adic_obra_id = tab.Rows(0).Item(0)
+                Dialog279.cmb_tipo.SelectedIndex = tab.Rows(0).Item(2)
+                Dialog279.chk_doc_microsip.Checked = CBool(Trim(tab.Rows(0).Item(3)))
+                Dialog279.lbl_id_docto.Text = tab.Rows(0).Item(4)
+                Dialog279.lbl_concepto_id.Text = tab.Rows(0).Item(5)
+                Dialog279.txt_folio.Text = tab.Rows(0).Item(6)
+                Dialog279.txt_importe.Text = tab.Rows(0).Item(7)
+                Dialog279.txt_notas.Text = tab.Rows(0).Item(8)
+                Dialog279.cal_fecha.Value = tab.Rows(0).Item(9)
+                Dialog279.habilita_controls(False)
+                Dialog279.ShowDialog()
+            End If
+        Catch ex As Exception
+            MsgBox("Error:abre_docto_adic_obra " & ex.Message)
+        End Try
+    End Sub
+    Private Sub grid_cot_CellDoubleClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_cot.CellDoubleClick
+        Try
+            If grid_cot.Item(12, grid_cot.CurrentCell.RowIndex).Value < 0 Then
+                Dialog242.Dispose()
+                Dialog242.habilita_controles(False)
+                Dialog242.carga_ini_cot(True)
+                Form21.ABRE_COTIZACION_OBRA_MICROSIP(grid_cot.Item(0, grid_cot.CurrentCell.RowIndex).Value, "", obra_id)
+            Else
+                abre_docto_adic_obra(grid_cot.Item(0, grid_cot.CurrentCell.RowIndex).Value)
+            End If
+        Catch ex As Exception
+            MsgBox("Error:grid_cot_CellDoubleClick " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton11_Click(sender As Object, e As EventArgs) Handles ToolStripButton11.Click
+        Try
+            If valida_estatus_obra(obra_id) = 0 Then
+                If valida_tiene_permiso(260, "NUEVA_EXPLOCION_MAT_OBRA") = 1 Then
+                    Dialog230.Dispose()
+                    Dialog230.ban_tipo_grid = 4
+                    Dialog230.obra_id230 = obra_id
+                    Dialog230.Panel1.Visible = False
+                    Dialog230.ShowDialog()
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton14_Click(sender As Object, e As EventArgs) Handles ToolStripButton14.Click
+        Try
+            If valida_estatus_obra(obra_id) = 0 Then
+                If guarda_explocion_materiales_obra(obra_id, grid_exp_mat, 0) > 0 Then
+                    MsgBox("Se actualizo correctamente la informacion", MsgBoxStyle.Information)
+                    ToolStripButton10_Click(sender, e)
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton10_Click(sender As Object, e As EventArgs) Handles ToolStripButton10.Click
+        Try
+            Dim tot As Double = 0
+            Dim tab As New DataTable
+            tab = retorna_explocion_mat_obra_id(obra_id)
+            If tab.Rows.Count > 0 Then
+                grid_exp_mat.Rows.Clear()
+                For Each x As DataRow In tab.Rows
+                    grid_exp_mat.Rows.Add(x("explocion_mat_obra_id"), x("articulo_id"), x("clave"), x("nombre"), x("um"), x("uds"), x("costo_unit"), x("costo_tot"), x("UNI_MED_ML_MQ"), x("tipo_docto"), x("folio"))
+                    tot += x("costo_tot")
+                Next
+                txt_imp_explo.Text = FormatCurrency(tot)
+            Else
+                MsgBox("No existen datos para mostrar", MsgBoxStyle.Critical)
+            End If
+        Catch ex As Exception
+
+        End Try
+    End Sub
+
+    Public Sub asigna_cot_de_obra()
+        Try
+            Dim fol As String = InputBox("Ingresa el Folio de la Cotizacion ", "Agregar una cotizacion de Microsip")
+            If fol.Length > 0 Then
+                Try
+                    Dialog242.Dispose()
+                    Dialog242.habilita_controles(True)
+                    Dialog242.carga_ini_cot(True)
+                    Form21.ABRE_COTIZACION_OBRA_MICROSIP(0, genera_folio(fol), obra_id)
+                Catch ex As Exception
+                    MsgBox("Error:grid_cot_CellDoubleClick " & ex.Message, MsgBoxStyle.Critical)
+                End Try
+            End If
+        Catch ex As Exception
+            MsgBox("Error:asigna_cot_de_obra " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Private Sub ToolStripButton15_Click(sender As Object, e As EventArgs) Handles ToolStripButton15.Click
+        If valida_estatus_obra(obra_id) = 0 Then
+            If valida_tiene_permiso(258, "NUEVA_COT_FAC_OBRA") = 1 Then
+                asigna_cot_de_obra()
+            End If
+        End If
+    End Sub
+
+    Private Sub ToolStripButton16_Click(sender As Object, e As EventArgs) Handles ToolStripButton16.Click
+        Try
+            If valida_estatus_obra(obra_id) = 0 Then
+                If valida_tiene_permiso(261, "ELIMINAR_EXPLOCION_MAT_OBRA") = 1 Then
+                    If (MsgBox("¿Deseas eliminar las partidas seleccionadas ?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question) = vbOK) Then
+                        For x = grid_exp_mat.Rows.Count - 1 To 0 Step -1
+                            If grid_exp_mat.Item(1, x).Selected = True Then
+                                elimina_explocion_mat(grid_exp_mat.Item(0, x).Value)
+                                grid_exp_mat.Rows.RemoveAt(x)
+                            End If
+                        Next
+                    End If
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub TabPage6_Click(sender As Object, e As EventArgs) Handles TabPage6.Click
+
+    End Sub
+    Private Sub ToolStripButton18_Click(sender As Object, e As EventArgs) Handles ToolStripButton18.Click
+        If valida_estatus_obra(obra_id) = 0 Then
+            If valida_tiene_permiso(262, "NUEVO_GASTO_PARA_OBRA") = 1 Then
+                Dialog274.Dispose()
+                Dialog274.obra_id_74 = obra_id
+                Dialog274.carga_inicial()
+                Dialog274.ShowDialog()
+            End If
+        End If
+    End Sub
+
+    Private Sub ToolStripButton17_Click(sender As Object, e As EventArgs) Handles ToolStripButton17.Click
+        Try
+            grid_gastos_adi.Rows.Clear()
+            Dim tab As New DataTable
+            tab = retorna_gastos_adicionales_por_obra(obra_id, 0)
+            Dim tot_gas, tot_gas_real As Double
+            If tab.Rows.Count > 0 Then
+                For Each x As DataRow In tab.Rows
+                    grid_gastos_adi.Rows.Add(x("gasto_adicional_id"), x("nombre"), x("estatus"), x("folio"), x("fecha_creacion"), x("nom_unidad"), x("importe"), x("importe_real"), x("notas"))
+                    If Trim(x("estatus")) <> "Cancelado" Then
+                        tot_gas += x("importe")
+                        tot_gas_real += x("importe_real")
+                    End If
+                Next
+                txt_tot_gas_adic.Text = FormatCurrency(tot_gas)
+                txt_tot_gasto_real.Text = FormatCurrency(tot_gas_real)
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Public Sub abre_gasto_adicional_obra(id As Integer)
+        Try
+            Dim tab As New DataTable
+            tab = retorna_gastos_adicionales_por_obra(0, id)
+            If tab.Rows.Count > 0 Then
+                Dialog274.Dispose()
+                Dialog274.obra_id_74 = tab.Rows(0).Item(7)
+                Dialog274.carga_inicial()
+                Dialog274.gasto_id = tab.Rows(0).Item(0)
+                Dialog274.cmb_rs.Text = tab.Rows(0).Item(2)
+                Dialog274.cal_fecha.Value = tab.Rows(0).Item(3)
+                Dialog274.cmb_unidad.Text = tab.Rows(0).Item(4)
+                Dialog274.txt_importe.Text = tab.Rows(0).Item(5)
+                Dialog274.txt_notas.Text = "" & tab.Rows(0).Item(6)
+                Dialog274.lbl_estatus.Text = tab.Rows(0).Item(8)
+                Dim tab3 As New DataTable
+                tab3 = retorna_personal_consumos_obra(id)
+                If tab3.Rows.Count > 0 Then
+                    For Each z As DataRow In tab3.Rows
+                        Dialog274.grid_responsables.Rows.Add(z("personal_consumo_obra_id"), z("id_empleado"), z("nombre_empleado"))
+                    Next
+                End If
+                Dim tab2 As New DataTable
+                tab2 = retorna_gastos_adicionales_por_obra_detalle(id)
+                Dim tot1, tot2 As Double
+                If tab2.Rows.Count > 0 Then
+                    For Each z As DataRow In tab2.Rows
+                        Dialog274.grid_gas_det.Rows.Add(z("gasto_adicional_obra_det_id"), z("concepto_gasto_id"), z("imp_presupuestado"), z("imp_real"))
+                        tot1 += z("imp_presupuestado")
+                        tot2 += z("imp_real")
+                    Next
+                    Dialog274.txt_importe.Text = FormatNumber(tot1)
+                    Dialog274.txt_imp_real.Text = FormatNumber(tot2)
+                End If
+                Dialog274.habilita_controles(False)
+                Dialog274.ShowDialog()
+            End If
+        Catch ex As Exception
+            MsgBox("Error:abre_gasto_adicional_obra " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Private Sub grid_gastos_adi_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_gastos_adi.CellContentClick
+
+    End Sub
+
+    Private Sub grid_gastos_adi_CellDoubleClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_gastos_adi.CellDoubleClick
+        Try
+            abre_gasto_adicional_obra(grid_gastos_adi.Item(0, grid_gastos_adi.CurrentCell.RowIndex).Value)
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub Button2_Click(sender As Object, e As EventArgs) Handles Button2.Click
+        Try
+            dialog_open.Filter = "Imagenes (*.jpg)|*.jpg|Imagenes (*.png)|*.png|All files (*.*)|*.*"
+            If dialog_open.ShowDialog = System.Windows.Forms.DialogResult.OK Then
+                pic_img.ImageLocation = dialog_open.FileName
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub pic_img_Click(sender As Object, e As EventArgs) Handles pic_img.Click
+
+    End Sub
+
+    Private Sub pic_img_DoubleClick(sender As Object, e As EventArgs) Handles pic_img.DoubleClick
+        abre_imagen_visor(pic_img, obra_id)
+    End Sub
+
+    Private Sub ToolStripButton20_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub ToolStripButton19_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub grid_mo_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_mo.CellContentClick
+
+    End Sub
+    Public Sub abre_personal_asignado_obra(id As Integer)
+        Try
+            Dim tab As New DataTable
+            tab = retorna_empleados_asignados_por_obra(0, id)
+            If tab.Rows.Count > 0 Then
+                Dialog275.Dispose()
+                Dialog275.obra_id_75 = tab.Rows(0).Item(8)
+                Dialog275.carga_inicial()
+                Dialog275.mano_obra_id = tab.Rows(0).Item(0)
+                Dialog275.cal_fecha.Value = tab.Rows(0).Item(1)
+                Dialog275.lbl_estatus.Text = tab.Rows(0).Item(2)
+                Dialog275.cmb_rs.Text = tab.Rows(0).Item(3)
+                Dialog275.cmb_unidad.Text = tab.Rows(0).Item(4)
+                Dialog275.txt_importe.Text = tab.Rows(0).Item(5)
+                Dialog275.txt_notas.Text = tab.Rows(0).Item(6)
+                Dim tab2 As New DataTable
+                tab2 = retorna_empleados_asignados_por_obra_det(id)
+                For Each x As DataRow In tab2.Rows
+                    Dialog275.grid_responsables.Rows.Add(x("empleado_asignado_a_obra_det_id"), x("id_empleado"), x("nombre"), x("costo_x_hrs"), x("hrs_trabajo"), x("hrs_trabajo_real"), (x("costo_x_hrs") * x("hrs_trabajo")), (x("costo_x_hrs") * x("hrs_trabajo_real")))
+                Next
+                Dialog275.habilita_controles(False)
+                Dialog275.calcula_total_mo()
+                Dialog275.ShowDialog()
+            End If
+        Catch ex As Exception
+            MsgBox("Error:abre_personal_asignado_obra " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Private Sub grid_mo_DoubleClick(sender As Object, e As EventArgs) Handles grid_mo.DoubleClick
+        Try
+            abre_personal_asignado_obra(grid_mo.Item(0, grid_mo.CurrentCell.RowIndex).Value)
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub lbl_sug_id_LinkClicked(sender As Object, e As LinkLabelLinkClickedEventArgs) Handles lbl_sug_id.LinkClicked
+
+    End Sub
+
+    Private Sub lbl_sug_id_DoubleClick(sender As Object, e As EventArgs) Handles lbl_sug_id.DoubleClick
+        Try
+            Form46.Dispose()
+            Form46.habilita_controles(False)
+            Form46.BAN_MOD = 1
+            Form21.abre_sugerido_obra(lbl_sug_id.Text)
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Public Sub imprime_analitica_de_obra(ByVal e As System.Drawing.Printing.PrintPageEventArgs, ByVal sugerido_id As Integer, obra_id As Integer)
+        'Imprime el encabezado del reporte'
+        Dim tab As New DataTable
+        tab = retorna_datos_sugerido_obra(sugerido_id)
+        Dim tab_o As New DataTable
+        tab_o = retorna_obras_por_periodo(fecha_ini, fecha_fin, obra_id)
+        If tab.Rows.Count > 0 Then
+            Dim porce_gas_admin_obra As Double = tab_o.Rows(0).Item(11)
+            e.Graphics.DrawImage(My.Resources.logo_mega2, 10, 10)
+            e.Graphics.DrawString("ANALITICA DE EJECUCION POR OBRA", New Font("Arial", 13, FontStyle.Bold), Brushes.Black, 280, 20)
+            e.Graphics.DrawLine(Pens.Black, 5, 10, 800, 10)
+            e.Graphics.DrawLine(Pens.Black, 10, 1070, 800, 1070)
+            e.Graphics.DrawLine(Pens.Black, 180, 60, 800, 60)
+            e.Graphics.DrawLine(Pens.Black, 180, 10, 180, 100)
+            e.Graphics.DrawLine(Pens.Black, 360, 60, 360, 100)
+            e.Graphics.DrawLine(Pens.Black, 490, 60, 490, 140)
+            e.Graphics.DrawLine(Pens.Black, 5, 10, 5, 1070)
+            e.Graphics.DrawLine(Pens.Black, 800, 10, 800, 1070)
+            e.Graphics.DrawString("Id_Obra: " & tab_o.Rows(0).Item(0), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 650, 20)
+            e.Graphics.DrawString("Fe.Imp:" & Now, New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 600, 40)
+            e.Graphics.DrawString("Codigo: CT-REG-13", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 200, 65)
+            e.Graphics.DrawLine(Pens.Black, 10, 100, 800, 100)
+            e.Graphics.DrawString("Revision: 00", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 370, 65)
+            e.Graphics.DrawString("Contacto:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 500, 65)
+            e.Graphics.DrawString("" & tab_o.Rows(0).Item(3), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 500, 80)
+            e.Graphics.DrawString("Pagina 1 de 1", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 680, 80)
+            e.Graphics.DrawString("Fecha termino:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 495, 105)
+            e.Graphics.DrawString(tab_o.Rows(0).Item(7), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 495, 120)
+            e.Graphics.DrawLine(Pens.Black, 580, 100, 580, 180)
+            e.Graphics.DrawString("Estatus:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 10, 105)
+            e.Graphics.DrawString(tab_o.Rows(0).Item(8), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 10, 120)
+            e.Graphics.DrawLine(Pens.Black, 120, 100, 120, 140)
+            e.Graphics.DrawString("Cliente:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 140, 105)
+            e.Graphics.DrawString(tab.Rows(0).Item(3), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 140, 120)
+            e.Graphics.DrawString("Vendedor", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 10, 140)
+            e.Graphics.DrawString(tab.Rows(0).Item(6), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 10, 155)
+            e.Graphics.DrawLine(Pens.Black, 200, 140, 200, 180)
+            e.Graphics.DrawString(Mid("Obra: " & tab_o.Rows(0).Item(2), 1, 40), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 200, 140)
+            e.Graphics.DrawString(Mid("" & tab_o.Rows(0).Item(2), 41, 50), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 200, 155)
+            e.Graphics.DrawLine(Pens.Black, 5, 140, 580, 140)
+            e.Graphics.DrawLine(Pens.Black, 5, 180, 800, 180)
+            Dim posy As Integer = 185
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawString("MATERIA PRIMA: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 10, posy)
+            e.Graphics.DrawString("Imp.Presupuestado ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 235, posy)
+            e.Graphics.DrawString("Concepto", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, posy)
+            e.Graphics.DrawString("Imp. Real ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 560, posy)
+            e.Graphics.DrawString("Diferencia $ ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 675, posy)
+            posy += 18
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            Dim tab2 As New DataTable
+            tab2 = retorna_datos_sugerido_obra_det2(sugerido_id, "MP")
+            Dim tab_mp_con As New DataTable
+            tab_mp_con = retorna_conceptos_mat_salidas_por_obra(obra_id)
+            Dim tot_mp, tot_mp_re, tot_mp_re_sin_cris As Double
+            Dim tab_comp As New DataTable
+            tab_comp.Columns.Add("descripcion", GetType(String))
+            tab_comp.Columns.Add("presupuesto", GetType(Double))
+            tab_comp.Columns.Add("descripcion_r", GetType(String))
+            tab_comp.Columns.Add("presupuesto_r", GetType(Double))
+            tab_comp.Columns.Add("diferen", GetType(Double))
+            If tab2.Rows.Count > 0 Then
+                For Each x As DataRow In tab2.Rows
+                    tab_comp.Rows.Add(x("descripcion"), x("presupuesto"), "", 0, 0)
+                Next
+            End If
+            If tab_mp_con.Rows.Count > 0 Then
+                Dim tab_comp2 As New DataTable
+                Dim ban_1 As Integer = 0
+                For Each Y As DataRow In tab_mp_con.Rows
+                    ban_1 = 0
+                    For z = tab_comp.Rows.Count - 1 To 0 Step -1
+                        If Trim(tab_comp.Rows(z).Item(0)) = Trim(Y("tipo")) Then
+                            tab_comp.Rows(z).Item(2) = Y("tipo")
+                            tab_comp.Rows(z).Item(3) = Y("costo_tot")
+                            ban_1 = 1
+                            Exit For
+                        End If
+                    Next
+                    If ban_1 = 0 Then
+                        tab_comp.Rows.Add("_", 0, Y("tipo"), Y("costo_tot"), 0)
+                    End If
+                Next
+            End If
+            If tab_comp.Rows.Count > 0 Then
+                For Each x As DataRow In tab_comp.Rows
+                    e.Graphics.DrawString(x("descripcion"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 10, posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto")), 300), posy)
+                    e.Graphics.DrawString(x("descripcion_r"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 400, posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto_r")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto_r")), 615), posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto") - x("presupuesto_r")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto") - x("presupuesto_r")), 720), posy)
+                    tot_mp_re += x("presupuesto_r")
+                    If x("descripcion_r") <> "CRISTAL" Then tot_mp_re_sin_cris += x("presupuesto_r")
+                    posy += 15
+                    tot_mp += x("presupuesto")
+                Next
+            End If
+            e.Graphics.DrawString("TOTAL MATERIA PRIMA: " & FormatCurrency(tot_mp), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 100, 330)
+            e.Graphics.DrawString(FormatCurrency(tot_mp_re), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 560, 330)
+            e.Graphics.DrawString(FormatCurrency(tot_mp - tot_mp_re), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 680, 330)
+            posy = 350
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawString("MANO DE OBRA: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 10, posy)
+            e.Graphics.DrawString("Imp.Presupuestado ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 235, posy)
+            e.Graphics.DrawString("Concepto", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, posy)
+            e.Graphics.DrawString("Imp. Real ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 560, posy)
+            e.Graphics.DrawString("Diferencia $ ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 675, posy)
+            posy += 18
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            Dim tab3 As New DataTable
+            tab3 = retorna_datos_sugerido_obra_det2(sugerido_id, "MO")
+            Dim tab_mo_real As New DataTable
+            tab_mo_real = retorna_mano_obra_asignada_resumen(obra_id)
+            Dim tab_mano As New DataTable
+            tab_mano.Columns.Add("descripcion", GetType(String))
+            tab_mano.Columns.Add("presupuesto", GetType(Double))
+            tab_mano.Columns.Add("descripcion_r", GetType(String))
+            tab_mano.Columns.Add("presupuesto_r", GetType(Double))
+            tab_mano.Columns.Add("diferen", GetType(Double))
+            If tab3.Rows.Count > 0 Then
+                For Each x As DataRow In tab3.Rows
+                    tab_mano.Rows.Add(x("descripcion"), x("presupuesto"), "", 0, 0)
+                Next
+            End If
+            If tab_mano.Rows.Count > 0 Then
+                Dim ban_1 As Integer = 0
+                For Each Y As DataRow In tab_mo_real.Rows
+                    ban_1 = 0
+                    For z = tab_mano.Rows.Count - 1 To 0 Step -1
+                        If Trim(tab_mano.Rows(z).Item(0)) = Trim(Y("tipo")) Then
+                            tab_mano.Rows(z).Item(2) = Y("tipo")
+                            tab_mano.Rows(z).Item(3) = Y("IMPORTE_MO_REAL")
+                            ban_1 = 1
+                            Exit For
+                        End If
+                    Next
+                    If ban_1 = 0 Then
+                        tab_mano.Rows.Add("_", 0, Y("tipo"), Y("IMPORTE_MO_REAL"), 0)
+                    End If
+                Next
+            End If
+            Dim tot_mo, tot_mo_real As Double
+            If tab_mano.Rows.Count > 0 Then
+                For Each x As DataRow In tab_mano.Rows
+                    e.Graphics.DrawString(x("descripcion"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 10, posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto")), 300), posy)
+                    e.Graphics.DrawString(x("descripcion_r"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 400, posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto_r")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto_r")), 625), posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto") - x("presupuesto_r")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto") - x("presupuesto_r")), 720), posy)
+                    tot_mo_real += x("presupuesto_r")
+                    posy += 15
+                    tot_mo += x("presupuesto")
+                Next
+                If tab_mo_real.Rows.Count > 0 Then
+                    posy = 368
+                    For Each y As DataRow In tab_mo_real.Rows
+
+                    Next
+                End If
+            End If
+            Dim pos_to_mo As Integer = posy
+            e.Graphics.DrawString("TOTAL MANO DE OBRA: " & FormatCurrency(tot_mo), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 100, 510)
+            e.Graphics.DrawString(FormatCurrency(tot_mo_real), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 585, 510)
+            e.Graphics.DrawString(FormatCurrency(tot_mo - tot_mo_real), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 680, 510)
+            posy = 525
+            Dim tabf As New DataTable
+            tabf = retorna_cotizaciones_microsip_por_obra2(obra_id)
+            Dim imp_fac As Double = 0
+            For Each z As DataRow In tabf.Rows
+                If z("tipo") = -1 Or z("tipo") = 1 Then
+                    imp_fac += z("importe_neto")
+                End If
+            Next
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawString("GASTOS DE OPERACION: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 10, posy)
+            e.Graphics.DrawString("Imp.Presupuestado ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 235, posy)
+            e.Graphics.DrawString("Concepto", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, posy)
+            e.Graphics.DrawString("Imp. Real ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 560, posy)
+            e.Graphics.DrawString("Diferencia $ ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 675, posy)
+            posy += 15
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            Dim tab4 As New DataTable
+            tab4 = retorna_datos_sugerido_obra_det2(sugerido_id, "GO")
+            Dim tab_go_gl As New DataTable
+            tab_go_gl.Columns.Add("descripcion", GetType(String))
+            tab_go_gl.Columns.Add("presupuesto", GetType(Double))
+            tab_go_gl.Columns.Add("descripcion_r", GetType(String))
+            tab_go_gl.Columns.Add("presupuesto_r", GetType(Double))
+            tab_go_gl.Columns.Add("diferen", GetType(Double))
+            Dim tab_go_real As New DataTable
+            tab_go_real = retorna_gastos_adicionales_por_obra_resumen(obra_id, 0, tot_mp_re_sin_cris + tot_mo_real, porce_gas_admin_obra, (imp_fac / 1.16))
+
+            If tab4.Rows.Count > 0 Then
+                For Each x As DataRow In tab4.Rows
+                    tab_go_gl.Rows.Add(x("descripcion"), x("presupuesto"), "", 0, 0)
+                Next
+            End If
+            If tab_go_gl.Rows.Count > 0 Then
+                Dim ban_1 As Integer = 0
+                For Each Y As DataRow In tab_go_real.Rows
+                    ban_1 = 0
+                    For z = tab_go_gl.Rows.Count - 1 To 0 Step -1
+                        If Trim(tab_go_gl.Rows(z).Item(0)) = Trim(Y("nombre")) Then
+                            tab_go_gl.Rows(z).Item(2) = Y("nombre")
+                            tab_go_gl.Rows(z).Item(3) = Y("importe_real")
+                            ban_1 = 1
+                            Exit For
+                        End If
+                    Next
+                    If ban_1 = 0 Then
+                        tab_go_gl.Rows.Add("_", 0, Y("nombre"), Y("importe_real"), 0)
+                    End If
+                Next
+            End If
+
+            Dim tot_gas_oper, tot_gas_oper_real As Double
+            If tab4.Rows.Count > 0 Then
+                For Each x As DataRow In tab_go_gl.Rows
+                    e.Graphics.DrawString(x("descripcion"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 10, posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto")), 300), posy)
+                    e.Graphics.DrawString(x("descripcion_r"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 400, posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto_r")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto_r")), 615), posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto") - x("presupuesto_r")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto") - x("presupuesto_r")), 720), posy)
+                    tot_gas_oper_real += x("presupuesto_r")
+                    posy += 15
+                    tot_gas_oper += x("presupuesto")
+                Next
+            End If
+            posy = 730
+            e.Graphics.DrawString("TOTAL GASTOS DE OPERACION: " & FormatCurrency(tot_gas_oper), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 100, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_gas_oper_real), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 585, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_gas_oper - tot_gas_oper_real), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 680, posy)
+            posy += 15
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawString("Subtotal: ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 90, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_mo + tot_mp), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_mo + tot_mp), 330), posy)
+            e.Graphics.DrawString("Subtotal: ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 390, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_mo_real + tot_mp_re), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_gas_oper_real + tot_mo_real + tot_mp_re), 620), posy)
+            posy += 15
+            Dim goper As Double = retorna_costo_proceso_por_clave(120)
+            e.Graphics.DrawString("Gasto de Operacion: " & goper & "%", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 600, 105)
+
+            Dim tab_or As New DataTable
+            tab_or = retorna_ordenes_por_obra(obra_id, "C")
+            Dim rs_asig As String = ""
+            For Each y As DataRow In tab_or.Rows
+                rs_asig += y("folio") & " "
+            Next
+            e.Graphics.DrawString("Orden de Trabajo(RS) " & vbCrLf & rs_asig, New Font("Arial", 12, FontStyle.Bold), Brushes.Black, 600, 125)
+
+            e.Graphics.DrawString("+ Gastos de operacion: ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 90, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_gas_oper), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_gas_oper), 330), posy)
+            e.Graphics.DrawString("+ Gastos de operacion:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 390, posy)
+            Dim go_real As Double = tot_gas_oper_real
+            e.Graphics.DrawString(FormatCurrency(go_real), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(go_real), 620), posy)
+            posy += 15
+            e.Graphics.DrawString("= Costo Total: ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 90, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_gas_oper + tot_mo + tot_mp), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_gas_oper), 330), posy)
+            e.Graphics.DrawString("= Costo Total: ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 390, posy)
+            e.Graphics.DrawString(FormatCurrency(go_real + tot_mo_real + tot_mp_re), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(go_real + tot_gas_oper_real + tot_mo_real + tot_mp_re), 620), posy)
+            posy += 15
+            e.Graphics.DrawString("+ Utilidad Neta: " & tab.Rows(0).Item(8) & "%", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 90, posy)
+            Dim porc_util As Double = ((tot_mp + tot_mo + tot_gas_oper) / ((100 - tab.Rows(0).Item(8)) * 0.01)) - (tot_mp + tot_mo + tot_gas_oper)
+            e.Graphics.DrawString(FormatCurrency(porc_util), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(porc_util), 330), posy)
+            posy += 15
+            e.Graphics.DrawString("=Total Presup(Antes de IVA): ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 90, posy)
+            Dim tot_pres As Double = tot_gas_oper + tot_mo + tot_mp + porc_util
+            Dim tot_real As Double = go_real + tot_gas_oper_real + tot_mo_real + tot_mp_re
+            e.Graphics.DrawString(FormatCurrency(tot_pres), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_pres), 330), posy)
+            e.Graphics.DrawString("=Total antes de IVA: ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 390, posy)
+            e.Graphics.DrawString(FormatCurrency((imp_fac / 1.16)), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_pres), 620), posy)
+            e.Graphics.DrawString("+ Utilidad Neta: ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 390, posy - 15)
+            e.Graphics.DrawString(FormatCurrency((imp_fac / 1.16) - (go_real + tot_mo_real + tot_mp_re)), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_pres), 620), posy - 15)
+            posy += 20
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawLine(Pens.Black, 388, 185, 388, posy)
+            e.Graphics.DrawString("ESTATUS DEL PROCESO DE FACTURACION: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 10, posy)
+            posy += 20
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            '///////////////////            
+            Dim imp As Double = 0
+            If tabf.Rows.Count > 0 Then
+                e.Graphics.DrawString("Folio", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 10, posy)
+                e.Graphics.DrawString("Estatus", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 90, posy)
+                e.Graphics.DrawString("Cliente", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 160, posy)
+                e.Graphics.DrawString("Factura", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 400, posy)
+                e.Graphics.DrawString("Imp.Factura", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 470, posy)
+                e.Graphics.DrawString("Cargos", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 550, posy)
+                e.Graphics.DrawString("Creditos", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 630, posy)
+                e.Graphics.DrawString("Saldo", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 715, posy)
+                posy += 15
+                Dim ip_fact, saldo_fact, imp_cred As Double
+                For Each x As DataRow In tabf.Rows
+                    If x("tipo") = -1 Then
+                        'Facturas Microsip
+                        Dim tab_m As New DataTable
+                        tab_m = retorna_saldo_ord_obra(x("folio"))
+                        If tab_m.Rows.Count > 0 Then
+                            If tab_m.Rows(0).Item(1) = 0 Then
+                                'se ocupa para cuendo no se facturo la orden
+                                e.Graphics.DrawString(x("folio"), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 10, posy)
+                                e.Graphics.DrawString(Mid(x("estatus"), 1, 10), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 85, posy)
+                                e.Graphics.DrawString(Mid(x("nom_cliente"), 1, 32), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 150, posy)
+                                e.Graphics.DrawString(FormatCurrency(x("importe_neto")), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 550, posy)
+                                e.Graphics.DrawString(FormatCurrency(x("importe_neto")), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 715, posy)
+                                ip_fact += x("importe_neto")
+                                saldo_fact += x("importe_neto")
+                                posy += 15
+                            Else
+                                e.Graphics.DrawString(x("folio"), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 10, posy)
+                                e.Graphics.DrawString(Mid(x("estatus"), 1, 10), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 85, posy)
+                                e.Graphics.DrawString(Mid(x("nom_cliente"), 1, 30), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 150, posy)
+                                e.Graphics.DrawString("" & tab_m.Rows(0).Item(0), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 390, posy)
+                                e.Graphics.DrawString(FormatCurrency(tab_m.Rows(0).Item(1)), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 470, posy)
+                                e.Graphics.DrawString(FormatCurrency(x("importe_neto")), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 550, posy)
+                                e.Graphics.DrawString(FormatCurrency(x("importe_neto") - tab_m.Rows(0).Item(2)), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 630, posy)
+                                e.Graphics.DrawString(FormatCurrency(tab_m.Rows(0).Item(2)), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 715, posy)
+                                posy += 15
+                                ip_fact += tab_m.Rows(0).Item(1)
+                                saldo_fact += tab_m.Rows(0).Item(2)
+                            End If
+                        End If
+                    ElseIf x("tipo") = 1 Then
+                        'Nota de Cargo
+                        e.Graphics.DrawString(x("folio"), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 10, posy)
+                        e.Graphics.DrawString(Mid(x("estatus"), 1, 10), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 85, posy)
+                        e.Graphics.DrawString(Mid(x("nom_cliente"), 1, 32), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 150, posy)
+                        e.Graphics.DrawString(FormatCurrency(x("importe_neto")), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 550, posy)
+                        e.Graphics.DrawString(FormatCurrency(x("importe_neto")), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 715, posy)
+                        ip_fact += x("importe_neto")
+                    ElseIf x("tipo") = 0 Then
+                        'Pago en Efectivo
+                        e.Graphics.DrawString(x("folio"), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 10, posy)
+                        e.Graphics.DrawString(Mid(x("estatus"), 1, 10), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 85, posy)
+                        e.Graphics.DrawString(x("tipo_docto"), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 390, posy)
+                        e.Graphics.DrawString(FormatCurrency(x("importe_neto")), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 630, posy)
+                        imp_cred += x("importe_neto")
+                    ElseIf x("tipo") = 2 Then
+                        'Anticipo
+
+                    End If
+                Next
+                posy += 15
+                'e.Graphics.DrawString(FormatCurrency(ip_fact), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 530, posy)
+                e.Graphics.DrawString(FormatCurrency(saldo_fact - imp_cred), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 715, posy)
+
+            End If
+            '//////////////////
+
+            Dim pos_y As Integer = 950
+            e.Graphics.DrawString("Notas:" & tab.Rows(0).Item(16), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 10, pos_y)
+            pos_y += 30
+            'Imprime las firmas del operador 
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y, 800, pos_y)
+            e.Graphics.DrawString("ELABORO", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 45, pos_y)
+            e.Graphics.DrawString("REVISO", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 240, pos_y)
+            e.Graphics.DrawLine(Pens.Black, 210, pos_y, 210, pos_y + 150)
+            e.Graphics.DrawString("REVISO", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 440, pos_y)
+            e.Graphics.DrawLine(Pens.Black, 410, pos_y, 410, pos_y + 150)
+            e.Graphics.DrawString("AUTORIZO", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 640, pos_y)
+            e.Graphics.DrawLine(Pens.Black, 610, pos_y, 610, pos_y + 150)
+            pos_y += 15
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y, 800, pos_y)
+            pos_y += 40
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y, 800, pos_y)
+            e.Graphics.DrawString("Nombre y Firma", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 30, pos_y)
+            e.Graphics.DrawString("Nombre y Firma", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 230, pos_y)
+            e.Graphics.DrawString("Nombre y Firma", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 430, pos_y)
+            e.Graphics.DrawString("Nombre y Firma", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 630, pos_y)
+        Else
+            MsgBox("No existen datos para mostrar en el reporte", MsgBoxStyle.Critical)
+        End If
+    End Sub
+    Public Sub imprime_analitica_de_obra_detalle(ByVal e As System.Drawing.Printing.PrintPageEventArgs, ByVal sugerido_id As Integer, obra_id As Integer)
+        'Imprime el encabezado del reporte'
+        Dim tab As New DataTable
+        tab = retorna_datos_sugerido_obra(sugerido_id)
+        Dim tab_o As New DataTable
+        tab_o = retorna_obras_por_periodo(fecha_ini, fecha_fin, obra_id)
+        If tab.Rows.Count > 0 Then
+            Dim porce_gas_admin_obra As Double = tab_o.Rows(0).Item(11)
+            e.Graphics.DrawImage(My.Resources.logo_mega2, 10, 10)
+            e.Graphics.DrawString("ANALITICA DE EJECUCION POR OBRA DETALLE", New Font("Arial", 13, FontStyle.Bold), Brushes.Black, 280, 20)
+            e.Graphics.DrawLine(Pens.Black, 5, 10, 800, 10)
+            e.Graphics.DrawLine(Pens.Black, 10, 1070, 800, 1070)
+            e.Graphics.DrawLine(Pens.Black, 180, 60, 800, 60)
+            e.Graphics.DrawLine(Pens.Black, 180, 10, 180, 100)
+            e.Graphics.DrawLine(Pens.Black, 360, 60, 360, 100)
+            e.Graphics.DrawLine(Pens.Black, 490, 60, 490, 140)
+            e.Graphics.DrawLine(Pens.Black, 5, 10, 5, 1070)
+            e.Graphics.DrawLine(Pens.Black, 800, 10, 800, 1070)
+            e.Graphics.DrawString("Id_Obra: " & tab_o.Rows(0).Item(0), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 650, 20)
+            e.Graphics.DrawString("Fe.Imp:" & Now, New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 600, 40)
+            e.Graphics.DrawString("Codigo: CT-REG-13", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 200, 65)
+            e.Graphics.DrawLine(Pens.Black, 10, 100, 800, 100)
+            e.Graphics.DrawString("Revision: 00", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 370, 65)
+            e.Graphics.DrawString("Contacto:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 500, 65)
+            e.Graphics.DrawString("" & tab_o.Rows(0).Item(3), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 500, 80)
+            e.Graphics.DrawString("Pagina 1 de 1", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 680, 80)
+            e.Graphics.DrawString("Fecha termino:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 495, 105)
+            e.Graphics.DrawString(tab_o.Rows(0).Item(7), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 495, 120)
+            e.Graphics.DrawLine(Pens.Black, 580, 100, 580, 180)
+            e.Graphics.DrawString("Estatus:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 10, 105)
+            e.Graphics.DrawString(tab_o.Rows(0).Item(8), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 10, 120)
+            e.Graphics.DrawLine(Pens.Black, 120, 100, 120, 140)
+            e.Graphics.DrawString("Cliente:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 140, 105)
+            e.Graphics.DrawString(tab.Rows(0).Item(3), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 140, 120)
+            e.Graphics.DrawString("Vendedor", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 10, 140)
+            e.Graphics.DrawString(tab.Rows(0).Item(6), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 10, 155)
+            e.Graphics.DrawLine(Pens.Black, 200, 140, 200, 180)
+            e.Graphics.DrawString(Mid("Obra: " & tab_o.Rows(0).Item(2), 1, 40), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 200, 140)
+            e.Graphics.DrawString(Mid("" & tab_o.Rows(0).Item(2), 41, 50), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 200, 155)
+            e.Graphics.DrawLine(Pens.Black, 5, 140, 580, 140)
+            e.Graphics.DrawLine(Pens.Black, 5, 180, 800, 180)
+            Dim posy As Integer = 185
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawString("MATERIA PRIMA: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 10, posy)
+            e.Graphics.DrawString("Imp.Presupuestado ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 235, posy)
+            e.Graphics.DrawString("Concepto", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, posy)
+            e.Graphics.DrawString("Imp. Real ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 560, posy)
+            e.Graphics.DrawString("Diferencia $ ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 675, posy)
+            posy += 18
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            Dim tab2 As New DataTable
+            tab2 = retorna_datos_sugerido_obra_det2(sugerido_id, "MP")
+            Dim tab_mp_con As New DataTable
+            tab_mp_con = retorna_conceptos_mat_salidas_por_obra(obra_id)
+            Dim tot_mp, tot_mp_re, tot_mp_re_sin_cris As Double
+            Dim tab_comp As New DataTable
+            tab_comp.Columns.Add("descripcion", GetType(String))
+            tab_comp.Columns.Add("presupuesto", GetType(Double))
+            tab_comp.Columns.Add("descripcion_r", GetType(String))
+            tab_comp.Columns.Add("presupuesto_r", GetType(Double))
+            tab_comp.Columns.Add("diferen", GetType(Double))
+            If tab2.Rows.Count > 0 Then
+                For Each x As DataRow In tab2.Rows
+                    tab_comp.Rows.Add(x("descripcion"), x("presupuesto"), "", 0, 0)
+                Next
+            End If
+            If tab_mp_con.Rows.Count > 0 Then
+                Dim tab_comp2 As New DataTable
+                Dim ban_1 As Integer = 0
+                For Each Y As DataRow In tab_mp_con.Rows
+                    ban_1 = 0
+                    For z = tab_comp.Rows.Count - 1 To 0 Step -1
+                        If Trim(tab_comp.Rows(z).Item(0)) = Trim(Y("tipo")) Then
+                            tab_comp.Rows(z).Item(2) = Y("tipo")
+                            tab_comp.Rows(z).Item(3) = Y("costo_tot")
+                            ban_1 = 1
+                            Exit For
+                        End If
+                    Next
+                    If ban_1 = 0 Then
+                        tab_comp.Rows.Add("_", 0, Y("tipo"), Y("costo_tot"), 0)
+                    End If
+                Next
+            End If
+            If tab_comp.Rows.Count > 0 Then
+                For Each x As DataRow In tab_comp.Rows
+                    e.Graphics.DrawString(x("descripcion"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 10, posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto")), 300), posy)
+                    e.Graphics.DrawString(x("descripcion_r"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 400, posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto_r")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto_r")), 615), posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto") - x("presupuesto_r")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto") - x("presupuesto_r")), 720), posy)
+                    tot_mp_re += x("presupuesto_r")
+                    If x("descripcion_r") <> "CRISTAL" Then tot_mp_re_sin_cris += x("presupuesto_r")
+                    posy += 15
+                    tot_mp += x("presupuesto")
+                Next
+            End If
+            e.Graphics.DrawString("TOTAL MATERIA PRIMA: " & FormatCurrency(tot_mp), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 100, 330)
+            e.Graphics.DrawString(FormatCurrency(tot_mp_re), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 560, 330)
+            e.Graphics.DrawString(FormatCurrency(tot_mp - tot_mp_re), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 680, 330)
+            posy = 350
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawString("MANO DE OBRA: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 10, posy)
+            e.Graphics.DrawString("Imp.Presupuestado ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 235, posy)
+            e.Graphics.DrawString("Concepto", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, posy)
+            e.Graphics.DrawString("Imp. Real ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 560, posy)
+            e.Graphics.DrawString("Diferencia $ ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 675, posy)
+            posy += 18
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            Dim tab3 As New DataTable
+            tab3 = retorna_datos_sugerido_obra_det2(sugerido_id, "MO")
+            Dim tab_mo_real As New DataTable
+            tab_mo_real = retorna_mano_obra_asignada_resumen(obra_id)
+            Dim tab_mano As New DataTable
+            tab_mano.Columns.Add("descripcion", GetType(String))
+            tab_mano.Columns.Add("presupuesto", GetType(Double))
+            tab_mano.Columns.Add("descripcion_r", GetType(String))
+            tab_mano.Columns.Add("presupuesto_r", GetType(Double))
+            tab_mano.Columns.Add("diferen", GetType(Double))
+            If tab3.Rows.Count > 0 Then
+                For Each x As DataRow In tab3.Rows
+                    tab_mano.Rows.Add(x("descripcion"), x("presupuesto"), "", 0, 0)
+                Next
+            End If
+            If tab_mano.Rows.Count > 0 Then
+                Dim ban_1 As Integer = 0
+                For Each Y As DataRow In tab_mo_real.Rows
+                    ban_1 = 0
+                    For z = tab_mano.Rows.Count - 1 To 0 Step -1
+                        If Trim(tab_mano.Rows(z).Item(0)) = Trim(Y("tipo")) Then
+                            tab_mano.Rows(z).Item(2) = Y("tipo")
+                            tab_mano.Rows(z).Item(3) = Y("IMPORTE_MO_REAL")
+                            ban_1 = 1
+                            Exit For
+                        End If
+                    Next
+                    If ban_1 = 0 Then
+                        tab_mano.Rows.Add("_", 0, Y("tipo"), Y("IMPORTE_MO_REAL"), 0)
+                    End If
+                Next
+            End If
+            Dim tot_mo, tot_mo_real As Double
+            If tab_mano.Rows.Count > 0 Then
+                For Each x As DataRow In tab_mano.Rows
+                    e.Graphics.DrawString(x("descripcion"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 10, posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto")), 300), posy)
+                    e.Graphics.DrawString(x("descripcion_r"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 400, posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto_r")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto_r")), 625), posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto") - x("presupuesto_r")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto") - x("presupuesto_r")), 720), posy)
+                    tot_mo_real += x("presupuesto_r")
+                    posy += 15
+                    tot_mo += x("presupuesto")
+                Next
+                If tab_mo_real.Rows.Count > 0 Then
+                    posy = 368
+                    For Each y As DataRow In tab_mo_real.Rows
+
+                    Next
+                End If
+            End If
+            Dim pos_to_mo As Integer = posy
+            e.Graphics.DrawString("TOTAL MANO DE OBRA: " & FormatCurrency(tot_mo), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 100, 510)
+            e.Graphics.DrawString(FormatCurrency(tot_mo_real), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 585, 510)
+            e.Graphics.DrawString(FormatCurrency(tot_mo - tot_mo_real), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 680, 510)
+            posy = 525
+            Dim tabf As New DataTable
+            tabf = retorna_cotizaciones_microsip_por_obra2(obra_id)
+            Dim imp_fac As Double = 0
+            For Each z As DataRow In tabf.Rows
+                If z("tipo") = -1 Or z("tipo") = 1 Then
+                    imp_fac += z("importe_neto")
+                End If
+            Next
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawString("GASTOS DE OPERACION: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 10, posy)
+            e.Graphics.DrawString("Imp.Presupuestado ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 235, posy)
+            e.Graphics.DrawString("Concepto", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, posy)
+            e.Graphics.DrawString("Imp. Real ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 560, posy)
+            e.Graphics.DrawString("Diferencia $ ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 675, posy)
+            posy += 15
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            Dim tab4 As New DataTable
+            tab4 = retorna_datos_sugerido_obra_det2(sugerido_id, "GO")
+            Dim tab_go_gl As New DataTable
+            tab_go_gl.Columns.Add("descripcion", GetType(String))
+            tab_go_gl.Columns.Add("presupuesto", GetType(Double))
+            tab_go_gl.Columns.Add("descripcion_r", GetType(String))
+            tab_go_gl.Columns.Add("presupuesto_r", GetType(Double))
+            tab_go_gl.Columns.Add("diferen", GetType(Double))
+            Dim tab_go_real As New DataTable
+            tab_go_real = retorna_gastos_adicionales_por_obra_resumen(obra_id, 0, tot_mp_re_sin_cris + tot_mo_real, porce_gas_admin_obra, (imp_fac / 1.16))
+
+            If tab4.Rows.Count > 0 Then
+                For Each x As DataRow In tab4.Rows
+                    tab_go_gl.Rows.Add(x("descripcion"), x("presupuesto"), "", 0, 0)
+                Next
+            End If
+            If tab_go_gl.Rows.Count > 0 Then
+                Dim ban_1 As Integer = 0
+                For Each Y As DataRow In tab_go_real.Rows
+                    ban_1 = 0
+                    For z = tab_go_gl.Rows.Count - 1 To 0 Step -1
+                        If Trim(tab_go_gl.Rows(z).Item(0)) = Trim(Y("nombre")) Then
+                            tab_go_gl.Rows(z).Item(2) = Y("nombre")
+                            tab_go_gl.Rows(z).Item(3) = Y("importe_real")
+                            ban_1 = 1
+                            Exit For
+                        End If
+                    Next
+                    If ban_1 = 0 Then
+                        tab_go_gl.Rows.Add("_", 0, Y("nombre"), Y("importe_real"), 0)
+                    End If
+                Next
+            End If
+
+            Dim tot_gas_oper, tot_gas_oper_real As Double
+            If tab4.Rows.Count > 0 Then
+                For Each x As DataRow In tab_go_gl.Rows
+                    e.Graphics.DrawString(x("descripcion"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 10, posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto")), 300), posy)
+                    e.Graphics.DrawString(x("descripcion_r"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 400, posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto_r")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto_r")), 615), posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto") - x("presupuesto_r")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto") - x("presupuesto_r")), 720), posy)
+                    tot_gas_oper_real += x("presupuesto_r")
+                    posy += 15
+                    tot_gas_oper += x("presupuesto")
+                Next
+            End If
+            posy = 730
+            e.Graphics.DrawString("TOTAL GASTOS DE OPERACION: " & FormatCurrency(tot_gas_oper), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 100, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_gas_oper_real), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 585, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_gas_oper - tot_gas_oper_real), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 680, posy)
+            posy += 15
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawString("Subtotal: ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 90, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_mo + tot_mp), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_mo + tot_mp), 330), posy)
+            e.Graphics.DrawString("Subtotal: ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 390, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_mo_real + tot_mp_re), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_gas_oper_real + tot_mo_real + tot_mp_re), 620), posy)
+            posy += 15
+            Dim goper As Double = retorna_costo_proceso_por_clave(120)
+            e.Graphics.DrawString("Gasto de Operacion: " & goper & "%", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 600, 105)
+
+            Dim tab_or As New DataTable
+            tab_or = retorna_ordenes_por_obra(obra_id, "C")
+            Dim rs_asig As String = ""
+            For Each y As DataRow In tab_or.Rows
+                rs_asig += y("folio") & " "
+            Next
+            e.Graphics.DrawString("Orden de Trabajo(RS) " & vbCrLf & rs_asig, New Font("Arial", 12, FontStyle.Bold), Brushes.Black, 600, 125)
+
+            e.Graphics.DrawString("+ Gastos de operacion: ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 90, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_gas_oper), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_gas_oper), 330), posy)
+            e.Graphics.DrawString("+ Gastos de operacion:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 390, posy)
+            Dim go_real As Double = tot_gas_oper_real
+            e.Graphics.DrawString(FormatCurrency(go_real), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(go_real), 620), posy)
+            posy += 15
+            e.Graphics.DrawString("= Costo Total: ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 90, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_gas_oper + tot_mo + tot_mp), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_gas_oper), 330), posy)
+            e.Graphics.DrawString("= Costo Total: ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 390, posy)
+            e.Graphics.DrawString(FormatCurrency(go_real + tot_mo_real + tot_mp_re), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(go_real + tot_gas_oper_real + tot_mo_real + tot_mp_re), 620), posy)
+            posy += 15
+            e.Graphics.DrawString("+ Utilidad Neta: " & tab.Rows(0).Item(8) & "%", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 90, posy)
+            Dim porc_util As Double = ((tot_mp + tot_mo + tot_gas_oper) / ((100 - tab.Rows(0).Item(8)) * 0.01)) - (tot_mp + tot_mo + tot_gas_oper)
+            e.Graphics.DrawString(FormatCurrency(porc_util), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(porc_util), 330), posy)
+            posy += 15
+            e.Graphics.DrawString("=Total Presup(Antes de IVA): ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 90, posy)
+            Dim tot_pres As Double = tot_gas_oper + tot_mo + tot_mp + porc_util
+            Dim tot_real As Double = go_real + tot_gas_oper_real + tot_mo_real + tot_mp_re
+            e.Graphics.DrawString(FormatCurrency(tot_pres), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_pres), 330), posy)
+            e.Graphics.DrawString("=Total antes de IVA: ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 390, posy)
+            e.Graphics.DrawString(FormatCurrency((imp_fac / 1.16)), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_pres), 620), posy)
+            e.Graphics.DrawString("+ Utilidad Neta: ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 390, posy - 15)
+            e.Graphics.DrawString(FormatCurrency((imp_fac / 1.16) - (go_real + tot_mo_real + tot_mp_re)), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_pres), 620), posy - 15)
+            posy += 20
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawLine(Pens.Black, 388, 185, 388, posy)
+            e.Graphics.DrawString("ESTATUS DEL PROCESO DE FACTURACION: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 10, posy)
+            posy += 20
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            '///////////////////            
+            Dim imp As Double = 0
+            If tabf.Rows.Count > 0 Then
+                e.Graphics.DrawString("Folio", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 10, posy)
+                e.Graphics.DrawString("Estatus", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 90, posy)
+                e.Graphics.DrawString("Cliente", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 160, posy)
+                e.Graphics.DrawString("Factura", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 400, posy)
+                e.Graphics.DrawString("Imp.Factura", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 470, posy)
+                e.Graphics.DrawString("Cargos", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 550, posy)
+                e.Graphics.DrawString("Creditos", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 630, posy)
+                e.Graphics.DrawString("Saldo", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 715, posy)
+                posy += 15
+                Dim ip_fact, saldo_fact, imp_cred As Double
+                For Each x As DataRow In tabf.Rows
+                    If x("tipo") = -1 Then
+                        'Facturas Microsip
+                        Dim tab_m As New DataTable
+                        tab_m = retorna_saldo_ord_obra(x("folio"))
+                        If tab_m.Rows.Count > 0 Then
+                            If tab_m.Rows(0).Item(1) = 0 Then
+                                'se ocupa para cuendo no se facturo la orden
+                                e.Graphics.DrawString(x("folio"), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 10, posy)
+                                e.Graphics.DrawString(Mid(x("estatus"), 1, 10), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 85, posy)
+                                e.Graphics.DrawString(Mid(x("nom_cliente"), 1, 32), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 150, posy)
+                                e.Graphics.DrawString(FormatCurrency(x("importe_neto")), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 550, posy)
+                                e.Graphics.DrawString(FormatCurrency(x("importe_neto")), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 715, posy)
+                                ip_fact += x("importe_neto")
+                                saldo_fact += x("importe_neto")
+                                posy += 15
+                            Else
+                                e.Graphics.DrawString(x("folio"), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 10, posy)
+                                e.Graphics.DrawString(Mid(x("estatus"), 1, 10), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 85, posy)
+                                e.Graphics.DrawString(Mid(x("nom_cliente"), 1, 30), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 150, posy)
+                                e.Graphics.DrawString("" & tab_m.Rows(0).Item(0), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 390, posy)
+                                e.Graphics.DrawString(FormatCurrency(tab_m.Rows(0).Item(1)), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 470, posy)
+                                e.Graphics.DrawString(FormatCurrency(x("importe_neto")), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 550, posy)
+                                e.Graphics.DrawString(FormatCurrency(x("importe_neto") - tab_m.Rows(0).Item(2)), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 630, posy)
+                                e.Graphics.DrawString(FormatCurrency(tab_m.Rows(0).Item(2)), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 715, posy)
+                                posy += 15
+                                ip_fact += tab_m.Rows(0).Item(1)
+                                saldo_fact += tab_m.Rows(0).Item(2)
+                            End If
+                        End If
+                    ElseIf x("tipo") = 1 Then
+                        'Nota de Cargo
+                        e.Graphics.DrawString(x("folio"), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 10, posy)
+                        e.Graphics.DrawString(Mid(x("estatus"), 1, 10), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 85, posy)
+                        e.Graphics.DrawString(Mid(x("nom_cliente"), 1, 32), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 150, posy)
+                        e.Graphics.DrawString(FormatCurrency(x("importe_neto")), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 550, posy)
+                        e.Graphics.DrawString(FormatCurrency(x("importe_neto")), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 715, posy)
+                        ip_fact += x("importe_neto")
+                    ElseIf x("tipo") = 0 Then
+                        'Pago en Efectivo
+                        e.Graphics.DrawString(x("folio"), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 10, posy)
+                        e.Graphics.DrawString(Mid(x("estatus"), 1, 10), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 85, posy)
+                        e.Graphics.DrawString(x("tipo_docto"), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 390, posy)
+                        e.Graphics.DrawString(FormatCurrency(x("importe_neto")), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 630, posy)
+                        imp_cred += x("importe_neto")
+                    ElseIf x("tipo") = 2 Then
+                        'Anticipo
+
+                    End If
+                Next
+                posy += 15
+                'e.Graphics.DrawString(FormatCurrency(ip_fact), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 530, posy)
+                e.Graphics.DrawString(FormatCurrency(saldo_fact - imp_cred), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 715, posy)
+
+            End If
+            '//////////////////
+            Dim pos_y As Integer = 950
+            e.Graphics.DrawString("Notas:" & tab.Rows(0).Item(16), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 10, pos_y)
+            pos_y += 30
+            'Imprime las firmas del operador 
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y, 800, pos_y)
+            e.Graphics.DrawString("ELABORO", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 45, pos_y)
+            e.Graphics.DrawString("REVISO", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 240, pos_y)
+            e.Graphics.DrawLine(Pens.Black, 210, pos_y, 210, pos_y + 150)
+            e.Graphics.DrawString("REVISO", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 440, pos_y)
+            e.Graphics.DrawLine(Pens.Black, 410, pos_y, 410, pos_y + 150)
+            e.Graphics.DrawString("AUTORIZO", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 640, pos_y)
+            e.Graphics.DrawLine(Pens.Black, 610, pos_y, 610, pos_y + 150)
+            pos_y += 15
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y, 800, pos_y)
+            pos_y += 40
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y, 800, pos_y)
+            e.Graphics.DrawString("Nombre y Firma", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 30, pos_y)
+            e.Graphics.DrawString("Nombre y Firma", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 230, pos_y)
+            e.Graphics.DrawString("Nombre y Firma", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 430, pos_y)
+            e.Graphics.DrawString("Nombre y Firma", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 630, pos_y)
+        Else
+            MsgBox("Error imprime_analitica_de_obra_detalle: No existen datos para mostrar en el reporte", MsgBoxStyle.Critical)
+        End If
+    End Sub
+    Private Sub ToolStripButton21_Click(sender As Object, e As EventArgs) Handles ToolStripButton21.Click
+        ban_repor = 105
+        Form4.print_prev.Document = Form4.print_doc
+        Form4.print_prev.InvalidatePreview()
+        Form4.print_prev.Refresh()
+        Form4.ShowDialog()
+    End Sub
+
+    Private Sub ToolStripButton22_Click(sender As Object, e As EventArgs) Handles ToolStripButton22.Click
+        Try
+            If tab_per.Rows(204).Item(1) = "T" Then
+                If (MsgBox("Al Cancelar la Obra, todas las ordenes que se encuentran en produccion se enviaran a Fin de Produccion, las que no se liberan a produccion se estaran Cancelando, No sera posible agregar mas ordenes de trabajo o materiales, ¿Deseas Continuar? ", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question) = vbOK) Then
+                    actualiza_estatus_obra(obra_id, "Cancelado")
+                End If
+            Else
+                Dim res2 As Object = MsgBox("No tiene el permiso para " & tab_per.Rows(204).Item(0) & " ¿Deseas que lo autorice otro usuario?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question)
+                If res2 = vbOK Then
+                    Dialog225.Dispose()
+                    Dim tab3 As New DataTable
+                    tab3 = CONSULTA_USUARIOS_ASIG_DE_UN_PERMISO("CERRAR_OBRA")
+                    If tab3.Rows.Count > 0 Then
+                        Dialog225.cmb_usuario.DataSource = tab3
+                        Dialog225.cmb_usuario.DisplayMember = tab3.Columns(1).ToString
+                        Dialog225.cmb_usuario.ValueMember = tab3.Columns(0).ToString
+                        Dialog225.ShowDialog()
+                    Else
+                        MsgBox("No Existen usuarios con este permiso asignado", MsgBoxStyle.Information)
+                    End If
+                    If Dialog225.ban_autor = 1 Then
+                        If (MsgBox("Al Cancelar la Obra, todas las ordenes que se encuentran en produccion se enviaran a Fin de Produccion, las que no se liberan a produccion se estaran Cancelando, No sera posible agregar mas ordenes de trabajo o materiales, ¿Deseas Continuar? ", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question) = vbOK) Then
+                            actualiza_estatus_obra(obra_id, "Cancelado")
+                        End If
+                    End If
+                End If
+            End If
+
+        Catch ex As Exception
+
+        End Try
+    End Sub
+    Private Sub Button8_Click(sender As Object, e As EventArgs) Handles Button8.Click
+        Try
+            Dim tab As New DataTable
+            tab = retorna_movimientos_microsip_reposicion(obra_id)
+            grid_documentos_micro.DataSource = tab
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub grid_documentos_micro_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_documentos_micro.CellContentClick
+
+    End Sub
+    Private Sub grid_documentos_micro_CellDoubleClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_documentos_micro.CellDoubleClick
+        Try
+            carga_dat_mat_pro(grid_documentos_micro.Item(0, grid_documentos_micro.CurrentCell.RowIndex).Value, grid_documentos_micro.Item(5, grid_documentos_micro.CurrentCell.RowIndex).Value)
+            Dialog59.ShowDialog()
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton24_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub ToolStripButton25_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub ToolStripButton26_Click(sender As Object, e As EventArgs) Handles ToolStripButton26.Click
+        Try
+            If valida_estatus_obra(obra_id) = 0 Then
+                If valida_tiene_permiso(258, "NUEVA_COT_FAC_OBRA") = 1 Then
+                    Dialog279.Dispose()
+                    Dialog279.ShowDialog()
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton27_Click(sender As Object, e As EventArgs) Handles ToolStripButton27.Click
+        If valida_estatus_obra(obra_id) = 0 Then
+            If valida_tiene_permiso(265, "NUEVO_ASIGNAR_MO") = 1 Then
+                Dialog275.Dispose()
+                Dialog275.obra_id_75 = obra_id
+                Dialog275.carga_inicial()
+                Dialog275.ShowDialog()
+            End If
+        End If
+    End Sub
+
+    Private Sub ToolStripButton28_Click(sender As Object, e As EventArgs) Handles ToolStripButton28.Click
+        Try
+            grid_mo.Rows.Clear()
+            Dim tab As New DataTable
+            tab = retorna_empleados_asignados_por_obra(obra_id, 0)
+            Dim tot_gas, tot_mo As Double
+            If tab.Rows.Count > 0 Then
+                For Each x As DataRow In tab.Rows
+                    grid_mo.Rows.Add(x("empleado_asignado_obra_id"), x("fecha"), x("estatus"), x("folio"), x("nom_unidad"), x("importe_mo"), x("IMPORTE_MO_REAL"), x("notas"))
+                    If Trim(x("estatus")) <> "Cancelado" Then
+                        tot_gas += x("importe_mo")
+                        tot_mo += x("IMPORTE_MO_REAL")
+                    End If
+                Next
+                txt_tot_mo_pres.Text = FormatCurrency(tot_gas)
+                txt_mo_real.Text = FormatCurrency(tot_mo)
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton31_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub ToolStripButton34_Click(sender As Object, e As EventArgs) Handles ToolStripButton34.Click
+        Try
+            If valida_estatus_obra(obra_id) = 0 Then
+                If valida_tiene_permiso(283, "NUEVA_COMISION_OBRA") = 1 Then
+                    Dialog29.Dispose()
+                    Dialog29.carga_inicial()
+                    Dialog29.obra_id = obra_id
+                    Dim tab As New DataTable
+                    Dialog29.lbl_tipo.Text = "Calculo de Comision Administrativos"
+                    Dialog29.tipo_comis = 1
+                    Dialog29.ShowDialog()
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Public Sub abre_calculo_comis(comis_id As Integer)
+        Try
+            Dim tab As New DataTable
+            tab = retorna_empleados_asignados_para_pago_comisiones(0, 0, comis_id)
+            If tab.Rows.Count > 0 Then
+                Dialog29.Dispose()
+                Dialog29.carga_inicial()
+                Dialog29.pago_comis_id = tab.Rows(0).Item(9)
+                Dialog29.cal_ini.Value = tab.Rows(0).Item(10)
+                Dialog29.tipo_comis = tab.Rows(0).Item(11)
+                Dialog29.lbl_estatus.Text = tab.Rows(0).Item(12)
+                Dialog29.txt_notas.Text = tab.Rows(0).Item(13)
+                Dialog29.obra_id = tab.Rows(0).Item(6)
+                If tab.Rows(0).Item(11) = 1 Then Dialog29.lbl_tipo.Text = "Calculo de Comisiones Administrativos"
+                For Each x As DataRow In tab.Rows
+                    Dialog29.grid_comis.Rows.Add(x("pago_comis_por_obra_det"), x("empleado_id"), x("nombre"), x("hrs_trabajadas"), x("por_comision"), x("importe_pagar"), x("descuentos"))
+                Next
+                Dialog29.genera_sumatoria_tot_comis()
+                Dialog29.habilita_controles(False)
+                Dialog29.ShowDialog()
+            End If
+        Catch ex As Exception
+            MsgBox("Error:abre_calculo_comis " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Private Sub ToolStripButton33_Click(sender As Object, e As EventArgs) Handles ToolStripButton33.Click
+        Try
+            If valida_estatus_obra(obra_id) = 0 Then
+                'COMISIONES DE OPERATIVOS
+                If valida_tiene_permiso(283, "NUEVA_COMISION_OBRA") = 1 Then
+                    Dialog29.Dispose()
+                    Dialog29.carga_inicial()
+                    Dialog29.obra_id = obra_id
+                    Dim tab As New DataTable
+                    tab = retorna_empleados_asignados_por_obra_resumen(obra_id, 0)
+                    If tab.Rows.Count > 0 Then
+                        For Each x As DataRow In tab.Rows
+                            Dialog29.grid_comis.Rows.Add(0, x("id_empleado"), x("nombre"), x("hrs_trab"), 0, 0, 0)
+                        Next
+                    End If
+                    Dialog29.ShowDialog()
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton29_Click(sender As Object, e As EventArgs) Handles ToolStripButton29.Click
+        Try
+            grid_comis.Rows.Clear()
+            Dim tab As New DataTable
+            tab = retorna_empleados_para_pago_comisiones_por_obra(obra_id, 0)
+            Dim tot_gas As Double
+            If tab.Rows.Count > 0 Then
+                For Each x As DataRow In tab.Rows
+                    grid_comis.Rows.Add(x("pago_comis_por_obra_enca_id"), x("fecha"), x("estatus"), x("tipo_comis"), x("importe_neto"), x("notas"))
+                    If Trim(x("estatus")) <> "Cancelado" Then
+                        tot_gas += x("importe_neto")
+                    End If
+                Next
+                txt_tot_comis.Text = FormatCurrency(tot_gas)
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub grid_comis_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_comis.CellContentClick
+
+    End Sub
+
+    Private Sub grid_comis_CellDoubleClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_comis.CellDoubleClick
+        Try
+            abre_calculo_comis(grid_comis.Item(0, grid_comis.CurrentCell.RowIndex).Value)
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub grid_exp_mat_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_exp_mat.CellContentClick
+
+    End Sub
+
+    Private Sub ToolStripButton19_Click_1(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub Button3_Click(sender As Object, e As EventArgs) Handles Button3.Click
+        Try
+            grid_gastos_adic.Rows.Add(0, cmb_con_gas_oper.SelectedValue.ToString, cmb_con_gas_oper.Text, retorna_porcentaje_gastos_de_operacion(cmb_con_gas_oper.SelectedValue.ToString))
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton30_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub ToolStripButton20_Click_1(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub ToolStripButton24_Click_1(sender As Object, e As EventArgs) Handles ToolStripButton24.Click
+        Try
+            guarda_conceptos_gas_adic_obra(obra_id, grid_gastos_adic)
+            habilita_controles23(False)
+        Catch ex As Exception
+
+        End Try
+    End Sub
+    Public Sub habilita_controles23(val As Boolean)
+        grid_gastos_adic.Enabled = val
+        ToolStripButton24.Enabled = val
+        ToolStripButton31.Enabled = val
+        Button3.Enabled = val
+        cmb_con_gas_oper.Enabled = val
+    End Sub
+    Private Sub ToolStripButton32_Click(sender As Object, e As EventArgs) Handles ToolStripButton32.Click
+        If valida_tiene_permiso(203, "MODIFICAR_OBRA") = 1 Then
+            habilita_controles23(True)
+        End If
+    End Sub
+
+    Private Sub ToolStripButton25_Click_1(sender As Object, e As EventArgs) Handles ToolStripButton25.Click
+        Try
+            Dim tab_rr2 As New DataTable
+            tab_rr2 = retorna_gastos_oper_adic_en_una_obra(obra_id)
+            grid_gastos_adic.Rows.Clear()
+            For Each x As DataRow In tab_rr2.Rows
+                grid_gastos_adic.Rows.Add(x("gasto_oper_adic_obra_id"), x("concepto_gas_operacion_obra_id"), x("concepto"), x("porcentaje"))
+            Next
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton35_Click(sender As Object, e As EventArgs) Handles ToolStripButton35.Click
+        Try
+            If valida_estatus_obra(obra_id) = 0 Then
+                If valida_tiene_permiso(260, "NUEVA_EXPLOCION_MAT_OBRA") = 1 Then
+                    Dialog230.Dispose()
+                    Dialog230.ban_tipo_grid = 44
+                    Dialog230.obra_id230 = obra_id
+                    Dialog230.Panel1.Visible = False
+                    Dialog230.ShowDialog()
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton36_Click(sender As Object, e As EventArgs) Handles ToolStripButton36.Click
+        Try
+            Dim tab_rr As New DataTable
+            tab_rr = retorna_pedidos_relacionados_en_una_obra(obra_id)
+            Dim tot_cris As Double = 0
+            grid_pedidos_rel.Rows.Clear()
+            For Each x As DataRow In tab_rr.Rows
+                grid_pedidos_rel.Rows.Add(x("docto_relac_obra_id"), x("tipo"), x("folio"), x("uds"), x("COSTO_TOT"))
+                tot_cris += x("COSTO_TOT")
+            Next
+            txt_tot_cris.Text = tot_cris
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton38_Click(sender As Object, e As EventArgs) Handles ToolStripButton38.Click
+        Try
+            If valida_estatus_obra(obra_id) = 0 Then
+                If (MsgBox("¿Deseas eliminar el pedido seleccionado ?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question) = vbOK) Then
+                    If elimina_pedido_relacionado_a_una_obra(obra_id, grid_pedidos_rel.Item(0, grid_pedidos_rel.CurrentCell.RowIndex).Value, grid_pedidos_rel.Item(2, grid_pedidos_rel.CurrentCell.RowIndex).Value) = 1 Then
+                        grid_pedidos_rel.Rows.RemoveAt(grid_pedidos_rel.CurrentCell.RowIndex)
+                    End If
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Public Sub habilita_controles3(val As Boolean)
+        Try
+            ToolStripButton35.Enabled = val
+            ToolStripButton38.Enabled = val
+            txt_gas_admin_obr.Enabled = val
+        Catch ex As Exception
+
+        End Try
+    End Sub
+    Private Sub ToolStripButton20_Click_2(sender As Object, e As EventArgs) Handles ToolStripButton20.Click
+        If valida_estatus_obra(obra_id) = 0 Then
+            If valida_tiene_permiso(203, "MODIFICAR_OBRA") = 1 Then
+                habilita_controles3(True)
+            End If
+        End If
+    End Sub
+
+    Private Sub ToolStripButton31_Click_1(sender As Object, e As EventArgs) Handles ToolStripButton31.Click
+        Try
+            If valida_estatus_obra(obra_id) = 0 Then
+                If (MsgBox("¿Deseas eliminar el gasto adicional seleccionado ?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question) = vbOK) Then
+                    If elimina_gasto_adicional_relacionado_a_una_obra(obra_id, grid_gastos_adic.Item(0, grid_gastos_adic.CurrentCell.RowIndex).Value) = 1 Then
+                        grid_gastos_adic.Rows.RemoveAt(grid_gastos_adic.CurrentCell.RowIndex)
+                    End If
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton30_Click_1(sender As Object, e As EventArgs) Handles ToolStripButton30.Click
+        Form4.Dispose()
+        pos_tab243 = 0
+        pos_tab243_2 = 0
+        tot_uds_extra = 0
+        tot_cost_tot_extra = 0
+        cos_tot_explo = 0
+        cos_tot_sal = 0
+        tot_uds_extra = 0
+        tot_cost_tot_extra = 0
+        ban_repor = 108
+        Dim tab As New DataTable
+        tab = retorna_explocion_mat_obra_id2(obra_id)
+        If tab.Rows.Count > 0 Then
+            Dim tab_r As New DataTable
+            Dim tab_r2 As New DataTable
+            tab_r.Columns.Add("id_exp_mat", GetType(Integer))
+            tab_r.Columns.Add("clave", GetType(String))
+            tab_r.Columns.Add("articulo_explo", GetType(String))
+            tab_r.Columns.Add("um", GetType(String))
+            tab_r.Columns.Add("uds_explo", GetType(Double))
+            tab_r.Columns.Add("cos_unit_exp_mat", GetType(Double))
+            tab_r.Columns.Add("clave_sal", GetType(String))
+            tab_r.Columns.Add("articulo_sal", GetType(String))
+            tab_r.Columns.Add("um_sal", GetType(String))
+            tab_r.Columns.Add("uds_sal", GetType(Double))
+            tab_r.Columns.Add("costo_sal", GetType(Double))
+            tab_r2.Columns.Add("clave_sal_extra", GetType(String))
+            tab_r2.Columns.Add("articulo_sal_extra", GetType(String))
+            tab_r2.Columns.Add("uds_sal_extra", GetType(Double))
+            tab_r2.Columns.Add("costo_sal_extra", GetType(Double))
+            For Each x As DataRow In tab.Rows
+                tab_r.Rows.Add(x("articulo_id"), "", x("nombre"), x("um"), x("uds"), x("cos_tot"), "", "", "", 0, 0)
+            Next
+            Dim tab_sal As New DataTable
+            tab_sal = retorna_doctos_salidas_por_obra_det(obra_id, -1)
+            Dim bann As Integer = 0
+            For Each xx As DataRow In tab_sal.Rows
+                bann = 0
+                For Each y As DataRow In tab_r.Rows
+                    If Trim(y("id_exp_mat")) = Trim(xx("articulo_id")) Or Trim(y("articulo_explo")) = Trim(xx("nom_art")) Then
+                        y("clave_sal") = xx("clave_art")
+                        y("articulo_sal") = xx("nom_art")
+                        y("um_sal") = xx("unid_med")
+                        y("uds_sal") = xx("uds")
+                        y("costo_sal") = xx("costo_tot")
+                        bann = 1
+                    End If
+                Next
+                If bann = 0 Then tab_r.Rows.Add(1, "", "", "", 0, 0, xx("clave_art"), xx("nom_art"), xx("unid_med"), xx("uds"), xx("costo_tot"))
+            Next
+            For Each XX As DataRow In tab_r.Rows
+                If XX("uds_explo") - XX("uds_sal") < 0 Then
+                    Dim uds_extra As Double = Math.Abs((XX("uds_explo") - XX("uds_sal")))
+                    Dim cos_extra As Double = 0
+                    If XX("uds_explo") = 0 Then
+                        cos_extra = Math.Abs(XX("costo_sal"))
+                    Else
+                        cos_extra = Math.Abs(((XX("costo_sal") / XX("uds_sal")) * uds_extra))
+                    End If
+                    tab_r2.Rows.Add(XX("clave_sal"), XX("articulo_sal"), uds_extra, cos_extra)
+                End If
+            Next
+            tab_gl = tab_r
+            tab_gl1 = tab_r2
+            Form4.print_prev.Document = Form4.print_doc
+            Form4.print_prev.InvalidatePreview()
+            Form4.print_prev.Refresh()
+            Form4.ShowDialog()
+        Else
+            MsgBox("No se asignó la explosión de materiales a la obra. Relaciónela para poder continuar con el reporte.", MsgBoxStyle.Information)
+        End If
+    End Sub
+    Public cos_tot_explo, cos_tot_sal, tot_uds_extra, tot_cost_tot_extra As Double
+
+    Private Sub TrackBar1_Scroll(sender As Object, e As EventArgs) Handles trac_bar.Scroll
+        If (trac_bar.Value * 10) <= 100 And trac_bar.Value > 0 Then
+            bar_avance.Value = (trac_bar.Value * 10)
+            lbl_avance.Text = bar_avance.Value
+        ElseIf trac_bar.Value = 0 Then
+            bar_avance.Value = 1
+            lbl_avance.Text = 0
+        End If
+    End Sub
+
+    Public pos_tab243 As Integer = 0
+
+    Private Sub TabPage1_Click(sender As Object, e As EventArgs) Handles TabPage1.Click
+
+    End Sub
+
+    Private Sub Button4_Click(sender As Object, e As EventArgs) Handles Button4.Click
+        Try
+            actualiza_avance_de_obra(obra_id, lbl_avance.Text)
+            MsgBox("Se actualizo correctamente el avance de Obra a " & lbl_avance.Text & " %", MsgBoxStyle.Information)
+        Catch ex As Exception
+
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton37_Click(sender As Object, e As EventArgs) Handles ToolStripButton37.Click
+        Try
+            If valida_estatus_obra(obra_id) = 0 Then
+                If tab_per.Rows(205).Item(1) = "T" Then
+                    nuevo_orden_trabajo()
+                Else
+                    Dim res2 As Object = MsgBox("No tiene el permiso para " & tab_per.Rows(205).Item(0) & " ¿Deseas que lo autorice otro usuario?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question)
+                    If res2 = vbOK Then
+                        Dialog225.Dispose()
+                        Dim tab3 As New DataTable
+                        tab3 = CONSULTA_USUARIOS_ASIG_DE_UN_PERMISO("nuevo_orden_trabajo_obra")
+                        If tab3.Rows.Count > 0 Then
+                            Dialog225.cmb_usuario.DataSource = tab3
+                            Dialog225.cmb_usuario.DisplayMember = tab3.Columns(1).ToString
+                            Dialog225.cmb_usuario.ValueMember = tab3.Columns(0).ToString
+                            Dialog225.ShowDialog()
+                        Else
+                            MsgBox("No Existen usuarios con este permiso asignado", MsgBoxStyle.Information)
+                        End If
+                        If Dialog225.ban_autor = 1 Then
+                            nuevo_orden_trabajo()
+                        End If
+                    End If
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton39_Click(sender As Object, e As EventArgs) Handles ToolStripButton39.Click
+        Try
+            grid_ordenes.Rows.Clear()
+            Dim tab As New DataTable
+            tab = retorna_ordenes_por_obra(obra_id, "C")
+            If tab.Rows.Count > 0 Then
+                For Each x As DataRow In tab.Rows
+                    grid_ordenes.Rows.Add(x("docto_orden_obra_id"), x("folio"), x("estatus"), x("fecha"), x("fecha_entrega"), x("importe_neto"))
+                Next
+            Else
+                MsgBox("No existen ordenes de trabajo asignadas a esta obra", MsgBoxStyle.Information)
+            End If
+            genera_total_grid()
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton8_Click_1(sender As Object, e As EventArgs) Handles ToolStripButton8.Click
+        Try
+            grid_mat_prod.Rows.Clear()
+            Dim tab As New DataTable
+            tab = retorna_material_a_producir_por_obra(obra_id)
+            For Each x As DataRow In tab.Rows
+                grid_mat_prod.Rows.Add(x("docto_orden_obra_det_id"), x("articulo_id"), x("folio"), x("estatus"), x("clave_articulo"), x("descripcion"), x("unidades"), x("uds_prod"), x("notas_adic"))
+            Next
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton40_Click(sender As Object, e As EventArgs) Handles ToolStripButton40.Click
+        Try
+            If Trim(lbl_estatus.Text) = "Planificacion" Then
+                actualiza_estatus_obra(obra_id, "Ejecucion")
+                lbl_estatus.Text = "Ejecucion"
+                cmb_estatus.Text = "Ejecucion"
+            Else
+                MsgBox("Para actualizar el estatus de la obra, es necesario que su estatus sea Planificacion. Actualice el estatus para poder continuar.", MsgBoxStyle.Information)
+            End If
+        Catch ex As Exception
+
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton7_Click_1(sender As Object, e As EventArgs) Handles ToolStripButton7.Click
+        Try
+            If Trim(lbl_estatus.Text) = "Ejecucion" Then
+                actualiza_estatus_obra(obra_id, "Obra Terminada")
+                actualiza_avance_de_obra(obra_id, 99)
+                lbl_estatus.Text = "Obra Terminada"
+                cmb_estatus.Text = "Obra Terminada"
+            Else
+                MsgBox("Para actualizar el estatus de la obra, es necesario que su estatus sea Ejecucion. Actualice el estatus para poder continuar.", MsgBoxStyle.Information)
+            End If
+        Catch ex As Exception
+
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton41_Click(sender As Object, e As EventArgs) Handles ToolStripButton41.Click
+        Try
+            Dim res As Object = MsgBox("No tiene permiso para modificar el estatus de una Obra ¿Deseas que lo autorice otro usuario?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question)
+            If res = vbOK Then
+                Dialog225.Dispose()
+                Dim tab As New DataTable
+                tab = CONSULTA_USUARIOS_ASIG_DE_UN_PERMISO("ADMIN_USER")
+                If tab.Rows.Count > 0 Then
+                    Dialog225.cmb_usuario.DataSource = tab
+                    Dialog225.cmb_usuario.DisplayMember = tab.Columns(1).ToString
+                    Dialog225.cmb_usuario.ValueMember = tab.Columns(0).ToString
+                    Dialog225.cmb_usuario.Text = "sysadm"
+                    Dialog225.cmb_usuario.Enabled = False
+                    Dialog225.ShowDialog()
+                Else
+                    MsgBox("No Existen usuarios con este permiso asignado", MsgBoxStyle.Information)
+                End If
+
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub Facturacion_Click(sender As Object, e As EventArgs) Handles Facturacion.Click
+
+    End Sub
+
+    Public pos_tab243_2 As Integer = 0
+
+    Private Sub ImprimirDetalleToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ImprimirDetalleToolStripMenuItem.Click
+        ban_repor = 73
+        Form4.print_prev.Document = Form4.print_doc
+        Form4.print_prev.InvalidatePreview()
+        Form4.print_prev.Refresh()
+        Form4.ShowDialog()
+    End Sub
+
+    Public Sub imprime_explocion_de_materiales(ByVal e As System.Drawing.Printing.PrintPageEventArgs, ByVal id_obra As Integer, pos_tab As Integer, tab_det As DataTable, pos_tab2 As Integer)
+        'Imprime el encabezado del reporte'
+        Dim tab As New DataTable
+        tab = retorna_obras_por_periodo(fecha_ini, fecha_fin, id_obra)
+        If tab.Rows.Count > 0 Then
+            e.Graphics.DrawImage(My.Resources.logo_mega2, 10, 10)
+            e.Graphics.DrawString("MEGALUMINIO SERVICIOS SA DE CV", New Font("Arial", 13, FontStyle.Bold), Brushes.Black, 190, 15)
+            'e.Graphics.DrawString("  SERVICIOS", New Font("Arial", 13, FontStyle.Bold), Brushes.Black, 20, 45)
+            e.Graphics.DrawString("EXPLOSION DE MATERIALES: " & "OBRA:" & tab.Rows(0).Item(2), New Font("Arial", 11, FontStyle.Regular), Brushes.Black, 190, 38)
+            e.Graphics.DrawLine(Pens.Black, 10, 10, 1070, 10)
+            e.Graphics.DrawLine(Pens.Black, 10, 800, 1070, 800)
+            e.Graphics.DrawLine(Pens.Black, 180, 35, 1070, 35)
+            e.Graphics.DrawLine(Pens.Black, 180, 60, 1070, 60)
+            e.Graphics.DrawLine(Pens.Black, 180, 10, 180, 100)
+            e.Graphics.DrawLine(Pens.Black, 345, 60, 345, 100)
+            e.Graphics.DrawLine(Pens.Black, 465, 60, 465, 100)
+            e.Graphics.DrawLine(Pens.Black, 665, 60, 665, 100)
+            e.Graphics.DrawLine(Pens.Black, 10, 10, 10, 800)
+            e.Graphics.DrawLine(Pens.Black, 1070, 10, 1070, 800)
+            e.Graphics.DrawString("Obra ID: " & tab.Rows(0).Item(0), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 600, 15)
+            e.Graphics.DrawString("Fecha Imp. " & Now, New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 800, 45)
+            e.Graphics.DrawString("Codigo: CT-REG-03", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 200, 65)
+            e.Graphics.DrawString("Estatus:" & vbCrLf & tab.Rows(0).Item(8), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 345, 65)
+            e.Graphics.DrawLine(Pens.Black, 10, 100, 1070, 100)
+            'e.Graphics.DrawString("Fecha de emision: 29-01-2016 ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 500, 60)
+
+            e.Graphics.DrawString("Fecha Inicio:" & tab.Rows(0).Item(6), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 465, 65)
+            e.Graphics.DrawString("Fecha Termino: " & tab.Rows(0).Item(7), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 465, 80)
+            e.Graphics.DrawString("Vendedor:" & tab.Rows(0).Item(10), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 665, 65)
+            e.Graphics.DrawString("Cliente: " & tab.Rows(0).Item(3), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 665, 80)
+            Dim pos_y As Integer = 101
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y, 1070, pos_y)
+            e.Graphics.DrawString("EXPLOSION DE MATERIALES", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 20, pos_y)
+            e.Graphics.DrawString("SALIDAS DE MATERIALES A OBRA", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 550, pos_y)
+            e.Graphics.DrawString("DIFERENCIA", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 980, pos_y)
+            pos_y += 15
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y, 1070, pos_y)
+            e.Graphics.DrawString("ID", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 20, pos_y)
+            e.Graphics.DrawString("Descripcion", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 120, pos_y)
+            e.Graphics.DrawString("Uds", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 320, pos_y)
+            e.Graphics.DrawString("UM", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 360, pos_y)
+            e.Graphics.DrawString("Costo.tot", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 390, pos_y)
+            e.Graphics.DrawString("Clave", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 450, pos_y)
+            e.Graphics.DrawString("Descripcion", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 525, pos_y)
+            e.Graphics.DrawString("UM", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 780, pos_y)
+            e.Graphics.DrawString("Uds", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 830, pos_y)
+            e.Graphics.DrawString("Costo.tot", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 870, pos_y)
+            e.Graphics.DrawString("Dif.Uds", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 930, pos_y)
+            e.Graphics.DrawString("Dif.Costo", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 980, pos_y)
+            pos_y += 15
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y - 3, 1070, pos_y - 3)
+            Dim rr As Integer = 0
+            For x = pos_tab To tab_det.Rows.Count - 1
+                If tab_det.Rows(x).Item(0) >= 0 Then
+                    e.Graphics.DrawString(tab_det.Rows(x).Item(0), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, 10, pos_y)
+                    e.Graphics.DrawString(Mid(tab_det.Rows(x).Item(2), 1, 42), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, 75, pos_y)
+                    e.Graphics.DrawString(tab_det.Rows(x).Item(4), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(tab_det.Rows(x).Item(4), 330), pos_y)
+                    e.Graphics.DrawString(tab_det.Rows(x).Item(3), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, 350, pos_y)
+                    e.Graphics.DrawString(FormatNumber(tab_det.Rows(x).Item(5), 2), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatNumber(tab_det.Rows(x).Item(5), 2), 440), pos_y)
+                    e.Graphics.DrawString(tab_det.Rows(x).Item(6), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, 455, pos_y)
+                    e.Graphics.DrawString(Mid(tab_det.Rows(x).Item(7), 1, 42), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, 525, pos_y)
+                    e.Graphics.DrawString(tab_det.Rows(x).Item(8), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, 780, pos_y)
+                    e.Graphics.DrawString(FormatNumber(tab_det.Rows(x).Item(9), 2), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatNumber(tab_det.Rows(x).Item(9), 2), 855), pos_y)
+                    e.Graphics.DrawString(FormatNumber(tab_det.Rows(x).Item(10), 2), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatNumber(tab_det.Rows(x).Item(10), 2), 920), pos_y)
+                    e.Graphics.DrawString(FormatNumber(tab_det.Rows(x).Item(4) - tab_det.Rows(x).Item(9), 2), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatNumber(tab_det.Rows(x).Item(4) - tab_det.Rows(x).Item(9), 2), 965), pos_y)
+                    e.Graphics.DrawString(FormatNumber(tab_det.Rows(x).Item(5) - tab_det.Rows(x).Item(10), 2), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatNumber(tab_det.Rows(x).Item(5) - tab_det.Rows(x).Item(10), 2), 1025), pos_y)
+                    pos_y += 14
+                    cos_tot_explo += tab_det.Rows(x).Item(5)
+                    cos_tot_sal += tab_det.Rows(x).Item(10)
+                    rr = x
+                    If pos_y >= 710 Then Exit For
+                End If
+            Next
+            pos_tab243 = rr
+            Dim ttx As Integer = 0
+            If rr >= tab_det.Rows.Count - 1 Then
+                pos_tab243 = rr + 1
+                e.Graphics.DrawLine(Pens.Black, 448, 101, 448, pos_y)
+                e.Graphics.DrawLine(Pens.Black, 926, 101, 926, pos_y)
+                e.Graphics.DrawString(FormatNumber(cos_tot_explo, 2), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatNumber(cos_tot_explo, 2), 440), pos_y)
+                e.Graphics.DrawString(FormatNumber(cos_tot_sal, 2), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatNumber(cos_tot_sal, 2), 920), pos_y)
+                e.Graphics.DrawString("Cotizado: ", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 700, pos_y + 50)
+                e.Graphics.DrawString(FormatNumber(cos_tot_explo, 2), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 800, pos_y + 50)
+                e.Graphics.DrawString("Real Utilizado: ", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 700, pos_y + 70)
+                e.Graphics.DrawString(FormatNumber(cos_tot_sal, 2), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 800, pos_y + 70)
+                e.Graphics.DrawLine(Pens.Black, 690, pos_y + 88, 900, pos_y + 88)
+                e.Graphics.DrawString(FormatNumber(cos_tot_explo - cos_tot_sal, 2), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 800, pos_y + 90)
+                pos_y += 20
+                Dim lin As New Pen(Color.Black, 8)
+                e.Graphics.DrawLine(lin, 10, pos_y, 1070, pos_y)
+                pos_y += 5
+                e.Graphics.DrawLine(Pens.Black, 10, pos_y - 2, 1070, pos_y - 2)
+                e.Graphics.DrawString("MATERIAL EXTRA EN PRODUCCION: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 10, pos_y)
+                pos_y += 20
+                e.Graphics.DrawLine(Pens.Black, 10, pos_y, 1070, pos_y)
+                e.Graphics.DrawString("Clave", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 20, pos_y)
+                e.Graphics.DrawString("Descripcion", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 120, pos_y)
+                e.Graphics.DrawString("Uds.Extra", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 365, pos_y)
+                e.Graphics.DrawString("Costo.Tot.Extra", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 420, pos_y)
+                pos_y += 20
+                For xx = pos_tab2 To tab_gl1.Rows.Count - 1
+                    e.Graphics.DrawString(tab_gl1.Rows(xx).Item(0), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, 20, pos_y)
+                    e.Graphics.DrawString(Mid(tab_gl1.Rows(xx).Item(1), 1, 40), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, 110, pos_y)
+                    Dim uds_extra As Double = tab_gl1.Rows(xx).Item(2)
+                    e.Graphics.DrawString(FormatNumber(Math.Abs(uds_extra), 2), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatNumber(Math.Abs(uds_extra), 2), 400), pos_y)
+                    e.Graphics.DrawString(FormatNumber(tab_gl1.Rows(xx).Item(3), 2), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatNumber(tab_gl1.Rows(xx).Item(3), 2), 475), pos_y)
+                    tot_uds_extra += Math.Abs(uds_extra)
+                    tot_cost_tot_extra += Math.Abs(tab_gl1.Rows(xx).Item(3))
+                    pos_y += 14
+                    pos_tab243_2 = xx
+                    If pos_y >= 710 Then Exit For
+                    ttx = xx
+                Next
+            End If
+            If ttx >= tab_gl1.Rows.Count - 1 Then
+                pos_tab243_2 += 1
+                pos_y += 5
+                e.Graphics.DrawString(FormatNumber(Math.Abs(tot_uds_extra), 2), New Font("Arial", 7, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatNumber(Math.Abs(tot_uds_extra), 2), 400), pos_y)
+                e.Graphics.DrawString(FormatNumber(tot_cost_tot_extra, 2), New Font("Arial", 7, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatNumber(tot_cost_tot_extra, 2), 475), pos_y)
+                pos_y = 745
+                e.Graphics.DrawLine(Pens.Black, 10, pos_y, 180, pos_y)
+                e.Graphics.DrawLine(Pens.Black, 340, pos_y, 500, pos_y)
+                e.Graphics.DrawLine(Pens.Black, 510, pos_y, 660, pos_y)
+                e.Graphics.DrawString("REALIZO", New Font("Arial", 10, FontStyle.Regular), Brushes.Black, 20, pos_y)
+                e.Graphics.DrawString("REVISO", New Font("Arial", 10, FontStyle.Regular), Brushes.Black, 360, pos_y)
+                e.Graphics.DrawString("AUTORIZO", New Font("Arial", 10, FontStyle.Regular), Brushes.Black, 520, pos_y)
+            End If
+        Else
+            MsgBox("El documento no se encuentra aplicado en Microsip no es posible Imprimir", MsgBoxStyle.Exclamation)
+        End If
+    End Sub
+    Public Sub imprime_material_extra_prod(ByVal e As System.Drawing.Printing.PrintPageEventArgs, ByVal id_obra As Integer, pos_tab As Integer, tab_det As DataTable, pos_tab2 As Integer)
+        Try
+            Dim tab As New DataTable
+            tab = retorna_obras_por_periodo(fecha_ini, fecha_fin, id_obra)
+            e.Graphics.DrawImage(My.Resources.logo_mega2, 10, 10)
+            e.Graphics.DrawString("MEGALUMINIO SERVICIOS SA DE CV", New Font("Arial", 13, FontStyle.Bold), Brushes.Black, 190, 15)
+            'e.Graphics.DrawString("  SERVICIOS", New Font("Arial", 13, FontStyle.Bold), Brushes.Black, 20, 45)
+            e.Graphics.DrawString("EXPLOSION DE MATERIALES: " & "OBRA:" & tab.Rows(0).Item(2), New Font("Arial", 11, FontStyle.Regular), Brushes.Black, 190, 38)
+            e.Graphics.DrawLine(Pens.Black, 10, 10, 1070, 10)
+            e.Graphics.DrawLine(Pens.Black, 10, 800, 1070, 800)
+            e.Graphics.DrawLine(Pens.Black, 180, 35, 1070, 35)
+            e.Graphics.DrawLine(Pens.Black, 180, 60, 1070, 60)
+            e.Graphics.DrawLine(Pens.Black, 180, 10, 180, 100)
+            e.Graphics.DrawLine(Pens.Black, 345, 60, 345, 100)
+            e.Graphics.DrawLine(Pens.Black, 465, 60, 465, 100)
+            e.Graphics.DrawLine(Pens.Black, 665, 60, 665, 100)
+            e.Graphics.DrawLine(Pens.Black, 10, 10, 10, 800)
+            e.Graphics.DrawLine(Pens.Black, 1070, 10, 1070, 800)
+            e.Graphics.DrawString("Obra ID: " & tab.Rows(0).Item(0), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 600, 15)
+            e.Graphics.DrawString("Fecha Imp. " & Now, New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 800, 45)
+            e.Graphics.DrawString("Codigo: CT-REG-03", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 200, 65)
+            e.Graphics.DrawString("Estatus:" & vbCrLf & tab.Rows(0).Item(8), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 345, 65)
+            e.Graphics.DrawLine(Pens.Black, 10, 100, 1070, 100)
+            'e.Graphics.DrawString("Fecha de emision: 29-01-2016 ", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 500, 60)
+            e.Graphics.DrawString("Fecha Inicio:" & tab.Rows(0).Item(6), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 465, 65)
+            e.Graphics.DrawString("Fecha Termino: " & tab.Rows(0).Item(7), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 465, 80)
+            e.Graphics.DrawString("Vendedor:" & tab.Rows(0).Item(10), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 665, 65)
+            e.Graphics.DrawString("Cliente: " & tab.Rows(0).Item(3), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 665, 80)
+            Dim pos_y As Integer = 101
+            e.Graphics.DrawLine(Pens.Black, 448, 101, 448, pos_y)
+            e.Graphics.DrawLine(Pens.Black, 926, 101, 926, pos_y)
+            e.Graphics.DrawString(FormatNumber(cos_tot_explo, 2), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatNumber(cos_tot_explo, 2), 440), pos_y)
+            e.Graphics.DrawString(FormatNumber(cos_tot_sal, 2), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatNumber(cos_tot_sal, 2), 920), pos_y)
+            e.Graphics.DrawString("Cotizado: ", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 700, pos_y + 50)
+            e.Graphics.DrawString(FormatNumber(cos_tot_explo, 2), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 800, pos_y + 50)
+            e.Graphics.DrawString("Real Utilizado: ", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 700, pos_y + 70)
+            e.Graphics.DrawString(FormatNumber(cos_tot_sal, 2), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 800, pos_y + 70)
+            e.Graphics.DrawLine(Pens.Black, 690, pos_y + 88, 900, pos_y + 88)
+            e.Graphics.DrawString(FormatNumber(cos_tot_explo - cos_tot_sal, 2), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 800, pos_y + 90)
+            pos_y += 20
+            Dim lin As New Pen(Color.Black, 8)
+            e.Graphics.DrawLine(lin, 10, pos_y, 1070, pos_y)
+            pos_y += 5
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y - 2, 1070, pos_y - 2)
+            e.Graphics.DrawString("MATERIAL EXTRA EN PRODUCCION: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 10, pos_y)
+            pos_y += 20
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y, 1070, pos_y)
+            e.Graphics.DrawString("Clave", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 20, pos_y)
+            e.Graphics.DrawString("Descripcion", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 120, pos_y)
+            e.Graphics.DrawString("Uds.Extra", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 365, pos_y)
+            e.Graphics.DrawString("Costo.Tot.Extra", New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 420, pos_y)
+            pos_y += 20
+            Dim ttx As Integer = 0
+            For xx = pos_tab2 To tab_gl1.Rows.Count - 1
+                e.Graphics.DrawString(tab_gl1.Rows(xx).Item(0), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, 20, pos_y)
+                e.Graphics.DrawString(Mid(tab_gl1.Rows(xx).Item(1), 1, 40), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, 110, pos_y)
+                Dim uds_extra As Double = tab_gl1.Rows(xx).Item(2)
+                e.Graphics.DrawString(FormatNumber(Math.Abs(uds_extra), 2), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatNumber(Math.Abs(uds_extra), 2), 400), pos_y)
+                e.Graphics.DrawString(FormatNumber(tab_gl1.Rows(xx).Item(3), 2), New Font("Arial", 7, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatNumber(tab_gl1.Rows(xx).Item(3), 2), 475), pos_y)
+                tot_cost_tot_extra += Math.Abs(tab_gl1.Rows(xx).Item(3))
+                tot_uds_extra += Math.Abs(uds_extra)
+                pos_y += 14
+                pos_tab243_2 = xx
+                ttx = xx
+                If pos_y >= 710 Then Exit For
+            Next
+            If ttx >= tab_gl1.Rows.Count - 1 Then
+                pos_tab243_2 += 1
+                pos_y += 5
+                e.Graphics.DrawString(FormatNumber(Math.Abs(tot_uds_extra), 2), New Font("Arial", 7, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatNumber(Math.Abs(tot_uds_extra), 2), 400), pos_y)
+                e.Graphics.DrawString(FormatNumber(tot_cost_tot_extra, 2), New Font("Arial", 7, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatNumber(tot_cost_tot_extra, 2), 475), pos_y)
+                pos_y = 745
+                e.Graphics.DrawLine(Pens.Black, 10, pos_y, 180, pos_y)
+                e.Graphics.DrawLine(Pens.Black, 340, pos_y, 500, pos_y)
+                e.Graphics.DrawLine(Pens.Black, 510, pos_y, 660, pos_y)
+                e.Graphics.DrawString("REALIZO", New Font("Arial", 10, FontStyle.Regular), Brushes.Black, 20, pos_y)
+                e.Graphics.DrawString("REVISO", New Font("Arial", 10, FontStyle.Regular), Brushes.Black, 360, pos_y)
+                e.Graphics.DrawString("AUTORIZO", New Font("Arial", 10, FontStyle.Regular), Brushes.Black, 520, pos_y)
+            End If
+
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub TabControl1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles TabControl1.SelectedIndexChanged
+        Try
+            If TabControl1.SelectedIndex = 1 Then
+                ToolStripButton9_Click(sender, e)
+            ElseIf TabControl1.SelectedIndex = 2 Then
+                ToolStripButton39_Click(sender, e)
+            ElseIf TabControl1.SelectedIndex = 3 Then
+                ToolStripButton10_Click(sender, e)
+            ElseIf TabControl1.SelectedIndex = 4 Then
+                ToolStripButton23_Click(sender, e)
+            ElseIf TabControl1.SelectedIndex = 5 Then
+                ToolStripButton28_Click(sender, e)
+            ElseIf TabControl1.SelectedIndex = 6 Then
+                ToolStripButton4_Click(sender, e)
+            ElseIf TabControl1.SelectedIndex = 7 Then
+                ToolStripButton17_Click(sender, e)
+            ElseIf TabControl1.SelectedIndex = 9 Then
+                Button8_Click(sender, e)
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+End Class

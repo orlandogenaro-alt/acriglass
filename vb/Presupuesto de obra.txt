@@ -1,0 +1,1609 @@
+Public Class Form46
+    Public SUG_ID As Integer = 0
+    Public Sub carga_inicial()
+        Try
+            Dim tab As New DataTable
+            tab = retorna_conceptos_obra(0)
+            cmb_concepto.DataSource = tab
+            cmb_concepto.ValueMember = tab.Columns(0).ToString
+            cmb_concepto.DisplayMember = tab.Columns(2).ToString
+            Dim tab2 As New DataTable
+            tab2 = retorna_conceptos_mano_obra(0)
+            cmb_concepto_mo.DataSource = tab2
+            cmb_concepto_mo.ValueMember = tab2.Columns(0).ToString
+            cmb_concepto_mo.DisplayMember = tab2.Columns(2).ToString
+            Dim tab3 As New DataTable
+            tab3 = retorna_conceptos_gastos_de_operacion(0)
+            cmb_conceptos_gas_oper.DataSource = tab3
+            cmb_conceptos_gas_oper.ValueMember = tab3.Columns(0).ToString
+            cmb_conceptos_gas_oper.DisplayMember = tab3.Columns(2).ToString
+            Dim tab4 As New DataTable
+            tab4 = retorna_vendedores_obra("T")
+            cmb_vendedor.DataSource = tab4
+            cmb_vendedor.DisplayMember = tab4.Columns(1).ToString
+            cmb_vendedor.ValueMember = tab4.Columns(0).ToString
+            txt_util_por.Text = retorna_valor_parametro_costos_sug(101)
+            Dim tab5 As New DataTable
+            tab5 = retorna_empleados_obra(0, "A")
+            cmb_empleados.DataSource = tab5
+            cmb_empleados.DisplayMember = tab5.Columns(2).ToString
+            cmb_empleados.ValueMember = tab5.Columns(1).ToString
+            Dim tab6 As New DataTable
+            tab6 = retorna_datos_tipos_empleados_comisiones(0)
+            If tab6.Rows.Count > 0 Then
+                cmb_tipo.DataSource = tab6
+                cmb_tipo.DisplayMember = tab6.Columns(2).ToString
+                cmb_tipo.ValueMember = tab6.Columns(0).ToString
+            End If
+            Dim tab7 As New DataTable
+            tab7 = retorna_conceptos_seguro()
+            cmb_con_seg.DataSource = tab7
+            cmb_con_seg.DisplayMember = tab7.Columns(1).ToString
+            cmb_con_seg.ValueMember = tab7.Columns(0).ToString
+        Catch ex As Exception
+            MsgBox("Error:carga_inicial " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Private Sub ToolStripButton3_Click(sender As Object, e As EventArgs) Handles ToolStripButton3.Click
+        Me.Close()
+    End Sub
+    Private Sub grid_mat_prima_KeyDown(sender As Object, e As KeyEventArgs) Handles grid_mat_prima.KeyDown
+        If e.Modifiers = Keys.Control AndAlso e.KeyCode = Keys.I Then
+            grid_mat_prima.Rows.Add("-1", 0)
+        End If
+    End Sub
+
+    Private Sub grid_mat_prima_Click(sender As Object, e As EventArgs) Handles grid_mat_prima.Click
+        If grid_mat_prima.Rows.Count = 0 Then grid_mat_prima.Rows.Add("-1", 0)
+        If grid_mat_prima.CurrentCell.ColumnIndex = 7 Then
+            Dialog230.Dispose()
+            Dialog230.ban_tipo_grid = 1
+            Dialog230.ShowDialog()
+        End If
+
+    End Sub
+
+    Private Sub grid_mano_obra_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_mano_obra.CellContentClick
+
+    End Sub
+
+    Private Sub grid_mano_obra_Click(sender As Object, e As EventArgs) Handles grid_mano_obra.Click
+        If grid_mano_obra.Rows.Count = 0 Then grid_mano_obra.Rows.Add("-1", 0)
+    End Sub
+
+    Private Sub grid_mano_obra_KeyDown(sender As Object, e As KeyEventArgs) Handles grid_mano_obra.KeyDown
+        If e.Modifiers = Keys.Control AndAlso e.KeyCode = Keys.I Then
+            grid_mano_obra.Rows.Add("-1", 0)
+        End If
+    End Sub
+
+    Private Sub grid_gas_operac_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_gas_operac.CellContentClick
+
+    End Sub
+
+    Private Sub grid_gas_operac_Click(sender As Object, e As EventArgs) Handles grid_gas_operac.Click
+        If grid_gas_operac.Rows.Count = 0 Then grid_gas_operac.Rows.Add("-1", 0)
+        If grid_gas_operac.CurrentCell.ColumnIndex = 7 Then
+            Dialog230.Dispose()
+            'El tipo es gastos de operacion =3
+            Dialog230.ban_tipo_grid = 3
+            Dialog230.ShowDialog()
+        End If
+    End Sub
+
+    Private Sub grid_gas_operac_KeyDown(sender As Object, e As KeyEventArgs) Handles grid_gas_operac.KeyDown
+        If e.Modifiers = Keys.Control AndAlso e.KeyCode = Keys.I Then
+            grid_gas_operac.Rows.Add("-1", 0)
+        End If
+    End Sub
+    Public Function retorna_datos_documento_detalle(tipo As String, folio As String) As DataTable
+        Try
+
+            Dim imp_tot As Double = 0
+            If tipo = "CM" Then
+                Dim tab As New DataTable
+                tab = retorna_datos_documento_ventas_microsip(folio, "C")
+                If tab.Rows.Count > 0 Then
+                    Return tab
+                Else
+                    MsgBox("El folio:" & folio & " no existe en el sistema Microsip o es incorrecto", MsgBoxStyle.Information)
+                    Return Nothing
+                End If
+            ElseIf tipo = "ST" Then
+                Dim tab As New DataTable
+                tab = retorna_datos_sugerido_templado(folio)
+                If tab.Rows.Count > 0 Then
+                    Return tab
+                Else
+                    MsgBox("El folio:" & folio & " no existe como sugerido de Templado o es incorrecto", MsgBoxStyle.Information)
+                    Return Nothing
+                End If
+            ElseIf tipo = "SD" Then
+                Dim tab As New DataTable
+                Dim prec_mq As Double = 0
+                tab = retorna_datos_sugerido_doble_vidrio(folio)
+                If tab.Rows.Count > 0 Then
+                    Return tab
+                Else
+                    MsgBox("El folio:" & folio & " no existe como sugerido de Insulado o es incorrecto", MsgBoxStyle.Information)
+                    Return Nothing
+                End If
+            ElseIf tipo = "SL" Then
+                Dim tab As New DataTable
+                Dim prec_mq As Double = 0
+                tab = retorna_datos_sugerido_doble_vidrio(folio)
+                If tab.Rows.Count > 0 Then
+                    Return tab
+                Else
+                    MsgBox("El folio:" & folio & " no existe como sugerido de Laminado o es incorrecto", MsgBoxStyle.Information)
+                    Return Nothing
+                End If
+            ElseIf tipo = "SF" Then
+                'Retorna datos sugerido de Feltes
+                Dim tab As New DataTable
+                Dim prec_mq As Double = 0
+                tab = retorna_datos_sugerido_fletes(folio)
+                If tab.Rows.Count > 0 Then
+                    Return tab
+                Else
+                    MsgBox("El folio:" & folio & " no existe como sugerido de laminado o es incorrecto", MsgBoxStyle.Information)
+                    Return Nothing
+                End If
+            Else
+                Return Nothing
+            End If
+        Catch ex As Exception
+            MsgBox("Error:retorna_datos_documento_detalle " & ex.Message, MsgBoxStyle.Critical)
+            Return Nothing
+        End Try
+    End Function
+    Public Sub recalcula_sugerido_por_cambios()
+        Try
+            grid_comisiones.EndEdit()
+            grid_gas_operac.EndEdit()
+            grid_mano_obra.EndEdit()
+            grid_mat_prima.EndEdit()
+            calcula_conceptos_calc_automatico()
+            calcula_total_mano_obra_sin_cambio_totales()
+            calcula_comisiones_sin_cambio_totales(txt_subtotal.Text)
+            calcula_totales_grid_sin_cambio_a_subtotal()
+            recalcula_por_cambio_subtotal()
+        Catch ex As Exception
+            MsgBox("Error:recalcula_sugerido_por_cambios " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Private Sub ToolStripButton1_Click(sender As Object, e As EventArgs) Handles ToolStripButton1.Click
+        Try
+            Dim tab_con As New DataTable
+            If Len(txt_email.Text) > 10 And Len(txt_proyecto.Text) > 0 Then
+                tab_con = actualiza_relacion_contacto_hubspot()
+                If tab_con.Rows.Count > 0 Then
+                    If guarda_presupuesto_de_obra() > 0 Then
+                        guarda_o_actualiza_sugerido_hs(SUG_ID, txt_ubicacion.Text, tab_con)
+                        Me.Dispose()
+                    End If
+                End If
+            Else
+                MsgBox("Es nesesario colocar el correo del contacto con el que se registro en HubSpot y un nombre de Proyecto para guardar el sugerido", MsgBoxStyle.Critical)
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub Form46_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+
+    End Sub
+
+    Private Sub grid_mat_prima_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_mat_prima.CellContentClick
+
+    End Sub
+    Public Sub calcula_totales_grid()
+        Try
+            Dim tot_mat_prima As Double = 0
+            For Each x As DataGridViewRow In grid_mat_prima.Rows
+                tot_mat_prima += x.Cells(3).Value
+            Next
+            txt_tot_mat_prima.Text = FormatCurrency(tot_mat_prima)
+            Dim tot_mano_obra As Double = 0
+            For Each x As DataGridViewRow In grid_mano_obra.Rows
+                tot_mano_obra += x.Cells(3).Value
+            Next
+            txt_tot_man_obra.Text = FormatCurrency(tot_mano_obra)
+            Dim tot_gas_oper As Double = 0
+            For Each x As DataGridViewRow In grid_gas_operac.Rows
+                tot_gas_oper += x.Cells(3).Value
+            Next
+            txt_tot_gas_oper.Text = FormatCurrency(tot_gas_oper)
+            txt_cos_primo.Text = FormatCurrency(tot_mat_prima + tot_mano_obra)
+            txt_util_neta.Text = FormatCurrency(((tot_mat_prima + tot_mano_obra + tot_gas_oper) / ((100 - txt_util_por.Text) * 0.01)) - (tot_mat_prima + tot_mano_obra + tot_gas_oper))
+            txt_subtotal.Text = FormatCurrency(CDbl(txt_cos_primo.Text) + CDbl(txt_util_neta.Text) + CDbl(txt_tot_gas_oper.Text))
+            txt_iva.Text = FormatCurrency(CDbl(txt_subtotal.Text) * 0.16)
+            txt_total.Text = FormatCurrency(CDbl(txt_subtotal.Text) + CDbl(txt_iva.Text))
+            'Se calcula los conceptos que son automaticos
+            calcula_conceptos_calc_automatico()
+            'se genera de nuevo la sumatoria considerando el cambio de los conceptos automaticos
+            tot_mat_prima = 0
+            For Each x As DataGridViewRow In grid_mat_prima.Rows
+                tot_mat_prima += x.Cells(3).Value
+            Next
+            txt_tot_mat_prima.Text = FormatCurrency(tot_mat_prima)
+            tot_mano_obra = 0
+            For Each x As DataGridViewRow In grid_mano_obra.Rows
+                tot_mano_obra += x.Cells(3).Value
+            Next
+            txt_tot_man_obra.Text = FormatCurrency(tot_mano_obra)
+            tot_gas_oper = 0
+            For Each x As DataGridViewRow In grid_gas_operac.Rows
+                tot_gas_oper += x.Cells(3).Value
+            Next
+            txt_tot_gas_oper.Text = FormatCurrency(tot_gas_oper)
+            txt_cos_primo.Text = FormatCurrency(tot_mat_prima + tot_mano_obra)
+            txt_util_neta.Text = FormatCurrency(((tot_mat_prima + tot_mano_obra + tot_gas_oper) / ((100 - txt_util_por.Text) * 0.01)) - (tot_mat_prima + tot_mano_obra + tot_gas_oper))
+            txt_subtotal.Text = FormatCurrency(CDbl(txt_cos_primo.Text) + CDbl(txt_util_neta.Text) + CDbl(txt_tot_gas_oper.Text))
+            txt_iva.Text = FormatCurrency(CDbl(txt_subtotal.Text) * 0.16)
+            txt_total.Text = FormatCurrency(CDbl(txt_subtotal.Text) + CDbl(txt_iva.Text))
+            If CDbl(txt_subtotal.Text) > 0 Then
+                For Each x As DataGridViewRow In grid_mat_prima.Rows
+                    x.Cells(6).Value = (x.Cells(3).Value / CDbl(txt_subtotal.Text)) * 100
+                Next
+                For Each x As DataGridViewRow In grid_mano_obra.Rows
+                    x.Cells(6).Value = (x.Cells(3).Value / CDbl(txt_subtotal.Text)) * 100
+                Next
+                For Each x As DataGridViewRow In grid_gas_operac.Rows
+                    x.Cells(6).Value = (x.Cells(3).Value / CDbl(txt_subtotal.Text)) * 100
+                Next
+            End If
+        Catch ex As Exception
+            MsgBox("Error:calcula_totales_grid " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Public Sub calcula_totales_grid_sin_cambio_a_subtotal()
+        Try
+            Dim tot_mat_prima As Double = 0
+            For Each x As DataGridViewRow In grid_mat_prima.Rows
+                tot_mat_prima += x.Cells(3).Value
+            Next
+            txt_tot_mat_prima.Text = FormatCurrency(tot_mat_prima)
+            Dim tot_mano_obra As Double = 0
+            For Each x As DataGridViewRow In grid_mano_obra.Rows
+                tot_mano_obra += x.Cells(3).Value
+            Next
+            txt_tot_man_obra.Text = FormatCurrency(tot_mano_obra)
+            Dim tot_gas_oper As Double = 0
+            For Each x As DataGridViewRow In grid_gas_operac.Rows
+                tot_gas_oper += x.Cells(3).Value
+            Next
+            txt_tot_gas_oper.Text = FormatCurrency(tot_gas_oper)
+            txt_cos_primo.Text = FormatCurrency(tot_mat_prima + tot_mano_obra)
+        Catch ex As Exception
+            MsgBox("Error:calcula_totales_grid " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Public BAN_MOD As Integer = 0
+    Public Function retorna_base_para_calculo_gasto_administrativo_matprima() As Double
+        Dim val_ret As Double = 0
+        Try
+            For Each xx As DataGridViewRow In grid_mat_prima.Rows
+                Dim val_mul As Double = retorna_es_base_para_calculo_gasto_administrativo(xx.Cells(2).Value)
+                val_ret += val_mul * (xx.Cells(3).Value)
+            Next
+            For Each xx As DataGridViewRow In grid_mano_obra.Rows
+                If retorna_es_base_para_calculo_mano_obra_gasto_administrativo(xx.Cells(2).Value) > 0 Then val_ret += (xx.Cells(3).Value)
+            Next
+            'MsgBox(val_ret)
+            Return val_ret
+        Catch ex As Exception
+            MsgBox("Error:retorna_base_para_calculo_gasto_administrativo_matprima " & ex.Message, MsgBoxStyle.Critical)
+            Return val_ret
+        End Try
+    End Function
+    Public Sub calcula_conceptos_calc_automatico()
+        Try
+            If BAN_MOD = 0 Then
+                'calcula si el concepto es calculo automatico materia prima
+                For Each xx As DataGridViewRow In grid_mat_prima.Rows
+                    Dim val_autom As Double = retorna_valor_calculo_automatico("conceptos_mat_prima_obra", "a.concepto_mat_prima_id", CDbl(txt_subtotal.Text), xx.Cells(2).Value)
+                    If val_autom > 0 Then
+                        xx.Cells(3).Value = val_autom
+                        xx.Cells(3).ReadOnly = True
+                    End If
+                Next
+                'calcula si el concepto es de calculo automatico para gastos de operacion
+                For Each xy As DataGridViewRow In grid_gas_operac.Rows
+                    If xy.Cells(2).Value = 3592620 Or xy.Cells(2).Value = 4051235 Or xy.Cells(2).Value = 4186327 Then
+                        Dim base_calculo = retorna_base_para_calculo_gasto_administrativo_matprima()
+                        Dim val_autom As Double = retorna_valor_calculo_automatico("CONCEPTOS_GAS_OPERACION_OBRA", "a.CONCEPTO_GAS_OPERACION_OBRA_ID", CDbl(base_calculo), xy.Cells(2).Value)
+                        If val_autom > 0 Then
+                            xy.Cells(3).Value = val_autom
+                            xy.Cells(3).ReadOnly = True
+                        End If
+                    Else
+                        Dim val_autom As Double = retorna_valor_calculo_automatico("CONCEPTOS_GAS_OPERACION_OBRA", "a.CONCEPTO_GAS_OPERACION_OBRA_ID", CDbl(txt_subtotal.Text), xy.Cells(2).Value)
+                        If val_autom > 0 Then
+                            xy.Cells(3).Value = val_autom
+                            xy.Cells(3).ReadOnly = True
+                        End If
+                    End If
+                Next
+                calcula_comisiones_sin_cambio_totales(txt_subtotal.Text)
+            End If
+        Catch ex As Exception
+            MsgBox("Error:calcula_conceptos_calc_automatico " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Public Sub calcula_conceptos_calc_automatico_subtotal_fijo(subtotal As Double)
+        Try
+            If BAN_MOD = 0 Then
+                'calcula si el concepto es calculo automatico materia prima
+                For Each xx As DataGridViewRow In grid_mat_prima.Rows
+                    Dim val_autom As Double = retorna_valor_calculo_automatico("conceptos_mat_prima_obra", "a.concepto_mat_prima_id", CDbl(subtotal), xx.Cells(2).Value)
+                    If val_autom > 0 Then
+                        xx.Cells(3).Value = val_autom
+                        xx.Cells(3).ReadOnly = True
+                    End If
+                Next
+                'calcula si el concepto es de calculo automatico para gastos de operacion
+                For Each xy As DataGridViewRow In grid_gas_operac.Rows
+                    If xy.Cells(2).Value = 3592620 Then
+                        Dim base_calculo = retorna_base_para_calculo_gasto_administrativo_matprima()
+                        Dim val_autom As Double = retorna_valor_calculo_automatico("CONCEPTOS_GAS_OPERACION_OBRA", "a.CONCEPTO_GAS_OPERACION_OBRA_ID", CDbl(base_calculo), xy.Cells(2).Value)
+                        If val_autom > 0 Then
+                            xy.Cells(3).Value = val_autom
+                            xy.Cells(3).ReadOnly = True
+                        End If
+                    Else
+                        Dim val_autom As Double = retorna_valor_calculo_automatico("CONCEPTOS_GAS_OPERACION_OBRA", "a.CONCEPTO_GAS_OPERACION_OBRA_ID", CDbl(subtotal), xy.Cells(2).Value)
+                        If val_autom > 0 Then
+                            xy.Cells(3).Value = val_autom
+                            xy.Cells(3).ReadOnly = True
+                        End If
+                    End If
+                Next
+                calcula_comisiones_sin_cambio_totales(subtotal)
+            End If
+        Catch ex As Exception
+            MsgBox("Error: calcula_conceptos_calc_automatico_subtotal_fijo " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Private Sub grid_gas_operac_CellEndEdit(sender As Object, e As DataGridViewCellEventArgs) Handles grid_gas_operac.CellEndEdit
+        calcula_totales_grid()
+    End Sub
+
+    Private Sub grid_gas_operac_CellEnter(sender As Object, e As DataGridViewCellEventArgs) Handles grid_gas_operac.CellEnter
+        calcula_totales_grid()
+    End Sub
+
+    Private Sub grid_gas_operac_RowsRemoved(sender As Object, e As DataGridViewRowsRemovedEventArgs) Handles grid_gas_operac.RowsRemoved
+        calcula_totales_grid()
+    End Sub
+
+    Private Sub grid_mano_obra_CellEndEdit(sender As Object, e As DataGridViewCellEventArgs) Handles grid_mano_obra.CellEndEdit
+        calcula_totales_grid()
+    End Sub
+
+    Private Sub grid_mano_obra_CellEnter(sender As Object, e As DataGridViewCellEventArgs) Handles grid_mano_obra.CellEnter
+        calcula_totales_grid()
+    End Sub
+
+    Private Sub grid_mano_obra_RowsRemoved(sender As Object, e As DataGridViewRowsRemovedEventArgs) Handles grid_mano_obra.RowsRemoved
+        calcula_totales_grid()
+    End Sub
+
+    Private Sub grid_mat_prima_CellEndEdit(sender As Object, e As DataGridViewCellEventArgs) Handles grid_mat_prima.CellEndEdit
+        calcula_totales_grid()
+    End Sub
+
+    Private Sub grid_mat_prima_CellEnter(sender As Object, e As DataGridViewCellEventArgs) Handles grid_mat_prima.CellEnter
+        calcula_totales_grid()
+    End Sub
+
+    Private Sub grid_mat_prima_RowsRemoved(sender As Object, e As DataGridViewRowsRemovedEventArgs) Handles grid_mat_prima.RowsRemoved
+        calcula_totales_grid()
+    End Sub
+
+    Private Sub ToolStripButton4_Click(sender As Object, e As EventArgs) Handles ToolStripButton4.Click
+        Try
+            If lbl_estatus.Text <> "Aceptado" And lbl_estatus.Text <> "Cancelado" Then
+                If tab_per.Rows(199).Item(1) = "T" Then
+                    habilita_controles(True)
+                    BAN_MOD = 0
+                Else
+                    Dim res2 As Object = MsgBox("No tiene el permiso para " & tab_per.Rows(199).Item(0) & " ¿Deseas que lo autorice otro usuario?")
+                    If res2 = vbOK Then
+                        Dialog225.Dispose()
+                        Dim tab3 As New DataTable
+                        tab3 = CONSULTA_USUARIOS_ASIG_DE_UN_PERMISO("MODIFICAR_SUGERIDO_OBRA")
+                        If tab3.Rows.Count > 0 Then
+                            Dialog225.cmb_usuario.DataSource = tab3
+                            Dialog225.cmb_usuario.DisplayMember = tab3.Columns(1).ToString
+                            Dialog225.cmb_usuario.ValueMember = tab3.Columns(0).ToString
+                            Dialog225.ShowDialog()
+                        Else
+                            MsgBox("No Existen usuarios con este permiso asignado")
+                        End If
+                        If Dialog225.ban_autor = 1 Then
+                            habilita_controles(True)
+                            BAN_MOD = 0
+                        End If
+                    End If
+                End If
+            Else
+                MsgBox("El estatus actual del presupuesto ya no es posible realizar modificaciones", MsgBoxStyle.Information)
+            End If
+        Catch ex As Exception
+            MsgBox("Error:" & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Public Sub habilita_controles(val As Boolean)
+        txt_cliente.Enabled = val
+        txt_proyecto.Enabled = val
+        txt_ubicacion.Enabled = val
+        cal_fecha.Enabled = val
+        grid_mano_obra.Enabled = val
+        Dim val2 As Boolean = False
+        If val = False Then val2 = True
+        'grid_mat_prima.Enabled = val
+        grid_mat_prima.Columns(2).ReadOnly = val2
+        grid_mat_prima.Columns(3).ReadOnly = val2
+        grid_mat_prima.Columns(7).Visible = val
+        grid_gas_operac.Enabled = val
+        grid_comisiones.Enabled = val
+        grid_man_obra.Enabled = val
+        ToolStripButton1.Enabled = val
+        ToolStripButton2.Enabled = val
+        cmb_vendedor.Enabled = val
+        Button1.Enabled = val
+        Button2.Enabled = val
+        cmb_tipo.Enabled = val
+        cmb_empleados.Enabled = val
+        txt_descripcion.Enabled = val
+        Agregar.Enabled = val
+        cmb_empleados.Enabled = val
+        grid_mano_obra.Enabled = val
+        Button2.Enabled = val
+        grid_comisiones.Enabled = val
+        cmb_con_seg.Enabled = val
+        Button3.Enabled = val
+        grid_anexo7.Enabled = val
+        txt_email.Enabled = val
+    End Sub
+    Public Function guarda_relacion_usuario_hubspot()
+        Try
+            If Len(Trim(correo_hubspot)) > 0 Then
+                Dim tab As New DataTable
+                Dim var As String = "?email=" & Trim(correo_hubspot)
+                tab = obtener_usuarios(var)
+                If tab.Rows.Count > 0 Then
+                    actualiza_id_usuario_hubspot(usr_id42, tab.Rows(0).Item(0))
+                    usuario_id_hubspot = tab.Rows(0).Item(0)
+                    Return 1
+                Else
+                    Return 0
+                End If
+            Else
+                Return 0
+            End If
+        Catch ex As Exception
+            MsgBox("Error:guarda_relacion_usuario_hubspot " & ex.Message)
+            Return 0
+        End Try
+    End Function
+
+    Public Sub guarda_o_actualiza_sugerido_hs(sug_id As Integer, UBICACION As String, tab_con As DataTable)
+        Try
+            If sug_id > 0 Then
+                Dim usuario_id_hubspot2 As String = retorna_id_hubspot_vendedores_obra(cmb_vendedor.SelectedValue.ToString)
+                If Trim(usuario_id_hubspot2) <> "0" Then
+                    If tab_con.Rows.Count > 0 Then
+                        Dim CONT(tab_con.Rows.Count) As String
+                        Dim rr As Integer = 0
+                        Dim compa(1) As String
+                        For Each x As DataRow In tab_con.Rows
+                            CONT.SetValue(x("id_hub"), rr)
+                            If Len(x("compania")) > 0 Then compa(0) = x("compania")
+                            rr += 1
+                        Next
+                        Dim ruta_archivo As String = crea_PDF_segunda_version(72)
+                        ' CreaPDF(sug_id, "PRESUPUESTO DE OBRA " & UCase(UBICACION))
+                        Dim id_hub As String = ""
+                        Dim nota As String = "PRESUPUESTO DE OBRA  Ubicado en: " & txt_ubicacion.Text
+                        If lbl_id_hubspot.Text.Length > 2 Then
+                            actualiza_negocio_hs(lbl_id_hubspot.Text, txt_folio.Text & " " & txt_proyecto.Text, nota, FormatNumber(txt_total.Text, 2,,, TriState.False), CONT, compa, "", "", "")
+                            Dim id_archivo As String = retorna_id_archivo_negocio_hs(sug_id, lbl_id_hubspot.Text)
+                            Dim id_archivo2 As String = carga_archivo(ruta_archivo, "Presupuesto_de_Obra.pdf")
+                            Dim not_archivo As String = agregar_una_nota_con_archivo(lbl_id_hubspot.Text, nota, id_archivo2, usuario_id_hubspot2, compa, CONT)
+                            'GUARDA LA RELACION DEL NEGOCIO CON EL ARCHIVO
+                            guarda_relacion_archivos_con_negocios_hubspot(sug_id, lbl_id_hubspot.Text, id_archivo2, not_archivo)
+                        Else
+                            id_hub = guardar_negocio_con_archivo_y_ruta_saca(txt_folio.Text & " " & txt_proyecto.Text, usuario_id_hubspot2, FormatNumber(txt_total.Text, 2,,, TriState.False), nota, "MXN", txt_folio.Text, "PRESUPUESTO OBRA", CONT, compa, sug_id, ruta_archivo)
+                        End If
+                        If Len(id_hub) > 0 Then
+                            actualiza_id_negosio_obra_saca_hs(sug_id, id_hub)
+                            lbl_id_hubspot.Text = id_hub
+                        End If
+                    End If
+                Else
+                    MsgBox("El Vendedor ya se encuentra dado de baja, o no existe relacion con HubSpot", MsgBoxStyle.Critical)
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error:guarda_o_actualiza_sugerido_hs " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub grid_mat_prima_ClientSizeChanged(sender As Object, e As EventArgs) Handles grid_mat_prima.ClientSizeChanged
+
+    End Sub
+    Public Sub ABRE_DOCUMENTO_RELACIONADO(grid As DataGridView)
+        Try
+            If grid.CurrentCell.ColumnIndex = 9 Then
+
+            End If
+        Catch ex As Exception
+            MsgBox("Error:ABRE_DOCUMENTO_RELACIONADO " & ex.Message)
+        End Try
+    End Sub
+    Private Sub grid_mat_prima_CellDoubleClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_mat_prima.CellDoubleClick
+        ABRE_DOCUMENTO_RELACIONADO(grid_mat_prima)
+    End Sub
+
+    Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
+        txt_subtotal.ReadOnly = False
+    End Sub
+
+    Private Sub txt_util_neta_TextChanged(sender As Object, e As EventArgs) Handles txt_util_neta.TextChanged
+
+    End Sub
+
+    Private Sub txt_util_neta_KeyDown(sender As Object, e As KeyEventArgs) Handles txt_util_neta.KeyDown
+        If e.KeyCode = Keys.Enter Then
+
+        End If
+    End Sub
+    Public Sub recalcula_por_cambio_subtotal()
+        Try
+            txt_util_neta.Text = txt_subtotal.Text - (CDbl(txt_cos_primo.Text) + CDbl(txt_tot_gas_oper.Text))
+            txt_util_por.Text = Math.Round(100 - (((CDbl(txt_cos_primo.Text) + CDbl(txt_tot_gas_oper.Text)) / ((CDbl(txt_subtotal.Text) * 0.01)))), 4)
+
+        Catch ex As Exception
+            MsgBox("Error:recalcula_por_cambio_subtotal " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub txt_subtotal_TextChanged(sender As Object, e As EventArgs) Handles txt_subtotal.TextChanged
+
+    End Sub
+    Public valor_subtotal_fijo As Double
+    Private Sub txt_subtotal_KeyDown(sender As Object, e As KeyEventArgs) Handles txt_subtotal.KeyDown
+        If e.KeyCode = Keys.Enter Then
+            valor_subtotal_fijo = txt_subtotal.Text
+            lbl1.Text = valor_subtotal_fijo
+            calcula_conceptos_calc_automatico_subtotal_fijo(valor_subtotal_fijo)
+            calcula_conceptos_anexo7(valor_subtotal_fijo)
+            calcula_total_mano_obra_sin_cambio_totales()
+            calcula_comisiones_sin_cambio_totales(valor_subtotal_fijo)
+            calcula_totales_grid_sin_cambio_a_subtotal()
+            recalcula_por_cambio_subtotal()
+        End If
+    End Sub
+    Public Sub imprime_formato_sugerido_envio(ByVal e As System.Drawing.Printing.PrintPageEventArgs, ByVal sugerido_id As Integer)
+        'Imprime el encabezado del reporte'
+        Dim tab As New DataTable
+        tab = retorna_datos_sugerido_obra(sugerido_id)
+        If tab.Rows.Count > 0 Then
+            e.Graphics.DrawImage(My.Resources.logo_mega2, 10, 10)
+            e.Graphics.DrawString("PRESUPUESTO POR PROYECTO", New Font("Arial", 13, FontStyle.Bold), Brushes.Black, 310, 20)
+            e.Graphics.DrawLine(Pens.Black, 5, 10, 800, 10)
+            e.Graphics.DrawLine(Pens.Black, 10, 1070, 800, 1070)
+            e.Graphics.DrawLine(Pens.Black, 180, 60, 800, 60)
+            e.Graphics.DrawLine(Pens.Black, 180, 10, 180, 100)
+            e.Graphics.DrawLine(Pens.Black, 360, 60, 360, 100)
+            e.Graphics.DrawLine(Pens.Black, 490, 60, 490, 140)
+            e.Graphics.DrawLine(Pens.Black, 5, 10, 5, 1070)
+            e.Graphics.DrawLine(Pens.Black, 800, 10, 800, 1070)
+            e.Graphics.DrawString("Folio: " & tab.Rows(0).Item(1), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 700, 20)
+            e.Graphics.DrawString("Fe.Imp:" & Now, New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 600, 40)
+            e.Graphics.DrawString("Codigo: CT-REG-13", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 200, 65)
+            e.Graphics.DrawLine(Pens.Black, 10, 100, 800, 100)
+            e.Graphics.DrawString("Revision: 00", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 370, 65)
+            e.Graphics.DrawString("Elaboro:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 500, 65)
+            e.Graphics.DrawString(tab.Rows(0).Item(15), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 500, 80)
+            e.Graphics.DrawString("Pagina 1 de 1", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 680, 80)
+            e.Graphics.DrawString("Fecha:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 495, 105)
+            e.Graphics.DrawString(tab.Rows(0).Item(2), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 495, 120)
+            e.Graphics.DrawLine(Pens.Black, 580, 100, 580, 180)
+            e.Graphics.DrawString("Estatus:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 10, 105)
+            e.Graphics.DrawString(tab.Rows(0).Item(7), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 10, 120)
+            e.Graphics.DrawLine(Pens.Black, 120, 100, 120, 140)
+            e.Graphics.DrawString("Cliente:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 140, 105)
+            e.Graphics.DrawString(tab.Rows(0).Item(3), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 140, 120)
+            e.Graphics.DrawString("Vendedor", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 10, 140)
+            e.Graphics.DrawString(tab.Rows(0).Item(6), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 10, 155)
+            e.Graphics.DrawLine(Pens.Black, 200, 140, 200, 180)
+            e.Graphics.DrawString(Mid("Proyecto: " & tab.Rows(0).Item(4), 1, 50), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 200, 140)
+            e.Graphics.DrawString(Mid("" & tab.Rows(0).Item(4), 41, 50), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 200, 155)
+            e.Graphics.DrawLine(Pens.Black, 5, 140, 580, 140)
+            e.Graphics.DrawLine(Pens.Black, 5, 180, 800, 180)
+            Dim posy As Integer = 185
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawString("MATERIA PRIMA: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 10, posy)
+            e.Graphics.DrawString("Importe ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 370, posy)
+            e.Graphics.DrawString("Porcentaje ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 450, posy)
+            e.Graphics.DrawString("Presupuesto ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 550, posy)
+            posy += 18
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            Dim tab2 As New DataTable
+            tab2 = retorna_datos_sugerido_obra_det(sugerido_id, "MP")
+            Dim tot_mp As Double = 0
+            If tab2.Rows.Count > 0 Then
+                For Each x As DataRow In tab2.Rows
+                    e.Graphics.DrawString(x("descripcion"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 10, posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(x("presupuesto"), 400), posy)
+                    e.Graphics.DrawString(x("porcentaje") & "%", New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(x("porcentaje"), 500), posy)
+                    e.Graphics.DrawString("" & x("folio"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 565, posy)
+                    posy += 15
+                    tot_mp += x("presupuesto")
+                Next
+            End If
+            Dim pos_tot_mat_prima As Integer = posy
+            e.Graphics.DrawString("TOTAL MATERIA PRIMA: " & FormatCurrency(tot_mp), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 150, posy)
+            posy += 18
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawString("MANO DE OBRA: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 10, posy)
+            posy += 18
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            Dim tab3 As New DataTable
+            tab3 = retorna_datos_sugerido_obra_det(sugerido_id, "MO")
+            Dim tot_mo As Double = 0
+            If tab3.Rows.Count > 0 Then
+                For Each x As DataRow In tab3.Rows
+                    e.Graphics.DrawString(x("descripcion"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 10, posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(x("presupuesto"), 400), posy)
+                    e.Graphics.DrawString(x("porcentaje") & "%", New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(x("porcentaje"), 500), posy)
+                    posy += 15
+                    tot_mo += x("presupuesto")
+                Next
+            End If
+            posy += 15
+            Dim pos_to_mo As Integer = posy
+            e.Graphics.DrawString("TOTAL MANO DE OBRA: " & FormatCurrency(tot_mo), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 150, posy)
+            posy += 15
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawString("GASTOS DE OPERACION: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 10, posy)
+            posy += 15
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            Dim tab4 As New DataTable
+            tab4 = retorna_datos_sugerido_obra_det(SUG_ID, "GO")
+            Dim tot_gas_oper As Double = 0
+            If tab4.Rows.Count > 0 Then
+                For Each x As DataRow In tab4.Rows
+                    e.Graphics.DrawString(x("descripcion"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 10, posy)
+                    e.Graphics.DrawString(FormatCurrency(x("presupuesto")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto")), 400), posy)
+                    e.Graphics.DrawString(x("porcentaje") & "%", New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(x("porcentaje"), 500), posy)
+                    e.Graphics.DrawString("" & x("folio"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 565, posy)
+                    posy += 15
+                    tot_gas_oper += x("presupuesto")
+                Next
+            End If
+            Dim pos_to_go As Integer = posy
+            e.Graphics.DrawString("TOTAL GASTOS DE OPERACION: " & FormatCurrency(tot_gas_oper), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 150, posy)
+            posy += 15
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawString("Costo Primo: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_mo + tot_mp), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_mo + tot_mp), 650), posy)
+            posy += 15
+            e.Graphics.DrawString("+ Gastos de operacion: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_gas_oper), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_gas_oper), 650), posy)
+            posy += 15
+            e.Graphics.DrawString("= Costo Total: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_gas_oper + tot_mo + tot_mp), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_gas_oper), 650), posy)
+            posy += 15
+            e.Graphics.DrawString("+ Utilidad Neta: " & tab.Rows(0).Item(8) & "%", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, posy)
+            Dim porc_util As Double = ((tot_mp + tot_mo + tot_gas_oper) / ((100 - tab.Rows(0).Item(8)) * 0.01)) - (tot_mp + tot_mo + tot_gas_oper)
+            e.Graphics.DrawString(FormatCurrency(porc_util), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(porc_util), 650), posy)
+            posy += 15
+            e.Graphics.DrawString(FormatPercent(tot_mp / (porc_util + tot_gas_oper + tot_mo + tot_mp)), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, pos_tot_mat_prima)
+            e.Graphics.DrawString(FormatPercent(tot_mo / (porc_util + tot_gas_oper + tot_mo + tot_mp)), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, pos_to_mo)
+            e.Graphics.DrawString(FormatPercent(tot_gas_oper / (porc_util + tot_gas_oper + tot_mo + tot_mp)), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 470, pos_to_go)
+            posy += 15
+            e.Graphics.DrawString("Subtotal: ", New Font("Arial", 12, FontStyle.Bold), Brushes.Black, 590, 105)
+            e.Graphics.DrawString(FormatCurrency(porc_util + tot_gas_oper + tot_mo + tot_mp), New Font("Arial", 12, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(porc_util + tot_gas_oper + tot_mo + tot_mp), 740), 105)
+            posy += 15
+            e.Graphics.DrawString("Iva(16%): ", New Font("Arial", 12, FontStyle.Bold), Brushes.Black, 590, 125)
+            e.Graphics.DrawString(FormatCurrency((porc_util + tot_gas_oper + tot_mo + tot_mp) * 0.16), New Font("Arial", 12, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency((porc_util + tot_gas_oper + tot_mo + tot_mp) * 0.16), 740), 125)
+            posy += 15
+            e.Graphics.DrawString("Total: ", New Font("Arial", 12, FontStyle.Bold), Brushes.Black, 590, 145)
+            e.Graphics.DrawString(FormatCurrency((porc_util + tot_gas_oper + tot_mo + tot_mp) * 1.16), New Font("Arial", 12, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency((porc_util + tot_gas_oper + tot_mo + tot_mp) * 1.16), 740), 145)
+            Dim pos_y As Integer = 950
+            e.Graphics.DrawString("Notas:" & tab.Rows(0).Item(16), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 10, pos_y)
+            pos_y += 30
+            'Imprime las firmas del operador 
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y, 800, pos_y)
+            e.Graphics.DrawString("ELABORO", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 45, pos_y)
+            e.Graphics.DrawString("REVISO", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 240, pos_y)
+            e.Graphics.DrawLine(Pens.Black, 210, pos_y, 210, pos_y + 150)
+            e.Graphics.DrawString("REVISO", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 440, pos_y)
+            e.Graphics.DrawLine(Pens.Black, 410, pos_y, 410, pos_y + 150)
+            e.Graphics.DrawString("AUTORIZO", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 640, pos_y)
+            e.Graphics.DrawLine(Pens.Black, 610, pos_y, 610, pos_y + 150)
+            pos_y += 15
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y, 800, pos_y)
+            pos_y += 40
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y, 800, pos_y)
+            e.Graphics.DrawString("Nombre y Firma", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 30, pos_y)
+            e.Graphics.DrawString("Nombre y Firma", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 230, pos_y)
+            e.Graphics.DrawString("Nombre y Firma", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 430, pos_y)
+            e.Graphics.DrawString("Nombre y Firma", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 630, pos_y)
+        Else
+            MsgBox("No existen datos para mostrar en el reporte")
+        End If
+    End Sub
+    Public pos_y46 As Integer
+    Public tipo46 As Integer
+    Public Sub imprime_formato_sugerido_envio_detalle(ByVal e As System.Drawing.Printing.PrintPageEventArgs, ByVal sugerido_id As Integer, tipo_consulta As Integer, posgl_y As Integer)
+        'Imprime el encabezado del reporte'
+        Dim tab As New DataTable
+        tab = retorna_datos_sugerido_obra(sugerido_id)
+        If tab.Rows.Count > 0 Then
+            e.Graphics.DrawImage(My.Resources.logo_mega2, 10, 10)
+            e.Graphics.DrawString("PRESUPUESTO POR PROYECTO DETALLE", New Font("Arial", 13, FontStyle.Bold), Brushes.Black, 210, 20)
+            e.Graphics.DrawLine(Pens.Black, 5, 10, 800, 10)
+            e.Graphics.DrawLine(Pens.Black, 10, 1070, 800, 1070)
+            e.Graphics.DrawLine(Pens.Black, 180, 60, 800, 60)
+            e.Graphics.DrawLine(Pens.Black, 180, 10, 180, 100)
+            e.Graphics.DrawLine(Pens.Black, 360, 60, 360, 100)
+            e.Graphics.DrawLine(Pens.Black, 490, 60, 490, 140)
+            e.Graphics.DrawLine(Pens.Black, 5, 10, 5, 1070)
+            e.Graphics.DrawLine(Pens.Black, 800, 10, 800, 1070)
+            e.Graphics.DrawString("Folio: " & tab.Rows(0).Item(1), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 700, 20)
+            e.Graphics.DrawString("Fe.Imp:" & Now, New Font("Arial", 7, FontStyle.Bold), Brushes.Black, 600, 40)
+            e.Graphics.DrawString("Codigo: CT-REG-13", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 200, 65)
+            e.Graphics.DrawLine(Pens.Black, 10, 100, 800, 100)
+            e.Graphics.DrawString("Revision: 00", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 370, 65)
+            e.Graphics.DrawString("Elaboro:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 500, 65)
+            e.Graphics.DrawString(tab.Rows(0).Item(15), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 500, 80)
+            e.Graphics.DrawString("Pagina 1 de 1", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 680, 80)
+            e.Graphics.DrawString("Fecha:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 495, 105)
+            e.Graphics.DrawString(tab.Rows(0).Item(2), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 495, 120)
+            e.Graphics.DrawLine(Pens.Black, 580, 100, 580, 180)
+            e.Graphics.DrawString("Estatus:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 10, 105)
+            e.Graphics.DrawString(tab.Rows(0).Item(7), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 10, 120)
+            e.Graphics.DrawLine(Pens.Black, 120, 100, 120, 140)
+            e.Graphics.DrawString("Cliente:", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 140, 105)
+            e.Graphics.DrawString(tab.Rows(0).Item(3), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 140, 120)
+            e.Graphics.DrawString("Vendedor", New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 10, 140)
+            e.Graphics.DrawString(tab.Rows(0).Item(6), New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 10, 155)
+            e.Graphics.DrawLine(Pens.Black, 200, 140, 200, 180)
+            e.Graphics.DrawString(Mid("Proyecto: " & tab.Rows(0).Item(4), 1, 50), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 200, 140)
+            e.Graphics.DrawString(Mid("" & tab.Rows(0).Item(4), 41, 50), New Font("Arial", 9, FontStyle.Bold), Brushes.Black, 200, 155)
+            e.Graphics.DrawLine(Pens.Black, 5, 140, 580, 140)
+            e.Graphics.DrawLine(Pens.Black, 5, 180, 800, 180)
+            Dim posy As Integer = 185
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawString("MATERIA PRIMA: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 10, posy)
+            e.Graphics.DrawString("Importe ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 370, posy)
+            e.Graphics.DrawString("Porcentaje ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 450, posy)
+            e.Graphics.DrawString("Presupuesto ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 550, posy)
+            posy += 18
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            Dim tab2 As New DataTable
+            tab2 = retorna_datos_sugerido_obra_det_materiales(sugerido_id, "MP")
+            Dim tot_mp As Double = 0
+            If tab2.Rows.Count > 0 Then
+                For x = posgl_y To tab2.Rows.Count - 1
+                    If tab2.Rows(x).Item(0) > 0 Then
+                        e.Graphics.DrawString(tab2.Rows(x).Item(10), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 10, posy)
+                        e.Graphics.DrawString(FormatCurrency(tab2.Rows(x).Item(2)), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(tab2.Rows(x).Item(2), 400), posy)
+                        e.Graphics.DrawString(tab2.Rows(x).Item(5) & "%", New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(tab2.Rows(x).Item(5), 500), posy)
+                        'e.Graphics.DrawString("" & tab2.Rows(x).Item(5) & " " & tab2.Rows(x).Item(7), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 565, posy)
+                        posy += 15
+                        tot_mp += tab2.Rows(x).Item(2)
+                    Else
+                        e.Graphics.DrawString(tab2.Rows(x).Item(10), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 10, posy)
+                        If tab2.Rows(x).Item(2).ToString = "Total" Then
+                            e.Graphics.DrawString(tab2.Rows(x).Item(2), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(tab2.Rows(x).Item(2), 650), posy)
+                        Else
+                            e.Graphics.DrawString(FormatCurrency(tab2.Rows(x).Item(2)), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(tab2.Rows(x).Item(2)), 650), posy)
+                        End If
+                        e.Graphics.DrawString(tab2.Rows(x).Item(5) & "  " & tab2.Rows(x).Item(7), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(tab2.Rows(x).Item(5), 550), posy)
+                        posy += 15
+                    End If
+                Next
+            End If
+            Dim pos_tot_mat_prima As Integer = posy
+            e.Graphics.DrawString("TOTAL MATERIA PRIMA: " & FormatCurrency(tot_mp), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 150, posy)
+            posy += 18
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawString("MANO DE OBRA: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 10, posy)
+            posy += 18
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            Dim tab3 As New DataTable
+            tab3 = retorna_datos_sugerido_obra_det_materiales(sugerido_id, "MO")
+            Dim tot_mo As Double = 0
+            If tab3.Rows.Count > 0 Then
+                For Each x As DataRow In tab3.Rows
+                    If x("docto_sugerido_obra_det_id") > 0 Then
+                        e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+                        e.Graphics.DrawString(x("descripcion"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 10, posy)
+                        e.Graphics.DrawString(IIf(IsNumeric(x("presupuesto")), FormatCurrency(x("presupuesto")), x("presupuesto")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(x("presupuesto"), 400), posy)
+                        e.Graphics.DrawString(x("porcentaje") & "%", New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(x("porcentaje"), 500), posy)
+                        e.Graphics.DrawString("" & x("folio"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 565, posy)
+                        e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+                        posy += 15
+                        tot_mo += x("presupuesto")
+                    Else
+                        e.Graphics.DrawString(x("descripcion"), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 10, posy)
+                        If x("presupuesto").ToString = "Total" Then
+                            e.Graphics.DrawString(x("presupuesto"), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(x("presupuesto"), 650), posy)
+                        Else
+                            e.Graphics.DrawString(FormatCurrency(x("presupuesto")), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(FormatCurrency(x("presupuesto")), 650), posy)
+                        End If
+                        e.Graphics.DrawString(x("porcentaje") & "  " & x("folio"), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(x("porcentaje"), 550), posy)
+                        posy += 13
+                    End If
+                Next
+            End If
+            Dim pos_to_mo As Integer = posy
+            e.Graphics.DrawString("TOTAL MANO DE OBRA: " & FormatCurrency(tot_mo), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 150, posy)
+            posy += 15
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawString("GASTOS DE OPERACION: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 10, posy)
+            posy += 15
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            Dim tab4 As New DataTable
+            tab4 = retorna_datos_sugerido_obra_det_materiales(SUG_ID, "GO")
+            Dim tot_gas_oper As Double = 0
+            If tab4.Rows.Count > 0 Then
+                For Each x As DataRow In tab4.Rows
+                    If x("docto_sugerido_obra_det_id") > 0 Then
+                        e.Graphics.DrawString(x("descripcion"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 10, posy)
+                        e.Graphics.DrawString(IIf(IsNumeric(x("presupuesto")), FormatCurrency(x("presupuesto")), x("presupuesto")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(x("presupuesto"), 400), posy)
+                        e.Graphics.DrawString(x("porcentaje") & "%", New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(x("porcentaje"), 500), posy)
+                        e.Graphics.DrawString("" & x("folio"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 565, posy)
+                        posy += 15
+                        tot_gas_oper += x("presupuesto")
+                    Else
+                        e.Graphics.DrawString(x("descripcion"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, 10, posy)
+                        'e.Graphics.DrawString(IIf(IsNumeric(x("presupuesto")), FormatCurrency(x("presupuesto")), x("presupuesto")), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(x("presupuesto"), 600), posy)
+                        e.Graphics.DrawString(x("porcentaje") & "  " & x("folio"), New Font("Arial", 9, FontStyle.Regular), Brushes.Black, genera_posicion_impresion(x("porcentaje"), 500), posy)
+                        posy += 15
+                    End If
+                Next
+            End If
+            Dim pos_to_go As Integer = posy
+            e.Graphics.DrawString("TOTAL GASTOS DE OPERACION: " & FormatCurrency(tot_gas_oper), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 150, posy)
+            posy += 15
+            e.Graphics.DrawLine(Pens.Black, 5, posy, 800, posy)
+            e.Graphics.DrawString("Costo Primo: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_mo + tot_mp), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_mo + tot_mp), 650), posy)
+            posy += 15
+            e.Graphics.DrawString("+ Gastos de operacion: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_gas_oper), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_gas_oper), 650), posy)
+            posy += 15
+            e.Graphics.DrawString("= Costo Total: ", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, posy)
+            e.Graphics.DrawString(FormatCurrency(tot_gas_oper + tot_mo + tot_mp), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(tot_gas_oper), 650), posy)
+            posy += 15
+            e.Graphics.DrawString("+ Utilidad Neta: " & tab.Rows(0).Item(8) & "%", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, posy)
+            Dim porc_util As Double = ((tot_mp + tot_mo + tot_gas_oper) / ((100 - tab.Rows(0).Item(8)) * 0.01)) - (tot_mp + tot_mo + tot_gas_oper)
+            e.Graphics.DrawString(FormatCurrency(porc_util), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(porc_util), 650), posy)
+            posy += 15
+            e.Graphics.DrawString("Subtotal: ", New Font("Arial", 12, FontStyle.Bold), Brushes.Black, 590, 105)
+            e.Graphics.DrawString(FormatCurrency(porc_util + tot_gas_oper + tot_mo + tot_mp), New Font("Arial", 12, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency(porc_util + tot_gas_oper + tot_mo + tot_mp), 740), 105)
+            posy += 15
+            e.Graphics.DrawString("Iva(16%): ", New Font("Arial", 12, FontStyle.Bold), Brushes.Black, 590, 125)
+            e.Graphics.DrawString(FormatCurrency((porc_util + tot_gas_oper + tot_mo + tot_mp) * 0.16), New Font("Arial", 12, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency((porc_util + tot_gas_oper + tot_mo + tot_mp) * 0.16), 740), 125)
+            posy += 15
+            e.Graphics.DrawString("Total: ", New Font("Arial", 12, FontStyle.Bold), Brushes.Black, 590, 145)
+            e.Graphics.DrawString(FormatCurrency((porc_util + tot_gas_oper + tot_mo + tot_mp) * 1.16), New Font("Arial", 12, FontStyle.Bold), Brushes.Black, genera_posicion_impresion(FormatCurrency((porc_util + tot_gas_oper + tot_mo + tot_mp) * 1.16), 740), 145)
+            e.Graphics.DrawString(FormatPercent(tot_mp / (porc_util + tot_gas_oper + tot_mo + tot_mp)), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, pos_tot_mat_prima)
+            e.Graphics.DrawString(FormatPercent(tot_mo / (porc_util + tot_gas_oper + tot_mo + tot_mp)), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 400, pos_to_mo)
+            e.Graphics.DrawString(FormatPercent(tot_gas_oper / (porc_util + tot_gas_oper + tot_mo + tot_mp)), New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 470, pos_to_go)
+            Dim pos_y As Integer = 965
+            e.Graphics.DrawString("Notas:" & tab.Rows(0).Item(16), New Font("Arial", 8, FontStyle.Regular), Brushes.Black, 10, pos_y)
+            pos_y += 30
+            'Imprime las firmas del operador 
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y, 800, pos_y)
+            e.Graphics.DrawString("ELABORO", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 45, pos_y)
+            e.Graphics.DrawString("REVISO", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 240, pos_y)
+            e.Graphics.DrawLine(Pens.Black, 210, pos_y, 210, pos_y + 150)
+            e.Graphics.DrawString("REVISO", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 440, pos_y)
+            e.Graphics.DrawLine(Pens.Black, 410, pos_y, 410, pos_y + 150)
+            e.Graphics.DrawString("AUTORIZO", New Font("Arial", 8, FontStyle.Bold), Brushes.Black, 640, pos_y)
+            e.Graphics.DrawLine(Pens.Black, 610, pos_y, 610, pos_y + 150)
+            pos_y += 15
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y, 800, pos_y)
+            pos_y += 40
+            e.Graphics.DrawLine(Pens.Black, 10, pos_y, 800, pos_y)
+            e.Graphics.DrawString("Nombre y Firma", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 30, pos_y)
+            e.Graphics.DrawString("Nombre y Firma", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 230, pos_y)
+            e.Graphics.DrawString("Nombre y Firma", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 430, pos_y)
+            e.Graphics.DrawString("Nombre y Firma", New Font("Arial", 10, FontStyle.Bold), Brushes.Black, 630, pos_y)
+        Else
+            MsgBox("No existen datos para mostrar en el reporte")
+        End If
+    End Sub
+
+    Private Sub ToolStripButton6_Click(sender As Object, e As EventArgs)
+        ban_repor = 72
+        Form4.print_prev.Document = Form4.print_doc
+        Form4.print_prev.InvalidatePreview()
+        Form4.print_prev.Refresh()
+        Form4.ShowDialog()
+    End Sub
+    Friend Function valida_empledo_no_exista(num_empleado As Integer) As Integer
+        Try
+            Dim rep As Integer = 0
+            For Each x As DataGridViewRow In grid_man_obra.Rows
+                If x.Cells(1).Value = num_empleado Then
+                    rep += 1
+                End If
+            Next
+            Return rep
+        Catch ex As Exception
+            MsgBox("Error:valida_empledo_no_exista " & ex.Message)
+            Return 1
+        End Try
+    End Function
+    Private Sub Agregar_Click(sender As Object, e As EventArgs) Handles Agregar.Click
+        If valida_empledo_no_exista(cmb_empleados.SelectedValue.ToString) = 0 Then
+            Dim suel_emple As Double = retorna_sueldo_diario_empleado(cmb_empleados.SelectedValue.ToString, 0)
+            grid_man_obra.Rows.Add("0", cmb_empleados.SelectedValue.ToString, cmb_empleados.Text, suel_emple)
+        Else
+            MsgBox("El empleado seleccionado ya se encuentra asignado en el presupuesto", MsgBoxStyle.Information)
+        End If
+    End Sub
+
+    Private Sub grid_man_obra_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_man_obra.CellContentClick
+
+    End Sub
+    Public Sub calcula_total_mano_obra()
+        Try
+            Dim tot_man As Double = 0
+            For Each x As DataGridViewRow In grid_man_obra.Rows
+                tot_man += x.Cells(5).Value
+            Next
+            txt_tot_mano_obra.Text = tot_man
+            Dim ban As Integer = 0
+            For Each t As DataGridViewRow In grid_mano_obra.Rows
+                If t.Cells(2).Value = 3580843 Then
+                    t.Cells(3).Value = tot_man
+                    ban = 1
+                End If
+            Next
+            If ban = 0 Then
+                grid_mano_obra.Rows.Add("-1", 0, 3580843, tot_man)
+            End If
+            calcula_totales_grid()
+        Catch ex As Exception
+            MsgBox("Error:calcula_total_mano_obra " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Public Sub calcula_total_mano_obra_sin_cambio_totales()
+        Try
+            Dim tot_man As Double = 0
+            For Each x As DataGridViewRow In grid_man_obra.Rows
+                tot_man += x.Cells(5).Value
+            Next
+            txt_tot_mano_obra.Text = tot_man
+            Dim ban As Integer = 0
+            For Each t As DataGridViewRow In grid_mano_obra.Rows
+                If t.Cells(2).Value = 3580843 Then
+                    t.Cells(3).Value = tot_man
+                    ban = 1
+                End If
+            Next
+            If ban = 0 Then
+                grid_mano_obra.Rows.Add("-1", 0, 3580843, tot_man)
+            End If
+        Catch ex As Exception
+            MsgBox("Error:calcula_total_mano_obra_sin_cambio_totales " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub grid_man_obra_CellEndEdit(sender As Object, e As DataGridViewCellEventArgs) Handles grid_man_obra.CellEndEdit
+        Try
+            If grid_man_obra.CurrentCell.ColumnIndex = 4 Or grid_man_obra.CurrentCell.ColumnIndex = 3 Then
+                grid_man_obra.Item(5, grid_man_obra.CurrentCell.RowIndex).Value = grid_man_obra.Item(3, grid_man_obra.CurrentCell.RowIndex).Value * grid_man_obra.Item(4, grid_man_obra.CurrentCell.RowIndex).Value
+            End If
+            calcula_total_mano_obra()
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub grid_man_obra_CellEnter(sender As Object, e As DataGridViewCellEventArgs) Handles grid_man_obra.CellEnter
+        calcula_total_mano_obra()
+    End Sub
+
+    Private Sub grid_man_obra_RowsAdded(sender As Object, e As DataGridViewRowsAddedEventArgs) Handles grid_man_obra.RowsAdded
+        calcula_total_mano_obra()
+    End Sub
+
+    Private Sub grid_man_obra_RowsRemoved(sender As Object, e As DataGridViewRowsRemovedEventArgs) Handles grid_man_obra.RowsRemoved
+        calcula_total_mano_obra()
+    End Sub
+
+    Private Sub Button2_Click(sender As Object, e As EventArgs) Handles Button2.Click
+        Try
+            Dim comis As Double = retorna_comision_por_tipo(cmb_tipo.SelectedValue.ToString)
+            Dim tot_pagar As Double = CDbl(txt_subtotal.Text) * comis * 0.01
+            grid_comisiones.Rows.Add("0", cmb_tipo.SelectedValue.ToString, cmb_tipo.Text, comis, tot_pagar)
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub grid_comisiones_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_comisiones.CellContentClick
+
+    End Sub
+
+    Private Sub grid_comisiones_CellEndEdit(sender As Object, e As DataGridViewCellEventArgs) Handles grid_comisiones.CellEndEdit
+        Try
+            If grid_comisiones.CurrentCell.ColumnIndex = 3 Then
+                If IsNumeric(grid_comisiones.Item(3, grid_comisiones.CurrentCell.RowIndex).Value) Then
+                    grid_comisiones.Item(4, grid_comisiones.CurrentCell.RowIndex).Value = (grid_comisiones.Item(3, grid_comisiones.CurrentCell.RowIndex).Value * 0.01 * txt_subtotal.Text)
+                End If
+            End If
+            calcula_total_comisiones()
+        Catch ex As Exception
+            MsgBox("Error:grid_comisiones_CellEndEdit " & ex.Message)
+        End Try
+    End Sub
+    Public Sub calcula_total_comisiones()
+        Try
+            Dim tot_man As Double = 0
+            For Each x As DataGridViewRow In grid_comisiones.Rows
+                tot_man += x.Cells(4).Value
+            Next
+            txt_tot_comis.Text = tot_man
+            Dim ban As Integer = 0
+            For Each t As DataGridViewRow In grid_mano_obra.Rows
+                If t.Cells(2).Value = 3580844 Then
+                    t.Cells(3).Value = tot_man
+                    ban = 1
+                End If
+            Next
+            If ban = 0 Then
+                grid_mano_obra.Rows.Add("-1", 0, 3580844, tot_man)
+            End If
+            calcula_totales_grid()
+        Catch ex As Exception
+            MsgBox("Error:calcula_total_comisiones " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Public Sub calcula_comisiones_sin_cambio_totales(SUBTOTAL As Double)
+        Try
+            Dim tot_man As Double = 0
+            For Each x As DataGridViewRow In grid_comisiones.Rows
+                tot_man += CDbl(SUBTOTAL) * x.Cells(3).Value * 0.01
+                x.Cells(4).Value = CDbl(SUBTOTAL) * x.Cells(3).Value * 0.01
+            Next
+            txt_tot_comis.Text = tot_man
+            Dim ban As Integer = 0
+            For Each t As DataGridViewRow In grid_mano_obra.Rows
+                If t.Cells(2).Value = 3580844 Then
+                    t.Cells(3).Value = tot_man
+                    ban = 1
+                End If
+            Next
+            If ban = 0 Then
+                grid_mano_obra.Rows.Add("-1", 0, 3580844, tot_man)
+            End If
+        Catch ex As Exception
+            MsgBox("Error:calcula_total_comisiones " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Private Sub grid_comisiones_RowsAdded(sender As Object, e As DataGridViewRowsAddedEventArgs) Handles grid_comisiones.RowsAdded
+        calcula_total_comisiones()
+    End Sub
+    Public Sub COLOCA_EN_CEROS_DIPLICAR_SUGERIDO()
+        Try
+            For Each x As DataGridViewRow In grid_mat_prima.Rows
+                x.Cells(0).Value = -1
+            Next
+            For Each x As DataGridViewRow In grid_mano_obra.Rows
+                x.Cells(0).Value = -1
+            Next
+            For Each x As DataGridViewRow In grid_gas_operac.Rows
+                x.Cells(0).Value = -1
+            Next
+            For Each x As DataGridViewRow In grid_man_obra.Rows
+                x.Cells(0).Value = 0
+            Next
+            For Each x As DataGridViewRow In grid_comisiones.Rows
+                x.Cells(0).Value = 0
+            Next
+            For Each x As DataGridViewRow In grid_anexo7.Rows
+                x.Cells(0).Value = 0
+            Next
+        Catch ex As Exception
+            MsgBox("Error:COLOCA_EN_CEROS_DIPLICAR_SUGERIDO " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Private Sub grid_comisiones_RowsRemoved(sender As Object, e As DataGridViewRowsRemovedEventArgs) Handles grid_comisiones.RowsRemoved
+        calcula_total_comisiones()
+    End Sub
+    Public Function guarda_presupuesto_de_obra() As Integer
+        Try
+            recalcula_sugerido_por_cambios()
+            Dim id As Integer = guarda_sugerido_obra(SUG_ID, txt_folio.Text, cal_fecha.Value, txt_cliente.Text, txt_proyecto.Text, txt_ubicacion.Text, cmb_vendedor.SelectedValue.ToString, lbl_estatus.Text, grid_mat_prima, grid_mano_obra, grid_gas_operac, CDbl(txt_util_por.Text), CDbl(txt_cos_primo.Text), CDbl(txt_tot_gas_oper.Text), CDbl(txt_util_neta.Text), CDbl(txt_subtotal.Text), CDbl(txt_iva.Text), CDbl(txt_total.Text), txt_descripcion.Text, txt_email.Text, lbl_id_hubspot.Text, grid_sug_rel)
+            If id > 0 Then
+                Dim tab2 As New DataTable
+                tab2 = retorna_datos_sugerido_obra_det(id, "MP")
+                If tab2.Rows.Count > 0 Then
+                    For Each x As DataRow In tab2.Rows
+                        If IsNumeric(x("docto_imp_id")) Then
+                            If x("docto_imp_id") > 0 And Len("" & x("folio")) > 0 Then
+                                Dim tab As New DataTable
+                                tab = retorna_datos_documento_detalle(x("tipo_docto"), x("folio"))
+                                If tab.Rows.Count > 0 Then
+                                    guarda_materiales_sugerido_det(tab, x("docto_sugerido_obra_det_id"))
+                                End If
+                            End If
+                        End If
+                    Next
+                End If
+                Dim tab3 As New DataTable
+                tab3 = retorna_datos_sugerido_obra_det(id, "MO")
+                If tab3.Rows.Count > 0 Then
+                    For Each x As DataRow In tab3.Rows
+                        If IsNumeric(x("docto_imp_id")) Then
+                            If x("docto_imp_id") > 0 And Len("" & x("folio")) > 0 Then
+                                Dim tab As New DataTable
+                                tab = retorna_datos_documento_detalle(x("tipo_docto"), x("folio"))
+                                If tab.Rows.Count > 0 Then
+                                    guarda_materiales_sugerido_det(tab, x("docto_sugerido_obra_det_id"))
+                                End If
+                            End If
+                        End If
+                    Next
+                End If
+                Dim tab4 As New DataTable
+                tab4 = retorna_datos_sugerido_obra_det(id, "GO")
+                If tab4.Rows.Count > 0 Then
+                    For Each x As DataRow In tab4.Rows
+                        If IsNumeric(x("docto_imp_id")) Then
+                            If x("docto_imp_id") > 0 And Len("" & x("folio")) > 0 Then
+                                Dim tab As New DataTable
+                                tab = retorna_datos_documento_detalle(x("tipo_docto"), x("folio"))
+                                If tab.Rows.Count > 0 Then
+                                    guarda_materiales_sugerido_det(tab, x("docto_sugerido_obra_det_id"))
+                                End If
+                            End If
+                        End If
+                    Next
+                End If
+                'Guarda la mano de Obra detalle empleados                
+                guarda_mano_de_obra_detalle(id, grid_man_obra)
+                'Guarda comisiones detalle
+                guarda_comisiones_det(id, grid_comisiones)
+                'guarda anexo 7 detalle 
+                guarda_anexos_siete_seguro(id, grid_anexo7)
+                SUG_ID = id
+                Return id
+                habilita_controles(False)
+            Else
+                MsgBox("No fue posible guardar el sugerido de Obra existen errores en su composicion ", MsgBoxStyle.Critical)
+                Return 0
+            End If
+
+        Catch ex As Exception
+            MsgBox("Error:guarda_presupuesto_de_obra " & ex.Message, MsgBoxStyle.Critical)
+            Return 0
+        End Try
+    End Function
+    Public Function actualiza_relacion_contacto_hubspot() As DataTable
+        Try
+            Dim tab As New DataTable
+            tab = retorna_contactos_v2(txt_email.Text, "", txt_cliente.Text)
+            If tab.Rows.Count > 0 Then
+                guarda_relacion_cliente_con_hubspot(0, -1, tab.Rows(0).Item(0), tab.Rows(0).Item(1), tab.Rows(0).Item(2), tab.Rows(0).Item(3), tab.Rows(0).Item(4))
+                Return tab
+            Else
+                MsgBox("No existe un contacto con los datos seleccionados ", MsgBoxStyle.Exclamation)
+                Return tab
+            End If
+        Catch ex As Exception
+            MsgBox("Error:actualiza_relacion_contacto_hubspot " & ex.Message, MsgBoxStyle.Critical)
+            Return Nothing
+        End Try
+    End Function
+    Private Sub ToolStripButton2_Click(sender As Object, e As EventArgs) Handles ToolStripButton2.Click
+        Try
+            Dim tab_con As New DataTable
+            If Len(txt_email.Text) > 10 And Len(txt_proyecto.Text) > 0 Then
+                tab_con = actualiza_relacion_contacto_hubspot()
+                If tab_con.Rows.Count > 0 Then
+                    If guarda_presupuesto_de_obra() > 0 Then
+                        guarda_o_actualiza_sugerido_hs(SUG_ID, txt_ubicacion.Text, tab_con)
+                        habilita_controles(False)
+                    End If
+                End If
+            Else
+                MsgBox("Es nesesario colocar el correo del contacto con el que se registro en HubSpot y un nombre de Proyecto para guardar el sugerido", MsgBoxStyle.Critical)
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub EliminarConceptoToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles EliminarConceptoToolStripMenuItem.Click
+        elimina_concepto_sugerido_grid(grid_mat_prima)
+    End Sub
+    Public Sub elimina_concepto_sugerido_grid(grid As DataGridView)
+        Try
+            Dim res As Object = MsgBox("¿Deseas eliminar del presupuesto el concepto seleccionado ?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question)
+            If res = vbOK Then
+                elimina_concepto_sugerido(grid.Item(0, grid.CurrentCell.RowIndex).Value)
+                grid.Rows.RemoveAt(grid.CurrentCell.RowIndex)
+            End If
+        Catch ex As Exception
+            MsgBox("Error:elimina_concepto_sugerido " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Private Sub ToolStripMenuItem1_Click(sender As Object, e As EventArgs) Handles ToolStripMenuItem1.Click
+        elimina_concepto_sugerido_grid(grid_mano_obra)
+    End Sub
+    Private Sub ToolStripMenuItem2_Click(sender As Object, e As EventArgs) Handles ToolStripMenuItem2.Click
+        elimina_concepto_sugerido_grid(grid_gas_operac)
+    End Sub
+    Private Sub ToolStripMenuItem3_Click(sender As Object, e As EventArgs) Handles ToolStripMenuItem3.Click
+        Try
+            Dim res As Object = MsgBox("¿Deseas eliminar del presupuesto el empleado seleccionado ?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question)
+            If res = vbOK Then
+                elimina_personal_mano_obra_det(grid_man_obra.Item(0, grid_man_obra.CurrentCell.RowIndex).Value)
+                grid_man_obra.Rows.RemoveAt(grid_man_obra.CurrentCell.RowIndex)
+            End If
+        Catch ex As Exception
+            MsgBox("Error:elimina_personal_obra " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Private Sub ToolStripMenuItem4_Click(sender As Object, e As EventArgs) Handles ToolStripMenuItem4.Click
+        Try
+            Dim res As Object = MsgBox("¿Deseas eliminar del presupuesto el concepto seleccionado ?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question)
+            If res = vbOK Then
+                elimina_tipo_para_pago_comisiones(grid_comisiones.Item(0, grid_comisiones.CurrentCell.RowIndex).Value)
+                grid_comisiones.Rows.RemoveAt(grid_comisiones.CurrentCell.RowIndex)
+            End If
+        Catch ex As Exception
+            MsgBox("Error:elimina_tipo_personal_obra " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub grid_gas_operac_CellDoubleClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_gas_operac.CellDoubleClick
+        ABRE_DOCUMENTO_RELACIONADO(grid_gas_operac)
+    End Sub
+
+    Private Sub ToolStripSplitButton1_ButtonClick(sender As Object, e As EventArgs)
+        ban_repor = 72
+        Form4.print_prev.Document = Form4.print_doc
+        Form4.print_prev.InvalidatePreview()
+        Form4.print_prev.Refresh()
+        Form4.ShowDialog()
+    End Sub
+
+    Private Sub ImprimirDetalleToolStripMenuItem_Click(sender As Object, e As EventArgs)
+        ban_repor = 73
+        Form4.print_prev.Document = Form4.print_doc
+        Form4.print_prev.InvalidatePreview()
+        Form4.print_prev.Refresh()
+        Form4.ShowDialog()
+    End Sub
+
+    Private Sub Button3_Click(sender As Object, e As EventArgs) Handles Button3.Click
+        grid_anexo7.Rows.Add(0, cmb_con_seg.SelectedValue.ToString, cmb_con_seg.Text, 0, 0)
+    End Sub
+    Public Sub calcula_conceptos_anexo7(subtotal As Double)
+        Try
+            For Each x As DataGridViewRow In grid_anexo7.Rows
+                Dim tot_pres As Double = CDbl(subtotal)
+                Dim tot1, tot2 As Double
+                If IsNumeric(x.Cells(3).Value) Then tot1 = tot_pres * x.Cells(3).Value * 0.01
+                If IsNumeric(x.Cells(4).Value) Then tot2 = tot1 * x.Cells(4).Value * 0.01
+                x.Cells(5).Value = tot2
+                Dim ban As Integer = 0
+                For Each y As DataGridViewRow In grid_gas_operac.Rows
+                    If y.Cells(2).Value = x.Cells(1).Value Then
+                        y.Cells(3).Value = tot2
+                        ban = 1
+                    End If
+                Next
+                If ban = 0 Then
+                    Dim val As Integer = CInt(x.Cells(1).Value)
+                    grid_gas_operac.Rows.Add("-1", 0, val, tot2)
+                End If
+            Next
+            'Calcula el gasto de operaciones
+            Dim tot_gas_oper As Double = 0
+            For Each x As DataGridViewRow In grid_gas_operac.Rows
+                tot_gas_oper += x.Cells(3).Value
+            Next
+            txt_tot_gas_oper.Text = FormatCurrency(tot_gas_oper)
+        Catch ex As Exception
+            MsgBox("Error:calcula_conceptos_anexo7 " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub grid_anexo7_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles grid_anexo7.CellContentClick
+
+    End Sub
+
+    Private Sub grid_anexo7_CellEndEdit(sender As Object, e As DataGridViewCellEventArgs) Handles grid_anexo7.CellEndEdit
+        calcula_conceptos_anexo7(txt_subtotal.Text)
+    End Sub
+
+    Private Sub ToolStripButton6_Click_1(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub ToolStripButton5_Click(sender As Object, e As EventArgs) Handles ToolStripButton5.Click
+        Try
+            If lbl_estatus.Text <> "Aceptado" And lbl_estatus.Text <> "Cancelado" And lbl_estatus.Text <> "Rechazado" Then
+                Dim res As Object = MsgBox("Se actualizara el estatus del presupuesto a Cancelado, ya no sera posible realizar modificaciones sobre el sugerido, ¿Deseas Continuar?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question)
+                If res = vbOK Then
+                    If valida_tiene_permiso(199, "MODIFICAR_SUGERIDO_OBRA") = 1 Then
+                        actualiza_estatus_sugerido_obra(SUG_ID, "Cancelado")
+                        lbl_estatus.Text = "Cancelado"
+                    End If
+                End If
+                Else
+                MsgBox("En el estatus actual del presupuesto, ya no es posible actualizar a Cancelado", MsgBoxStyle.Information)
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripButton7_Click(sender As Object, e As EventArgs) Handles ToolStripButton7.Click
+        SUG_ID = 0
+        COLOCA_EN_CEROS_DIPLICAR_SUGERIDO()
+        habilita_controles(True)
+        txt_folio.Text = 0
+    End Sub
+
+    Private Sub PresupuestoAceptadoToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles PresupuestoAceptadoToolStripMenuItem.Click
+        Try
+            If valida_tiene_permiso(199, "MODIFICAR_SUGERIDO_OBRA") = 1 Then
+                If lbl_estatus.Text <> "Aceptado" And lbl_estatus.Text <> "Cancelado" And lbl_estatus.Text <> "Rechazado" Then
+                    Dim res As Object = MsgBox("Se actualizara el estatus del presupuesto a Aceptado, ya no sera posible realizar modificaciones sobre el sugerido, ¿Deseas Continuar?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question)
+                    If res = vbOK Then
+                        actualiza_estatus_sugerido_obra(SUG_ID, "Aceptado")
+                        lbl_estatus.Text = "Aceptado"
+                    End If
+                Else
+                    MsgBox("En el estatus actual del presupuesto, ya no es posible actualizar Aceptado", MsgBoxStyle.Information)
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub PresupuestoCanceladoToolStripMenuItem_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub PresupuestoEnSegimientoToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles PresupuestoEnSegimientoToolStripMenuItem.Click
+        Try
+            If valida_tiene_permiso(199, "MODIFICAR_SUGERIDO_OBRA") = 1 Then
+                If lbl_estatus.Text <> "Cancelado" And lbl_estatus.Text <> "Rechazado" Then
+                    actualiza_estatus_sugerido_obra(SUG_ID, "Seguimiento")
+                    lbl_estatus.Text = "Seguimiento"
+                Else
+                    MsgBox("En el estatus actual del presupuesto, ya no es posible actualizar Seguimiento", MsgBoxStyle.Information)
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub AbrirConceptoToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AbrirConceptoToolStripMenuItem.Click
+        Form21.abre_concepto_man_obra(grid_mano_obra.Item(2, grid_mano_obra.CurrentCell.RowIndex).Value)
+    End Sub
+
+    Private Sub AbrirConceptoToolStripMenuItem1_Click(sender As Object, e As EventArgs) Handles AbrirConceptoToolStripMenuItem1.Click
+        Form21.abre_concepto_mp(grid_mat_prima.Item(2, grid_mat_prima.CurrentCell.RowIndex).Value)
+    End Sub
+
+    Private Sub AbrirConceptoToolStripMenuItem2_Click(sender As Object, e As EventArgs) Handles AbrirConceptoToolStripMenuItem2.Click
+        Form21.abre_concepto_go(grid_gas_operac.Item(2, grid_gas_operac.CurrentCell.RowIndex).Value)
+    End Sub
+    Public Sub registrar_obra()
+        Try
+            If SUG_ID > 0 Then
+                If MsgBox("El presupuesto se actualizara su estatus a Aceptado, no sera posible realizar cambio a el sugerido, ¿ Deseas Continuar ?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question) = vbOK Then
+                    Dialog243.Dispose()
+                    Dialog243.carga_inicial()
+                    Dialog243.sugerido_id_rel = SUG_ID
+                    Dialog243.ShowDialog()
+                End If
+            Else
+                MsgBox("Es nesesario guardar el sugerido para registrar la Obra", MsgBoxStyle.Information)
+            End If
+        Catch ex As Exception
+            MsgBox("Error:registrar_obra " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+    Private Sub ToolStripButton6_Click_2(sender As Object, e As EventArgs) Handles ToolStripButton6.Click
+        Try
+            If tab_per.Rows(202).Item(1) = "T" Then
+                registrar_obra()
+            Else
+                Dim res2 As Object = MsgBox("No tiene el permiso para " & tab_per.Rows(202).Item(0) & " ¿Deseas que lo autorice otro usuario?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question)
+                If res2 = vbOK Then
+                    Dialog225.Dispose()
+                    Dim tab3 As New DataTable
+                    tab3 = CONSULTA_USUARIOS_ASIG_DE_UN_PERMISO("NUEVO_OBRA")
+                    If tab3.Rows.Count > 0 Then
+                        Dialog225.cmb_usuario.DataSource = tab3
+                        Dialog225.cmb_usuario.DisplayMember = tab3.Columns(1).ToString
+                        Dialog225.cmb_usuario.ValueMember = tab3.Columns(0).ToString
+                        Dialog225.ShowDialog()
+                    Else
+                        MsgBox("No Existen usuarios con este permiso asignado", MsgBoxStyle.Information)
+                    End If
+                    If Dialog225.ban_autor = 1 Then
+                        registrar_obra()
+                    End If
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+
+    End Sub
+
+    Private Sub ToolStripButton8_Click(sender As Object, e As EventArgs) Handles ToolStripButton8.Click
+        Try
+            If lbl_estatus.Text = "Cancelado" Then
+                If valida_tiene_permiso(199, "MODIFICAR_SUGERIDO_OBRA") = 1 Then
+                    If MsgBox("¿Deseas archivar como eliminado este sugerido?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Information) = vbOK Then
+                        elimina_sugerido_de_obra(SUG_ID)
+                        Me.Dispose()
+                    End If
+                End If
+            Else
+                    MsgBox("En el estatus  del presupuesto, ya no es posible eliminar a Cancelado", MsgBoxStyle.Information)
+            End If
+
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ImprimirDetalleToolStripMenuItem1_Click(sender As Object, e As EventArgs) Handles ImprimirDetalleToolStripMenuItem1.Click
+        ban_repor = 73
+        Form4.print_prev.Document = Form4.print_doc
+        Form4.print_prev.InvalidatePreview()
+        Form4.print_prev.Refresh()
+        Form4.ShowDialog()
+    End Sub
+    Private Sub ImprimirToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ImprimirToolStripMenuItem.Click
+        ban_repor = 72
+        Form4.print_prev.Document = Form4.print_doc
+        Form4.print_prev.InvalidatePreview()
+        Form4.print_prev.Refresh()
+        Form4.ShowDialog()
+    End Sub
+
+    Private Sub ToolStripDropDownButton2_Click(sender As Object, e As EventArgs) Handles ToolStripDropDownButton2.Click
+
+    End Sub
+
+    Private Sub Button4_Click(sender As Object, e As EventArgs) Handles Button4.Click
+        Try
+            Dim tab As New DataTable
+            tab = retorna_contactos_v2(txt_email.Text, "", txt_cliente.Text)
+            If tab.Rows.Count > 0 Then
+                Dim mesa As String = "Contactos asignados a este correo en Hubspot:" & vbCrLf & vbCrLf
+                For Each x As DataRow In tab.Rows
+                    mesa += x("Nombre") & vbCrLf
+                Next
+                MsgBox(mesa, MsgBoxStyle.Information Or MsgBoxStyle.MsgBoxSetForeground, "Contactos relacionados con Hubspot")
+            Else
+                MsgBox("El correo seleccionado no tiene relacion con algun contacto en Hubspot", MsgBoxStyle.Critical)
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub lbl_id_hubspot_LinkClicked(sender As Object, e As LinkLabelLinkClickedEventArgs) Handles lbl_id_hubspot.LinkClicked
+
+    End Sub
+
+    Private Sub lbl_id_hubspot_DoubleClick(sender As Object, e As EventArgs) Handles lbl_id_hubspot.DoubleClick
+        Try
+            If lbl_id_hubspot.Text <> "0" Then abre_negocio(lbl_id_hubspot.Text)
+        Catch ex As Exception
+            MsgBox("Error: Abre Negocio " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub txt_total_TextChanged(sender As Object, e As EventArgs) Handles txt_total.TextChanged
+
+    End Sub
+
+    Private Sub txt_iva_TextChanged(sender As Object, e As EventArgs) Handles txt_iva.TextChanged
+
+    End Sub
+    Public Function valida_sugerido_no_este_asignado(sugerido_id As Integer)
+        Dim ret As Integer = 0
+        Try
+            For Each x As DataGridViewRow In grid_sug_rel.Rows
+                If x.Cells(1).Value = sugerido_id Then ret += 1
+            Next
+            Return ret
+        Catch ex As Exception
+            Return 0
+        End Try
+    End Function
+    Private Sub Button5_Click(sender As Object, e As EventArgs) Handles Button5.Click
+        Try
+            If valida_tiene_permiso(199, "MODIFICAR_SUGERIDO_OBRA") = 1 Then
+                If SUG_ID > 0 Then
+                    Dim res As Object = InputBox("Ingresa el folio del sugerido a relacionar ", "Presupuestos de Obra")
+                    If Len(res) > 0 Then
+                        Dim tab As New DataTable
+                        tab = retorna_sugeridos_obra(fecha_ini, fecha_fin, res)
+                        If tab.Rows.Count > 0 Then
+                            If tab.Rows(0).Item(0) <> SUG_ID Then
+                                If valida_sugerido_no_este_asignado(tab.Rows(0).Item(0)) = 0 Then
+                                    grid_sug_rel.Rows.Add(0, tab.Rows(0).Item(0), tab.Rows(0).Item(1), tab.Rows(0).Item(3), tab.Rows(0).Item(4))
+                                Else
+                                    MsgBox("El sugerido que intenta agregar ya se encuentra asignado a el sugerido", MsgBoxStyle.Critical)
+                                End If
+                            Else
+                                MsgBox("El sugerido que intenta relacionar es el mismo que el sugerido destino, no es posible agregar", MsgBoxStyle.Information)
+                            End If
+                        Else
+                            MsgBox("El Folio del Sugerido es Incorrecto o no existe en el catalogo", MsgBoxStyle.Information)
+                        End If
+                    End If
+                Else
+                    MsgBox("Es nesesario guardar el sugerido para relacionar con otros sugeridos del sistema ", MsgBoxStyle.Information)
+                End If
+            End If
+        Catch ex As Exception
+
+        End Try
+    End Sub
+
+    Private Sub Button6_Click(sender As Object, e As EventArgs) Handles Button6.Click
+        Try
+            If valida_tiene_permiso(199, "MODIFICAR_SUGERIDO_OBRA") = 1 Then
+                Dim res As Object = MsgBox("¿Deseas eliminar de la lista el sugerido seleccionado ?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question)
+                If res = vbOK Then
+                    elimina_sugerido_relacionado_obra(grid_sug_rel.Item(0, grid_sug_rel.CurrentCell.RowIndex).Value, grid_sug_rel.Item(1, grid_sug_rel.CurrentCell.RowIndex).Value)
+                    grid_sug_rel.Rows.RemoveAt(grid_sug_rel.CurrentCell.RowIndex)
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub PresupuestoRechazadoToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles PresupuestoRechazadoToolStripMenuItem.Click
+        Try
+            If valida_tiene_permiso(199, "MODIFICAR_SUGERIDO_OBRA") = 1 Then
+                If lbl_estatus.Text <> "Aceptado" And lbl_estatus.Text <> "Cancelado" Then
+                    Dim res As Object = MsgBox("Se actualizara el estatus del presupuesto a Rechazado, ya no sera posible realizar modificaciones sobre el sugerido, ¿Deseas Continuar?", MsgBoxStyle.OkCancel Or MsgBoxStyle.Question)
+                    If res = vbOK Then
+                        actualiza_estatus_sugerido_obra(SUG_ID, "Rechazado")
+                        lbl_estatus.Text = "Rechazado"
+                    End If
+                Else
+                    MsgBox("En el estatus actual del presupuesto, ya no es posible actualizar Rechazado", MsgBoxStyle.Information)
+                End If
+            End If
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+    End Sub
+
+    Private Sub ToolStripDropDownButton1_Click(sender As Object, e As EventArgs) Handles ToolStripDropDownButton1.Click
+
+    End Sub
+End Class

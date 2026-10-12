@@ -5,6 +5,7 @@
 // GET ?accion=resumen&ini=…&fin=…   indicadores de Bienvenido
 // GET ?accion=obra&id=N              registro de obra con responsables
 // GET ?accion=presupuesto&id=N       presupuesto de obra con sus conceptos (MP / MO / GO)
+// GET ?accion=presupuesto_folio&folio=N  presupuesto por folio (para relacionarlo con otro)
 // GET ?accion=imagen&id=N            imagen de la obra
 // GET ?accion=catalogos              responsables y conceptos de gastos de operación
 // GET ?accion=relacionados&id=N      negocio de HubSpot y folios de Easy-Glass ligados a la obra
@@ -233,6 +234,32 @@ try {
             foreach ($articulos as $a) $porRenglon[$a['docto_sugerido_obra_det_id']][] = $a;
             foreach ($p['conceptos'] as &$c) $c['articulos'] = $porRenglon[$c['docto_sugerido_obra_det_id']] ?? [];
             unset($c);
+            // Detalle del Form46: empleados × días, comisiones, anexo de seguro y sugeridos relacionados
+            $p['empleados'] = bd_filas('AW',
+                'select empleado_id, clave_empleado as clave, nombre, sueldo_diario as sueldo, num_dias as dias, total
+                   from mano_obra_detalle where docto_sugerido_obra_id = ? order by mano_obra_det_id', [$id]);
+            $p['comisiones'] = bd_filas('AW',
+                'select tipo_empleado_id as tipo_id, nombre, porcentaje, total_comision as total
+                   from comisiones_obra_det where docto_sugerido_obra_id = ? order by comision_obra_det_id', [$id]);
+            $p['seguros'] = bd_filas('AW',
+                'select coalesce(c.descripcion, s.nombre) as concepto, s.porcentaje_1, s.porcentaje_2, s.total
+                   from anexos_obra_seguro s
+                   left join conceptos_gas_operacion_obra c on c.concepto_gas_operacion_obra_id = s.concepto_gas_operacion_obra_id
+                  where s.docto_sugerido_obra_id = ? order by s.anexo_obra_idd', [$id]);
+            $p['relacionados'] = bd_filas('AW',
+                'select r.sugerido_id_hijo as sugerido_id, coalesce(h.folio, r.folio_sugerido_hijo) as folio,
+                        coalesce(h.cliente, r.cliente_sugerido_hijo) as cliente, h.proyecto, h.estatus, h.total
+                   from sugeridos_relacionados r
+                   left join doctos_sugerido_obra h on h.docto_sugerido_obra_id = r.sugerido_id_hijo
+                  where r.sugerido_id_padre = ? order by r.sug_relacion_id', [$id]);
+            responder(['ok' => true, 'presupuesto' => $p]);
+
+        case 'presupuesto_folio':
+            // Sugeridos relacionados (Form46.Button5): busca el presupuesto por su folio
+            $p = bd_fila('AW',
+                'select docto_sugerido_obra_id as sugerido_id, folio, cliente, proyecto, estatus, total
+                   from doctos_sugerido_obra where folio = ?', [(int) ($_GET['folio'] ?? 0)]);
+            if (!$p) error('El folio del presupuesto es incorrecto o no existe.', 404);
             responder(['ok' => true, 'presupuesto' => $p]);
 
         case 'relacionados':

@@ -30,11 +30,14 @@
 
     // ---------- Rejilla ----------
     function render() {
+        renderExtras();
         if (seccion === 'ct') { renderCt(); return; }
         var filas = datos[seccion];
         if (!filas.length) {
             tbody.innerHTML = '<tr class="vacio-fila"><td colspan="10">Sin conceptos. Presiona Ctrl + I para agregar uno.</td></tr>';
             calcularTotales();
+            // Los cálculos pudieron agregar un renglón fijo a esta sección
+            if (datos[seccion].length) render();
             return;
         }
         var dis = soloLectura ? ' disabled' : '';
@@ -77,11 +80,21 @@
     }
 
     function refrescarCalculados() {
-        var filas = datos[seccion];
         var subtotal = calcularTotales();
+        if (seccion === 'ct') return;
+        var filas = datos[seccion];
+        // Los cálculos agregaron un renglón fijo (mano de obra, comisiones, seguro): se vuelve a pintar
+        if (tbody.querySelectorAll('tr[data-i]').length !== filas.length) { render(); return; }
         tbody.querySelectorAll('tr[data-i]').forEach(function (tr) {
             var r = filas[tr.dataset.i];
             var imp = num(r.presupuesto);
+            // Conceptos de cálculo automático y renglones fijos: el importe no se captura
+            var inp = tr.querySelector('[data-campo="presupuesto"]');
+            inp.readOnly = !!r.calc;
+            inp.title = r.calc === 'auto' ? 'Cálculo automático (porcentaje del catálogo de conceptos)'
+                      : r.calc === 'fijo' ? 'Se calcula con los empleados, comisiones o anexo de seguro' : '';
+            tr.classList.toggle('calc', !!r.calc);
+            if (r.calc && document.activeElement !== inp) inp.value = r.presupuesto;
             tr.querySelector('[data-calc="subtotal"]').textContent = fmt(imp);
             tr.querySelector('[data-calc="total"]').textContent = fmt(imp);
             // Igual que Form46: % del concepto respecto al subtotal del presupuesto
@@ -105,7 +118,7 @@
         var r = datos[seccion][e.target.closest('tr').dataset.i];
         r[campo] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
         marcarCambio();
-        if (campo === 'presupuesto') refrescarCalculados();
+        if (campo === 'presupuesto' || campo === 'concepto') refrescarCalculados();
     });
 
     tbody.addEventListener('click', function (e) {
@@ -719,36 +732,292 @@
                      : 'Todos los conceptos capturados ya están en la lista.');
     });
 
+    // ---------- Cálculos del Form46 ----------
+    // Empleados × días (grid_man_obra), comisiones (grid_comisiones), anexo de seguro (grid_anexo7)
+    // y sugeridos relacionados (grid_sug_rel)
+    var extras = { empleados: [], comisiones: [], seguros: [], relacionados: [] };
+    var FIJOS = window.ACRI_FIJOS || {};   // { mano_obra, comisiones }: renglones de Mano de Obra que se llenan solos
+
+    function clave(s) { return String(s || '').trim().toUpperCase(); }
+    function redondear(n) { return Math.round(n * 100) / 100; }
+    function infoConcepto(sec, nombre) {
+        var k = clave(nombre);
+        if (!k) return null;
+        return (CATALOGO[sec] || []).filter(function (c) { return clave(c.nombre) === k; })[0] || null;
+    }
+    function filaDe(sec, nombre) {
+        return datos[sec].filter(function (r) { return clave(r.concepto) === clave(nombre); })[0];
+    }
+    // Pone el importe en el renglón del concepto; si no existe lo agrega (calcula_total_mano_obra, anexo7)
+    function ponerFijo(sec, nombre, importe) {
+        if (!clave(nombre)) return;
+        var r = filaDe(sec, nombre);
+        if (!r) {
+            r = { id: ++consecutivo, concepto: nombre, presupuesto: 0, importar: false, folio: '' };
+            datos[sec].push(r);
+        }
+        r.presupuesto = redondear(importe);
+        r.calc = 'fijo';
+    }
+
+    // retorna_base_para_calculo_gasto_administrativo_matprima: MP × afecta_gasto_oper + Mano de Obra (sin comisiones)
+    function baseGastoAdministrativo() {
+        var b = 0;
+        datos.mp.forEach(function (r) {
+            var i = infoConcepto('mp', r.concepto);
+            if (i) b += num(i.afecta) * num(r.presupuesto);
+        });
+        datos.mo.forEach(function (r) {
+            var i = infoConcepto('mo', r.concepto);
+            if (i ? i.base : clave(r.concepto) !== clave(FIJOS.comisiones)) b += num(r.presupuesto);
+        });
+        return b;
+    }
+
+    // Una pasada con el subtotal dado: empleados, comisiones, conceptos automáticos y anexo de seguro
+    function aplicarCalculos(subtotal) {
+        ['mp', 'mo', 'go'].forEach(function (s) { datos[s].forEach(function (r) { delete r.calc; }); });
+
+        if (extras.empleados.length) {
+            var totEmp = 0;
+            extras.empleados.forEach(function (e) { e.total = redondear(num(e.sueldo) * num(e.dias)); totEmp += e.total; });
+            ponerFijo('mo', FIJOS.mano_obra, totEmp);
+        }
+        if (extras.comisiones.length) {
+            var totCom = 0;
+            extras.comisiones.forEach(function (c) { c.total = redondear(subtotal * num(c.porcentaje) * 0.01); totCom += c.total; });
+            ponerFijo('mo', FIJOS.comisiones, totCom);
+        }
+        // calcula_conceptos_calc_automatico: % del subtotal; los gastos base_mp, % de la base de MP + MO
+        datos.mp.forEach(function (r) {
+            var i = infoConcepto('mp', r.concepto);
+            if (!i || !i.auto || num(i.pct) <= 0) return;
+            r.presupuesto = redondear(subtotal * num(i.pct) / 100);
+            r.calc = 'auto';
+        });
+        var base = null;
+        datos.go.forEach(function (r) {
+            var i = infoConcepto('go', r.concepto);
+            if (!i || !i.auto || num(i.pct) <= 0) return;
+            if (i.base_mp && base === null) base = baseGastoAdministrativo();
+            r.presupuesto = redondear((i.base_mp ? base : subtotal) * num(i.pct) / 100);
+            r.calc = 'auto';
+        });
+        // calcula_conceptos_anexo7: subtotal × %1 × %2 al concepto de Gastos de Operacion
+        extras.seguros.forEach(function (s) {
+            s.total = redondear(subtotal * num(s.porcentaje_1) * 0.01 * num(s.porcentaje_2) * 0.01);
+            ponerFijo('go', s.concepto, s.total);
+        });
+    }
+
+    function firma() {
+        return ['mp', 'mo', 'go'].map(function (s) { return datos[s].map(function (r) { return num(r.presupuesto); }).join(','); }).join('|');
+    }
+
+    // La utilidad es margen sobre el precio de venta, no sobre el costo (Form46):
+    // subtotal = costo / ((100 - %util) / 100)
+    function subtotalPorUtilidad(costo) {
+        var pct = num($('pctUtilidad').value);
+        return pct < 100 ? costo / ((100 - pct) * 0.01) : costo;
+    }
+
+    // calcula_totales_grid: el subtotal depende de los conceptos automáticos y de las comisiones y ellos del
+    // subtotal; el escritorio lo recalcula en cada celda, aquí se repite hasta que las cifras ya no cambian.
+    // Con el subtotal fijo (lápiz) es calcula_conceptos_calc_automatico_subtotal_fijo + recalcula_por_cambio_subtotal.
+    // En solo lectura (BAN_MOD del Form46) se muestran las cifras guardadas sin recalcular.
+    function recalcular() {
+        var subtotal = 0;
+        for (var n = 0; n < 60 && !soloLectura; n++) {
+            subtotal = subtotalManual ? num($('tSUB').value.replace(/,/g, '')) : subtotalPorUtilidad(suma(datos.mp) + suma(datos.mo) + suma(datos.go));
+            var antes = firma();
+            aplicarCalculos(subtotal);
+            if (firma() === antes) break;
+        }
+        var t = { mp: suma(datos.mp), mo: suma(datos.mo), go: suma(datos.go) };
+        t.costo = t.mp + t.mo + t.go;
+        t.subtotal = subtotalManual ? subtotal : subtotalPorUtilidad(t.costo);
+        return t;
+    }
+
     // ---------- Totales ----------
     function calcularTotales() {
-        var mp = suma(datos.mp), mo = suma(datos.mo), go = suma(datos.go);
-        var primo = mp + mo;
-        var base = primo + go;
-        var utilidad, subtotal;
-
-        // La utilidad es margen sobre el precio de venta, no sobre el costo (Form46):
-        // subtotal = costo / ((100 - %util) / 100)
-        if (subtotalManual) {
-            subtotal = num($('tSUB').value.replace(/,/g, ''));
-            utilidad = subtotal - base;
-            $('pctUtilidad').value = subtotal ? (100 - base / (subtotal * 0.01)).toFixed(4) : 0;
-        } else {
-            var pct = num($('pctUtilidad').value);
-            subtotal = pct < 100 ? base / ((100 - pct) * 0.01) : base;
-            utilidad = subtotal - base;
-            $('tSUB').value = fmt(subtotal);
-        }
+        var t = recalcular();
+        var subtotal = t.subtotal;
+        var utilidad = subtotal - t.costo;
+        if (subtotalManual) $('pctUtilidad').value = subtotal ? (100 - t.costo / (subtotal * 0.01)).toFixed(4) : 0;
+        else $('tSUB').value = fmt(subtotal);
         var iva = subtotal * IVA;
 
-        $('tMP').textContent = fmt(mp);
-        $('tMO').textContent = fmt(mo);
-        $('tCP').textContent = fmt(primo);
-        $('tGO').textContent = fmt(go);
+        $('tMP').textContent = fmt(t.mp);
+        $('tMO').textContent = fmt(t.mo);
+        $('tCP').textContent = fmt(t.mp + t.mo);
+        $('tGO').textContent = fmt(t.go);
         $('tUT').textContent = fmt(utilidad);
         $('tIVA').textContent = fmt(iva);
         $('tTOT').textContent = fmt(subtotal + iva);
+        pintarTotalesExtras();
         return subtotal;
     }
+
+    // ---------- Empleados, comisiones y anexo de seguro (debajo de Mano de Obra / Gastos de Operacion) ----------
+    var EMPLEADOS = window.ACRI_EMPLEADOS || [];
+    var TIPOS_COMISION = window.ACRI_TIPOS_COMISION || [];
+    var EXTRAS = {
+        empleados: {
+            tbody: 'tbEmpleados', vacio: 'Agrega los empleados que trabajarán en la obra.',
+            celdas: function (e, dis) {
+                return '<td class="id">' + escapar(e.clave || '') + '</td><td class="ro izq">' + escapar(e.nombre) + '</td>' +
+                    '<td><input type="number" step="0.01" min="0" class="num" data-campo="sueldo" value="' + num(e.sueldo) + '"' + dis + '></td>' +
+                    '<td><input type="number" step="0.5" min="0" class="num" data-campo="dias" value="' + (num(e.dias) || '') + '"' + dis + '></td>';
+            }
+        },
+        comisiones: {
+            tbody: 'tbComisiones', vacio: 'Agrega los tipos de empleado que cobran comisión sobre el subtotal.',
+            celdas: function (c, dis) {
+                return '<td class="ro izq">' + escapar(c.nombre) + '</td>' +
+                    '<td><input type="number" step="0.0001" min="0" class="num" data-campo="porcentaje" value="' + num(c.porcentaje) + '"' + dis + '></td>';
+            }
+        },
+        seguros: {
+            tbody: 'tbSeguros', vacio: 'Agrega los conceptos de seguro de la obra.',
+            celdas: function (s, dis) {
+                return '<td class="ro izq">' + escapar(s.concepto) + '</td>' +
+                    '<td><input type="number" step="0.01" min="0" class="num" data-campo="porcentaje_1" value="' + num(s.porcentaje_1) + '"' + dis + '></td>' +
+                    '<td><input type="number" step="0.01" min="0" class="num" data-campo="porcentaje_2" value="' + num(s.porcentaje_2) + '"' + dis + '></td>';
+            }
+        }
+    };
+
+    function renderExtras() {
+        $('extrasMO').hidden = seccion !== 'mo';
+        $('extrasGO').hidden = seccion !== 'go';
+        var dis = soloLectura ? ' disabled' : '';
+        Object.keys(EXTRAS).forEach(function (k) {
+            var x = EXTRAS[k], lista = extras[k];
+            $(x.tbody).innerHTML = lista.length ? lista.map(function (o, i) {
+                return '<tr data-i="' + i + '">' + x.celdas(o, dis) + '<td class="ro" data-total></td>' +
+                    '<td><button class="borrar" title="Quitar"' + dis + '>✕</button></td></tr>';
+            }).join('') : '<tr class="vacio-fila"><td colspan="6">' + escapar(x.vacio) + '</td></tr>';
+        });
+        $('fijoMO').textContent = FIJOS.mano_obra || '';
+        $('fijoCOM').textContent = FIJOS.comisiones || '';
+        [['addEmpleado', 'selEmpleado'], ['addComision', 'selTipoComision'], ['addSeguro', 'selSeguro']].forEach(function (p) {
+            $(p[0]).disabled = $(p[1]).disabled = soloLectura || !$(p[1]).options.length;
+        });
+        renderRelacionados();
+        pintarTotalesExtras();
+    }
+
+    function pintarTotalesExtras() {
+        var tot = { empleados: 0, comisiones: 0 };
+        Object.keys(EXTRAS).forEach(function (k) {
+            $(EXTRAS[k].tbody).querySelectorAll('tr[data-i]').forEach(function (tr) {
+                var o = extras[k][tr.dataset.i];
+                if (!o) return;
+                tr.querySelector('[data-total]').textContent = fmt(num(o.total));
+                if (k in tot) tot[k] += num(o.total);
+            });
+        });
+        $('totEmpleados').textContent = fmt(tot.empleados);
+        $('totComisiones').textContent = fmt(tot.comisiones);
+    }
+
+    // Conceptos de Gastos de Operacion marcados como seguro (retorna_conceptos_seguro)
+    $('selSeguro').innerHTML = (CATALOGO.go || []).filter(function (c) { return c.seguro && c.activo; })
+        .map(function (c) { return '<option>' + escapar(c.nombre) + '</option>'; }).join('');
+
+    Object.keys(EXTRAS).forEach(function (k) {
+        var tb = $(EXTRAS[k].tbody);
+        tb.addEventListener('input', function (e) {
+            var campo = e.target.dataset.campo;
+            if (!campo) return;
+            extras[k][e.target.closest('tr').dataset.i][campo] = e.target.value;
+            marcarCambio();
+            refrescarCalculados();
+        });
+        tb.addEventListener('click', function (e) {
+            if (!e.target.classList.contains('borrar') || soloLectura) return;
+            var o = extras[k][e.target.closest('tr').dataset.i];
+            if (!confirm('¿Deseas eliminar del presupuesto ' + (k === 'empleados' ? 'el empleado' : 'el concepto') + ' seleccionado?')) return;
+            extras[k].splice(e.target.closest('tr').dataset.i, 1);
+            // Sin renglones el concepto fijo queda en cero (o deja de ser del anexo de seguro)
+            if (k === 'empleados' && !extras.empleados.length) ponerFijo('mo', FIJOS.mano_obra, 0);
+            if (k === 'comisiones' && !extras.comisiones.length) ponerFijo('mo', FIJOS.comisiones, 0);
+            if (k === 'seguros') ponerFijo('go', o.concepto, 0);
+            marcarCambio();
+            render();
+        });
+    });
+
+    $('addEmpleado').addEventListener('click', function () {
+        var id = +$('selEmpleado').value;
+        var em = EMPLEADOS.filter(function (x) { return +x.empleado_id === id; })[0];
+        if (!em) return;
+        // valida_empledo_no_exista
+        if (extras.empleados.some(function (x) { return +x.empleado_id === id; })) {
+            alert('El empleado seleccionado ya se encuentra asignado en el presupuesto.');
+            return;
+        }
+        extras.empleados.push({ empleado_id: id, clave: em.numero_empleado, nombre: em.nombre, sueldo: num(em.sueldo_diario), dias: 0, total: 0 });
+        marcarCambio();
+        render();
+        var ult = $('tbEmpleados').querySelector('tr:last-child [data-campo="dias"]');
+        if (ult) ult.focus();
+    });
+    $('addComision').addEventListener('click', function () {
+        var id = +$('selTipoComision').value;
+        var t = TIPOS_COMISION.filter(function (x) { return +x.tipo_empleado_id === id; })[0];
+        if (!t) return;
+        extras.comisiones.push({ tipo_id: id, nombre: t.nombre, porcentaje: num(t.porcentaje), total: 0 });
+        marcarCambio();
+        render();
+    });
+    $('addSeguro').addEventListener('click', function () {
+        var nombre = $('selSeguro').value;
+        if (!nombre) return;
+        if (extras.seguros.some(function (x) { return clave(x.concepto) === clave(nombre); })) {
+            alert('El concepto ya está en el anexo de seguro.');
+            return;
+        }
+        extras.seguros.push({ concepto: nombre, porcentaje_1: 0, porcentaje_2: 0, total: 0 });
+        marcarCambio();
+        render();
+    });
+
+    // ---------- Sugeridos relacionados (Form46.Button5 / Button6) ----------
+    function renderRelacionados() {
+        var dis = soloLectura ? ' disabled' : '';
+        $('tbRelacionados').innerHTML = extras.relacionados.length ? extras.relacionados.map(function (r, i) {
+            return '<tr data-i="' + i + '"><td class="id">' + escapar(r.folio) + '</td><td class="ro izq">' + escapar(r.cliente) + '</td>' +
+                '<td class="ro izq">' + escapar(r.proyecto) + '</td><td class="ro izq">' + escapar(r.estatus) + '</td>' +
+                '<td class="ro">' + fmt(num(r.total)) + '</td><td><button class="borrar" title="Quitar de la lista"' + dis + '>✕</button></td></tr>';
+        }).join('') : '<tr class="vacio-fila"><td colspan="6">Sin sugeridos relacionados.</td></tr>';
+        $('addRelacionado').disabled = soloLectura;
+    }
+    $('addRelacionado').addEventListener('click', function () {
+        if (!presupuestoId) { alert('Es necesario guardar el presupuesto para relacionarlo con otros presupuestos del sistema.'); return; }
+        var folio = prompt('Ingresa el folio del presupuesto a relacionar:');
+        if (!folio || !folio.trim()) return;
+        fetch('api/obras.php?accion=presupuesto_folio&folio=' + encodeURIComponent(folio.trim())).then(function (r) {
+            if (r.status === 401) { (window.top || window).location.href = 'index.php'; throw new Error('Sesión expirada'); }
+            return r.json().catch(function () { throw new Error('Respuesta no válida del servidor (HTTP ' + r.status + ').'); });
+        }).then(function (j) {
+            if (!j.ok) throw new Error(j.error);
+            var p = j.presupuesto;
+            if (+p.sugerido_id === presupuestoId) throw new Error('El presupuesto que intentas relacionar es este mismo; no es posible agregarlo.');
+            if (extras.relacionados.some(function (x) { return +x.sugerido_id === +p.sugerido_id; })) throw new Error('El presupuesto ya está relacionado.');
+            extras.relacionados.push(p);
+            marcarCambio();
+            renderRelacionados();
+        }).catch(function (err) { alert(err.message); });
+    });
+    $('tbRelacionados').addEventListener('click', function (e) {
+        if (!e.target.classList.contains('borrar') || soloLectura) return;
+        if (!confirm('¿Deseas eliminar de la lista el presupuesto seleccionado?')) return;
+        extras.relacionados.splice(e.target.closest('tr').dataset.i, 1);
+        marcarCambio();
+        renderRelacionados();
+    });
 
     $('pctIvaTxt').textContent = IVA * 100;
     $('pctUtilidad').addEventListener('input', function () {
@@ -929,15 +1198,48 @@
         $('estatus').textContent = e;
         $('estatus').className = 'estatus c-' + ((window.ACRI_ESTATUS || {})[e] || 'gris');
     }
-    // En solo lectura el cambio de estatus se guarda al momento (como en el sistema de escritorio)
-    function ponerEstatus(e) {
+    // Reglas del Form46 (mismas que estatusTransicion() en includes/estatus.php)
+    function motivoEstatus(antes, despues) {
+        var a = antes.toUpperCase(), d = despues.toUpperCase();
+        if (a === d) return '';
+        var bloquean = { ACEPTADO: ['ACEPTADO', 'CANCELADO', 'RECHAZADO'], CANCELADO: ['ACEPTADO', 'CANCELADO', 'RECHAZADO'], RECHAZADO: ['ACEPTADO', 'CANCELADO'] }[d]
+            || ['CANCELADO', 'RECHAZADO'];
+        return bloquean.indexOf(a) >= 0 ? 'En el estatus actual del presupuesto (' + antes + ') ya no es posible pasarlo a ' + despues + '.' : '';
+    }
+    function estatusFinal(e) { return ['ACEPTADO', 'CANCELADO'].indexOf(String(e).toUpperCase()) >= 0; }
+
+    // El cambio de estatus se guarda al momento (actualiza_estatus_sugerido_obra); requiere el permiso
+    // «Modificar presupuestos» o que otro usuario lo autorice
+    function ponerEstatus(e, autoriza) {
         var antes = $('estatus').textContent.trim();
         if (e === antes) return;
-        pintarEstatus(e);
-        marcarCambio();
-        if (!soloLectura || !presupuestoId) return;
-        guardar().then(function (ok) {
-            if (!ok) { pintarEstatus(antes); cambios = false; }
+        if (!presupuestoId) { alert('Es necesario guardar el presupuesto antes de cambiar su estatus.'); return; }
+        var motivo = motivoEstatus(antes, e);
+        if (motivo) { alert(motivo); return; }
+        if (autoriza === undefined) {
+            if (/^(Aceptado|Cancelado|Rechazado)$/i.test(e)
+                && !confirm('Se actualizará el estatus del presupuesto a ' + e + ' y ya no será posible realizar modificaciones. ¿Deseas continuar?')) return;
+            if (!window.ACRI_PUEDE_MODIFICAR) {
+                if (!confirm('No tienes el permiso para Modificar presupuestos. ¿Deseas que lo autorice otro usuario?')) return;
+                pedirAutorizacion('Cambiar el estatus requiere el permiso «Modificar presupuestos».').then(function (a) { if (a) ponerEstatus(e, a); });
+                return;
+            }
+        }
+        // Si hay cambios sin guardar, primero se guardan
+        var listo = cambios && !soloLectura ? guardar() : Promise.resolve(true);
+        listo.then(function (ok) {
+            if (!ok) return;
+            return pedirPresupuestos('estatus', { id: presupuestoId, estatus: e, autoriza: autoriza }).then(function (j) {
+                pintarEstatus(j.estatus);
+                if (estatusFinal(j.estatus) && !soloLectura) { soloLectura = true; aplicarModo(); }
+                if (enPestana) window.parent.postMessage({ tipo: 'guardado', id: presupuestoId }, location.origin);
+            });
+        }).catch(function (err) {
+            if (err.autorizar && !autoriza) {
+                pedirAutorizacion(err.message).then(function (a) { if (a) ponerEstatus(e, a); });
+                return;
+            }
+            alert('No se pudo cambiar el estatus: ' + err.message);
         });
     }
 
@@ -1039,6 +1341,7 @@
     });
 
     function documentoActual() {
+        // recalcula_sugerido_por_cambios antes de guardar
         var subtotal = calcularTotales();
         var mp = suma(datos.mp), mo = suma(datos.mo), go = suma(datos.go);
         var conceptos = [];
@@ -1077,7 +1380,11 @@
                 iva: subtotal * IVA,
                 total: subtotal * (1 + IVA)
             },
-            conceptos: conceptos
+            conceptos: conceptos,
+            empleados: extras.empleados,
+            comisiones: extras.comisiones,
+            seguros: extras.seguros,
+            relacionados: extras.relacionados.map(function (r) { return { sugerido_id: r.sugerido_id }; })
         };
     }
 
@@ -1087,6 +1394,13 @@
         if (!$('cliente').value.trim()) {
             alert('Captura el cliente antes de guardar.');
             $('cliente').focus();
+            return Promise.resolve(false);
+        }
+        // Form46: el correo del contacto en HubSpot y el proyecto son obligatorios
+        var correo = $('email').value.trim();
+        if (correo.length <= 10 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo) || !$('proyecto').value.trim()) {
+            alert('Es necesario colocar el correo del contacto con el que se registró en HubSpot y un nombre de Proyecto para guardar el presupuesto.');
+            $(correo.length <= 10 ? 'email' : 'proyecto').focus();
             return Promise.resolve(false);
         }
         guardando = true;
@@ -1253,16 +1567,25 @@
         },
         'modificar': function () {
             if (!presupuestoId) { alert('El presupuesto todavía no se guarda: ya puedes capturarlo.'); return; }
-            if (!window.ACRI_PUEDE_MODIFICAR) { avisoSoloLectura(); return; }
             if (soloLectura) {
                 var est = $('estatus').textContent.trim();
-                if (est === 'Aceptado' || est === 'Cancelado') {
+                if (estatusFinal(est)) {
                     alert('En el estatus actual del presupuesto (' + est + ') ya no es posible hacer modificaciones.');
                     return;
                 }
-                soloLectura = false;
-                aplicarModo();
-                $('cliente').focus();
+                var habilitar = function () {
+                    soloLectura = false;
+                    aplicarModo();
+                    $('cliente').focus();
+                };
+                if (window.ACRI_PUEDE_MODIFICAR) { habilitar(); return; }
+                // Sin el permiso, otro usuario lo autoriza (Dialog225 del escritorio)
+                if (!confirm('No tienes el permiso para Modificar presupuestos. ¿Deseas que lo autorice otro usuario?')) return;
+                pedirAutorizacion('Modificar el presupuesto requiere el permiso «Modificar presupuestos».').then(function (a) {
+                    if (!a) return;
+                    pedirPresupuestos('autorizar', { autoriza: a }).then(habilitar)
+                        .catch(function (err) { alert('No se autorizó: ' + err.message); });
+                });
                 return;
             }
             // Dejar de modificar: si hay cambios se descartan volviendo a abrir el presupuesto
@@ -1306,18 +1629,33 @@
             });
         },
         'cancelar': function () {
-            if (confirm('¿Cancelar este presupuesto?')) ponerEstatus('Cancelado');
+            // ponerEstatus pide la confirmación y valida que el estatus actual lo permita
+            ponerEstatus('Cancelado');
         },
         'eliminar': function () {
             if (!presupuestoId) {
                 if (confirm('Este presupuesto no se ha guardado. ¿Descartarlo?')) { cambios = false; cerrarVentana(); }
                 return;
             }
+            // Form46: solo se elimina un presupuesto Cancelado
+            if ($('estatus').textContent.trim().toUpperCase() !== 'CANCELADO') {
+                alert('Solo se puede eliminar un presupuesto Cancelado. Cancélalo primero.');
+                return;
+            }
             if (!confirm('¿Eliminar el presupuesto folio ' + $('folio').value + '? No se puede deshacer.')) return;
-            pedirPresupuestos('eliminar', { id: presupuestoId }).then(function () {
-                cambios = false;
-                cerrarVentana();
-            }).catch(function (err) { alert('No se pudo eliminar el presupuesto: ' + err.message); });
+            var eliminar = function (autoriza) {
+                pedirPresupuestos('eliminar', { id: presupuestoId, autoriza: autoriza }).then(function () {
+                    cambios = false;
+                    cerrarVentana();
+                }).catch(function (err) {
+                    if (err.autorizar && !autoriza) {
+                        pedirAutorizacion(err.message).then(function (a) { if (a) eliminar(a); });
+                        return;
+                    }
+                    alert('No se pudo eliminar el presupuesto: ' + err.message);
+                });
+            };
+            eliminar();
         },
         'cerrar': function () {
             if (!cambios || confirm('Hay cambios sin guardar. ¿Cerrar de todos modos?')) {
@@ -1381,6 +1719,18 @@
                     articulos: c.articulos || []
                 });
             });
+            extras = {
+                empleados: (p.empleados || []).map(function (e) {
+                    return { empleado_id: parseInt(e.empleado_id, 10) || 0, clave: e.clave, nombre: e.nombre || '', sueldo: num(e.sueldo), dias: num(e.dias), total: num(e.total) };
+                }),
+                comisiones: (p.comisiones || []).map(function (c) {
+                    return { tipo_id: parseInt(c.tipo_id, 10) || 0, nombre: c.nombre || '', porcentaje: num(c.porcentaje), total: num(c.total) };
+                }),
+                seguros: (p.seguros || []).map(function (s) {
+                    return { concepto: s.concepto || '', porcentaje_1: num(s.porcentaje_1), porcentaje_2: num(s.porcentaje_2), total: num(s.total) };
+                }),
+                relacionados: p.relacionados || []
+            };
             creador = txt(p.usuario_creador);
             if (enPestana && p.cliente) {
                 window.parent.postMessage({ tipo: 'titulo', texto: 'Presupuesto · ' + p.cliente }, location.origin);

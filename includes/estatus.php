@@ -70,3 +70,26 @@ function estatusValido($nombre): ?string
     }
     return null;
 }
+
+// Reglas del Form46 para pasar de un estatus a otro; regresa el motivo si no se permite, o null.
+//   Aceptado / Cancelado: no desde Aceptado, Cancelado ni Rechazado
+//   Rechazado:            no desde Aceptado ni Cancelado
+//   Seguimiento y los demás del catálogo: no desde Cancelado ni Rechazado
+function estatusTransicion(string $antes, string $despues): ?string
+{
+    $a = mb_strtoupper(trim($antes));
+    $d = mb_strtoupper(trim($despues));
+    if ($a === $d) return null;
+    $bloquean = [
+        'ACEPTADO'  => ['ACEPTADO', 'CANCELADO', 'RECHAZADO'],
+        'CANCELADO' => ['ACEPTADO', 'CANCELADO', 'RECHAZADO'],
+        'RECHAZADO' => ['ACEPTADO', 'CANCELADO'],
+    ][$d] ?? ['CANCELADO', 'RECHAZADO'];
+    return in_array($a, $bloquean, true) ? "En el estatus actual del presupuesto ($antes) ya no es posible pasarlo a $despues." : null;
+}
+
+// Un presupuesto Aceptado o Cancelado ya no se modifica (Form46: Modificar)
+function estatusBloqueaCambios(string $estatus): bool
+{
+    return in_array(mb_strtoupper(trim($estatus)), ['ACEPTADO', 'CANCELADO'], true);
+}

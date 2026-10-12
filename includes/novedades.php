@@ -6,6 +6,13 @@ return [
     [
         'fecha' => '2026-10-12',
         'cambios' => [
+            ['nuevo',  'Presupuesto: conceptos de cálculo automático', 'Los conceptos marcados con cálculo automático en el catálogo se calculan solos con su porcentaje del subtotal; los Gastos de Operación administrativos se calculan sobre la materia prima y la mano de obra. Se muestran en azul y no se capturan.'],
+            ['nuevo',  'Presupuesto: empleados y comisiones en Mano de Obra', 'Debajo de Mano de Obra se agregan empleados (sueldo diario × días) y tipos de empleado con su % de comisión sobre el subtotal. Sus totales llenan solos los renglones de mano de obra y comisiones.'],
+            ['nuevo',  'Presupuesto: anexo de seguro en Gastos de Operación', 'Los conceptos de seguro se calculan como Subtotal × %1 × %2 y pasan solos a Gastos de Operación.'],
+            ['nuevo',  'Presupuesto: Sugeridos relacionados', 'La pestaña Sugeridos relacionados permite ligar otros presupuestos por su folio.'],
+            ['mejora', 'Presupuesto: reglas de estatus como en el sistema de escritorio', 'El estatus se guarda al momento y respeta las reglas: no se acepta ni se cancela un presupuesto Aceptado, Cancelado o Rechazado, y no se pasa a Seguimiento uno Cancelado o Rechazado. Sin el permiso, otro usuario puede autorizar el cambio y también «Modificar».'],
+            ['mejora', 'Presupuesto: Eliminar solo presupuestos Cancelados', 'Para eliminar un presupuesto primero hay que cancelarlo.'],
+            ['mejora', 'Presupuesto: correo y proyecto obligatorios', 'Para guardar se pide el correo del contacto de HubSpot y el nombre del proyecto. El % de utilidad inicial sale del parámetro de costos 101.'],
             ['nuevo',  'Administrador › Novedades del Sistema', 'Esta página: aquí se anota todo lo que se agrega, modifica o refuerza en el sistema.'],
             ['mejora', 'Concepto/Tarea: el Costo se puede capturar', 'El costo capturado a mano ya no se sobrescribe al sincronizar con su sección; si se borra, vuelve a tomarse en automático.'],
             ['mejora', 'Concepto/Tarea: Modificar y Guardar bajo el título', 'Los botones se movieron debajo del título del diálogo.'],

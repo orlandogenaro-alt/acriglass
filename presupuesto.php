@@ -26,11 +26,30 @@ if (!$vendedores) $vendedores = ['ALFREDO MARTINEZ'];
 
 // Conceptos de Materia Prima / Mano de Obra / Gastos de Operacion (Administrador › Conceptos de …)
 $conceptos = ['mp' => [], 'mo' => [], 'go' => []];
+$fijos = ['mano_obra' => ACRI_CONCEPTOS_FIJOS['mano_obra']['descripcion'], 'comisiones' => ACRI_CONCEPTOS_FIJOS['comisiones']['descripcion']];
+// Empleados (Mano de Obra × días) y tipos de empleado (comisiones) del Form46
+$empleados = $tiposComision = [];
+// % de Utilidad Neta por defecto: parámetro de costos 101 (Form46.carga_inicial)
+$utilidadDefecto = 40;
 if (!modoConfiguracion()) {
     try {
         $conceptos = conceptosPresupuesto();
+        $fijos = conceptosFijosNombres($conceptos);
     } catch (Throwable $e) {
         error_log('AcriGlass presupuesto conceptos: ' . $e->getMessage());
+    }
+    try {
+        $empleados = bd_filas('AW', "select empleado_id, numero_empleado, nombre, sueldo_diario from empleados_obra
+                                      where estatus = 'A' order by nombre");
+        $tiposComision = bd_filas('AW', 'select tipo_empleado_id, nombre, porcentaje from tipos_empleados_comisiones order by nombre');
+    } catch (Throwable $e) {
+        error_log('AcriGlass presupuesto empleados: ' . $e->getMessage());
+    }
+    try {
+        $v = bd_valor('AW', 'select valor from parametros_costos_sug where clave = 101');
+        if (is_numeric($v) && $v >= 0 && $v < 100) $utilidadDefecto = round((float) $v, 4);
+    } catch (Throwable $e) {
+        error_log('AcriGlass presupuesto utilidad: ' . $e->getMessage());
     }
 }
 
@@ -247,6 +266,64 @@ $secciones = [
                     <tbody></tbody>
                 </table>
             </div>
+
+            <!-- Mano de Obra: empleados × días y comisiones (grid_man_obra / grid_comisiones del Form46) -->
+            <div class="extras" id="extrasMO" hidden>
+                <section class="extra">
+                    <div class="extra-barra">
+                        <strong>Empleados</strong>
+                        <select id="selEmpleado">
+                            <?php foreach ($empleados as $em): ?>
+                            <option value="<?= (int) $em['empleado_id'] ?>"><?= e($em['nombre']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button type="button" class="ct-btn" id="addEmpleado">+ Agregar</button>
+                        <span class="extra-total">Total: <output id="totEmpleados">0.00</output> → <em id="fijoMO"></em></span>
+                    </div>
+                    <div class="extra-caja">
+                        <table class="grid mini-grid">
+                            <thead><tr><th>No.</th><th>Empleado</th><th class="c-num">Sueldo diario</th><th class="c-num">Días</th><th class="c-num">Total</th><th class="c-del"></th></tr></thead>
+                            <tbody id="tbEmpleados"></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="extra">
+                    <div class="extra-barra">
+                        <strong>Comisiones</strong>
+                        <select id="selTipoComision">
+                            <?php foreach ($tiposComision as $tc): ?>
+                            <option value="<?= (int) $tc['tipo_empleado_id'] ?>"><?= e($tc['nombre']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button type="button" class="ct-btn" id="addComision">+ Agregar</button>
+                        <span class="extra-total">Total: <output id="totComisiones">0.00</output> → <em id="fijoCOM"></em></span>
+                    </div>
+                    <div class="extra-caja">
+                        <table class="grid mini-grid">
+                            <thead><tr><th>Tipo de empleado</th><th class="c-num">% sobre subtotal</th><th class="c-num">Total</th><th class="c-del"></th></tr></thead>
+                            <tbody id="tbComisiones"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Gastos de Operacion: anexo de seguro (grid_anexo7 del Form46) -->
+            <div class="extras" id="extrasGO" hidden>
+                <section class="extra">
+                    <div class="extra-barra">
+                        <strong>Anexo de seguro</strong>
+                        <select id="selSeguro"></select>
+                        <button type="button" class="ct-btn" id="addSeguro">+ Agregar</button>
+                        <span class="extra-ayuda">Total = Subtotal × %1 × %2 · pasa al concepto de Gastos de Operacion</span>
+                    </div>
+                    <div class="extra-caja">
+                        <table class="grid mini-grid">
+                            <thead><tr><th>Concepto</th><th class="c-num">% 1</th><th class="c-num">% 2</th><th class="c-num">Total</th><th class="c-del"></th></tr></thead>
+                            <tbody id="tbSeguros"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
         </div>
     </div>
 
@@ -270,7 +347,7 @@ $secciones = [
             <div class="t-fila"><b>+</b><span>Gastos de Operacion:</span> <output id="tGO">0</output></div>
             <div class="t-fila">
                 <b>+</b><span>Utilidad Neta:</span>
-                <input type="number" id="pctUtilidad" value="40" min="0" step="0.01" class="num pct" title="% de utilidad">
+                <input type="number" id="pctUtilidad" value="<?= e((string) $utilidadDefecto) ?>" min="0" max="99.9999" step="0.01" class="num pct" title="% de utilidad">
                 <output id="tUT">0</output>
             </div>
             <div class="t-fila">
@@ -288,9 +365,18 @@ $secciones = [
 
 <!-- ============ VISTA: SUGERIDOS ============ -->
 <section class="vista" data-vista="sugeridos">
-    <div class="vacio">
-        <p>Sugeridos relacionados</p>
-        <small>Aquí aparecerán presupuestos y obras similares cuando esté conectada la base de datos.</small>
+    <div class="extra sug-panel">
+        <div class="extra-barra">
+            <strong>Sugeridos relacionados</strong>
+            <span class="extra-ayuda">Otros presupuestos de obra ligados a este (se guardan con el presupuesto)</span>
+            <button type="button" class="ct-btn" id="addRelacionado">+ Relacionar por folio</button>
+        </div>
+        <div class="extra-caja">
+            <table class="grid mini-grid">
+                <thead><tr><th>Folio</th><th>Cliente</th><th>Proyecto</th><th>Estatus</th><th class="c-num">Total</th><th class="c-del"></th></tr></thead>
+                <tbody id="tbRelacionados"></tbody>
+            </table>
+        </div>
     </div>
 </section>
 
@@ -471,6 +557,9 @@ $secciones = [
     window.ACRI_PUEDE_REGISTRAR_OBRA = <?= $puedeRegistrarObra ? 'true' : 'false' ?>;
     window.ACRI_ESTATUS = <?= json_encode(array_column($estatus, 'color', 'nombre'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_CONCEPTOS = <?= json_encode($conceptos, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.ACRI_FIJOS = <?= json_encode($fijos, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.ACRI_EMPLEADOS = <?= json_encode($empleados, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.ACRI_TIPOS_COMISION = <?= json_encode($tiposComision, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <script src="<?= recurso('js/formato-presupuesto.js') ?>"></script>
 <script src="<?= recurso('js/presupuesto.js') ?>"></script>

@@ -482,6 +482,27 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .grid .borrar { width: 100%; height: 32px; color: var(--texto-3); }
 .grid .borrar:hover { background: var(--rojo-suave); color: var(--rojo); }
 .grid tr.vacio-fila td { color: var(--texto-3); text-align: center; font-style: italic; padding: 28px; border: none; background: var(--tarjeta) !important; }
+/* Conceptos de cálculo automático y renglones fijos (empleados, comisiones, seguro): no se capturan */
+.grid tr.calc td input[data-campo="presupuesto"] { color: var(--azul-texto); font-style: italic; cursor: default; }
+.grid td.ro.izq { text-align: left; color: var(--texto); }
+
+/* ---------- Empleados, comisiones, anexo de seguro y sugeridos relacionados ---------- */
+.extras { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 10px; }
+.extra { display: flex; flex-direction: column; min-width: 0; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 4px; overflow: hidden; }
+.extra-barra { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 6px 8px; background: var(--sub); border-bottom: 1px solid var(--borde); font-size: 12.5px; color: var(--enfasis); }
+.extra-barra .ct-btn { margin-bottom: 0; height: 28px; }
+.extra-barra .ct-btn:disabled, .extra-barra select:disabled { opacity: .5; cursor: default; }
+.extra-barra select { height: 28px; max-width: 220px; min-width: 0; padding: 0 6px; background: var(--input); color: var(--texto); border: 1px solid var(--borde-2); border-radius: 4px; }
+.extra-total { margin-left: auto; color: var(--texto-2); }
+.extra-total output { font-weight: 700; color: var(--enfasis); font-variant-numeric: tabular-nums; }
+.extra-total em { font-style: normal; color: var(--texto-3); }
+.extra-ayuda { color: var(--texto-3); font-size: 11.5px; }
+.extra-caja { max-height: 170px; overflow: auto; }
+.grid.mini-grid { min-width: 0; }
+.grid.mini-grid tr.vacio-fila td { padding: 14px; }
+.sug-panel { flex: 1; }
+.sug-panel .extra-barra .ct-btn { margin-left: auto; }
+.sug-panel .extra-caja { flex: 1; max-height: none; }
 
 /* Quitar flechas de input number */
 input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }

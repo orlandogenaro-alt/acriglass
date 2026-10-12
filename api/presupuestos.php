@@ -255,24 +255,6 @@ function guardar(array $d): array
     return ['id' => $id, 'folio' => (int) bd_valor('AW', 'select folio from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id])];
 }
 
-// Sin el permiso, otro usuario que sí lo tenga autoriza con su usuario y contraseña (Dialog225 del
-// escritorio). Sin datos de autorización regresa { autorizar: true } para que la pantalla los pida.
-// Regresa el login de quien autorizó.
-function autorizacion($a, string $permiso): string
-{
-    $desc = ACRI_PERMISOS[$permiso] ?? $permiso;
-    if (!is_array($a)) responder(['ok' => false, 'autorizar' => true, 'error' => "No tienes el permiso para «{$desc}» ($permiso)."], 403);
-    $r = autenticarUsuario(trim((string) ($a['usuario'] ?? '')), (string) ($a['contrasena'] ?? ''));
-    if ($r['estado'] !== 'ok') {
-        sleep(1);   // frena intentos repetidos de contraseña
-        error($r['estado'] === 'baja' ? 'El usuario que autoriza está dado de baja.' : 'Usuario o contraseña de quien autoriza incorrectos.', 403);
-    }
-    if (empty($r['permisos'][$permiso]) && empty($r['permisos']['ADMIN_USER'])) {
-        error("El usuario {$r['login']} tampoco tiene el permiso para «{$desc}».", 403);
-    }
-    return (string) $r['login'];
-}
-
 // Registra la obra del presupuesto (reg_obras) y la liga al presupuesto (doctos_sugerido_obra.obra_id).
 // Si ya tiene obra, regresa la existente. El vendedor del presupuesto queda como responsable
 // y el presupuesto pasa a Aceptado.

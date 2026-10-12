@@ -184,6 +184,26 @@ function bd_ejecutar(string $clave, string $sql, array $params = []): int
     return $st->rowCount();
 }
 
+// insert / update con columnas binarias (imágenes, archivos). $binarios: posiciones (desde 0) de $params
+// que se mandan tal cual como BLOB / bytea, sin convertirlas a Windows-1252
+function bd_ejecutar_binario(string $clave, string $sql, array $params, array $binarios): int
+{
+    $convierte = bd_convierte(bd_config($clave));
+    $st = bd_pdo($clave)->prepare($sql);
+    foreach (array_values($params) as $i => $v) {
+        if ($v === null) $tipo = PDO::PARAM_NULL;
+        elseif (in_array($i, $binarios, true)) $tipo = PDO::PARAM_LOB;
+        elseif (is_int($v)) $tipo = PDO::PARAM_INT;
+        else {
+            $tipo = PDO::PARAM_STR;
+            if ($convierte && is_string($v)) $v = mb_convert_encoding($v, 'Windows-1252', 'UTF-8');
+        }
+        $st->bindValue($i + 1, $v, $tipo);
+    }
+    $st->execute();
+    return $st->rowCount();
+}
+
 // Inserta un renglón y regresa su id. En Firebird el id sale de GEN_ID($generador) (ID_CATALOGOS por omisión,
 // igual que los triggers de AW); en Supabase, de la columna identity.
 function bd_insertar(string $clave, string $tabla, string $colId, array $campos, string $generador = 'id_catalogos'): int

@@ -80,6 +80,12 @@
     overflow: hidden;
 }
 .ob-marco img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.ob-marco.puede { cursor: pointer; }
+.ob-marco.puede:hover, .ob-marco.arrastre { border-color: var(--azul); background: var(--azul-suave); }
+.ob-marco.subiendo { opacity: .55; }
+.ob-marco-vacio { color: var(--texto-3); text-align: center; padding: 12px; }
+.ob-img-btns { margin-left: auto; display: flex; gap: 8px; }
+.ob-fechas .ob-img-btns .ob-btn { margin-left: 0; }
 
 .ob-fechas { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; font-weight: 700; }
 .ob-fechas label { display: flex; align-items: center; gap: 8px; }
@@ -137,6 +143,25 @@
 .ob-rel-avisos:empty { display: none; }
 .ob-listado .ob-grid td.num { text-align: right; padding: 0 6px; }
 .ob-listado .ob-grid td.txt { padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+
+.ob-estado { color: var(--texto-3); margin-left: 8px; }
+.ob-listado .ob-grid td.neg { color: var(--rojo); }
+.ob-listado .ob-grid td.alerta { background: var(--rojo-suave); color: var(--rojo); }
+.ob-listado .ob-grid td a { color: var(--azul-texto); }
+.ob-listado .ob-grid td .borrar-adj { color: var(--rojo); padding: 0 6px; }
+.ob-listado .ob-grid tbody tr[data-detalle] { cursor: pointer; }
+
+/* Detalle de Microsip de un renglón de facturación */
+.ob-detalle { border: 1px solid var(--borde); border-radius: var(--radio); background: var(--tarjeta); padding: 2px 8px 8px; }
+.ob-detalle legend { padding: 0 4px; font-weight: 700; }
+.ob-detalle .ob-grid { min-width: 600px; }
+.ob-detalle td { padding: 0 6px; }
+
+/* ---------- Conceptos/Tareas ---------- */
+.ob-ct tr.ct-concepto td { font-weight: 700; }
+.ob-ct tr.ct-partida td.ct-nom { padding-left: 28px; color: var(--texto-2); }
+.ob-ct tr.ct-grupo td { background: var(--sub); color: var(--texto-3); font-weight: 700; padding: 2px 6px; }
+.ob-ct td small { color: var(--texto-3); font-weight: 400; }
 
 /* ---------- Parámetros ---------- */
 .ob-parametros { display: flex; flex-direction: column; gap: 10px; padding: 16px; max-width: 520px; }

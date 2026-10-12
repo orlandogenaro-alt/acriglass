@@ -44,3 +44,21 @@ function autenticarUsuario(string $usuario, string $contrasena): array
     }
     return ['estado' => 'ok', 'login' => $u['login'], 'permisos' => $permisos, 'usuario_id' => $u['usuario_id']];
 }
+
+// Para las APIs: sin el permiso, otro usuario que sí lo tenga autoriza con su usuario y contraseña
+// (Dialog225 del escritorio). Sin datos de autorización responde { autorizar: true } para que la
+// pantalla los pida. Regresa el login de quien autorizó. Requiere includes/respuesta.php.
+function autorizacion($a, string $permiso): string
+{
+    $desc = defined('ACRI_PERMISOS') ? (ACRI_PERMISOS[$permiso] ?? $permiso) : $permiso;
+    if (!is_array($a)) responder(['ok' => false, 'autorizar' => true, 'error' => "No tienes el permiso para «{$desc}» ($permiso)."], 403);
+    $r = autenticarUsuario(trim((string) ($a['usuario'] ?? '')), (string) ($a['contrasena'] ?? ''));
+    if ($r['estado'] !== 'ok') {
+        sleep(1);   // frena intentos repetidos de contraseña
+        error($r['estado'] === 'baja' ? 'El usuario que autoriza está dado de baja.' : 'Usuario o contraseña de quien autoriza incorrectos.', 403);
+    }
+    if (empty($r['permisos'][$permiso]) && empty($r['permisos']['ADMIN_USER'])) {
+        error("El usuario {$r['login']} tampoco tiene el permiso para «{$desc}».", 403);
+    }
+    return (string) $r['login'];
+}

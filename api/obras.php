@@ -3,6 +3,7 @@
 // GET ?accion=presupuestos&ini=AAAA-MM-DD&fin=AAAA-MM-DD
 // GET ?accion=obras&ini=…&fin=…
 // GET ?accion=resumen&ini=…&fin=…   indicadores de Bienvenido
+// GET ?accion=tablero&anio=AAAA[&obra=N]  tablero financiero y de presupuesto de los proyectos (Bienvenido)
 // GET ?accion=obra&id=N              registro de obra con responsables
 // GET ?accion=presupuesto&id=N       presupuesto de obra con sus conceptos (MP / MO / GO)
 // GET ?accion=presupuesto_folio&folio=N  presupuesto por folio (para relacionarlo con otro)
@@ -464,6 +465,67 @@ function facturacion(int $obraId): array
     return ['filas' => $filas, 'avisos' => $avisos];
 }
 
+// Tablero de los proyectos en Bienvenido: obras del año (sin las canceladas) o una sola obra.
+// Presupuesto por tipo de concepto, lo ejercido (salidas de material, mano de obra y gastos
+// adicionales reales) y lo comprometido sin pagar. La cobranza la suma el navegador con
+// ?accion=facturacion de cada obra porque cada folio se cruza con Microsip.
+function tablero(int $anio, int $obraId): array
+{
+    $obras = bd_filas('AW',
+        "select a.obra_id, a.nom_obra, a.estatus, b.folio, b.proyecto
+           from reg_obras a
+           left join doctos_sugerido_obra b on b.docto_sugerido_obra_id = a.sugerido_id
+          where a.fecha_ini between ? and ? and a.estatus <> 'Cancelado'
+          order by a.obra_id desc", ["$anio-01-01", "$anio-12-31"]);
+    $ids = $obraId ? [$obraId] : array_map(fn($o) => (int) $o['obra_id'], $obras);
+    $r = ['obras' => $obras, 'ids' => $ids, 'avisos' => [],
+          'presupuesto' => ['MP' => 0.0, 'MO' => 0.0, 'GO' => 0.0],
+          'materiales' => 0.0, 'mano_obra' => 0.0, 'gastos' => 0.0, 'por_pagar' => 0.0];
+    if (!$ids) return $r;
+    $en = '(' . implode(',', array_fill(0, count($ids), '?')) . ')';
+    // Una tabla que no exista en esta base deja su parte en cero con un aviso
+    $leer = function (string $sql) use ($ids, &$r) {
+        try {
+            return bd_filas('AW', $sql, $ids);
+        } catch (Throwable $e) {
+            $r['avisos'][] = bd_mensaje_error($e);
+            return [];
+        }
+    };
+
+    foreach ($leer("select trim(d.tipo_concepto) as tipo, coalesce(sum(d.presupuesto), 0) as total
+                      from doctos_sugerido_obra_det d
+                      join reg_obras o on o.sugerido_id = d.docto_sugerido_obra_id
+                     where o.obra_id in $en
+                     group by trim(d.tipo_concepto)") as $f) {
+        if (isset($r['presupuesto'][$f['tipo']])) $r['presupuesto'][$f['tipo']] = (float) $f['total'];
+    }
+    foreach ($leer("select coalesce(sum(d.costo_total), 0) as total
+                      from doctos_solicitudes_det d
+                      join dvd_solicitudes_material s on s.docto_solicitud_id = d.docto_solicitud_id
+                      join doctos_orden_obra o on o.docto_orden_obra_id = s.docto_orden_obra_id
+                     where o.obra_id in $en and trim(coalesce(s.estatus, '')) not in ('C', 'Cancelado')") as $f) {
+        $r['materiales'] = (float) $f['total'];
+    }
+    // Mano de obra y gastos: lo real ya se pagó; lo capturado que falta por registrar queda por pagar
+    foreach ($leer("select importe_mo as importe, coalesce(imp_mo_real, 0) as imp_real
+                      from empleados_asignados_a_obra
+                     where obra_id in $en and trim(coalesce(estatus, '')) <> 'C'") as $f) {
+        $r['mano_obra'] += (float) $f['imp_real'];
+        $r['por_pagar'] += max(0, (float) $f['importe'] - (float) $f['imp_real']);
+    }
+    foreach ($leer("select g.importe,
+                           (select coalesce(sum(d.imp_real), 0) from gastos_adicionales_obra_det d
+                             where d.gasto_adicional_id = g.gasto_adicional_id) as imp_real
+                      from gastos_adicionales_obra g
+                     where g.obra_id in $en and trim(coalesce(g.estatus, '')) <> 'C'") as $f) {
+        $r['gastos'] += (float) $f['imp_real'];
+        $r['por_pagar'] += max(0, (float) $f['importe'] - (float) $f['imp_real']);
+    }
+    $r['por_pagar'] = round($r['por_pagar'], 2);
+    return $r;
+}
+
 $ini = fechaParam('ini', date('Y-m-01'));
 $fin = fechaParam('fin', date('Y-m-d'));
 
@@ -498,6 +560,11 @@ try {
                 // Obras en proceso: todas las que siguen abiertas, sin importar la fecha
                 'obras_en_proceso' => (int) bd_valor('AW', "select count(*) from reg_obras where estatus in ('Planificacion', 'Ejecucion', 'Obra Terminada')"),
             ]);
+
+        case 'tablero':
+            $anio = (int) ($_GET['anio'] ?? 0);
+            if ($anio < 2000 || $anio > 2100) $anio = (int) date('Y');
+            responder(['ok' => true, 'anio' => $anio] + tablero($anio, (int) ($_GET['obra'] ?? 0)));
 
         case 'obra':
             $id = (int) ($_GET['id'] ?? 0);

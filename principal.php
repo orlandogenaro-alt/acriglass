@@ -209,6 +209,42 @@ function idItem(string $nombre): string
                     </div>
                     <?php endforeach; ?>
                 </div>
+
+                <?php if (!modoConfiguracion()): ?>
+                <!-- Tablero de los proyectos (obras): financiero y presupuesto -->
+                <div class="tablero" id="tablero">
+                    <div class="bv-cabecera tb-cabecera">
+                        <h2 class="bv-titulo">Proyectos</h2>
+                        <div class="tb-filtros">
+                            <label>Año <select id="tbAnio"></select></label>
+                            <label>Obra <select id="tbObra"><option value="0">Todas las obras del año</option></select></label>
+                        </div>
+                    </div>
+                    <p class="tb-estado" id="tbEstado"></p>
+
+                    <div class="tb-kpis">
+                        <div class="tb-kpi" data-serie="pagado"><h3>PAGADO</h3><b data-kpi="pagado">—</b><small>Materiales + mano de obra real</small></div>
+                        <div class="tb-kpi" data-serie="cobrado"><h3>COBRADO</h3><b data-kpi="cobrado">—</b><small>Cobros, anticipos y notas de crédito</small></div>
+                        <div class="tb-kpi" data-serie="otros"><h3>OTROS GASTOS</h3><b data-kpi="otros">—</b><small>Gastos adicionales reales</small></div>
+                        <div class="tb-kpi" data-serie="utilidad"><h3>UTILIDAD / PÉRDIDA</h3><b data-kpi="utilidad">—</b><small>Cobrado − pagado − otros gastos</small></div>
+                    </div>
+
+                    <div class="tb-fila">
+                        <div class="tb-lado">
+                            <div class="tb-kpi"><h3>POR COBRAR</h3><b data-kpi="por_cobrar">—</b><small>Saldo en Microsip y AW</small></div>
+                            <div class="tb-kpi"><h3>POR PAGAR</h3><b data-kpi="por_pagar">—</b><small>Mano de obra y gastos sin importe real</small></div>
+                        </div>
+                        <figure class="tb-grafica"><figcaption>BALANCE FINANCIERO</figcaption><div id="grfFinanciero"></div></figure>
+                        <figure class="tb-grafica"><figcaption>PORCENTAJE FINANCIERO</figcaption><div id="grfFinPct"></div></figure>
+                    </div>
+
+                    <div class="tb-fila tb-fila-2">
+                        <figure class="tb-grafica"><figcaption>BALANCE PRESUPUESTO</figcaption><div id="grfPresupuesto"></div></figure>
+                        <figure class="tb-grafica"><figcaption>PORCENTAJE PRESUPUESTO</figcaption><div id="grfPresPct"></div></figure>
+                    </div>
+                </div>
+                <?php endif; ?>
+
                 <p class="bv-nota"><?= modoConfiguracion()
                     ? '⚠ Modo configuración: captura la contraseña de AW en Administrador › Bases de datos y vuelve a iniciar sesión con tu usuario.'
                     : 'Presupuestos y obras vienen de AW-Management; el resto de los indicadores se conectará después.' ?></p>
@@ -225,5 +261,6 @@ function idItem(string $nombre): string
 </script>
 <script src="<?= recurso('js/fichas.js') ?>"></script>
 <script src="<?= recurso('js/principal.js') ?>"></script>
+<script src="<?= recurso('js/tablero.js') ?>"></script>
 </body>
 </html>

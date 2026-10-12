@@ -6,6 +6,7 @@ return [
     [
         'fecha' => '2026-10-12',
         'cambios' => [
+            ['nuevo',      'Bienvenido: tablero de Proyectos', 'Debajo de los indicadores se ve el tablero de las obras por año, de todas o de una sola: Pagado (materiales y mano de obra real), Cobrado y Por cobrar (con la facturación de Microsip), Otros gastos, Utilidad/Pérdida y Por pagar, con las gráficas Balance financiero y Porcentaje financiero. También Balance presupuesto: lo presupuestado contra lo ejercido en materia prima, mano de obra y gastos de operación, y el % del presupuesto ya ejercido.'],
             ['nuevo',      'Conceptos/Tareas se guardan', 'Los Conceptos/Tareas del presupuesto (fechas, responsable, empleados, jornada, color y las tareas, subtareas e hitos agregados a mano) ya se guardan con el presupuesto; antes se perdían al cerrarlo.'],
             ['nuevo',      'Obra: 13-Conceptos/Tareas como en el presupuesto', 'La obra muestra los mismos Conceptos/Tareas del presupuesto, con lista, Gantt, adjuntos y la ventana Ver/Modificar con doble clic. Lo que se captura en la obra se guarda al momento y se ve también en el presupuesto.'],
             ['nuevo',      'Avance por Concepto/Tarea', 'Cada concepto/tarea tiene su % de avance y su estatus (Pendiente, En proceso, Terminada o Atrasada si venció su Fin real). El avance de la obra se calcula solo con el de sus tareas, ponderado por su costo.'],

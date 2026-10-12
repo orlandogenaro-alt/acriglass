@@ -98,6 +98,79 @@
     }
     function avisarError(err) { if (!err.cancelado) alert(err.message); }
 
+    // ---------- Ayudas de los documentos de la obra ----------
+    // Aviso breve que se quita solo («Se guardó correctamente»); se muestra sobre el diálogo abierto
+    function notificar(texto, tipo) {
+        var abiertos = document.querySelectorAll('dialog[open]');
+        var host = abiertos.length ? abiertos[abiertos.length - 1] : document.body;
+        var t = document.createElement('div');
+        t.className = 'aviso-flot' + (tipo ? ' ' + tipo : '');
+        t.setAttribute('role', 'status');
+        t.textContent = texto;
+        host.appendChild(t);
+        setTimeout(function () { t.classList.add('fuera'); }, 2600);
+        setTimeout(function () { t.remove(); }, 3100);
+    }
+
+    // Cambios sin guardar: antes de cerrar (✕, Cerrar o Esc) se pregunta para no perder lo capturado
+    function vigilarCambios(dlg) {
+        dlg._sucio = false;
+        dlg.addEventListener('input', function (e) {
+            if (e.target.closest('input, select, textarea') && !e.target.readOnly) dlg._sucio = true;
+        });
+        dlg.addEventListener('click', function (e) {
+            if (e.target.closest('.quitar, .mo-mas, .cot-acciones button, [data-agregar], [data-importar]')) dlg._sucio = true;
+        });
+        dlg.addEventListener('cancel', function (e) { e.preventDefault(); cerrarDoc(dlg); });
+    }
+    function cerrarDoc(dlg) {
+        if (dlg._sucio && !confirm('Tienes cambios sin guardar.\n\n¿Cerrar de todos modos? Se perderá lo que capturaste.')) return;
+        dlg._sucio = false;
+        dlg.close();
+    }
+
+    // Cantidades negativas en una lista (no se permiten en importes, horas ni unidades)
+    function hayNegativos(filas, cols) {
+        return filas.some(function (f) { return cols.some(function (c) { return num(f[c]) < 0; }); });
+    }
+
+    // Botones y línea de ayuda según el estado del documento: nuevo, guardado (bloqueado), modificando o cancelado
+    var AYUDA_BOTONES = {
+        'guardar': 'Guarda el documento y lo deja bloqueado',
+        'guardar-salir': 'Guarda el documento y cierra la ventana',
+        'guardar-cerrar': 'Guarda el documento y cierra la ventana',
+        'imprimir': 'Imprime el formato del documento (primero hay que guardarlo)',
+        'modificar': 'Desbloquea el documento guardado para hacerle cambios',
+        'cancelar': 'Cancela el documento (pide el motivo); ya no cuenta en la obra',
+        'bitacora': 'Muestra quién guardó o canceló el documento y cuándo',
+        'cerrar': 'Cierra la ventana',
+        'entrada-pt': 'Entrada de producto terminado en Microsip (por ahora en el sistema de escritorio)',
+        'enviar': 'Enviar la cotización a Microsip (por ahora en el sistema de escritorio)',
+        'estatus': 'Cambiar el estatus de la cotización (por ahora en el sistema de escritorio)'
+    };
+    function estadoDocumento(dlg, d) {   // d = { guardado, editable, cancelado }
+        var abierta = obraAbierta();
+        dlg.querySelectorAll('.mo-toolbar [data-mo], .mo-toolbar [data-cot]').forEach(function (b) {
+            var a = b.dataset.mo || b.dataset.cot;
+            if (!b.title) b.title = AYUDA_BOTONES[a] || '';
+            if (/^guardar/.test(a)) b.disabled = !d.editable;
+            else if (a === 'modificar') b.disabled = d.editable || !d.guardado || d.cancelado || !abierta;
+            else if (a === 'cancelar') b.disabled = !d.guardado || d.cancelado || !abierta;
+            else if (a === 'imprimir' || a === 'bitacora') b.disabled = !d.guardado;
+        });
+        var ayuda = dlg.querySelector('.doc-ayuda');
+        if (!ayuda) return;
+        var txt, cls;
+        if (d.cancelado) { txt = 'Documento cancelado: solo se puede consultar.'; cls = 'rojo'; }
+        else if (d.editable) {
+            txt = d.guardado ? 'Estás modificando el documento. Presiona Guardar para conservar los cambios.' : 'Captura los datos y presiona Guardar.';
+            cls = 'azul';
+        } else if (!abierta) { txt = 'El estatus de la obra ya no permite cambios: el documento solo se puede consultar.'; cls = 'gris'; }
+        else { txt = 'Documento guardado. Para hacerle cambios presiona Modificar.'; cls = 'gris'; }
+        ayuda.className = 'doc-ayuda ' + cls;
+        ayuda.textContent = txt;
+    }
+
     // ---------- Diálogo de captura genérico ----------
     // cfg: { titulo, aviso, campos: [{ id, etiqueta, tipo, valor, opciones, ancho, soloLectura }],
     //        grids: [{ id, titulo, columnas: [{ id, etiqueta, tipo, opciones, calc, total, alElegir }], filas, importar }],
@@ -128,7 +201,7 @@
                 var l = opcionesLista(c.opciones || []);
                 return '<input list="' + l.id + '" value="' + escapar(v) + '" autocomplete="off"' + attrs + dis + '>' + l.html;
             }
-            var t = c.tipo === 'number' ? 'number" step="any' : (c.tipo || 'text');
+            var t = c.tipo === 'number' ? 'number" step="any" min="0' : (c.tipo || 'text');
             return '<input type="' + t + '" value="' + escapar(v) + '"' + attrs + dis + '>';
         }
 
@@ -228,14 +301,21 @@
         $('frmForm').onsubmit = function (e) {
             e.preventDefault();
             $('frmGuardar').disabled = true;
-            Promise.resolve(cfg.guardar(datos())).then(function (cerrar) { if (cerrar !== false) dlg.close(); })
+            Promise.resolve(cfg.guardar(datos())).then(function (cerrar) {
+                if (cerrar === false) return;
+                dlg._sucio = false;
+                dlg.close();
+                notificar('Se guardó correctamente.');
+            })
                 .catch(avisarError)
                 .finally(function () { $('frmGuardar').disabled = false; });
         };
+        dlg._sucio = false;
         dlg.showModal();
     }
+    vigilarCambios($('frmDialogo'));
     document.querySelectorAll('[data-frm-cerrar]').forEach(function (b) {
-        b.addEventListener('click', function () { $('frmDialogo').close(); });
+        b.addEventListener('click', function () { cerrarDoc($('frmDialogo')); });
     });
 
     // ---------- Pestañas del documento (TabControl1_SelectedIndexChanged: cada pestaña se consulta al abrirla) ----------
@@ -768,7 +848,8 @@
 
     function cotHabilita(val) {
         cot.editable = val;
-        $('cotDialogo').querySelectorAll('.cot-edit, [data-cot="guardar"], [data-cot="guardar-cerrar"]').forEach(function (el) { el.disabled = !val; });
+        $('cotDialogo').querySelectorAll('.cot-edit').forEach(function (el) { el.disabled = !val; });
+        estadoDocumento($('cotDialogo'), { guardado: !!cot.id, editable: val, cancelado: cot.estatus === 'C' });
         cotPintar();
     }
     function cotPonerEstatus(e) {
@@ -785,7 +866,7 @@
     function cotPintar() {
         var dis = cot.editable ? '' : ' disabled';
         var campo = function (f, c, num) {
-            return '<input' + (num ? ' type="number" step="any"' : ' class="txt"') + ' data-col="' + c + '" value="' + escapar(f[c] == null ? '' : f[c]) + '"' + dis + '>';
+            return '<input' + (num ? ' type="number" step="any" min="0"' : ' class="txt"') + ' data-col="' + c + '" value="' + escapar(f[c] == null ? '' : f[c]) + '"' + dis + '>';
         };
         $('cotPartidas').innerHTML = cot.partidas.length ? cot.partidas.map(function (f, i) {
             return '<tr data-i="' + i + '"><td>' + campo(f, 'clave_articulo') + '</td><td>' + campo(f, 'descripcion') + '</td>' +
@@ -838,6 +919,7 @@
         $('cotQuejasAviso').hidden = true;
         cotPestana('general');
         cotHabilita(!doc && obraAbierta());
+        $('cotDialogo')._sucio = false;
         $('cotDialogo').showModal();
     }
 
@@ -891,9 +973,22 @@
 
     // Guardar / Guardar y Cerrar
     function cotGuardar(cerrar) {
-        if (!$('cotNombre').value.trim()) { alert('Selecciona el cliente de la cotización.'); return; }
+        if (!$('cotNombre').value.trim()) {
+            alert('Falta el cliente. Búscalo con el botón del embudo junto a «Nombre».');
+            $('cotNombre').focus();
+            return;
+        }
         var partidas = cot.partidas.filter(function (f) { return String(f.clave_articulo || '').trim() || String(f.descripcion || '').trim(); });
-        if (!partidas.length) { alert('Agrega al menos una partida a la cotización.'); return; }
+        if (!partidas.length) {
+            alert('Agrega al menos una partida en la pestaña General (botón «Agregar renglón»).');
+            cotPestana('general');
+            return;
+        }
+        if (hayNegativos(partidas, ['unidades', 'precio_unitario', 'costo_unit'])) {
+            alert('Hay cantidades negativas en las partidas. Corrígelas para poder guardar.');
+            cotPestana('general');
+            return;
+        }
         var d = {
             id: obraId, docto_id: cot.id, folio: $('cotFolio').value, fecha: $('cotFecha').value, fecha_entrega: $('cotEntrega').value,
             cliente_id: cot.cliente_id, clave_cliente: $('cotClave').value, nom_cliente: $('cotNombre').value,
@@ -904,8 +999,10 @@
             $('cotDocId').value = cot.id;
             cotPonerEstatus('P');
             cargarFacturacion();
+            $('cotDialogo')._sucio = false;
             if (cerrar) $('cotDialogo').close();
             else cotHabilita(false);
+            notificar('Se guardó correctamente.');
         }).catch(avisarError);
     }
     function cotModificar() {
@@ -924,6 +1021,7 @@
             cotPonerEstatus('C');
             cotHabilita(false);
             cargarFacturacion();
+            notificar('La cotización quedó cancelada.');
         }).catch(avisarError);
     }
     function cotImprimir() {
@@ -953,7 +1051,7 @@
         'modificar': cotModificar,
         'cancelar': cotCancelar,
         'bitacora': function () { verBitacora('cot', cot.id); },
-        'cerrar': function () { $('cotDialogo').close(); },
+        'cerrar': function () { cerrarDoc($('cotDialogo')); },
         // Escriben en Microsip: la web solo puede hacerlo por la API de Easy-Glass, que aún no tiene esos recursos
         'entrada-pt': function () { alert('Entrada PT da de alta la entrada de producto terminado en Microsip. La API de Easy-Glass aún no tiene ese recurso, así que se sigue haciendo en el sistema de escritorio.'); },
         'enviar': function () { alert('Enviar a Microsip de una cotización capturada aquí necesita un recurso nuevo en la API de Easy-Glass (hoy solo envía presupuestos de Easy-Glass con folio EG). Mientras tanto se envía desde el sistema de escritorio.'); },
@@ -963,7 +1061,8 @@
         var b = e.target.closest('[data-cot]');
         if (b && !b.disabled) COT_BOTONES[b.dataset.cot]();
     });
-    $('cotDialogo').querySelector('.hs-cerrar').addEventListener('click', function () { $('cotDialogo').close(); });
+    $('cotDialogo').querySelector('.hs-cerrar').addEventListener('click', function () { cerrarDoc($('cotDialogo')); });
+    vigilarCambios($('cotDialogo'));
 
     // Busca Cliente: clientes de Easy-Glass por la API (la clave es el número de cliente)
     function buscaCliente(modo, texto) {
@@ -1006,6 +1105,7 @@
         cot.cliente_id = c.cliente_id;
         $('cotClave').value = c.clave;
         $('cotNombre').value = c.nombre;
+        $('cotDialogo')._sucio = true;
         $('bcDialogo').close();
     });
     document.querySelectorAll('[data-bc-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('bcDialogo').close(); }); });
@@ -1117,7 +1217,8 @@
     // habilita_controles
     function moHabilita(val) {
         mo.editable = val;
-        $('moDialogo').querySelectorAll('.mo-edit, [data-mo="guardar"], [data-mo="guardar-salir"]').forEach(function (el) { el.disabled = !val; });
+        $('moDialogo').querySelectorAll('.mo-edit').forEach(function (el) { el.disabled = !val; });
+        estadoDocumento($('moDialogo'), { guardado: !!mo.id, editable: val, cancelado: mo.estatus === 'Cancelado' });
         moPintar();
     }
     function moPonerEstatus(e) {
@@ -1131,7 +1232,7 @@
         $('moFilas').innerHTML = mo.filas.length ? mo.filas.map(function (f, i) {
             return '<tr data-i="' + i + '"><td>' + escapar(f.nombre) + '</td>' +
                 ['costo_x_hrs', 'hrs_trabajo', 'hrs_trabajo_real'].map(function (c) {
-                    return '<td style="width:92px"><input type="number" step="any" data-col="' + c + '" value="' + escapar(f[c]) + '"' + dis + '></td>';
+                    return '<td style="width:92px"><input type="number" step="any" min="0" data-col="' + c + '" value="' + escapar(f[c]) + '"' + dis + '></td>';
                 }).join('') +
                 '<td class="num" style="width:96px">' + (dinero(num(f.costo_x_hrs) * num(f.hrs_trabajo)) || '$0.00') + '</td>' +
                 '<td style="width:26px">' + (mo.editable ? '<button type="button" class="quitar" title="Quitar">🗑</button>' : '') + '</td></tr>';
@@ -1165,6 +1266,7 @@
             $('moNotas').value = doc ? (doc.notas || '') : '';
             moPonerEstatus(doc && doc.estatus === 'Cancelado' ? 'Cancelado' : 'Normal');
             moHabilita(!doc && obraAbierta());
+            $('moDialogo')._sucio = false;
             $('moDialogo').showModal();
         }).catch(avisarError);
     }
@@ -1200,7 +1302,12 @@
     // toll_guardar2 (Guardar: queda bloqueado) y tol_guardar (Guardar y Salir)
     function moGuardar(salir) {
         if (!mo.filas.length) {
-            alert('Aún no se ha asignado personal a la obra. Agregue personal para poder guardar los cambios.');
+            alert('Aún no se ha asignado personal a la obra. Elija al empleado en «Personal de Obra» y presione + para agregarlo.');
+            $('moPersonal').focus();
+            return;
+        }
+        if (hayNegativos(mo.filas, ['costo_x_hrs', 'hrs_trabajo', 'hrs_trabajo_real'])) {
+            alert('Hay costos u horas negativos en la lista. Corrígelos para poder guardar.');
             return;
         }
         var d = {
@@ -1214,8 +1321,10 @@
                  : 'Esta captura requiere el permiso «Modificar obras».').then(function (j) {
             mo.id = j.mo_id;
             cargarListado('mano', 'mano');
+            $('moDialogo')._sucio = false;
             if (salir) $('moDialogo').close();
             else moHabilita(false);
+            notificar('Se guardó correctamente.');
         }).catch(avisarError);
     }
 
@@ -1240,6 +1349,7 @@
             moPonerEstatus('Cancelado');
             moHabilita(false);
             cargarListado('mano', 'mano');
+            notificar('La asignación quedó cancelada.');
         }).catch(avisarError);
     }
 
@@ -1304,12 +1414,13 @@
         'modificar': moModificar,
         'cancelar': moCancelar,
         'bitacora': function () { verBitacora('mo', mo.id); },
-        'cerrar': function () { $('moDialogo').close(); }
+        'cerrar': function () { cerrarDoc($('moDialogo')); }
     };
     $('moDialogo').addEventListener('click', function (e) {
         var b = e.target.closest('[data-mo]');
         if (b && !b.disabled) MO_BOTONES[b.dataset.mo]();
     });
+    vigilarCambios($('moDialogo'));
     document.querySelectorAll('[data-mo-bit-cerrar]').forEach(function (b) {
         b.addEventListener('click', function () { $('moBitacora').close(); });
     });
@@ -1319,7 +1430,8 @@
 
     function gaHabilita(val) {
         ga.editable = val;
-        $('gaDialogo').querySelectorAll('.mo-edit, [data-mo="guardar"], [data-mo="guardar-salir"]').forEach(function (el) { el.disabled = !val; });
+        $('gaDialogo').querySelectorAll('.mo-edit').forEach(function (el) { el.disabled = !val; });
+        estadoDocumento($('gaDialogo'), { guardado: !!ga.id, editable: val, cancelado: ga.estatus === 'Cancelado' });
         gaPintar();
     }
     function gaPonerEstatus(e) {
@@ -1337,7 +1449,7 @@
         $('gaConceptos').innerHTML = ga.conceptos.length ? ga.conceptos.map(function (f, i) {
             return '<tr data-i="' + i + '"><td><input class="txt" list="gaListaConceptos" autocomplete="off" data-col="concepto" value="' + escapar(f.concepto) + '"' + dis + '></td>' +
                 ['imp_presupuestado', 'imp_real'].map(function (c) {
-                    return '<td style="width:120px"><input type="number" step="any" data-col="' + c + '" value="' + escapar(f[c]) + '"' + dis + '></td>';
+                    return '<td style="width:120px"><input type="number" step="any" min="0" data-col="' + c + '" value="' + escapar(f[c]) + '"' + dis + '></td>';
                 }).join('') + '<td style="width:26px">' + quitar + '</td></tr>';
         }).join('') : '<tr class="vacio"><td colspan="4">Agregue los conceptos del gasto con el botón +</td></tr>';
         gaTotales();
@@ -1373,6 +1485,7 @@
             $('gaNotas').value = doc ? (doc.notas || '') : '';
             gaPonerEstatus(doc && doc.estatus === 'Cancelado' ? 'Cancelado' : 'Normal');
             gaHabilita(!doc && obraAbierta());
+            $('gaDialogo')._sucio = false;
             $('gaDialogo').showModal();
         }).catch(avisarError);
     }
@@ -1415,8 +1528,14 @@
 
     // toll_guardar2 (Guardar: queda bloqueado) y tol_guardar (Guardar y Salir)
     function gaGuardar(salir) {
+        if (hayNegativos(ga.conceptos, ['imp_presupuestado', 'imp_real'])) {
+            alert('Hay importes negativos en los conceptos. Corrígelos para poder guardar.');
+            return;
+        }
         if (gaTotales() <= 0) {
-            alert('No se agregaron gastos a la obra. Agregue los conceptos para poder guardar los cambios.');
+            alert('No se agregaron gastos a la obra. Escriba el concepto y su importe presupuestado para poder guardar.');
+            var primero = $('gaConceptos').querySelector('input');
+            if (primero) primero.focus();
             return;
         }
         var d = {
@@ -1431,8 +1550,10 @@
             ga.id = j.gasto_id;
             catObra = null;   // pudo darse de alta un concepto nuevo
             cargarListado('gastos', 'gastos');
+            $('gaDialogo')._sucio = false;
             if (salir) $('gaDialogo').close();
             else gaHabilita(false);
+            notificar('Se guardó correctamente.');
         }).catch(avisarError);
     }
 
@@ -1457,6 +1578,7 @@
             gaPonerEstatus('Cancelado');
             gaHabilita(false);
             cargarListado('gastos', 'gastos');
+            notificar('El gasto quedó cancelado.');
         }).catch(avisarError);
     }
 
@@ -1484,12 +1606,13 @@
         'modificar': gaModificar,
         'cancelar': gaCancelar,
         'bitacora': function () { verBitacora('gasto', ga.id); },
-        'cerrar': function () { $('gaDialogo').close(); }
+        'cerrar': function () { cerrarDoc($('gaDialogo')); }
     };
     $('gaDialogo').addEventListener('click', function (e) {
         var b = e.target.closest('[data-mo]');
         if (b && !b.disabled) GA_BOTONES[b.dataset.mo]();
     });
+    vigilarCambios($('gaDialogo'));
 
     function abrirDocumento(tipo, id, dialogo) {
         pedir('accion=documento&tipo=' + tipo + '&id=' + encodeURIComponent(obraId) + '&doc=' + encodeURIComponent(id))

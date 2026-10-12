@@ -268,6 +268,7 @@ function guardarOrden(array $d): array
         if ($desc === null && !$uds) continue;
         if ($desc === null) error('Hay una partida sin descripción.');
         $pu = numero($p['precio_unitario'] ?? 0);
+        if ($uds < 0 || $pu < 0 || numero($p['costo_unit'] ?? 0) < 0) error('La partida ' . ($clave ?? $desc) . ' tiene cantidades negativas.');
         $partidas[] = [
             'articulo_id' => (int) ($p['articulo_id'] ?? 0) ?: null, 'clave_articulo' => texto($p['clave_articulo'] ?? '', 30),
             'descripcion' => $desc, 'unidades' => $uds, 'um' => texto($p['um'] ?? '', 30), 'precio_unitario' => $pu,
@@ -497,6 +498,7 @@ function guardarManoObra(array $d): array
         $costo = numero($e['costo_x_hrs'] ?? 0);
         $hrs = numero($e['hrs_trabajo'] ?? 0);
         $real = numero($e['hrs_trabajo_real'] ?? 0);
+        if ($costo < 0 || $hrs < 0 || $real < 0) error("El empleado $nombre tiene costo u horas negativos.");
         $det[] = ['id_empleado' => $emp ?: null, 'nombre' => $nombre, 'costo_x_hrs' => $costo, 'hrs_trabajo' => $hrs, 'hrs_trabajo_real' => $real,
                   'costo_tot_pres' => numero($costo * $hrs), 'cost_tot_real' => numero($costo * $real)];
     }
@@ -589,7 +591,10 @@ function guardarGasto(array $d): array
         foreach ((array) ($d['detalle'] ?? []) as $r) {
             $c = texto($r['concepto'] ?? '', 60);
             if ($c === null) continue;
-            $det[] = ['concepto_gasto_id' => conceptoGastoId($c), 'imp_presupuestado' => numero($r['imp_presupuestado'] ?? 0), 'imp_real' => numero($r['imp_real'] ?? 0)];
+            $ip = numero($r['imp_presupuestado'] ?? 0);
+            $ir = numero($r['imp_real'] ?? 0);
+            if ($ip < 0 || $ir < 0) error("El concepto $c tiene un importe negativo.");
+            $det[] = ['concepto_gasto_id' => conceptoGastoId($c), 'imp_presupuestado' => $ip, 'imp_real' => $ir];
         }
         $importe = numero(array_sum(array_column($det, 'imp_presupuestado')));
         if (!$det || $importe <= 0) error('No se agregaron gastos a la obra. Agregue los conceptos para poder guardar los cambios.');

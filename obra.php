@@ -60,6 +60,14 @@ $listados = [
         'totales'  => [['totGastos', 'Total gastos', 'importe'], ['totGastosReal', 'Total real', 'importe_real']],
     ],
 ];
+// Pista bajo los botones de cada pestaña para quien apenas usa el sistema
+$pistas = [
+    'facturacion' => 'Clic en un renglón para ver sus documentos de Microsip · doble clic para abrirlo · clic derecho para más opciones (eliminar, cancelar o enviar a Microsip).',
+    'ordenes'     => 'Doble clic en una orden de trabajo para verla, liberarla a producción o cancelarla.',
+    'explosion'   => 'Doble clic en una partida para corregir sus unidades o su costo · selecciona renglones para eliminarlos.',
+    'mano'        => 'Doble clic en una asignación para verla, modificarla, imprimirla o cancelarla.',
+    'gastos'      => 'Doble clic en un gasto para verlo, modificarlo, imprimirlo o cancelarlo.',
+];
 $hoy = date('Y-m-d');
 // Responsables para los Conceptos/Tareas: vendedores de obra activos
 $ctUsuarios = [];
@@ -282,6 +290,9 @@ function iconoPestana() {
         <?php endforeach; ?>
         <span class="ob-estado" data-estado></span>
     </div>
+    <?php if (isset($pistas[$clave])): ?>
+    <p class="ob-pista">💡 <?= e($pistas[$clave]) ?></p>
+    <?php endif; ?>
     <?php if ($clave === 'facturacion'): ?>
     <ul class="ob-rel-avisos" id="facAvisos"></ul>
     <?php endif; ?>
@@ -416,6 +427,7 @@ function iconoPestana() {
     </div>
     <?= barraDocumento() ?>
     <div class="mo-cuerpo">
+        <p class="doc-ayuda" role="status"></p>
         <div class="mo-fila">
             <label>Folio de la OT <select id="moOrden" class="mo-edit"></select></label>
             <label class="mo-der">Fecha de Trabajo: <input type="date" id="moFecha" class="mo-edit"></label>
@@ -489,6 +501,7 @@ function iconoPestana() {
         </button>
     </div>
     <div class="cot-cuerpo">
+        <p class="doc-ayuda" role="status"></p>
         <div class="cot-enc">
             <div>
                 <h2 class="cot-titulo">Cotizacion</h2>
@@ -605,6 +618,7 @@ function iconoPestana() {
     </div>
     <?= barraDocumento() ?>
     <div class="mo-cuerpo">
+        <p class="doc-ayuda" role="status"></p>
         <div class="mo-fila">
             <label>Folio de la OT <select id="gaOrden" class="mo-edit"></select></label>
             <div class="mo-der ga-der">

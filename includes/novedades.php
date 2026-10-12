@@ -6,6 +6,9 @@ return [
     [
         'fecha' => '2026-10-12',
         'cambios' => [
+            ['nuevo',      'Conceptos/Tareas se guardan', 'Los Conceptos/Tareas del presupuesto (fechas, responsable, empleados, jornada, color y las tareas, subtareas e hitos agregados a mano) ya se guardan con el presupuesto; antes se perdían al cerrarlo.'],
+            ['nuevo',      'Obra: 13-Conceptos/Tareas como en el presupuesto', 'La obra muestra los mismos Conceptos/Tareas del presupuesto, con lista, Gantt, adjuntos y la ventana Ver/Modificar con doble clic. Lo que se captura en la obra se guarda al momento y se ve también en el presupuesto.'],
+            ['nuevo',      'Avance por Concepto/Tarea', 'Cada concepto/tarea tiene su % de avance y su estatus (Pendiente, En proceso, Terminada o Atrasada si venció su Fin real). El avance de la obra se calcula solo con el de sus tareas, ponderado por su costo.'],
             ['nuevo',      'Obra: capturas en la web', 'Ya no se usa el sistema de escritorio: Nueva Orden de Trabajo (con partidas, liberar a producción, fin de producción y cancelar), Nueva Cotización para Facturación, Nuevo Documento de Cobro (efectivo, nota de cargo, anticipo), agregar artículos a la Explosión de Material (o importarlos del presupuesto) y corregir sus unidades y costo, Asignar Mano de Obra por empleado y horas, y Gastos Adicionales con importes y personal. Doble clic en un renglón lo abre.'],
             ['correccion', 'Obra: la imagen no se guardaba en línea', 'El sitio en línea respondía «HTTP 404» al guardar la imagen de la obra.'],
             ['mejora',     'Obra: tablas en la base en línea', 'Script Consultas/supabase_obras.sql con las tablas de órdenes, facturación, explosión, salidas, mano de obra, consumos, gastos y adjuntos.'],

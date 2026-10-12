@@ -12,6 +12,7 @@ require __DIR__ . '/../includes/bd.php';
 require __DIR__ . '/../includes/autenticacion.php';
 require __DIR__ . '/../includes/permisos.php';
 require __DIR__ . '/../includes/estatus.php';
+require __DIR__ . '/../includes/tareas.php';
 require __DIR__ . '/../includes/respuesta.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') error('Método no permitido.', 405);
@@ -246,6 +247,8 @@ function guardar(array $d): array
             }
         }
         guardarDetalles($id, $d, $cache);
+        // Conceptos/Tareas (fechas, responsable, avance…); sin la tabla se guarda el resto del presupuesto
+        if (isset($d['tareas']) && tareasDisponibles()) guardarTareas($id, (array) $d['tareas']);
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
@@ -342,6 +345,7 @@ function eliminar(array $d): void
     $pdo->beginTransaction();
     try {
         borrarDetalles($id);
+        if (tareasDisponibles()) bd_ejecutar('AW', 'delete from conceptos_tareas where docto_sugerido_obra_id = ?', [$id]);
         // Si otro presupuesto lo tenía relacionado, deja de estarlo
         bd_ejecutar('AW', 'delete from sugeridos_relacionados where sugerido_id_hijo = ?', [$id]);
         bd_ejecutar('AW', 'delete from doctos_suge_obra_det_mat where docto_sugerido_obra_det_id in

@@ -1115,39 +1115,58 @@
     }
     $('actualizarRel').addEventListener('click', cargarRelacionados);
 
-    // ---------- 13-Conceptos/Tareas (los del presupuesto de la obra) ----------
+    // ---------- 13-Conceptos/Tareas: los mismos del presupuesto (js/conceptos-tareas.js) ----------
+    // Cada cambio se guarda al momento en conceptos_tareas (api/tareas.php); si una tarea tiene avance,
+    // el avance de la obra se calcula con el de sus tareas.
+    var ctPres = null;   // presupuesto de la obra: { datos, proyecto, ubicacion, fecha }
+    var ctCola = Promise.resolve();
+    var ct = AcriTareas({
+        datos: function () { return ctPres ? ctPres.datos : { mp: [], mo: [], go: [] }; },
+        contexto: function () { return ctPres || {}; },
+        soloLectura: function () { return !ctPres || estatus === 'Finalizacion' || estatus === 'Cancelado'; },
+        avisoSoloLectura: function () {
+            alert(!ctPres ? 'La obra no está ligada a un presupuesto de obra.' : 'No es posible modificar una obra que su estatus es: ' + estatus);
+        },
+        visible: function () { return vistaDe('conceptos').classList.contains('visible'); },
+        carpeta: function () { return 'P' + sugeridoId; },
+        alCambiar: function () { ctCola = ctCola.then(guardarTareas); }
+    });
+
+    function guardarTareas() {
+        $('ctEstado').textContent = 'Guardando…';
+        return fetch('api/tareas.php?accion=guardar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Acri-Token': token },
+            body: JSON.stringify({ presupuesto_id: sugeridoId, tareas: ct.exportar().tareas })
+        }).then(respuesta).then(function (j) {
+            $('ctEstado').textContent = 'Guardado · avance de las tareas: ' + j.avance + ' %';
+            if (j.avance_obra) { avance = j.avance; $('sliderAvance').value = avance; pintarAvance(); }
+        }).catch(function (err) {
+            $('ctEstado').textContent = '⚠ ' + err.message;
+            alert('No se guardaron los conceptos/tareas: ' + err.message);
+        });
+    }
+
     function cargarConceptos() {
         if (!obraId) return;
         cargado.conceptos = true;
+        if (!sugeridoId) {
+            ctPres = null;
+            ct.cargar([]);
+            ct.render();
+            $('ctEstado').textContent = 'La obra no está ligada a un presupuesto de obra.';
+            return;
+        }
         $('ctEstado').textContent = 'Consultando…';
-        return pedir('accion=conceptos&id=' + encodeURIComponent(obraId)).then(function (j) {
-            var tot = { MP: 0, MO: 0, GO: 0 }, grupo = '', n = 0, html = '';
-            j.conceptos.forEach(function (c) {
-                if (c.agrupador !== grupo) {
-                    grupo = c.agrupador;
-                    html += '<tr class="ct-grupo"><td colspan="9">' + escapar(grupo) + '</td></tr>';
-                }
-                tot[c.tipo] += c.importe;
-                n++;
-                html += '<tr class="ct-concepto" title="' + escapar(c.notas) + '"><td class="sel-col"></td><td class="num">' + n + '</td>' +
-                    '<td class="txt">' + escapar(c.clave) + '</td><td class="txt ct-nom">' + escapar(c.concepto) + '</td>' +
-                    '<td class="txt">' + escapar(c.agrupador) + '</td><td class="num">' + numero(c.cantidad) + '</td><td class="txt">' + escapar(c.unidad) + '</td>' +
-                    '<td class="txt">' + escapar(c.folio) + '</td><td class="num">' + dinero(c.importe) + '</td></tr>';
-                c.partidas.forEach(function (p, i) {
-                    html += '<tr class="ct-partida"><td class="sel-col"></td><td class="num"><small>' + n + '.' + (i + 1) + '</small></td>' +
-                        '<td class="txt">' + escapar(p.clave) + '</td><td class="txt ct-nom" title="' + escapar(p.descripcion) + '">' + escapar(p.concepto) +
-                        (p.descripcion && p.descripcion !== p.concepto ? ' <small>' + escapar(p.descripcion) + '</small>' : '') + '</td>' +
-                        '<td class="txt">' + escapar(c.agrupador) + '</td><td class="num">' + numero(p.cantidad) + '</td><td class="txt">' + escapar(p.unidad) + '</td>' +
-                        '<td class="txt">' + escapar(p.folio) + '</td><td class="num">' + dinero(p.importe) + '</td></tr>';
-                });
-            });
-            $('ctFilas').innerHTML = html || '<tr class="vacio-fila"><td colspan="9">' +
-                (j.presupuesto ? 'El presupuesto folio ' + escapar(j.presupuesto.folio) + ' no tiene conceptos capturados.' : 'La obra no está ligada a un presupuesto de obra.') + '</td></tr>';
-            $('ctTotMP').textContent = dinero(tot.MP);
-            $('ctTotMO').textContent = dinero(tot.MO);
-            $('ctTotGO').textContent = dinero(tot.GO);
-            $('ctTotal').textContent = dinero(tot.MP + tot.MO + tot.GO);
-            $('ctEstado').textContent = j.presupuesto ? 'Presupuesto folio ' + j.presupuesto.folio + ' · ' + n + ' concepto(s)' : '';
+        return pedir('accion=presupuesto&id=' + encodeURIComponent(sugeridoId)).then(function (j) {
+            var p = j.presupuesto;
+            ctPres = { datos: AcriTareas.datosDePresupuesto(p), proyecto: p.proyecto, ubicacion: p.ubicacion, fecha: dia(p.fecha) };
+            ct.aviso(p.aviso_descripciones || '');
+            ct.cargar(p.tareas || []);
+            ct.render();
+            ct.contarAdjuntos();
+            $('ctEstado').textContent = p.aviso_tareas ? '⚠ ' + p.aviso_tareas
+                : 'Presupuesto folio ' + p.folio + ' · doble clic en un concepto/tarea para verlo; Modificar para capturar fechas, responsable y avance.';
         }).catch(function (err) {
             cargado.conceptos = false;
             $('ctEstado').textContent = '⚠ ' + err.message;

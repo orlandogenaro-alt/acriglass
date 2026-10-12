@@ -1,5 +1,7 @@
 <?php
 require __DIR__ . '/includes/sesion.php';
+require_once __DIR__ . '/includes/bd.php';
+require __DIR__ . '/includes/conceptos-tareas.php';
 
 // Obra existente (AW.REG_OBRAS); 0 = nueva. Los catálogos y los datos se cargan desde js/obra.js
 $obraId = max(0, (int) ($_GET['id'] ?? 0));
@@ -58,6 +60,15 @@ $listados = [
     ],
 ];
 $hoy = date('Y-m-d');
+// Responsables para los Conceptos/Tareas: vendedores de obra activos
+$ctUsuarios = [];
+if (!modoConfiguracion()) {
+    try {
+        $ctUsuarios = array_column(bd_filas('AW', "select nombre from vendedores_obras where estatus = 'A' order by nombre"), 'nombre');
+    } catch (Throwable $e) {
+        error_log('AcriGlass obra responsables: ' . $e->getMessage());
+    }
+}
 // Permisos que la pantalla revisa antes de pedir la autorización de otro usuario
 $permisos = array_values(array_filter(['NUEVO_OBRA', 'MODIFICAR_OBRA', 'CERRAR_OBRA', 'ADMIN_USER'], fn($p) => tienePermiso($p)));
 
@@ -323,26 +334,17 @@ function iconoPestana() {
     <div class="ob-totales"><label>Folios: <output id="relCuenta">0</output></label><label>Total c/IVA: <output id="relTotal">$0.00</output></label></div>
 </section>
 
-<!-- ============ 13-CONCEPTOS/TAREAS (los del presupuesto de la obra) ============ -->
-<section class="vista ob-listado" data-vista="conceptos">
+<!-- ============ 13-CONCEPTOS/TAREAS (los mismos del presupuesto: js/conceptos-tareas.js) ============ -->
+<section class="vista ob-listado ob-ct-vista" data-vista="conceptos">
     <div class="ob-subbarra">
         <button type="button" class="ob-btn" id="actualizarCt">🔄 Actualizar</button>
         <button type="button" class="ob-btn" id="abrirPresupuesto">📄 Abrir presupuesto</button>
-        <span class="ob-estado" id="ctEstado"></span>
+        <span class="ob-estado" id="ctEstado">Doble clic en un concepto/tarea para verlo; Modificar para capturar fechas, responsable y avance.</span>
     </div>
-    <div class="grid-caja">
-        <table class="grid ob-grid ob-ct">
-            <thead><tr><th class="sel-col"></th><th>#</th><th>Clave</th><th>Concepto/Tarea</th><th>Agrupador</th><th>Cantidad</th><th>Unidad</th><th>Documento</th><th>Importe</th></tr></thead>
-            <tbody id="ctFilas"><tr class="vacio-fila"><td colspan="9">Abre una obra guardada para ver sus conceptos/tareas.</td></tr></tbody>
-        </table>
-    </div>
-    <div class="ob-totales">
-        <label>Materia Prima: <output id="ctTotMP">$0.00</output></label>
-        <label>Mano de Obra: <output id="ctTotMO">$0.00</output></label>
-        <label>Gastos de Operacion: <output id="ctTotGO">$0.00</output></label>
-        <label>Total: <output id="ctTotal">$0.00</output></label>
-    </div>
+    <?php ctPanel(); ?>
 </section>
+
+<?php ctDialogos($ctUsuarios); ?>
 
 <!-- ============ DIÁLOGO DE CAPTURA (orden de trabajo, cotización, cobro, explosión, mano de obra, gasto) ============ -->
 <dialog class="hs-dialogo frm-dialogo" id="frmDialogo">
@@ -380,6 +382,7 @@ function iconoPestana() {
     </form>
 </dialog>
 
+<script src="<?= recurso('js/conceptos-tareas.js') ?>"></script>
 <script src="<?= recurso('js/obra.js') ?>"></script>
 </body>
 </html>

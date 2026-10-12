@@ -12,13 +12,13 @@
 // GET ?accion=listado&id=N&tipo=T    pestañas 3 a 9 del Dialog243 (ordenes, explosion, salidas, salidas_det,
 //                                    mano, consumos, gastos, adjuntos)
 // GET ?accion=facturacion&id=N       2-Facturacion: documentos de cobro de AW + Microsip vía la API de Easy-Glass
-// GET ?accion=conceptos&id=N         Conceptos/Tareas del presupuesto de la obra
 // GET ?accion=adjunto&id=N           descarga un archivo adjunto de la obra
 // GET ?accion=documento&tipo=orden|mo|gasto&id=obra&doc=N   documento con su detalle
 // GET ?accion=catalogos_obra&id=N    empleados, conceptos de gasto, unidades, órdenes y artículos del presupuesto
 define('ACRI_API', true);
 require __DIR__ . '/../includes/sesion.php';
 require __DIR__ . '/../includes/servicios.php';
+require __DIR__ . '/../includes/tareas.php';
 
 if (modoConfiguracion()) {
     require __DIR__ . '/../includes/respuesta.php';
@@ -464,65 +464,6 @@ function facturacion(int $obraId): array
     return ['filas' => $filas, 'avisos' => $avisos];
 }
 
-// Conceptos/Tareas del presupuesto de la obra, con la misma clave que en el presupuesto
-// (MP-<mes>-<consecutivo>) y una subtarea por cada partida del documento importado
-function conceptosTareas(int $obraId): array
-{
-    $p = bd_fila('AW',
-        'select b.docto_sugerido_obra_id, b.folio, b.fecha, b.proyecto
-           from reg_obras a join doctos_sugerido_obra b on b.docto_sugerido_obra_id = a.sugerido_id
-          where a.obra_id = ?', [$obraId]);
-    if (!$p) return ['presupuesto' => null, 'conceptos' => []];
-    $id = (int) $p['docto_sugerido_obra_id'];
-    $renglones = bd_filas('AW',
-        "select d.docto_sugerido_obra_det_id as det_id, trim(d.tipo_concepto) as tipo, d.presupuesto, d.folio, d.notas,
-                coalesce(cmp.descripcion, cmo.descripcion, cgo.descripcion) as concepto
-           from doctos_sugerido_obra_det d
-           left join conceptos_mat_prima_obra cmp on trim(d.tipo_concepto) = 'MP' and cmp.concepto_mat_prima_id = d.concepto_id
-           left join conceptos_mano_obra cmo on trim(d.tipo_concepto) = 'MO' and cmo.concepto_mano_obra_id = d.concepto_id
-           left join conceptos_gas_operacion_obra cgo on trim(d.tipo_concepto) = 'GO' and cgo.concepto_gas_operacion_obra_id = d.concepto_id
-          where d.docto_sugerido_obra_id = ?
-          order by d.docto_sugerido_obra_det_id", [$id]);
-    $articulos = [];
-    foreach (bd_filas('AW',
-        'select m.docto_sugerido_obra_det_id as det_id, m.folio, m.clave_articulo, m.nom_articulo, m.unidades, m.unid_medida, m.precio_total
-           from doctos_suge_obra_det_mat m
-           join doctos_sugerido_obra_det d on d.docto_sugerido_obra_det_id = m.docto_sugerido_obra_det_id
-          where d.docto_sugerido_obra_id = ?
-          order by m.docto_suge_obra_det_mat_id', [$id]) as $a) {
-        $articulos[$a['det_id']][] = $a;
-    }
-
-    $agrupador = ['MP' => 'Materia Prima', 'MO' => 'Mano de Obra', 'GO' => 'Gastos de Operacion'];
-    $mes = $p['fecha'] ? substr((string) $p['fecha'], 5, 2) : date('m');
-    $consecutivo = 0;
-    $conceptos = [];
-    foreach ($renglones as $r) {
-        $tipo = strtoupper((string) $r['tipo']);
-        if (!isset($agrupador[$tipo])) continue;
-        $n = ++$consecutivo;   // igual que js/presupuesto.js: cuenta también los renglones sin nombre
-        $nombre = trim((string) $r['concepto']);
-        if ($nombre === '') continue;
-        $clave = $tipo . '-' . $mes . '-' . str_pad((string) $n, 3, '0', STR_PAD_LEFT);
-        $arts = $articulos[$r['det_id']] ?? [];
-        // Cantidad y unidad: la suma de las partidas si todas tienen la misma unidad
-        $unidades = array_map(fn($a) => trim((string) $a['unid_medida']), $arts);
-        $mismaUnidad = $arts && $unidades[0] !== '' && count(array_unique($unidades)) === 1;
-        $conceptos[] = [
-            'clave' => $clave, 'tipo' => $tipo, 'agrupador' => $agrupador[$tipo], 'concepto' => $nombre,
-            'cantidad' => $mismaUnidad ? array_sum(array_map(fn($a) => (float) $a['unidades'], $arts)) : 1,
-            'unidad' => $mismaUnidad ? $unidades[0] : ($tipo === 'MO' ? 'Servicio' : 'Lote'),
-            'folio' => $r['folio'], 'notas' => $r['notas'], 'importe' => (float) $r['presupuesto'],
-            'partidas' => array_map(fn($a, $i) => [
-                'clave' => $clave . '.' . ($i + 1), 'concepto' => trim((string) $a['clave_articulo']) ?: $a['nom_articulo'],
-                'descripcion' => $a['nom_articulo'], 'cantidad' => (float) $a['unidades'], 'unidad' => trim((string) $a['unid_medida']) ?: 'Pieza',
-                'folio' => $a['folio'], 'importe' => (float) $a['precio_total'],
-            ], $arts, array_keys($arts)),
-        ];
-    }
-    return ['presupuesto' => ['id' => $id, 'folio' => $p['folio'], 'proyecto' => $p['proyecto']], 'conceptos' => $conceptos];
-}
-
 $ini = fechaParam('ini', date('Y-m-01'));
 $fin = fechaParam('fin', date('Y-m-d'));
 
@@ -630,6 +571,14 @@ try {
                    from sugeridos_relacionados r
                    left join doctos_sugerido_obra h on h.docto_sugerido_obra_id = r.sugerido_id_hijo
                   where r.sugerido_id_padre = ? order by r.sug_relacion_id', [$id]);
+            // Conceptos/Tareas guardados (los comparten el presupuesto y la obra)
+            $p['tareas'] = [];
+            $p['aviso_tareas'] = null;
+            try {
+                if (tareasDisponibles()) $p['tareas'] = leerTareas($id); else $p['aviso_tareas'] = tareasAviso();
+            } catch (Throwable $e) {
+                $p['aviso_tareas'] = 'Conceptos/Tareas: ' . bd_mensaje_error($e);
+            }
             responder(['ok' => true, 'presupuesto' => $p]);
 
         case 'presupuesto_folio':
@@ -648,9 +597,6 @@ try {
 
         case 'facturacion':
             responder(['ok' => true] + facturacion((int) ($_GET['id'] ?? 0)));
-
-        case 'conceptos':
-            responder(['ok' => true] + conceptosTareas((int) ($_GET['id'] ?? 0)));
 
         case 'documento':
             responder(['ok' => true, 'documento' => documento((string) ($_GET['tipo'] ?? ''), (int) ($_GET['id'] ?? 0), (int) ($_GET['doc'] ?? 0))]);

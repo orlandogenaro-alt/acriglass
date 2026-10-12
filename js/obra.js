@@ -762,27 +762,267 @@
         }).catch(avisarError);
     }
 
-    // 2-Facturacion: cotización para facturación (nuevo_cotizacion_microsip)
+    // 2-Facturacion: Cotizacion Microsip (encabezado, General, Quejas de Cliente y Otros Datos)
+    var IVA = 0.16;
+    var cot = { id: 0, partidas: [], estatus: 'P', editable: true, cliente_id: null };
+
+    function cotHabilita(val) {
+        cot.editable = val;
+        $('cotDialogo').querySelectorAll('.cot-edit, [data-cot="guardar"], [data-cot="guardar-cerrar"]').forEach(function (el) { el.disabled = !val; });
+        cotPintar();
+    }
+    function cotPonerEstatus(e) {
+        cot.estatus = e;
+        $('cotEstatus').textContent = e === 'C' ? 'Cancelado' : (cot.id ? 'Documento Creado' : 'Documento Nuevo');
+        $('cotEstatus').classList.toggle('cancelado', e === 'C');
+    }
+    function cotPestana(t) {
+        $('cotDialogo').querySelectorAll('[data-cot-tab]').forEach(function (b) { b.classList.toggle('activo', b.dataset.cotTab === t); });
+        $('cotDialogo').querySelectorAll('[data-cot-panel]').forEach(function (p) { p.classList.toggle('visible', p.dataset.cotPanel === t); });
+        if (t === 'quejas') cotQuejas();
+    }
+    // Pestaña General: Clave, Descripcion, Uds., U.Med., Precio.Unit., Total y Costo.Unita
+    function cotPintar() {
+        var dis = cot.editable ? '' : ' disabled';
+        var campo = function (f, c, num) {
+            return '<input' + (num ? ' type="number" step="any"' : ' class="txt"') + ' data-col="' + c + '" value="' + escapar(f[c] == null ? '' : f[c]) + '"' + dis + '>';
+        };
+        $('cotPartidas').innerHTML = cot.partidas.length ? cot.partidas.map(function (f, i) {
+            return '<tr data-i="' + i + '"><td>' + campo(f, 'clave_articulo') + '</td><td>' + campo(f, 'descripcion') + '</td>' +
+                '<td>' + campo(f, 'unidades', true) + '</td><td>' + campo(f, 'um') + '</td><td>' + campo(f, 'precio_unitario', true) + '</td>' +
+                '<td class="num">' + (dinero(num(f.unidades) * num(f.precio_unitario)) || '$0.00') + '</td><td>' + campo(f, 'costo_unit', true) + '</td>' +
+                '<td>' + (cot.editable ? '<button type="button" class="quitar" title="Quitar">🗑</button>' : '') + '</td></tr>';
+        }).join('') : '<tr class="vacio"><td colspan="8">Sin partidas. Agregue un renglón o importe la materia prima del presupuesto.</td></tr>';
+        cotTotales();
+    }
+    function cotTotales() {
+        var sub = 0, costo = 0;
+        cot.partidas.forEach(function (f) { sub += num(f.unidades) * num(f.precio_unitario); costo += num(f.unidades) * num(f.costo_unit); });
+        var iva = Math.round(sub * IVA * 100) / 100;
+        $('cotSubtotal').value = dinero(sub) || '$0.00';
+        $('cotCosto').value = dinero(costo) || '$0.00';
+        $('cotIva').value = dinero(iva) || '$0.00';
+        $('cotTotal').value = dinero(sub + iva) || '$0.00';
+        $('cotImporteNeto').value = $('cotSubtotal').value;
+        return sub;
+    }
+
+    // f = renglón de 2-Facturación (tipo -1) o null para una nueva
     function dialogoCotizacion(f) {
         catalogosObra().then(function (cat) {
-            formulario({
-                titulo: f ? 'Cotización ' + f.folio : 'Nueva Cotización para Facturación',
-                soloLectura: !!f,
-                campos: [
-                    { id: 'folio', etiqueta: 'Folio', valor: f ? f.folio : '' },
-                    { id: 'nom_cliente', etiqueta: 'Cliente', valor: f ? f.cliente : cat.cliente },
-                    { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: f ? dia(f.fecha) : hoy() },
-                    { id: 'importe', etiqueta: 'Importe', tipo: 'number', valor: f ? f.importe : '' },
-                    { id: 'descripcion', etiqueta: 'Descripción', tipo: 'textarea', valor: '' }
-                ],
-                acciones: f && obraAbierta() ? [{ texto: '✕ Quitar de la obra', fn: function () {
-                    if (!confirm('¿Quitar la cotización ' + f.folio + ' de esta obra?')) return Promise.resolve(false);
-                    return guardarCon('quitar_cot', { docto_id: f.id }).then(cargarFacturacion);
-                } }] : [],
-                guardar: f ? null : function (d) { return guardarCon('guardar_cot', d).then(cargarFacturacion); }
-            });
+            cot.cat = cat;
+            if (!f) return cotAbrir(null);
+            return pedir('accion=documento&tipo=cot&id=' + encodeURIComponent(obraId) + '&doc=' + encodeURIComponent(f.id))
+                .then(function (j) { cotAbrir(j.documento); });
         }).catch(avisarError);
     }
+    function cotAbrir(doc) {
+        cot.id = doc ? doc.id : 0;
+        cot.cliente_id = doc ? doc.cliente_id : null;
+        cot.partidas = doc ? doc.partidas.map(function (p) { return Object.assign({}, p); }) : [{}];
+        $('cotObra').textContent = $('nombreObra').value;
+        $('cotFecha').value = doc ? dia(doc.fecha) || hoy() : hoy();
+        $('cotFolio').value = doc ? (doc.folio || '') : '';
+        $('cotClave').value = doc ? (doc.clave_cliente || '') : '';
+        $('cotNombre').value = doc ? (doc.nom_cliente || '') : (cot.cat.cliente || '');
+        $('cotEntrega').value = doc ? dia(doc.fecha_entrega) : hoy();
+        $('cotUrgencia').value = doc && doc.urgencia ? doc.urgencia : 'Nesesaria (Normal)';
+        $('cotDescripcion').value = doc ? (doc.descripcion || '') : '';
+        $('cotDocId').value = cot.id || '';
+        $('cotCreo').value = doc ? (doc.usuario_creacion || '') : '';
+        $('cotCreoFecha').value = doc ? String(doc.fecha_creacion || '').substr(0, 16) : '';
+        $('cotModifico').value = doc ? (doc.usuario_modificacion || '') : '';
+        $('cotModificoFecha').value = doc ? String(doc.fecha_mod || '').substr(0, 16) : '';
+        cotPonerEstatus(doc ? String(doc.estatus || '').trim().toUpperCase() : 'P');
+        $('cotQuejas').innerHTML = '';
+        $('cotQuejasAviso').hidden = true;
+        cotPestana('general');
+        cotHabilita(!doc && obraAbierta());
+        $('cotDialogo').showModal();
+    }
+
+    // Partidas
+    $('cotAgregar').addEventListener('click', function () { cot.partidas.push({}); cotPintar(); });
+    $('cotImportar').addEventListener('click', function () {
+        var nuevas = (cot.cat.articulos || []).map(function (a) {
+            return { articulo_id: a.articulo_id, clave_articulo: a.clave, descripcion: a.nombre, unidades: a.uds, um: a.um, precio_unitario: 0, costo_unit: a.costo_unit };
+        });
+        if (!nuevas.length) { alert('El presupuesto no tiene materia prima para importar.'); return; }
+        cot.partidas = cot.partidas.filter(function (f) { return String(f.clave_articulo || f.descripcion || '').trim(); }).concat(nuevas);
+        cotPintar();
+    });
+    $('cotPartidas').addEventListener('input', function (e) {
+        var tr = e.target.closest('tr[data-i]');
+        if (!tr || !e.target.dataset.col) return;
+        var f = cot.partidas[tr.dataset.i];
+        f[e.target.dataset.col] = e.target.value;
+        tr.querySelector('td.num').textContent = dinero(num(f.unidades) * num(f.precio_unitario)) || '$0.00';
+        cotTotales();
+    });
+    $('cotPartidas').addEventListener('click', function (e) {
+        if (!e.target.closest('.quitar')) return;
+        cot.partidas.splice(e.target.closest('tr').dataset.i, 1);
+        cotPintar();
+    });
+
+    // Quejas de Cliente: por el folio de la cotización o por el nombre del cliente
+    function cotQuejas() {
+        $('cotQuejas').innerHTML = '<tr class="vacio"><td colspan="6">Consultando…</td></tr>';
+        pedir('accion=quejas&folio=' + encodeURIComponent($('cotFolio').value.trim()) + '&cliente=' + encodeURIComponent($('cotNombre').value.trim()))
+            .then(function (j) {
+                $('cotQuejasAviso').hidden = !j.aviso;
+                $('cotQuejasAviso').textContent = j.aviso || '';
+                $('cotQuejas').innerHTML = j.filas.length ? j.filas.map(function (q) {
+                    return '<tr><td>' + escapar(q.folio) + '</td><td>' + escapar(q.cliente) + '</td><td>' + escapar(fechaDMY(dia(q.fecha))) + '</td>' +
+                        '<td>' + escapar(q.vendedor) + '</td><td>' + escapar(q.proceso) + '</td><td>' + escapar(q.estado || q.estatus) + '</td></tr>';
+                }).join('') : '<tr class="vacio"><td colspan="6">El cliente no tiene quejas registradas.</td></tr>';
+            }).catch(function (err) {
+                $('cotQuejas').innerHTML = '<tr class="vacio"><td colspan="6">' + escapar(err.message) + '</td></tr>';
+            });
+    }
+    $('cotDialogo').addEventListener('click', function (e) {
+        var t = e.target.closest('[data-cot-tab]');
+        if (t) { cotPestana(t.dataset.cotTab); return; }
+        var q = e.target.closest('[data-queja]');
+        if (!q) return;
+        if (q.dataset.queja === 'mostrar') cotQuejas();
+        else alert('La captura de quejas de clientes todavía no está en la web: se registra en el módulo de Quejas de Clientes del sistema de escritorio. Aquí se muestran las del cliente.');
+    });
+
+    // Guardar / Guardar y Cerrar
+    function cotGuardar(cerrar) {
+        if (!$('cotNombre').value.trim()) { alert('Selecciona el cliente de la cotización.'); return; }
+        var partidas = cot.partidas.filter(function (f) { return String(f.clave_articulo || '').trim() || String(f.descripcion || '').trim(); });
+        if (!partidas.length) { alert('Agrega al menos una partida a la cotización.'); return; }
+        var d = {
+            id: obraId, docto_id: cot.id, folio: $('cotFolio').value, fecha: $('cotFecha').value, fecha_entrega: $('cotEntrega').value,
+            cliente_id: cot.cliente_id, clave_cliente: $('cotClave').value, nom_cliente: $('cotNombre').value,
+            urgencia: $('cotUrgencia').value, descripcion: $('cotDescripcion').value, partidas: partidas
+        };
+        guardarCon('guardar_cot', d).then(function (j) {
+            cot.id = j.docto_id;
+            $('cotDocId').value = cot.id;
+            cotPonerEstatus('P');
+            cargarFacturacion();
+            if (cerrar) $('cotDialogo').close();
+            else cotHabilita(false);
+        }).catch(avisarError);
+    }
+    function cotModificar() {
+        if (!validaEstatusObra()) return;
+        if (cot.estatus === 'C') { alert('No es posible modificar un documento cancelado'); return; }
+        cotHabilita(true);
+    }
+    function cotCancelar() {
+        if (!validaEstatusObra()) return;
+        if (!cot.id) { alert('El documento aún no se ha guardado.'); return; }
+        if (cot.estatus === 'C') { alert('El documento ya está cancelado.'); return; }
+        if (!confirm('¿Deseas archivar como cancelado este documento?')) return;
+        var motivo = prompt('INGRESA EL MOTIVO DE CANCELACION: ', '');
+        if (motivo === null) return;
+        guardarCon('cancelar_cot', { doc_id: cot.id, motivo: motivo }).then(function () {
+            cotPonerEstatus('C');
+            cotHabilita(false);
+            cargarFacturacion();
+        }).catch(avisarError);
+    }
+    function cotImprimir() {
+        if (!cot.id) { alert('Guarda el documento para poder imprimirlo.'); return; }
+        var sub = cotTotales(), iva = Math.round(sub * IVA * 100) / 100;
+        var filas = cot.partidas.filter(function (f) { return String(f.clave_articulo || f.descripcion || '').trim(); });
+        imprimirFormato({
+            titulo: 'COTIZACION', id: cot.id, folioOt: 'RS ' + ($('cotFolio').value || '0'), fecha: fechaDMY($('cotFecha').value),
+            concepto: 'Entrega ' + fechaDMY($('cotEntrega').value) + ' · ' + $('cotUrgencia').value, estatus: $('cotEstatus').textContent,
+            unidad: '—', descripcion: $('cotDescripcion').value,
+            cuerpo: '<b>CLIENTE: </b>' + escapar(($('cotClave').value ? $('cotClave').value + ' · ' : '') + $('cotNombre').value) +
+                '<table style="width:100%;margin-top:8px;border-collapse:collapse"><tr style="font-weight:bold"><td>Clave</td><td>Descripcion</td><td style="text-align:right">Uds.</td><td>U.Med.</td><td style="text-align:right">Precio.Unit.</td><td style="text-align:right">Total</td></tr>' +
+                filas.map(function (f) {
+                    return '<tr><td>' + escapar(f.clave_articulo || '') + '</td><td>' + escapar(f.descripcion || '') + '</td><td style="text-align:right">' + escapar(f.unidades || 0) +
+                        '</td><td>' + escapar(f.um || '') + '</td><td style="text-align:right">' + (dinero(num(f.precio_unitario)) || '$0.00') +
+                        '</td><td style="text-align:right">' + (dinero(num(f.unidades) * num(f.precio_unitario)) || '$0.00') + '</td></tr>';
+                }).join('') +
+                '<tr><td colspan="5" style="text-align:right;padding-top:8px"><b>Sub Total:</b></td><td style="text-align:right;padding-top:8px">' + (dinero(sub) || '$0.00') + '</td></tr>' +
+                '<tr><td colspan="5" style="text-align:right"><b>IVA:</b></td><td style="text-align:right">' + (dinero(iva) || '$0.00') + '</td></tr>' +
+                '<tr><td colspan="5" style="text-align:right"><b>Total:</b></td><td style="text-align:right"><b>' + (dinero(sub + iva) || '$0.00') + '</b></td></tr></table>'
+        });
+    }
+    var COT_BOTONES = {
+        'guardar': function () { cotGuardar(false); },
+        'guardar-cerrar': function () { cotGuardar(true); },
+        'imprimir': cotImprimir,
+        'modificar': cotModificar,
+        'cancelar': cotCancelar,
+        'bitacora': function () { verBitacora('cot', cot.id); },
+        'cerrar': function () { $('cotDialogo').close(); },
+        // Escriben en Microsip: la web solo puede hacerlo por la API de Easy-Glass, que aún no tiene esos recursos
+        'entrada-pt': function () { alert('Entrada PT da de alta la entrada de producto terminado en Microsip. La API de Easy-Glass aún no tiene ese recurso, así que se sigue haciendo en el sistema de escritorio.'); },
+        'enviar': function () { alert('Enviar a Microsip de una cotización capturada aquí necesita un recurso nuevo en la API de Easy-Glass (hoy solo envía presupuestos de Easy-Glass con folio EG). Mientras tanto se envía desde el sistema de escritorio.'); },
+        'estatus': function () { alert('Modificar Estatus aún no está disponible en la web.'); }
+    };
+    $('cotDialogo').querySelector('.mo-toolbar').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-cot]');
+        if (b && !b.disabled) COT_BOTONES[b.dataset.cot]();
+    });
+    $('cotDialogo').querySelector('.hs-cerrar').addEventListener('click', function () { $('cotDialogo').close(); });
+
+    // Busca Cliente: clientes de Easy-Glass por la API (la clave es el número de cliente)
+    function buscaCliente(modo, texto) {
+        var radios = document.getElementsByName('bcModo');
+        radios.forEach(function (r) { r.checked = r.value === modo; });
+        $('bcClave').value = modo === 'clave' ? texto : '';
+        $('bcNombre').value = modo === 'nombre' ? texto : '';
+        bcModo();
+        $('bcFilas').innerHTML = '';
+        $('bcEstado').textContent = '';
+        $('bcDialogo').showModal();
+        if (texto) bcBuscar();
+    }
+    function bcModo() {
+        var porClave = document.querySelector('input[name="bcModo"]:checked').value === 'clave';
+        $('bcClave').disabled = !porClave;
+        $('bcNombre').disabled = porClave;
+        (porClave ? $('bcClave') : $('bcNombre')).focus();
+    }
+    var bcResultados = [];
+    function bcBuscar() {
+        var porClave = document.querySelector('input[name="bcModo"]:checked').value === 'clave';
+        var q = (porClave ? $('bcClave') : $('bcNombre')).value.trim();
+        if (!q) { $('bcEstado').textContent = 'Escribe la ' + (porClave ? 'clave' : 'nombre') + ' a buscar.'; return; }
+        $('bcEstado').textContent = 'Buscando…';
+        pedir('accion=clientes_eg&q=' + encodeURIComponent(q)).then(function (j) {
+            bcResultados = porClave ? j.filas.filter(function (c) { return c.clave === q; }).concat(j.filas.filter(function (c) { return c.clave !== q && c.clave.indexOf(q) === 0; })) : j.filas;
+            $('bcFilas').innerHTML = bcResultados.length ? bcResultados.map(function (c, i) {
+                return '<tr data-i="' + i + '" title="' + escapar([c.contacto, c.telefono, c.vendedor].filter(Boolean).join(' · ')) + '"><td>' + escapar(c.clave) + '</td><td>' + escapar(c.nombre) + '</td></tr>';
+            }).join('') : '<tr class="vacio"><td colspan="2">No se encontraron clientes.</td></tr>';
+            $('bcEstado').textContent = bcResultados.length ? bcResultados.length + ' cliente(s) · doble clic para elegir' : '';
+        }).catch(function (err) { $('bcEstado').textContent = err.message; });
+    }
+    document.getElementsByName('bcModo').forEach(function (r) { r.addEventListener('change', bcModo); });
+    $('bcForm').addEventListener('submit', function (e) { e.preventDefault(); bcBuscar(); });
+    $('bcFilas').addEventListener('dblclick', function (e) {
+        var tr = e.target.closest('tr[data-i]');
+        if (!tr) return;
+        var c = bcResultados[tr.dataset.i];
+        cot.cliente_id = c.cliente_id;
+        $('cotClave').value = c.clave;
+        $('cotNombre').value = c.nombre;
+        $('bcDialogo').close();
+    });
+    document.querySelectorAll('[data-bc-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('bcDialogo').close(); }); });
+    $('cotDialogo').querySelectorAll('[data-buscar]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            buscaCliente(b.dataset.buscar, (b.dataset.buscar === 'clave' ? $('cotClave') : $('cotNombre')).value.trim());
+        });
+    });
+    // Enter en Cliente (No) o Nombre también abre la búsqueda
+    ['cotClave', 'cotNombre'].forEach(function (id) {
+        $(id).addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            buscaCliente(id === 'cotClave' ? 'clave' : 'nombre', this.value.trim());
+        });
+        $(id).addEventListener('input', function () { cot.cliente_id = null; });
+    });
 
     // 2-Facturacion: pago en efectivo, nota de cargo o anticipo (Dialog279)
     function dialogoCobro(f) {

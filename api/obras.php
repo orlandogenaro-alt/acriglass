@@ -14,7 +14,9 @@
 //                                    mano, consumos, gastos, adjuntos)
 // GET ?accion=facturacion&id=N       2-Facturacion: documentos de cobro de AW + Microsip vía la API de Easy-Glass
 // GET ?accion=adjunto&id=N           descarga un archivo adjunto de la obra
-// GET ?accion=documento&tipo=orden|mo|gasto&id=obra&doc=N   documento con su detalle
+// GET ?accion=documento&tipo=orden|mo|gasto|cot&id=obra&doc=N   documento con su detalle
+// GET ?accion=clientes_eg&q=T        Busca Cliente (API de Easy-Glass)
+// GET ?accion=quejas&folio=F&cliente=N   Quejas de Cliente de una cotización
 // GET ?accion=catalogos_obra&id=N    empleados, conceptos de gasto, unidades, órdenes y artículos del presupuesto
 define('ACRI_API', true);
 require __DIR__ . '/../includes/sesion.php';
@@ -300,6 +302,14 @@ function documento(string $tipo, int $obra, int $id): array
                                                 from empleados_asignados_a_obra_det where empleado_asignado_obra_id = ? order by empleado_asignado_a_obra_det_id', [$id]);
             $m['bitacora'] = bitacoraDocumento($id);
             return $m;
+
+        case 'cot':   // Cotizacion Microsip: encabezado, partidas (General) y bitácora
+            $c = bd_fila('AW', 'select * from doctos_microsip_obra where docto_orden_obra_id = ? and obra_id = ?', [$id, $obra]);
+            if (!$c) break;
+            $c['id'] = $c['docto_orden_obra_id'];
+            $c['partidas'] = bd_filas('AW', 'select * from doctos_microsip_obra_det where docto_orden_obra_id = ? order by pos, docto_orden_obra_det_id', [$id]);
+            $c['bitacora'] = bitacoraDocumento($id);
+            return $c;
 
         case 'gasto':
             $g = bd_fila('AW', 'select g.gasto_adicional_id as id, c.nombre as concepto, g.estatus, g.docto_orden_obra_id, g.unidad_transporte_id, g.nom_unidad, g.importe, g.notas, g.fecha_creacion
@@ -681,6 +691,32 @@ try {
 
         case 'documento':
             responder(['ok' => true, 'documento' => documento((string) ($_GET['tipo'] ?? ''), (int) ($_GET['id'] ?? 0), (int) ($_GET['doc'] ?? 0))]);
+
+        case 'clientes_eg':   // Busca Cliente: clientes de Easy-Glass (clave = número de cliente) por la API
+            $q = trim((string) ($_GET['q'] ?? ''));
+            if ($q === '') error('Escribe la clave o el nombre a buscar.');
+            $r = api_http('EASYGLASS', 'GET', '/clientes?activos=1&q=' . rawurlencode($q));
+            if (!$r['ok']) error('No se pudo consultar los clientes en la API de Easy-Glass: ' . ($r['error'] ?: 'sin respuesta'), 502);
+            responder(['ok' => true, 'filas' => array_map(fn($c) => [
+                'cliente_id' => $c['cliente_id'] ?? null, 'clave' => (string) ($c['clave_cliente'] ?? ''), 'nombre' => $c['nombre'] ?? '',
+                'contacto' => $c['contacto'] ?? '', 'telefono' => $c['telefono'] ?? '', 'vendedor' => $c['vendedor'] ?? '',
+            ], (array) ($r['datos']['datos'] ?? []))]);
+
+        case 'quejas':   // Quejas de Cliente de la cotización: por su folio (FOLIO_PEDIDO_AW) o por el nombre del cliente
+            $folio = trim((string) ($_GET['folio'] ?? ''));
+            $cliente = trim((string) ($_GET['cliente'] ?? ''));
+            if ($folio === '' && $cliente === '') responder(['ok' => true, 'filas' => []]);
+            try {
+                $filas = bd_filas('AW',
+                    "select q.docto_queja_id as id, q.folio, q.cliente, q.fecha, q.vendedor, q.proceso, q.estatus, e.nombre as estado
+                       from doctos_quejas_clientes q
+                       left join estados_quejas_cliente e on e.estado_queja_id = q.estado_queja_id
+                      where (q.folio_pedido_aw = ? and q.folio_pedido_aw <> '') or upper(q.cliente) = upper(?)
+                      order by q.fecha desc, q.folio desc", [$folio, $cliente]);
+            } catch (Throwable $e) {
+                responder(['ok' => true, 'filas' => [], 'aviso' => 'Las quejas de clientes no están en esta base: ' . bd_mensaje_error($e)]);
+            }
+            responder(['ok' => true, 'filas' => $filas]);
 
         case 'catalogos_obra':
             responder(['ok' => true] + catalogosObra((int) ($_GET['id'] ?? 0)));

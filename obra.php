@@ -439,6 +439,164 @@ function iconoPestana() {
     </div>
 </dialog>
 
+<!-- ============ COTIZACION MICROSIP (2-Facturacion) ============ -->
+<dialog class="hs-dialogo cot-dialogo" id="cotDialogo">
+    <div class="hs-cabecera">
+        <strong>Cotizacion Microsip</strong>
+        <button type="button" class="hs-cerrar" data-cot="cerrar" title="Cerrar">✕</button>
+    </div>
+    <div class="toolbar mo-toolbar">
+        <button type="button" class="tb" data-cot="guardar">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#3b7dc4"/><rect x="7" y="3" width="10" height="7" fill="#dfeefc"/><rect x="7" y="14" width="10" height="7" fill="#fff"/></svg>
+            <span>Guardar</span>
+        </button>
+        <button type="button" class="tb" data-cot="guardar-cerrar">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#333"/><rect x="7" y="3" width="10" height="7" fill="#dfeefc"/></svg>
+            <span>Guardar y Cerrar</span>
+        </button>
+        <button type="button" class="tb" data-cot="imprimir">
+            <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="7" fill="#fff" stroke="#666"/><rect x="2" y="9" width="20" height="9" rx="2" fill="#8a8a8a"/><rect x="6" y="14" width="12" height="8" fill="#fff" stroke="#666"/></svg>
+            <span>Imprimir</span>
+        </button>
+        <button type="button" class="tb" data-cot="entrada-pt">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="16" height="18" fill="#dfeefc" stroke="#3b7dc4"/><path d="M7 8h8M7 12h8M7 16h5" stroke="#3b7dc4"/><path d="M15 15l3 3 4-6" stroke="#2e7d32" stroke-width="2" fill="none"/></svg>
+            <span>Entrada PT</span>
+        </button>
+        <button type="button" class="tb" data-cot="enviar">
+            <svg viewBox="0 0 24 24"><rect x="2" y="4" width="14" height="16" fill="#dfeefc" stroke="#3b7dc4"/><path d="M10 12h11M17 8l4 4-4 4" stroke="#2e7d32" stroke-width="2" fill="none"/></svg>
+            <span>Enviar a Microsip</span>
+        </button>
+        <button type="button" class="tb" data-cot="modificar">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="16" height="18" fill="#dfeefc" stroke="#3b7dc4"/><path d="M8 20l1-4 9-9 3 3-9 9z" fill="#f5c542" stroke="#8a6d1e"/></svg>
+            <span>Modificar</span>
+        </button>
+        <button type="button" class="tb" data-cot="estatus">
+            <svg viewBox="0 0 24 24"><path d="M4 20l2-6L16 4l4 4-10 10z" fill="#f5c542" stroke="#8a6d1e"/></svg>
+            <span>Modificar Estatus</span>
+        </button>
+        <button type="button" class="tb" data-cot="bitacora">
+            <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="1" fill="#6d9e3a" stroke="#4a6e26"/><rect x="8" y="5" width="8" height="4" fill="#f5c542"/><path d="M8 13h8M8 16h8" stroke="#fff"/></svg>
+            <span>Bitacora</span>
+        </button>
+        <button type="button" class="tb" data-cot="cancelar">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#fff" stroke="#d32f2f" stroke-width="2"/><path d="M6 6l12 12" stroke="#d32f2f" stroke-width="2"/></svg>
+            <span>Cancelar</span>
+        </button>
+        <span class="sep"></span>
+        <button type="button" class="tb" data-cot="cerrar">
+            <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="#e53935" stroke-width="2.5" stroke-linecap="round"/></svg>
+            <span>Cerrar</span>
+        </button>
+    </div>
+    <div class="cot-cuerpo">
+        <div class="cot-enc">
+            <div>
+                <h2 class="cot-titulo">Cotizacion</h2>
+                <div class="cot-obra"><span>OBRA:</span> <b id="cotObra"></b></div>
+            </div>
+            <div class="cot-fecfol">
+                <span class="cot-cab">Fecha</span><span class="cot-cab">Folio</span>
+                <input type="date" id="cotFecha" class="cot-edit">
+                <div class="cot-folio"><select disabled><option>RS</option></select><input id="cotFolio" class="cot-edit" maxlength="9" placeholder="0"></div>
+            </div>
+        </div>
+        <div class="cot-fila">
+            <div class="cot-cliente">
+                <label>Cliente (No) : <input id="cotClave" class="cot-edit" autocomplete="off"></label>
+                <button type="button" class="cot-buscar cot-edit" data-buscar="clave" title="Buscar cliente por clave"><svg viewBox="0 0 24 24"><path d="M3 4h18l-7 8v6l-4 2v-8z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 22h18" stroke="currentColor" stroke-width="2" stroke-dasharray="2 2"/></svg></button>
+                <label>Nombre: <input id="cotNombre" class="cot-edit" autocomplete="off"></label>
+                <button type="button" class="cot-buscar cot-edit" data-buscar="nombre" title="Buscar cliente por nombre"><svg viewBox="0 0 24 24"><path d="M3 4h18l-7 8v6l-4 2v-8z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 22h18" stroke="currentColor" stroke-width="2" stroke-dasharray="2 2"/></svg></button>
+            </div>
+            <div class="cot-estatus" id="cotEstatus">Documento Creado</div>
+            <div class="cot-der">
+                <label>Fecha Entrega: <input type="date" id="cotEntrega" class="cot-edit"></label>
+                <label>Urgencia: <select id="cotUrgencia" class="cot-edit">
+                    <option>Urgente</option><option selected>Nesesaria (Normal)</option><option>Programada</option>
+                </select></label>
+            </div>
+        </div>
+
+        <nav class="cot-tabs">
+            <button type="button" class="activo" data-cot-tab="general">General</button>
+            <button type="button" data-cot-tab="quejas">Quejas de Cliente</button>
+            <button type="button" data-cot-tab="otros">Otros Datos</button>
+        </nav>
+
+        <section class="cot-panel visible" data-cot-panel="general">
+            <div class="cot-acciones">
+                <button type="button" class="ob-btn cot-edit" id="cotAgregar">＋ Agregar renglón</button>
+                <button type="button" class="ob-btn cot-edit" id="cotImportar">⇩ Materia prima del presupuesto</button>
+            </div>
+            <div class="mo-grid cot-grid">
+                <table>
+                    <thead><tr><th style="width:110px">Clave</th><th>Descripcion</th><th style="width:70px">Uds.</th><th style="width:70px">U.Med.</th>
+                        <th style="width:95px">Precio.Unit.</th><th style="width:100px">Total</th><th style="width:95px">Costo.Unita</th><th style="width:26px"></th></tr></thead>
+                    <tbody id="cotPartidas"></tbody>
+                </table>
+            </div>
+            <div class="cot-totales">
+                <label>Sub Total: <input id="cotSubtotal" readonly></label><input id="cotCosto" readonly title="Costo total">
+                <label>IVA: <input id="cotIva" readonly></label><span></span>
+                <label>Total: <input id="cotTotal" readonly></label><span></span>
+            </div>
+        </section>
+
+        <section class="cot-panel" data-cot-panel="quejas">
+            <fieldset class="cot-quejas">
+                <legend>Quejas de Clientes</legend>
+                <div class="cot-barra-verde">
+                    <button type="button" data-queja="nueva"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#3b7dc4"/><rect x="7" y="3" width="10" height="7" fill="#dfeefc"/></svg><span>Nueva</span></button>
+                    <button type="button" data-queja="mostrar"><svg viewBox="0 0 24 24"><path d="M3 7h7l2 2h9v11H3z" fill="#f5c542" stroke="#8a6d1e"/></svg><span>Mostrar</span></button>
+                </div>
+                <p class="cot-aviso" id="cotQuejasAviso" hidden></p>
+                <div class="mo-grid cot-grid">
+                    <table>
+                        <thead><tr><th style="width:70px">Folio</th><th>Cliente</th><th style="width:95px">Fecha</th><th style="width:120px">Vendedor</th><th style="width:120px">Proceso</th><th style="width:100px">Estatus</th></tr></thead>
+                        <tbody id="cotQuejas"></tbody>
+                    </table>
+                </div>
+            </fieldset>
+        </section>
+
+        <section class="cot-panel" data-cot-panel="otros">
+            <div class="cot-otros">
+                <label class="ancho">Descripción: <textarea id="cotDescripcion" rows="4" maxlength="200" class="cot-edit"></textarea></label>
+                <label>Docto. Id: <input id="cotDocId" readonly></label>
+                <label>Importe neto (sin IVA): <input id="cotImporteNeto" readonly></label>
+                <label>Creado por: <input id="cotCreo" readonly></label>
+                <label>Fecha de creación: <input id="cotCreoFecha" readonly></label>
+                <label>Modificado por: <input id="cotModifico" readonly></label>
+                <label>Fecha de modificación: <input id="cotModificoFecha" readonly></label>
+            </div>
+        </section>
+    </div>
+</dialog>
+
+<!-- Busca Cliente (clientes de Easy-Glass por la API) -->
+<dialog class="hs-dialogo bc-dialogo" id="bcDialogo">
+    <form id="bcForm">
+        <div class="hs-cabecera">
+            <strong>Busca Cliente</strong>
+            <button type="button" class="hs-cerrar" data-bc-cerrar title="Cerrar">✕</button>
+        </div>
+        <div class="bc-campos">
+            <label class="bc-op"><input type="radio" name="bcModo" value="nombre"> Nombre:</label>
+            <input id="bcNombre" autocomplete="off">
+            <span></span>
+            <label class="bc-op"><input type="radio" name="bcModo" value="clave" checked> Clave:</label>
+            <input id="bcClave" autocomplete="off">
+            <button type="submit" class="hs-btn">Buscar</button>
+        </div>
+        <div class="mo-grid bc-grid">
+            <table>
+                <thead><tr><th style="width:90px">Clave</th><th>Nombre</th></tr></thead>
+                <tbody id="bcFilas"></tbody>
+            </table>
+        </div>
+        <div class="hs-pie"><span class="bc-estado" id="bcEstado"></span><button type="button" class="hs-btn" data-bc-cerrar>Cancelar</button></div>
+    </form>
+</dialog>
+
 <!-- ============ GASTOS DE OBRA (Dialog274) ============ -->
 <dialog class="hs-dialogo mo-dialogo" id="gaDialogo">
     <div class="hs-cabecera">

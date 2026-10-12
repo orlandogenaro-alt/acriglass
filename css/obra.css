@@ -246,3 +246,76 @@
 .mo-grid-chico { min-height: 90px; max-height: 150px; }
 .mo-grid td input.txt { text-align: left; }
 .mo-etq { color: var(--texto-2); }
+
+/* ---------- Cotizacion Microsip (2-Facturacion) ---------- */
+.cot-dialogo { width: min(820px, calc(100vw - 24px)); }
+.cot-dialogo[open] { display: flex; flex-direction: column; }
+.cot-dialogo .tb:disabled { opacity: .4; cursor: default; background: none; color: var(--texto-2); }
+.cot-cuerpo { overflow: auto; padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+.cot-enc { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.cot-titulo { font-size: 22px; font-weight: 800; color: var(--azul); margin: 0; }
+.cot-obra { color: var(--texto-2); font-size: 14px; margin-top: 4px; }
+.cot-obra span { margin-right: 6px; font-weight: 700; }
+.cot-obra b { text-transform: uppercase; }
+.cot-fecfol { display: grid; grid-template-columns: 130px 150px; gap: 3px 4px; }
+.cot-cab { background: var(--azul-suave); color: var(--azul-texto); text-align: center; font-weight: 700; padding: 2px 0; }
+.cot-fecfol input, .cot-fecfol select { height: 28px; padding: 0 6px; }
+.cot-folio { display: flex; gap: 3px; }
+.cot-folio select { width: 52px; }
+.cot-folio input { flex: 1; min-width: 0; }
+.cot-fila { display: grid; grid-template-columns: 1fr auto auto; gap: 10px 16px; align-items: center; }
+.cot-cliente { display: grid; grid-template-columns: 1fr 30px; gap: 6px 4px; align-items: center; }
+.cot-cliente label { display: grid; grid-template-columns: 92px 1fr; align-items: center; color: var(--texto-2); }
+.cot-cliente input { height: 28px; padding: 0 6px; }
+.cot-buscar { width: 30px; height: 26px; border: 1px solid var(--borde-2); border-radius: 4px; background: var(--input); color: var(--texto); display: flex; align-items: center; justify-content: center; }
+.cot-buscar svg { width: 16px; height: 16px; }
+.cot-buscar:hover:not(:disabled) { background: var(--azul-suave); }
+.cot-estatus { font-size: 20px; font-weight: 800; letter-spacing: .03em; color: var(--texto-3); text-align: center; }
+.cot-estatus.cancelado { color: var(--rojo); }
+.cot-der { display: grid; gap: 6px; }
+.cot-der label { display: grid; grid-template-columns: 100px 160px; align-items: center; font-weight: 700; color: var(--texto-2); }
+.cot-der input, .cot-der select { height: 28px; padding: 0 6px; font-weight: 400; }
+.cot-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--borde); margin-top: 4px; }
+.cot-tabs button { padding: 6px 12px; border: 1px solid transparent; border-bottom: 0; border-radius: 4px 4px 0 0; color: var(--texto-2); }
+.cot-tabs button.activo { background: var(--tarjeta); border-color: var(--borde); color: var(--texto); font-weight: 700; margin-bottom: -1px; }
+.cot-panel { display: none; flex-direction: column; gap: 8px; }
+.cot-panel.visible { display: flex; }
+.cot-acciones { display: flex; gap: 8px; }
+.cot-acciones .ob-btn { font-size: 12px; min-height: 26px; }
+.cot-grid { min-height: 220px; max-height: 300px; }
+.cot-grid td input.txt { text-align: left; }
+.cot-grid td.num { text-align: right; padding: 0 6px; white-space: nowrap; }
+.cot-totales { display: grid; grid-template-columns: auto 120px; justify-content: end; gap: 4px 8px; align-items: center; }
+.cot-totales label { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-weight: 700; }
+.cot-totales input { width: 130px; height: 26px; padding: 0 6px; text-align: right; background: var(--sub); }
+.cot-totales > input { width: 120px; }
+.cot-quejas { border: 1px solid var(--borde); border-radius: var(--radio); padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 6px; }
+.cot-quejas legend { padding: 0 4px; color: var(--texto-2); }
+.cot-barra-verde { display: flex; gap: 4px; padding: 4px 8px; background: #8fbf8a; border-radius: 4px; }
+.cot-barra-verde button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 3px 10px; border-radius: 4px; color: #1d2b1c; font-size: 12px; }
+.cot-barra-verde button:hover { background: rgba(255, 255, 255, .35); }
+.cot-barra-verde svg { width: 18px; height: 18px; }
+.cot-aviso { padding: 6px 10px; border-radius: 4px; background: var(--ambar-suave); border: 1px solid var(--ambar-borde); color: var(--ambar); }
+.cot-otros { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 14px; }
+.cot-otros label { display: grid; gap: 4px; color: var(--texto-2); font-weight: 600; }
+.cot-otros label.ancho { grid-column: 1 / -1; }
+.cot-otros input, .cot-otros textarea { height: 28px; padding: 0 8px; font-weight: 400; }
+.cot-otros textarea { height: auto; padding: 4px 8px; resize: vertical; }
+.cot-otros input[readonly] { background: var(--sub); }
+.cot-dialogo :disabled { background: var(--sub); color: var(--texto-2); }
+@media (max-width: 700px) {
+    .cot-fila { grid-template-columns: 1fr; }
+    .cot-estatus { text-align: left; }
+}
+
+/* Busca Cliente */
+.bc-dialogo { width: min(620px, calc(100vw - 24px)); }
+.bc-campos { display: grid; grid-template-columns: 110px 1fr 110px; gap: 8px 10px; align-items: center; padding: 14px 16px 8px; }
+.bc-campos input:not([type=radio]) { height: 30px; padding: 0 8px; }
+.bc-campos input:disabled { background: var(--sub); }
+.bc-campos .hs-btn { grid-row: span 1; }
+.bc-op { display: flex; align-items: center; gap: 6px; font-size: 15px; }
+.bc-grid { margin: 0 16px; min-height: 280px; max-height: 360px; }
+.bc-grid tbody tr { cursor: pointer; }
+.bc-grid tbody tr:not(.vacio):hover { background: var(--azul-suave); }
+.bc-estado { color: var(--texto-2); }

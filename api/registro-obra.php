@@ -11,7 +11,7 @@
 // POST ?accion=eliminar_explosion { id, partidas: [explocion_mat_obra_id], autoriza? }
 // POST ?accion=asignar_cot      { id, folio }   cotización / pedido de Microsip (por la API de Easy-Glass) a la obra
 // POST ?accion=enviar_microsip { id, folio, simular? }  folio de Easy-Glass → Pedido y OC en Microsip (ENVIAR_MICROSIP_OBRA)
-// POST ?accion=guardar_cot / quitar_cot           cotización de facturación capturada / quitar una asignada
+// POST ?accion=guardar_cot / cancelar_cot / quitar_cot   Cotizacion Microsip: encabezado y partidas / cancelar con motivo / quitar una asignada
 // POST ?accion=guardar_cobro / cancelar_cobro     pago en efectivo, nota de cargo o anticipo (Dialog279)
 // POST ?accion=guardar_orden / estatus_orden      orden de trabajo y sus partidas (Dialog242)
 // POST ?accion=agregar_explosion / actualizar_explosion   explosión de material (Dialog230)
@@ -332,18 +332,61 @@ function guardarCotizacion(array $d): array
     $obra = (int) ($d['id'] ?? 0);
     validaEstatusObra($obra);
     exigirOAutorizar($d, 'MODIFICAR_OBRA');
+    $docId = (int) ($d['docto_id'] ?? 0);
+    if ($docId && estatusLetraDoc(documentoDeObra('doctos_microsip_obra', 'docto_orden_obra_id', $docId, $obra, 'La cotización')) === 'C') {
+        error('No es posible modificar un documento cancelado');
+    }
     $folio = texto($d['folio'] ?? '', 9);
-    if ($folio === null) error('Captura el folio de la cotización.');
-    if (bd_valor('AW', 'select count(*) from doctos_microsip_obra where obra_id = ? and folio = ?', [$obra, $folio])) error("El folio $folio ya está asignado a esta obra.");
-    $importe = numero($d['importe'] ?? 0);
-    if ($importe <= 0) error('Captura el importe de la cotización.');
-    $id = bd_insertar('AW', 'doctos_microsip_obra', 'docto_orden_obra_id', [
-        'obra_id' => $obra, 'nom_cliente' => texto($d['nom_cliente'] ?? '', 200), 'folio' => $folio,
-        'fecha' => fecha($d['fecha'] ?? '') ?? date('Y-m-d'), 'fecha_entrega' => fecha($d['fecha_entrega'] ?? ''),
-        'estatus' => 'P', 'descripcion' => texto($d['descripcion'] ?? '', 200), 'importe_neto' => $importe,
-        'fecha_creacion' => date('Y-m-d H:i:s'), 'usuario_creacion' => usuario(),
-    ]);
-    return ['docto_id' => $id];
+    if ($folio !== null && bd_valor('AW', 'select count(*) from doctos_microsip_obra where obra_id = ? and folio = ? and docto_orden_obra_id <> ?', [$obra, $folio, $docId])) {
+        error("El folio $folio ya está asignado a esta obra.");
+    }
+    $nombre = texto($d['nom_cliente'] ?? '', 200);
+    if ($nombre === null) error('Selecciona el cliente de la cotización.');
+
+    // Partidas (pestaña General): Clave, Descripcion, Uds, U.Med., Precio Unit., Total y Costo Unit.
+    $conCosto = bd_tiene_columna('AW', 'doctos_microsip_obra_det', 'costo_unit');
+    $det = [];
+    foreach ((array) ($d['partidas'] ?? []) as $p) {
+        $clave = texto($p['clave_articulo'] ?? '', 30);
+        $desc = texto($p['descripcion'] ?? '', 200);
+        if ($clave === null && $desc === null) continue;
+        $uds = numero($p['unidades'] ?? 0);
+        $pu = numero($p['precio_unitario'] ?? 0);
+        $f = ['articulo_id' => (int) ($p['articulo_id'] ?? 0) ?: null, 'clave_articulo' => $clave, 'descripcion' => $desc, 'unidades' => $uds,
+              'um' => texto($p['um'] ?? '', 30), 'precio_unitario' => $pu, 'precio_total' => numero($uds * $pu),
+              'notas_adic' => texto($p['notas_adic'] ?? '', 4000), 'pos' => count($det) + 1];
+        if ($conCosto) $f['costo_unit'] = numero($p['costo_unit'] ?? 0);
+        $det[] = $f;
+    }
+    if (!$det) error('Agrega al menos una partida a la cotización.');
+    $subtotal = numero(array_sum(array_column($det, 'precio_total')));
+
+    $enc = [
+        'cliente_id' => (int) ($d['cliente_id'] ?? 0) ?: null, 'clave_cliente' => texto($d['clave_cliente'] ?? '', 30), 'nom_cliente' => $nombre,
+        'folio' => $folio, 'fecha' => fecha($d['fecha'] ?? '') ?? date('Y-m-d'), 'fecha_entrega' => fecha($d['fecha_entrega'] ?? ''),
+        'descripcion' => texto($d['descripcion'] ?? '', 200), 'importe_neto' => $subtotal,
+    ];
+    if (bd_tiene_columna('AW', 'doctos_microsip_obra', 'urgencia')) $enc['urgencia'] = texto($d['urgencia'] ?? '', 30);
+
+    $pdo = bd_pdo('AW');
+    $pdo->beginTransaction();
+    try {
+        if ($docId) {
+            $enc += ['fecha_mod' => date('Y-m-d H:i:s'), 'usuario_modificacion' => usuario()];
+            bd_ejecutar('AW', 'update doctos_microsip_obra set ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($enc))) . ' where docto_orden_obra_id = ?',
+                array_merge(array_values($enc), [$docId]));
+        } else {
+            $docId = bd_insertar('AW', 'doctos_microsip_obra', 'docto_orden_obra_id', $enc + [
+                'obra_id' => $obra, 'estatus' => 'P', 'fecha_creacion' => date('Y-m-d H:i:s'), 'usuario_creacion' => usuario()]);
+        }
+        reemplazarDetalle('doctos_microsip_obra_det', 'docto_orden_obra_det_id', 'docto_orden_obra_id', $docId, $det);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+    bitacora($docId, 'Estatus:Documento Creado Importe: $' . number_format($subtotal, 2));
+    return ['docto_id' => $docId];
 }
 
 function quitarCotizacion(array $d): void
@@ -762,6 +805,9 @@ try {
             responder(['ok' => true] + enviarMicrosip(entrada()));
         case 'guardar_cot':
             responder(['ok' => true] + guardarCotizacion(entrada()));
+        case 'cancelar_cot':
+            cancelarConMotivo(entrada(), 'doctos_microsip_obra', 'docto_orden_obra_id', 'MODIFICAR_OBRA', 'La cotización');
+            responder(['ok' => true]);
         case 'quitar_cot':
             quitarCotizacion(entrada());
             responder(['ok' => true]);

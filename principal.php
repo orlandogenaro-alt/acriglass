@@ -52,6 +52,7 @@ $menu = [
             ['Conceptos de Mano de Obra',        '👷', 'pagina', 'conceptos.php?tipo=mo'],
             ['Conceptos de Gastos de Operacion', '💲', 'pagina', 'conceptos.php?tipo=go'],
             ['Estatus de Presupuestos',          '🔄', 'pagina', 'estatus.php'],
+            ['Novedades del Sistema',            '📰', 'pagina', 'novedades.php'],
             ['Empresa',            '🏢', 'pendiente'],
         ],
     ],

@@ -1,0 +1,73 @@
+:root {
+    --fondo: #0f1623;
+    --tarjeta: #172133;
+    --borde: #26324a;
+    --texto: #d7deea;
+    --texto-suave: #8b97ad;
+    --azul: #3b82f6;
+    --dorado: #d9b36c;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Nunito', 'Segoe UI', sans-serif;
+    font-size: 13px;
+    color: var(--texto);
+    background: var(--fondo);
+    padding: 20px 22px 30px;
+}
+
+.m-acri { color: var(--dorado); }
+.m-glass { color: #5aa0e6; }
+
+/* Cabecera */
+.cabecera h1 { font-family: 'Exo 2', sans-serif; font-size: 24px; font-weight: 800; margin-bottom: 6px; }
+.h-texto { color: #fff; margin-left: 8px; font-family: 'Nunito', sans-serif; }
+.cabecera p { max-width: 900px; line-height: 1.8; color: var(--texto-suave); }
+.cabecera b { color: var(--texto); }
+
+/* Insignia del tipo de cambio */
+.tipo {
+    display: inline-block;
+    min-width: 92px;
+    padding: 2px 9px;
+    border-radius: 12px;
+    border: 1px solid;
+    font-size: 11px;
+    font-weight: 800;
+    text-align: center;
+    letter-spacing: .3px;
+    white-space: nowrap;
+}
+.tipo.nuevo      { background: #14532d; border-color: #22c55e; color: #dcfce7; }
+.tipo.mejora     { background: #1e3a8a; border-color: #3b82f6; color: #dbeafe; }
+.tipo.correccion { background: #7c2d12; border-color: #f97316; color: #ffedd5; }
+
+/* Línea de tiempo por día */
+.linea { max-width: 900px; margin-top: 20px; }
+.dia {
+    background: var(--tarjeta);
+    border: 1px solid var(--borde);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+}
+.dia h2 {
+    font-size: 13.5px; font-weight: 800; color: #e6ebf3; letter-spacing: .3px;
+    padding-bottom: 8px; margin-bottom: 4px;
+    border-bottom: 1px solid var(--borde);
+}
+.dia ul { list-style: none; }
+.dia li {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 9px 0;
+}
+.dia li + li { border-top: 1px dashed var(--borde); }
+.dia li b { color: #fff; }
+.dia li p { margin-top: 3px; color: var(--texto-suave); line-height: 1.45; }
+
+@media (max-width: 560px) {
+    body { padding: 16px; }
+    .dia li { flex-direction: column; gap: 6px; }
+}

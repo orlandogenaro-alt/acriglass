@@ -27,26 +27,26 @@ $menu = [
     [
         'id' => 'servicios', 'titulo' => 'Servicios', 'icono' => '🧭',
         'items' => [
-            ['Estado de resultados',        '📊', 'pendiente'],
-            ['Explosión insumos',           '🧱', 'pendiente'],
-            ['Órdenes por cobrar',          '🧾', 'pendiente'],
-            ['Renta de maquinaria',         '🚜', 'pendiente'],
-            ['Cuentas por pagar',           '💸', 'pendiente'],
-            ['Mano de obra',                '👷', 'pendiente'],
-            ['Presupuesto',                 '📝', 'pendiente'],
-            ['Relación de gastos',          '💵', 'pendiente'],
-            ['Pruebas',                     '🧪', 'pendiente'],
-            ['Planos',                      '📐', 'pendiente'],
-            ['Gantt Obras',                 '📅', 'pendiente'],
-            ['Tramites',                    '📑', 'pendiente'],
-            ['Ganancia por proyecto',       '📈', 'pendiente'],
-            ['Bitácora de obra',            '📓', 'pendiente'],
-            ['Subcontratos',                '🤝', 'pendiente'],
-            ['Inventario de obras',         '📦', 'pendiente'],
-            ['Cuentas por cobrar',          '💰', 'pendiente'],
-            ['Presupuesto por actividades', '🗒️', 'pendiente'],
-            ['Avance financiero',           '📉', 'pendiente'],
-            ['Gastos indirectos',           '🏷️', 'pendiente'],
+            ['Estado de resultados',        '📊', 'pagina', 'servicio-obra.php?m=resultados'],
+            ['Explosión insumos',           '🧱', 'pagina', 'servicio-obra.php?m=explosion'],
+            ['Órdenes por cobrar',          '🧾', 'pagina', 'servicio-obra.php?m=ordenes'],
+            ['Renta de maquinaria',         '🚜', 'pagina', 'servicio-obra.php?m=renta'],
+            ['Cuentas por pagar',           '💸', 'pagina', 'servicio-obra.php?m=cxp'],
+            ['Mano de obra',                '👷', 'pagina', 'servicio-obra.php?m=mano'],
+            ['Presupuesto',                 '📝', 'pagina', 'servicio-obra.php?m=presupuesto'],
+            ['Relación de gastos',          '💵', 'pagina', 'servicio-obra.php?m=gastos'],
+            ['Pruebas',                     '🧪', 'pagina', 'servicio-obra.php?m=pruebas'],
+            ['Planos',                      '📐', 'pagina', 'servicio-obra.php?m=planos'],
+            ['Gantt Obras',                 '📅', 'pagina', 'servicio-obra.php?m=gantt'],
+            ['Tramites',                    '📑', 'pagina', 'servicio-obra.php?m=tramites'],
+            ['Ganancia por proyecto',       '📈', 'pagina', 'servicio-obra.php?m=ganancia'],
+            ['Bitácora de obra',            '📓', 'pagina', 'servicio-obra.php?m=bitacora'],
+            ['Subcontratos',                '🤝', 'pagina', 'servicio-obra.php?m=subcontratos'],
+            ['Inventario de obras',         '📦', 'pagina', 'servicio-obra.php?m=inventario'],
+            ['Cuentas por cobrar',          '💰', 'pagina', 'servicio-obra.php?m=cxc'],
+            ['Presupuesto por actividades', '🗒️', 'pagina', 'servicio-obra.php?m=actividades'],
+            ['Avance financiero',           '📉', 'pagina', 'servicio-obra.php?m=avance'],
+            ['Gastos indirectos',           '🏷️', 'pagina', 'servicio-obra.php?m=indirectos'],
         ],
     ],
     [
@@ -83,6 +83,10 @@ $menu = [
     ],
 ];
 
+// Servicios con los mismos permisos del módulo de obras
+if (!tienePermiso('MODULO_SUGERIDOS_OBRA', 'NUEVO_OBRA', 'MODIFICAR_OBRA', 'CERRAR_OBRA', 'ADMIN_USER')) {
+    $menu = array_values(array_filter($menu, fn($g) => $g['id'] !== 'servicios'));
+}
 // Administrador solo con el permiso ADMIN_USER de AW
 if (!tienePermiso('ADMIN_USER')) {
     $menu = array_values(array_filter($menu, fn($g) => $g['id'] !== 'administrador'));

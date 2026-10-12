@@ -1,0 +1,131 @@
+/* Pantallas del menú Servicios (servicio-obra.php). Base: catalogo.css */
+
+.so-cabecera { margin-top: 2px; }
+.so-impreso { display: none; }
+
+/* ---------- Filtros ---------- */
+.so-barra {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--borde); border-radius: 8px;
+    background: var(--tarjeta);
+}
+.so-barra label { display: flex; align-items: center; gap: 6px; font-weight: 700; color: #cfd8ea; }
+.so-barra select, .so-barra input[type=search] {
+    height: 32px; padding: 0 10px;
+    border: 1px solid var(--borde-2); border-radius: 6px;
+    background: var(--caja);
+    color-scheme: dark;
+}
+.so-obra select { max-width: 360px; }
+.so-barra input[type=search] { width: 200px; }
+
+.so-estado { min-height: 18px; margin: 8px 2px; color: var(--texto-suave); font-weight: 700; }
+
+/* ---------- Indicadores ---------- */
+.so-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.so-kpis:empty { display: none; }
+.so-kpi { padding: 10px 14px; border: 1px solid var(--borde); border-radius: 8px; background: var(--tarjeta); }
+.so-kpi h3 { font-size: 11px; font-weight: 800; letter-spacing: .3px; text-transform: uppercase; color: var(--texto-suave); }
+.so-kpi b { display: block; margin-top: 4px; font-size: 19px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
+
+/* ---------- Tabla ---------- */
+.so-tabla { max-height: calc(100vh - 290px); }
+.so-tabla .c-grid th[data-campo] { cursor: pointer; user-select: none; }
+.so-tabla .c-grid th[data-campo]:hover { color: #fff; }
+.so-tabla .c-grid td.der { font-variant-numeric: tabular-nums; }
+.so-tabla tfoot td {
+    position: sticky; bottom: 0;
+    background: #1f2b44; font-weight: 800; color: #fff;
+    border-top: 1px solid var(--borde-2);
+}
+.so-grupo td { background: #15203a; color: var(--dorado); font-weight: 800; }
+.so-grupo small { margin-left: 6px; color: var(--texto-suave); font-weight: 700; }
+.so-subtotal td { font-weight: 800; color: #cfd8ea; border-bottom-color: var(--borde-2); }
+.so-sub td { color: var(--texto-suave); }
+.so-neg { color: #f87171 !important; }
+.so-nulo { color: var(--texto-suave); }
+.so-archivo { color: #93c5fd; text-decoration: none; }
+.so-archivo:hover { text-decoration: underline; }
+.so-vacio { padding: 40px; text-align: center; color: var(--texto-suave); border: 1px solid var(--borde); border-radius: 8px; background: var(--tarjeta); }
+.so-pie { margin-top: 8px; color: var(--texto-suave); font-size: 12px; }
+
+/* Barra de porcentaje dentro de la celda */
+.so-pct { position: relative; min-width: 110px; height: 18px; border-radius: 9px; background: #0f1828; overflow: hidden; }
+.so-pct i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #2563eb, #3b82f6); border-radius: 9px; }
+.so-pct.sobre i { background: linear-gradient(90deg, #b91c1c, #ef4444); }
+.so-pct span { position: relative; display: block; text-align: center; font-size: 11px; font-weight: 800; line-height: 18px; color: #fff; }
+
+/* ---------- Estado de resultados ---------- */
+.so-er .c-grid td:first-child { min-width: 320px; }
+.so-er .so-total td { font-weight: 800; border-top: 1px solid var(--borde-2); }
+.so-er .so-resultado td { font-weight: 800; color: #fff; background: #1d2a44; font-size: 13.5px; }
+
+/* ---------- Gantt ---------- */
+.so-gantt {
+    overflow: auto;
+    max-height: calc(100vh - 290px);
+    border: 1px solid var(--borde); border-radius: 8px;
+    background: var(--tarjeta);
+}
+.so-g-fila { display: flex; min-width: 900px; border-bottom: 1px solid var(--borde); }
+.so-g-nombre {
+    position: sticky; left: 0; z-index: 1;
+    flex: 0 0 300px; width: 300px;
+    padding: 7px 10px;
+    background: var(--tarjeta);
+    border-right: 1px solid var(--borde-2);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.so-g-pista { position: relative; flex: 1; min-height: 32px; }
+.so-g-cab { position: sticky; top: 0; z-index: 2; }
+.so-g-cab .so-g-nombre, .so-g-meses { background: #1f2b44; font-size: 11.5px; font-weight: 800; text-transform: uppercase; color: #cfd8ea; }
+.so-g-meses span { position: absolute; top: 0; bottom: 0; padding: 8px 6px; border-left: 1px solid var(--borde-2); overflow: hidden; white-space: nowrap; }
+.so-g-obra { cursor: pointer; }
+.so-g-obra:hover .so-g-nombre, .so-g-obra:hover { background: #1d2a44; }
+.so-g-obra b { color: var(--texto-suave); }
+.so-g-tarea .so-g-nombre { color: var(--texto-suave); font-size: 12px; background: #141d2f; }
+.so-g-tarea { background: #141d2f; }
+.so-g-barra {
+    --c: #3b82f6;
+    position: absolute; top: 7px; height: 18px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--c) 35%, transparent);
+    border: 1px solid var(--c);
+    overflow: hidden;
+}
+.so-g-barra i { position: absolute; inset: 0 auto 0 0; background: var(--c); }
+.so-g-barra span { position: relative; padding: 0 6px; font-size: 10.5px; font-weight: 800; line-height: 16px; color: #fff; white-space: nowrap; }
+.so-g-tarea .so-g-barra { top: 9px; height: 14px; }
+.so-g-tarea .so-g-barra span { line-height: 12px; }
+.so-hoy { position: absolute; top: 0; bottom: 0; width: 2px; background: #f59e0b; z-index: 1; }
+
+/* ---------- Captura ---------- */
+.so-dialogo { width: min(720px, calc(100vw - 24px)); }
+.so-dialogo .c-campos { max-height: calc(100vh - 220px); overflow: auto; padding-right: 4px; }
+.so-quitar { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; }
+.so-quien { color: var(--texto-suave); }
+
+@media (max-width: 800px) {
+    .so-barra input[type=search] { width: 100%; }
+    .so-obra select { max-width: 100%; }
+    .so-g-nombre { flex-basis: 180px; width: 180px; }
+}
+
+/* ---------- Impresión ---------- */
+@media print {
+    @page { size: landscape; margin: 10mm; }
+    body { background: #fff; color: #000; padding: 0; font-size: 10px; }
+    .so-barra, .so-estado, .so-dialogo { display: none !important; }
+    .c-cabecera h1, .h-texto { color: #000; }
+    .c-cabecera p { color: #333; }
+    .so-impreso { display: block; font-weight: 700; }
+    .so-kpi, .c-tabla, .so-gantt { border-color: #999; background: #fff; max-height: none; overflow: visible; }
+    .so-kpi b, .so-kpi h3 { color: #000; }
+    .c-grid th, .so-tabla tfoot td, .so-g-cab .so-g-nombre, .so-g-meses { background: #e5e7eb !important; color: #000; position: static; }
+    .c-grid td { border-color: #ccc; padding: 4px 6px; }
+    .so-grupo td, .so-er .so-resultado td { background: #f3f4f6 !important; color: #000; }
+    .so-g-nombre, .so-g-tarea, .so-g-tarea .so-g-nombre { background: #fff; color: #000; }
+    .chip { border-color: #999; color: #000; background: #fff; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

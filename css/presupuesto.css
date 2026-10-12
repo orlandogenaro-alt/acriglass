@@ -748,3 +748,10 @@ output, #tSUB, .pct {
     body > *:not(#formatoImpresion) { display: none !important; }
     #formatoImpresion { display: block; }
 }
+
+/* ---------- Autorización de otro usuario ---------- */
+.au-dialogo { width: min(420px, calc(100vw - 24px)); }
+.au-campos { display: grid; gap: 12px; padding: 16px; }
+.au-campos p { color: var(--texto-2); }
+.au-campos label { display: grid; gap: 4px; color: var(--texto-2); font-weight: 600; }
+.au-campos input { height: 32px; padding: 0 10px; }

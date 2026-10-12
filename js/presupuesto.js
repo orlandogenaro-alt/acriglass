@@ -983,10 +983,43 @@
             if (r.status === 401) { (window.top || window).location.href = 'index.php'; throw new Error('Sesión expirada'); }
             return r.json().catch(function () { throw new Error('Respuesta no válida del servidor (HTTP ' + r.status + ').'); });
         }).then(function (j) {
-            if (!j.ok) throw new Error(j.error || 'Error desconocido.');
+            if (!j.ok) {
+                var err = new Error(j.error || 'Error desconocido.');
+                err.autorizar = !!j.autorizar;   // falta un permiso: lo puede autorizar otro usuario
+                throw err;
+            }
             return j;
         });
     }
+
+    // Autorización de otro usuario (Dialog225 del escritorio): resuelve con { usuario, contrasena } o null si se cancela
+    function pedirAutorizacion(mensaje) {
+        return new Promise(function (resolver) {
+            var dlg = $('auDialogo'), form = $('auForm'), hecho = false;
+            function terminar(v) {
+                if (hecho) return;
+                hecho = true;
+                form.onsubmit = null;
+                dlg.onclose = null;
+                if (dlg.open) dlg.close();
+                $('auContrasena').value = '';
+                resolver(v);
+            }
+            $('auMensaje').textContent = mensaje + ' Puede autorizarlo otro usuario que tenga el permiso.';
+            $('auUsuario').value = '';
+            $('auContrasena').value = '';
+            form.onsubmit = function (e) {
+                e.preventDefault();
+                terminar({ usuario: $('auUsuario').value.trim(), contrasena: $('auContrasena').value });
+            };
+            dlg.onclose = function () { terminar(null); };
+            dlg.showModal();
+            $('auUsuario').focus();
+        });
+    }
+    document.querySelectorAll('[data-au-cerrar]').forEach(function (b) {
+        b.addEventListener('click', function () { $('auDialogo').close(); });
+    });
 
     function documentoActual() {
         var subtotal = calcularTotales();
@@ -1160,6 +1193,37 @@
         else window.open('obra.php?id=' + encodeURIComponent(id), '_blank');
     }
 
+    // Form46.registrar_obra: el presupuesto debe estar guardado y pasa a Aceptado.
+    // autoriza: { usuario, contrasena } de quien autoriza si no se tiene el permiso NUEVO_OBRA
+    function registrarObra(autoriza) {
+        if (!presupuestoId) { alert('Es necesario guardar el presupuesto para registrar la obra.'); return; }
+        if (!confirm('El presupuesto se actualizará a estatus Aceptado y ya no será posible hacerle cambios. ¿Deseas continuar?')) return;
+        // Si tiene cambios sin guardar, primero se guardan
+        var listo = cambios ? guardar() : Promise.resolve(true);
+        listo.then(function (ok) {
+            if (!ok) return;
+            var nombre = prompt('Nombre de la obra:', $('proyecto').value.trim() || $('cliente').value.trim());
+            if (nombre === null) return;
+            return pedirPresupuestos('registrar_obra', { id: presupuestoId, nom_obra: nombre.trim(), autoriza: autoriza }).then(function (j) {
+                obraId = j.obra_id;
+                $('obra').textContent = j.nom_obra || 'Obra ' + j.obra_id;
+                if (j.estatus) pintarEstatus(j.estatus);
+                soloLectura = true;
+                aplicarModo();
+                if (enPestana) window.parent.postMessage({ tipo: 'guardado', id: presupuestoId }, location.origin);
+                if (j.nueva) alert('Obra «' + $('obra').textContent + '» registrada. Se abrirá en Obras.');
+                abrirObra(j.obra_id, $('obra').textContent);
+            });
+        }).catch(function (err) {
+            // El permiso cambió desde que se abrió la pantalla: se pide la autorización y se reintenta
+            if (err.autorizar && !autoriza) {
+                pedirAutorizacion(err.message).then(function (a) { if (a) registrarObra(a); });
+                return;
+            }
+            alert('No se pudo registrar la obra: ' + err.message);
+        });
+    }
+
     var acciones = {
         'guardar': function () {
             if (soloLectura && !cambios) { alert('No hay cambios que guardar. Presiona «Modificar» para cambiar el presupuesto.'); return; }
@@ -1213,25 +1277,16 @@
             if (guardando) return;
             var est = $('estatus').textContent.trim();
             if (est === 'Cancelado' || est === 'Rechazado') { alert('El presupuesto está ' + est + ': no se puede registrar la obra.'); return; }
-            if (!presupuestoId) { alert('Es necesario guardar el presupuesto para registrar la obra.'); return; }
-            if (!confirm('El presupuesto se actualizará a estatus Aceptado y ya no será posible hacerle cambios. ¿Deseas continuar?')) return;
-            // Si tiene cambios sin guardar, primero se guardan
-            var listo = cambios ? guardar() : Promise.resolve(true);
-            listo.then(function (ok) {
-                if (!ok) return;
-                var nombre = prompt('Nombre de la obra:', $('proyecto').value.trim() || $('cliente').value.trim());
-                if (nombre === null) return;
-                return pedirPresupuestos('registrar_obra', { id: presupuestoId, nom_obra: nombre.trim() }).then(function (j) {
-                    obraId = j.obra_id;
-                    $('obra').textContent = j.nom_obra || 'Obra ' + j.obra_id;
-                    if (j.estatus) pintarEstatus(j.estatus);
-                    soloLectura = true;
-                    aplicarModo();
-                    if (enPestana) window.parent.postMessage({ tipo: 'guardado', id: presupuestoId }, location.origin);
-                    if (j.nueva) alert('Obra «' + $('obra').textContent + '» registrada. Se abrirá en Obras.');
-                    abrirObra(j.obra_id, $('obra').textContent);
-                });
-            }).catch(function (err) { alert('No se pudo registrar la obra: ' + err.message); });
+            // Sin el permiso NUEVO_OBRA, otro usuario lo autoriza (como en el escritorio)
+            var autoriza = Promise.resolve(undefined);
+            if (!window.ACRI_PUEDE_REGISTRAR_OBRA) {
+                if (!confirm('No tienes el permiso para Registrar obras. ¿Deseas que lo autorice otro usuario?')) return;
+                autoriza = pedirAutorizacion('Registrar la obra requiere el permiso «Registrar obras».');
+            }
+            autoriza.then(function (a) {
+                if (a === null) return;
+                registrarObra(a);
+            });
         },
         'cancelar': function () {
             if (confirm('¿Cancelar este presupuesto?')) ponerEstatus('Cancelado');

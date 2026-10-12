@@ -52,6 +52,7 @@ try {
 
 // Un presupuesto guardado se abre en solo lectura; «Modificar» lo habilita con este permiso
 $puedeModificar = tienePermiso('MODIFICAR_SUGERIDO_OBRA', 'ADMIN_USER');
+$puedeRegistrarObra = tienePermiso('NUEVO_OBRA', 'ADMIN_USER');
 
 // Secciones del presupuesto (pestañas verticales)
 $secciones = [
@@ -437,6 +438,26 @@ $secciones = [
     </div>
 </dialog>
 
+<!-- ============ AUTORIZACIÓN DE OTRO USUARIO (Dialog225) ============ -->
+<dialog class="hs-dialogo au-dialogo" id="auDialogo">
+    <form id="auForm">
+        <div class="hs-cabecera">
+            <strong>Autorización</strong>
+            <button type="button" class="hs-cerrar" data-au-cerrar title="Cerrar">✕</button>
+        </div>
+        <div class="au-campos">
+            <p id="auMensaje"></p>
+            <label>Usuario que autoriza: <input id="auUsuario" autocomplete="off" required></label>
+            <label>Contraseña: <input type="password" id="auContrasena" autocomplete="off" required></label>
+        </div>
+        <div class="hs-pie">
+            <span></span>
+            <button type="button" class="hs-btn" data-au-cerrar>Cancelar</button>
+            <button type="submit" class="hs-btn principal">Autorizar</button>
+        </div>
+    </form>
+</dialog>
+
 <!-- Formato impreso (Imprimir / Imprimir Detalle): solo se ve al imprimir -->
 <div id="formatoImpresion"></div>
 
@@ -444,6 +465,7 @@ $secciones = [
     window.ACRI_MEMBRETE = <?= json_encode($membrete, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_USUARIO = <?= json_encode($usuarioSesion, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_PUEDE_MODIFICAR = <?= $puedeModificar ? 'true' : 'false' ?>;
+    window.ACRI_PUEDE_REGISTRAR_OBRA = <?= $puedeRegistrarObra ? 'true' : 'false' ?>;
     window.ACRI_ESTATUS = <?= json_encode(array_column($estatus, 'color', 'nombre'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_CONCEPTOS = <?= json_encode($conceptos, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>

@@ -8,6 +8,8 @@
 define('ACRI_API', true);
 require __DIR__ . '/../includes/sesion.php';
 require __DIR__ . '/../includes/bd.php';
+require __DIR__ . '/../includes/autenticacion.php';
+require __DIR__ . '/../includes/permisos.php';
 require __DIR__ . '/../includes/estatus.php';
 require __DIR__ . '/../includes/respuesta.php';
 
@@ -158,12 +160,30 @@ function guardar(array $d): array
     return ['id' => $id, 'folio' => (int) bd_valor('AW', 'select folio from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id])];
 }
 
+// Sin el permiso, otro usuario que sí lo tenga autoriza con su usuario y contraseña (Dialog225 del
+// escritorio). Sin datos de autorización regresa { autorizar: true } para que la pantalla los pida.
+// Regresa el login de quien autorizó.
+function autorizacion($a, string $permiso): string
+{
+    $desc = ACRI_PERMISOS[$permiso] ?? $permiso;
+    if (!is_array($a)) responder(['ok' => false, 'autorizar' => true, 'error' => "No tienes el permiso para «{$desc}» ($permiso)."], 403);
+    $r = autenticarUsuario(trim((string) ($a['usuario'] ?? '')), (string) ($a['contrasena'] ?? ''));
+    if ($r['estado'] !== 'ok') {
+        sleep(1);   // frena intentos repetidos de contraseña
+        error($r['estado'] === 'baja' ? 'El usuario que autoriza está dado de baja.' : 'Usuario o contraseña de quien autoriza incorrectos.', 403);
+    }
+    if (empty($r['permisos'][$permiso]) && empty($r['permisos']['ADMIN_USER'])) {
+        error("El usuario {$r['login']} tampoco tiene el permiso para «{$desc}».", 403);
+    }
+    return (string) $r['login'];
+}
+
 // Registra la obra del presupuesto (reg_obras) y la liga al presupuesto (doctos_sugerido_obra.obra_id).
 // Si ya tiene obra, regresa la existente. El vendedor del presupuesto queda como responsable
 // y el presupuesto pasa a Aceptado.
 function registrarObra(array $d): array
 {
-    if (!tienePermiso('NUEVO_OBRA', 'ADMIN_USER')) error('No tienes permiso para registrar obras (NUEVO_OBRA).', 403);
+    $autorizo = tienePermiso('NUEVO_OBRA', 'ADMIN_USER') ? null : autorizacion($d['autoriza'] ?? null, 'NUEVO_OBRA');
     $id = (int) ($d['id'] ?? 0);
     if (!$id) error('Guarda el presupuesto antes de registrar la obra.');
     $p = bd_fila('AW', 'select docto_sugerido_obra_id, folio, cliente, proyecto, ubicacion, vendedor_obra_id, estatus, obra_id
@@ -193,6 +213,7 @@ function registrarObra(array $d): array
         'fecha_creacion'   => date('Y-m-d H:i:s'),
         'usuario_creacion' => mb_substr((string) ($_SESSION['usuario'] ?? ''), 0, 50),
     ];
+    if ($autorizo !== null) $obra['notas'] = mb_substr("Registro autorizado por $autorizo.", 0, 200);
     if (bd_tiene_columna('AW', 'reg_obras', 'gasto_administrativo')) $obra['gasto_administrativo'] = 26;
     if (bd_tiene_columna('AW', 'reg_obras', 'avance_obra')) $obra['avance_obra'] = 0;
 

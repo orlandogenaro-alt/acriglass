@@ -635,8 +635,25 @@ function asignarCotizacion(array $d): array
     $r = api_http('EASYGLASS', 'GET', '/microsip-pedidos?folio=' . rawurlencode($folio));
     if (!$r['ok']) error('No se pudo consultar Microsip en la API de Easy-Glass: ' . ($r['error'] ?: 'sin respuesta'), 502);
     $docs = $r['datos']['datos'] ?? [];
-    if (!$docs) error("No existe en Microsip un documento con el folio $folio.", 404);
-    $p = $docs[0];
+    if ($docs) {
+        $p = $docs[0];
+    } else {
+        // Presupuesto de Easy-Glass que aún no pasa a Microsip: se liga como EG0009783 y la
+        // pestaña de facturación lo cruza con Microsip cuando ya exista el pedido
+        $num = preg_match('/^(EG)?0*(\d{1,7})$/', $folio, $mm) ? $mm[2] : '';
+        $e = $num !== '' ? api_http('EASYGLASS', 'GET', '/presupuestos?folio=' . $num) : null;
+        $pre = $e && $e['ok'] ? ($e['datos']['datos'] ?? null) : null;
+        if (!is_array($pre) || empty($pre['folio'])) error("No existe en Microsip ni en Easy-Glass un documento con el folio $folio.", 404);
+        $p = [
+            'folio'         => 'EG' . str_pad($num, 7, '0', STR_PAD_LEFT),
+            'cliente_no'    => null,
+            'cliente'       => $pre['nom_cliente'] ?? '',
+            'fecha'         => $pre['fecha'] ?? '',
+            'estatus_clave' => substr((string) ($pre['estatus'] ?? ''), 0, 1),
+            'descripcion'   => 'Easy-Glass ' . $num . (!empty($pre['proyecto']) ? ' · ' . $pre['proyecto'] : ''),
+            'importe_neto'  => $pre['total_proyecto'] ?? 0,
+        ];
+    }
     if (bd_valor('AW', 'select count(*) from doctos_microsip_obra where obra_id = ? and folio = ?', [$id, $p['folio']])) {
         error("El folio {$p['folio']} ya está asignado a esta obra.");
     }

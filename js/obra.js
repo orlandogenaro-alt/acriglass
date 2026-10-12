@@ -20,7 +20,6 @@
 
     function tiene(p) { return permisos.indexOf(p) >= 0 || permisos.indexOf('ADMIN_USER') >= 0; }
     function marcarCambio() { cambios = true; }
-    function deEscritorio(que) { alert(que + ' todavía se captura en el sistema de escritorio.'); }
     function escapar(s) {
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
     }
@@ -98,6 +97,146 @@
         });
     }
     function avisarError(err) { if (!err.cancelado) alert(err.message); }
+
+    // ---------- Diálogo de captura genérico ----------
+    // cfg: { titulo, aviso, campos: [{ id, etiqueta, tipo, valor, opciones, ancho, soloLectura }],
+    //        grids: [{ id, titulo, columnas: [{ id, etiqueta, tipo, opciones, calc, total, alElegir }], filas, importar }],
+    //        soloLectura, acciones: [{ texto, fn }], guardar(datos) → Promise }
+    // tipos de campo: text, date, number, textarea, select ([{ v, t }]) y lista (texto con sugerencias [{ t, … }])
+    function formulario(cfg) {
+        var dlg = $('frmDialogo'), cuerpo = $('frmCuerpo');
+        var grids = (cfg.grids || []).map(function (g) {
+            return { cfg: g, filas: (g.filas || []).map(function (f) { return Object.assign({}, f); }) };
+        });
+        var lectura = !!cfg.soloLectura;
+        var nLista = 0;
+
+        function opcionesLista(ops) {
+            var id = 'frmLista' + (++nLista);
+            return { id: id, html: '<datalist id="' + id + '">' + ops.map(function (o) { return '<option value="' + escapar(o.t) + '">'; }).join('') + '</datalist>' };
+        }
+        function control(c, valor, attrs) {
+            var dis = lectura || c.soloLectura ? ' disabled' : '';
+            var v = valor == null ? '' : valor;
+            if (c.tipo === 'textarea') return '<textarea rows="3"' + attrs + dis + '>' + escapar(v) + '</textarea>';
+            if (c.tipo === 'select') {
+                return '<select' + attrs + dis + '>' + c.opciones.map(function (o) {
+                    return '<option value="' + escapar(o.v) + '"' + (String(o.v) === String(v) ? ' selected' : '') + '>' + escapar(o.t) + '</option>';
+                }).join('') + '</select>';
+            }
+            if (c.tipo === 'lista') {
+                var l = opcionesLista(c.opciones || []);
+                return '<input list="' + l.id + '" value="' + escapar(v) + '" autocomplete="off"' + attrs + dis + '>' + l.html;
+            }
+            var t = c.tipo === 'number' ? 'number" step="any' : (c.tipo || 'text');
+            return '<input type="' + t + '" value="' + escapar(v) + '"' + attrs + dis + '>';
+        }
+
+        function pintarGrid(k) {
+            var g = grids[k], cols = g.cfg.columnas;
+            var cont = cuerpo.querySelector('[data-grid="' + k + '"] .tabla');
+            var html = '<table><thead><tr>' + cols.map(function (c) { return '<th' + (c.ancho ? ' style="width:' + c.ancho + '"' : '') + '>' + escapar(c.etiqueta) + '</th>'; }).join('') +
+                (lectura ? '' : '<th style="width:34px"></th>') + '</tr></thead><tbody>';
+            html += g.filas.length ? g.filas.map(function (f, i) {
+                return '<tr data-fila="' + i + '">' + cols.map(function (c) {
+                    if (c.calc) return '<td class="calc" data-calc="' + c.id + '">' + dinero(c.calc(f)) + '</td>';
+                    return '<td>' + control(c, f[c.id], ' data-col="' + c.id + '"') + '</td>';
+                }).join('') + (lectura ? '' : '<td><button type="button" class="quitar" title="Quitar renglón">🗑</button></td>') + '</tr>';
+            }).join('') : '<tr class="vacio"><td colspan="' + (cols.length + 1) + '">Sin renglones.</td></tr>';
+            html += '</tbody>';
+            if (cols.some(function (c) { return c.total; })) {
+                html += '<tfoot><tr>' + cols.map(function (c) { return '<td data-total="' + c.id + '"></td>'; }).join('') + (lectura ? '' : '<td></td>') + '</tr></tfoot>';
+            }
+            cont.innerHTML = html + '</table>';
+            totales(k);
+        }
+        function totales(k) {
+            var g = grids[k];
+            g.cfg.columnas.forEach(function (c) {
+                var td = cuerpo.querySelector('[data-grid="' + k + '"] [data-total="' + c.id + '"]');
+                if (!td || !c.total) return;
+                td.textContent = dinero(g.filas.reduce(function (s, f) { return s + (parseFloat(c.calc ? c.calc(f) : f[c.id]) || 0); }, 0));
+            });
+        }
+
+        $('frmTitulo').textContent = cfg.titulo;
+        cuerpo.innerHTML = (cfg.aviso ? '<p class="frm-aviso">' + escapar(cfg.aviso) + '</p>' : '') +
+            (cfg.campos && cfg.campos.length ? '<div class="frm-campos">' + cfg.campos.map(function (c) {
+                return '<label' + (c.ancho || c.tipo === 'textarea' ? ' class="ancho"' : '') + '>' + escapar(c.etiqueta) + control(c, c.valor, ' data-campo="' + c.id + '"') + '</label>';
+            }).join('') + '</div>' : '') +
+            grids.map(function (g, k) {
+                return '<div class="frm-grid" data-grid="' + k + '"><h4>' + escapar(g.cfg.titulo || '') +
+                    (lectura ? '' : ' <button type="button" class="ob-btn" data-agregar>＋ Agregar renglón</button>') +
+                    (!lectura && g.cfg.importar ? ' <button type="button" class="ob-btn" data-importar>' + escapar(g.cfg.importar.texto) + '</button>' : '') +
+                    '</h4><div class="tabla"></div></div>';
+            }).join('');
+        grids.forEach(function (g, k) { pintarGrid(k); });
+
+        cuerpo.oninput = cuerpo.onchange = function (e) {
+            var gEl = e.target.closest('[data-grid]'), tr = e.target.closest('tr[data-fila]');
+            if (!gEl || !tr || !e.target.dataset.col) return;
+            var k = +gEl.dataset.grid, g = grids[k], f = g.filas[tr.dataset.fila];
+            var col = g.cfg.columnas.filter(function (c) { return c.id === e.target.dataset.col; })[0];
+            f[col.id] = e.target.value;
+            if (col.alElegir && e.type === 'change') {
+                var item = (col.opciones || []).filter(function (o) { return o.t === e.target.value; })[0];
+                col.alElegir(f, item || null);
+                pintarGrid(k);
+                return;
+            }
+            g.cfg.columnas.forEach(function (c) {
+                if (c.calc) tr.querySelector('[data-calc="' + c.id + '"]').textContent = dinero(c.calc(f));
+            });
+            totales(k);
+        };
+        cuerpo.onclick = function (e) {
+            var gEl = e.target.closest('[data-grid]');
+            if (!gEl) return;
+            var k = +gEl.dataset.grid, g = grids[k];
+            if (e.target.closest('[data-agregar]')) { g.filas.push({}); pintarGrid(k); return; }
+            if (e.target.closest('[data-importar]')) {
+                var nuevas = g.cfg.importar.fn();
+                if (!nuevas.length) { alert('No hay renglones para importar.'); return; }
+                g.filas = g.filas.filter(function (f) { return Object.keys(f).some(function (x) { return f[x] !== '' && f[x] != null; }); }).concat(nuevas);
+                pintarGrid(k);
+                return;
+            }
+            var q = e.target.closest('.quitar');
+            if (q) { g.filas.splice(q.closest('tr').dataset.fila, 1); pintarGrid(k); }
+        };
+
+        function datos() {
+            var d = {};
+            cuerpo.querySelectorAll('[data-campo]').forEach(function (el) { d[el.dataset.campo] = el.value; });
+            grids.forEach(function (g) { d[g.cfg.id] = g.filas; });
+            return d;
+        }
+
+        $('frmAcciones').innerHTML = '';
+        (cfg.acciones || []).forEach(function (a) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'hs-btn';
+            b.textContent = a.texto;
+            b.onclick = function () {
+                var r = a.fn(datos());
+                if (r && r.then) r.then(function (cerrar) { if (cerrar !== false) dlg.close(); }).catch(avisarError);
+            };
+            $('frmAcciones').appendChild(b);
+        });
+        $('frmGuardar').hidden = lectura || !cfg.guardar;
+        $('frmForm').onsubmit = function (e) {
+            e.preventDefault();
+            $('frmGuardar').disabled = true;
+            Promise.resolve(cfg.guardar(datos())).then(function (cerrar) { if (cerrar !== false) dlg.close(); })
+                .catch(avisarError)
+                .finally(function () { $('frmGuardar').disabled = false; });
+        };
+        dlg.showModal();
+    }
+    document.querySelectorAll('[data-frm-cerrar]').forEach(function (b) {
+        b.addEventListener('click', function () { $('frmDialogo').close(); });
+    });
 
     // ---------- Pestañas del documento (TabControl1_SelectedIndexChanged: cada pestaña se consulta al abrirla) ----------
     var cargado = {};
@@ -540,6 +679,290 @@
         }).catch(avisarError);
     }
 
+    // ---------- Capturas de la obra (Dialog242, 279, 230, 275 y 274 del escritorio) ----------
+    var catObra = null;
+    function catalogosObra() {
+        if (catObra) return Promise.resolve(catObra);
+        return pedir('accion=catalogos_obra&id=' + encodeURIComponent(obraId)).then(function (j) { catObra = j; return j; });
+    }
+    function num(v) { return parseFloat(v) || 0; }
+    function hoy() {
+        var d = new Date();
+        return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    }
+    function dia(v) { return String(v || '').substr(0, 10); }
+    function obraAbierta() { return ABIERTOS.indexOf(estatus) >= 0; }
+    // Cambio en AW con la obra y, si hace falta, la autorización de otro usuario con «Modificar obras»
+    function guardarCon(accion, cuerpo) {
+        return conAutorizacion(function (a) {
+            return enviar(accion, Object.assign({ id: obraId, autoriza: a }, cuerpo));
+        }, 'Esta captura requiere el permiso «Modificar obras».');
+    }
+    function opcionesOrdenes(cat) {
+        return [{ v: '', t: '(sin orden de trabajo)' }].concat(cat.ordenes.map(function (o) { return { v: o.id, t: o.folio + ' · ' + (o.descripcion || '') }; }));
+    }
+    function listaEmpleados(cat) { return cat.empleados.map(function (e) { return { t: e.nombre, id: e.id, sueldo: num(e.sueldo_diario) }; }); }
+    function listaNombres(items) { return items.map(function (x) { return { t: x.nombre }; }); }
+    // Antes de una captura nueva: obra guardada y con estatus abierto (valida_estatus_obra)
+    function puedeCapturar(msg) { return validaEstatusObra() && requiereObra(msg); }
+
+    // 3-Orden de trabajo (nuevo_orden_trabajo / Dialog242)
+    function dialogoOrden(orden) {
+        catalogosObra().then(function (cat) {
+            var e2 = orden ? orden.estatus_2 : 'O';
+            var acciones = [];
+            function cambio(est, pregunta) {
+                return { texto: { P: '▶ Liberar a Producción', F: '✔ Fin de Producción', C: '✕ Cancelar orden' }[est], fn: function () {
+                    if (!confirm(pregunta)) return Promise.resolve(false);
+                    return guardarCon('estatus_orden', { orden_id: orden.id, estatus: est }).then(function () {
+                        catObra = null;
+                        cargarListado('ordenes', 'ordenes', 'No existen ordenes de trabajo asignadas a esta obra');
+                    });
+                } };
+            }
+            if (orden && obraAbierta()) {
+                if (e2 === 'O') acciones.push(cambio('P', '¿Liberar la orden ' + orden.folio + ' a producción?'));
+                if (e2 === 'P') acciones.push(cambio('F', '¿Enviar la orden ' + orden.folio + ' a Fin de Producción?'));
+                if (e2 === 'O' || e2 === 'P') acciones.push(cambio('C', '¿Cancelar la orden ' + orden.folio + '?'));
+            }
+            formulario({
+                titulo: orden ? 'Orden de Trabajo ' + orden.folio + ' · ' + orden.estatus : 'Nueva Orden de Trabajo · ' + $('nombreObra').value.split('\n')[0],
+                aviso: orden && e2 !== 'O' ? 'La orden ya se liberó a producción: solo se puede consultar.' : '',
+                soloLectura: e2 !== 'O' || !obraAbierta(),
+                campos: [
+                    { id: 'nom_cliente', etiqueta: 'Cliente', valor: orden ? orden.nom_cliente : cat.cliente },
+                    { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: orden ? dia(orden.fecha) : hoy() },
+                    { id: 'fecha_entrega', etiqueta: 'Fecha de entrega', tipo: 'date', valor: orden ? dia(orden.fecha_entrega) : '' },
+                    { id: 'descripcion', etiqueta: 'Descripción', tipo: 'textarea', valor: orden ? orden.descripcion : '' }
+                ],
+                grids: [{
+                    id: 'partidas', titulo: 'Partidas', filas: orden ? orden.partidas : [{}],
+                    columnas: [
+                        { id: 'clave_articulo', etiqueta: 'Clave', ancho: '110px' },
+                        { id: 'descripcion', etiqueta: 'Descripción' },
+                        { id: 'unidades', etiqueta: 'Uds', tipo: 'number', ancho: '80px' },
+                        { id: 'um', etiqueta: 'U.M.', ancho: '80px' },
+                        { id: 'precio_unitario', etiqueta: 'Precio Unit.', tipo: 'number', ancho: '110px' },
+                        { id: 'importe', etiqueta: 'Importe', ancho: '110px', total: true, calc: function (f) { return num(f.unidades) * num(f.precio_unitario); } },
+                        { id: 'notas_adic', etiqueta: 'Notas' }
+                    ],
+                    importar: { texto: '⇩ Artículos del presupuesto', fn: function () {
+                        return cat.articulos.map(function (a) {
+                            return { articulo_id: a.articulo_id, clave_articulo: a.clave, descripcion: a.nombre, unidades: a.uds, um: a.um, precio_unitario: a.costo_unit };
+                        });
+                    } }
+                }],
+                acciones: acciones,
+                guardar: function (d) {
+                    return guardarCon('guardar_orden', {
+                        orden_id: orden ? orden.id : 0, nom_cliente: d.nom_cliente, fecha: d.fecha, fecha_entrega: d.fecha_entrega,
+                        descripcion: d.descripcion, partidas: d.partidas
+                    }).then(function (j) {
+                        if (!orden) alert('Se registró la orden de trabajo folio ' + j.folio + '.');
+                        catObra = null;
+                        cargarListado('ordenes', 'ordenes', 'No existen ordenes de trabajo asignadas a esta obra');
+                    });
+                }
+            });
+        }).catch(avisarError);
+    }
+
+    // 2-Facturacion: cotización para facturación (nuevo_cotizacion_microsip)
+    function dialogoCotizacion(f) {
+        catalogosObra().then(function (cat) {
+            formulario({
+                titulo: f ? 'Cotización ' + f.folio : 'Nueva Cotización para Facturación',
+                soloLectura: !!f,
+                campos: [
+                    { id: 'folio', etiqueta: 'Folio', valor: f ? f.folio : '' },
+                    { id: 'nom_cliente', etiqueta: 'Cliente', valor: f ? f.cliente : cat.cliente },
+                    { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: f ? dia(f.fecha) : hoy() },
+                    { id: 'importe', etiqueta: 'Importe', tipo: 'number', valor: f ? f.importe : '' },
+                    { id: 'descripcion', etiqueta: 'Descripción', tipo: 'textarea', valor: '' }
+                ],
+                acciones: f && obraAbierta() ? [{ texto: '✕ Quitar de la obra', fn: function () {
+                    if (!confirm('¿Quitar la cotización ' + f.folio + ' de esta obra?')) return Promise.resolve(false);
+                    return guardarCon('quitar_cot', { docto_id: f.id }).then(cargarFacturacion);
+                } }] : [],
+                guardar: f ? null : function (d) { return guardarCon('guardar_cot', d).then(cargarFacturacion); }
+            });
+        }).catch(avisarError);
+    }
+
+    // 2-Facturacion: pago en efectivo, nota de cargo o anticipo (Dialog279)
+    function dialogoCobro(f) {
+        var cancelado = f && String(f.estatus).trim() === 'Cancelado';
+        formulario({
+            titulo: f ? f.tipo_docto + ' ' + f.folio + (cancelado ? ' · Cancelado' : '') : 'Nuevo Documento de Cobro',
+            soloLectura: !!f,
+            campos: [
+                { id: 'tipo', etiqueta: 'Tipo', tipo: 'select', valor: f ? f.tipo : 0,
+                  opciones: [{ v: 0, t: 'Pago en Efectivo' }, { v: 1, t: 'Nota de Cargo' }, { v: 2, t: 'Anticipo' }] },
+                { id: 'es_microsip', etiqueta: '¿Documento de Microsip?', tipo: 'select', valor: 0, opciones: [{ v: 0, t: 'No' }, { v: 1, t: 'Sí' }] },
+                { id: 'folio', etiqueta: 'Folio (vacío = automático)', valor: f ? f.folio : '' },
+                { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: f ? dia(f.fecha) : hoy() },
+                { id: 'importe', etiqueta: 'Importe', tipo: 'number', valor: f ? f.importe : '' },
+                { id: 'notas', etiqueta: 'Notas', tipo: 'textarea', valor: f ? f.cliente : '' }
+            ],
+            acciones: f && !cancelado && obraAbierta() ? [{ texto: '✕ Cancelar documento', fn: function () {
+                if (!confirm('¿Cancelar el documento ' + f.folio + '?')) return Promise.resolve(false);
+                return guardarCon('cancelar_cobro', { docto_id: f.id }).then(cargarFacturacion);
+            } }] : [],
+            guardar: f ? null : function (d) {
+                d.es_microsip = d.es_microsip === '1';
+                return guardarCon('guardar_cobro', d).then(function (j) {
+                    alert('Se registró el documento folio ' + j.folio + '.');
+                    cargarFacturacion();
+                });
+            }
+        });
+    }
+
+    // 4-Explosion de material: agregar artículos (Dialog230)
+    var COLS_EXPLOSION = [
+        { id: 'clave', etiqueta: 'Clave', ancho: '110px' },
+        { id: 'nombre', etiqueta: 'Nombre' },
+        { id: 'um', etiqueta: 'U.M.', ancho: '70px' },
+        { id: 'uds', etiqueta: 'Uds', tipo: 'number', ancho: '80px' },
+        { id: 'costo_unit', etiqueta: 'Costo Unit.', tipo: 'number', ancho: '100px' },
+        { id: 'costo_tot', etiqueta: 'Costo Total', ancho: '110px', total: true, calc: function (f) { return num(f.uds) * num(f.costo_unit); } },
+        { id: 'um_ml_m2', etiqueta: 'U.M. ML/M2', ancho: '80px' },
+        { id: 'tipo_docto', etiqueta: 'Tipo Docto', ancho: '100px' },
+        { id: 'folio', etiqueta: 'Folio', ancho: '90px' }
+    ];
+    function dialogoExplosion() {
+        catalogosObra().then(function (cat) {
+            formulario({
+                titulo: 'Explosión de Material · Agregar artículos',
+                grids: [{
+                    id: 'partidas', titulo: 'Artículos', filas: [{}], columnas: COLS_EXPLOSION,
+                    importar: { texto: '⇩ Materia prima del presupuesto', fn: function () {
+                        return cat.articulos.map(function (a) {
+                            return { articulo_id: a.articulo_id, clave: a.clave, nombre: a.nombre, um: a.um, uds: a.uds, costo_unit: a.costo_unit, tipo_docto: 'Presupuesto', folio: a.folio };
+                        });
+                    } }
+                }],
+                guardar: function (d) {
+                    return guardarCon('agregar_explosion', { partidas: d.partidas }).then(function () {
+                        cargarListado('explosion', 'explosion', 'No existen datos para mostrar');
+                    });
+                }
+            });
+        }).catch(avisarError);
+    }
+    // Doble clic en una partida: corregir unidades y costo (guarda_explocion_materiales_obra)
+    function dialogoPartidaExplosion(f) {
+        formulario({
+            titulo: 'Partida de explosión · ' + (f.clave || f.nombre),
+            soloLectura: !obraAbierta(),
+            campos: [
+                { id: 'nombre', etiqueta: 'Artículo', valor: f.nombre, soloLectura: true, ancho: true },
+                { id: 'uds', etiqueta: 'Uds', tipo: 'number', valor: f.uds },
+                { id: 'costo_unit', etiqueta: 'Costo Unit.', tipo: 'number', valor: f.costo_unit }
+            ],
+            guardar: function (d) {
+                return guardarCon('actualizar_explosion', { partidas: [{ id: f.id, uds: d.uds, costo_unit: d.costo_unit }] }).then(function () {
+                    alert('Se actualizo correctamente la informacion');
+                    cargarListado('explosion', 'explosion', 'No existen datos para mostrar');
+                });
+            }
+        });
+    }
+
+    // 6-Mano de obra asignada (Dialog275)
+    function dialogoManoObra(mo) {
+        catalogosObra().then(function (cat) {
+            var cancelado = mo && mo.estatus === 'Cancelado';
+            formulario({
+                titulo: mo ? 'Mano de Obra · ' + fechaDMY(dia(mo.fecha)) + (cancelado ? ' · Cancelado' : '') : 'Asignar Mano de Obra',
+                soloLectura: cancelado || !obraAbierta(),
+                campos: [
+                    { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: mo ? dia(mo.fecha) : hoy() },
+                    { id: 'docto_orden_obra_id', etiqueta: 'Orden de trabajo', tipo: 'select', opciones: opcionesOrdenes(cat), valor: mo ? mo.docto_orden_obra_id : '' },
+                    { id: 'nom_unidad', etiqueta: 'Unidad', tipo: 'lista', opciones: listaNombres(cat.unidades), valor: mo ? mo.nom_unidad : '' },
+                    { id: 'notas', etiqueta: 'Notas', tipo: 'textarea', valor: mo ? mo.notas : '' }
+                ],
+                grids: [{
+                    id: 'empleados', titulo: 'Empleados', filas: mo ? mo.empleados : [{}],
+                    columnas: [
+                        { id: 'nombre', etiqueta: 'Empleado', tipo: 'lista', opciones: listaEmpleados(cat), alElegir: function (f, e) {
+                            f.id_empleado = e ? e.id : '';
+                            if (e && !num(f.costo_x_hrs)) f.costo_x_hrs = Math.round(e.sueldo / 8 * 100) / 100;   // sueldo diario / 8 h
+                        } },
+                        { id: 'costo_x_hrs', etiqueta: 'Costo x Hr', tipo: 'number', ancho: '100px' },
+                        { id: 'hrs_trabajo', etiqueta: 'Hrs', tipo: 'number', ancho: '80px' },
+                        { id: 'hrs_trabajo_real', etiqueta: 'Hrs Real', tipo: 'number', ancho: '80px' },
+                        { id: 'importe', etiqueta: 'Importe', ancho: '110px', total: true, calc: function (f) { return num(f.costo_x_hrs) * num(f.hrs_trabajo); } },
+                        { id: 'importe_real', etiqueta: 'Importe Real', ancho: '110px', total: true, calc: function (f) { return num(f.costo_x_hrs) * num(f.hrs_trabajo_real); } }
+                    ]
+                }],
+                acciones: mo && !cancelado && obraAbierta() ? [{ texto: '✕ Cancelar asignación', fn: function () {
+                    if (!confirm('¿Cancelar esta asignación de mano de obra?')) return Promise.resolve(false);
+                    return guardarCon('cancelar_mo', { doc_id: mo.id }).then(function () { cargarListado('mano', 'mano'); });
+                } }] : [],
+                guardar: function (d) {
+                    d.mo_id = mo ? mo.id : 0;
+                    return guardarCon('guardar_mo', d).then(function () { cargarListado('mano', 'mano'); });
+                }
+            });
+        }).catch(avisarError);
+    }
+
+    // 8-Gastos adicionales (Dialog274)
+    function dialogoGasto(g) {
+        catalogosObra().then(function (cat) {
+            var cancelado = g && g.estatus === 'Cancelado';
+            var conceptos = listaNombres(cat.conceptos_gasto);
+            formulario({
+                titulo: g ? 'Gasto Adicional · ' + (g.concepto || '') + (cancelado ? ' · Cancelado' : '') : 'Nuevo Gasto Adicional',
+                soloLectura: cancelado || !obraAbierta(),
+                campos: [
+                    { id: 'concepto', etiqueta: 'Concepto', tipo: 'lista', opciones: conceptos, valor: g ? g.concepto : '' },
+                    { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: g ? dia(g.fecha) : hoy() },
+                    { id: 'docto_orden_obra_id', etiqueta: 'Orden de trabajo', tipo: 'select', opciones: opcionesOrdenes(cat), valor: g ? g.docto_orden_obra_id : '' },
+                    { id: 'nom_unidad', etiqueta: 'Unidad', tipo: 'lista', opciones: listaNombres(cat.unidades), valor: g ? g.nom_unidad : '' },
+                    { id: 'notas', etiqueta: 'Notas', tipo: 'textarea', valor: g ? g.notas : '' }
+                ],
+                grids: [{
+                    id: 'detalle', titulo: 'Importes', filas: g ? g.detalle : [{}],
+                    columnas: [
+                        { id: 'concepto', etiqueta: 'Concepto', tipo: 'lista', opciones: conceptos },
+                        { id: 'imp_presupuestado', etiqueta: 'Importe presupuestado', tipo: 'number', ancho: '170px', total: true },
+                        { id: 'imp_real', etiqueta: 'Importe real', tipo: 'number', ancho: '150px', total: true }
+                    ]
+                }, {
+                    id: 'personal', titulo: 'Personal', filas: g ? g.personal : [],
+                    columnas: [{ id: 'nombre', etiqueta: 'Empleado', tipo: 'lista', opciones: listaEmpleados(cat), alElegir: function (f, e) { f.id_empleado = e ? e.id : ''; } }]
+                }],
+                acciones: g && !cancelado && obraAbierta() ? [{ texto: '✕ Cancelar gasto', fn: function () {
+                    if (!confirm('¿Cancelar este gasto adicional?')) return Promise.resolve(false);
+                    return guardarCon('cancelar_gasto', { doc_id: g.id }).then(function () { cargarListado('gastos', 'gastos'); });
+                } }] : [],
+                guardar: function (d) {
+                    d.gasto_id = g ? g.id : 0;
+                    return guardarCon('guardar_gasto', d).then(function () { catObra = null; cargarListado('gastos', 'gastos'); });
+                }
+            });
+        }).catch(avisarError);
+    }
+
+    function abrirDocumento(tipo, id, dialogo) {
+        pedir('accion=documento&tipo=' + tipo + '&id=' + encodeURIComponent(obraId) + '&doc=' + encodeURIComponent(id))
+            .then(function (j) { dialogo(j.documento); }).catch(avisarError);
+    }
+
+    // Doble clic en un renglón de cada pestaña
+    var DOBLE_CLIC = {
+        ordenes: function (f) { abrirDocumento('orden', f.id, dialogoOrden); },
+        mano: function (f) { abrirDocumento('mo', f.id, dialogoManoObra); },
+        gastos: function (f) { abrirDocumento('gasto', f.id, dialogoGasto); },
+        explosion: dialogoPartidaExplosion,
+        facturacion: function (f) {
+            if (f.tipo === -1) dialogoCotizacion(f);
+            else if (f.tipo >= 0 && f.tipo <= 2) dialogoCobro(f);
+        }
+    };
+
     var subAcciones = {
         'consultar': function (vista) {
             if (!requiereObra('Es necesario guardar la obra para consultar su información.')) return;
@@ -548,18 +971,30 @@
         },
         'exportar': function () { exportar(vistaDe('salidas'), 'Materiales de Obra ' + $('nombreObra').value); },
         'nueva-cot': function () {
-            if (validaEstatusObra() && requiereObra('Es necesario guardar la obra para registrar una Cotizacion para Facturacion.')) deEscritorio('La cotización de Microsip para facturación');
+            if (puedeCapturar('Es necesario guardar la obra para registrar una Cotizacion para Facturacion.')) dialogoCotizacion(null);
         },
         'asignar-cot': asignarCotizacion,
+        'nuevo-cobro': function () { if (puedeCapturar('Es necesario guardar la obra para registrar un documento de cobro.')) dialogoCobro(null); },
         'nueva-ot': function () {
-            if (validaEstatusObra() && requiereObra('Es necesario guardar la obra para registrar una orden de trabajo.')) deEscritorio('La orden de trabajo');
+            if (puedeCapturar('Es necesario guardar la obra para registrar una orden de trabajo.')) dialogoOrden(null);
         },
-        'nueva-explosion': function () { if (validaEstatusObra() && requiereObra()) deEscritorio('La explosión de materiales'); },
+        'nueva-explosion': function () { if (puedeCapturar()) dialogoExplosion(); },
         'eliminar-explosion': eliminarExplosion,
-        'nuevo-gasto': function () { if (validaEstatusObra() && requiereObra()) deEscritorio('El gasto adicional'); },
+        'nueva-mo': function () { if (puedeCapturar()) dialogoManoObra(null); },
+        'nuevo-gasto': function () { if (puedeCapturar()) dialogoGasto(null); },
         'salidas-doctos':  function () { if (requiereObra()) cargarSalidas('doctos'); },
         'salidas-detalle': function () { if (requiereObra()) cargarSalidas('detalle'); }
     };
+
+    document.querySelectorAll('.ob-listado').forEach(function (vista) {
+        vista.addEventListener('dblclick', function (e) {
+            var tr = e.target.closest('tbody tr[data-i]');
+            var fn = DOBLE_CLIC[vista.dataset.vista];
+            if (!tr || !fn || e.target.closest('a, button')) return;
+            var f = (datosListado[vista.dataset.vista] || [])[tr.dataset.i];
+            if (f) fn(f);
+        });
+    });
 
     document.querySelectorAll('.ob-listado').forEach(function (vista) {
         vista.addEventListener('click', function (e) {
@@ -856,6 +1291,7 @@
             obraId = parseInt(o.obra_id, 10) || 0;
             sugeridoId = parseInt(o.sugerido_id, 10) || 0;
             cargado = {};
+            catObra = null;
             $('presId').textContent = sugeridoId;
             $('presFolio').value = o.folio || '';
             $('presProyecto').value = o.proyecto || '';

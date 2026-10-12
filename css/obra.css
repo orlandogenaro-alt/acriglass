@@ -163,6 +163,30 @@
 .ob-ct tr.ct-grupo td { background: var(--sub); color: var(--texto-3); font-weight: 700; padding: 2px 6px; }
 .ob-ct td small { color: var(--texto-3); font-weight: 400; }
 
+/* ---------- Diálogo de captura ---------- */
+.frm-dialogo { width: min(1000px, calc(100vw - 24px)); }
+.frm-dialogo form { display: flex; flex-direction: column; max-height: calc(100vh - 40px); }
+.frm-cuerpo { overflow: auto; padding: 14px 16px 0; display: flex; flex-direction: column; gap: 14px; }
+.frm-campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 14px; }
+.frm-campos label { display: grid; gap: 4px; color: var(--texto-2); font-weight: 600; }
+.frm-campos label.ancho { grid-column: 1 / -1; }
+.frm-campos input, .frm-campos select, .frm-campos textarea { height: 30px; padding: 0 8px; font-weight: 400; }
+.frm-campos textarea { height: auto; padding: 4px 8px; resize: vertical; }
+.frm-campos :disabled, .frm-grid :disabled { background: var(--sub); color: var(--texto-2); }
+.frm-grid h4 { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.frm-grid h4 .ob-btn { font-size: 12px; min-height: 24px; }
+.frm-grid .tabla { overflow-x: auto; border: 1px solid var(--borde); border-radius: var(--radio); }
+.frm-grid table { width: 100%; border-collapse: collapse; min-width: 640px; }
+.frm-grid th { background: var(--cab); color: var(--cab-texto); font-weight: 400; font-size: 12px; text-align: left; padding: 4px 6px; }
+.frm-grid td { border-top: 1px solid var(--linea); padding: 2px 4px; }
+.frm-grid td input, .frm-grid td select { width: 100%; height: 26px; padding: 0 6px; }
+.frm-grid td.calc, .frm-grid tfoot td { text-align: right; padding: 0 8px; white-space: nowrap; }
+.frm-grid tfoot td { font-weight: 700; }
+.frm-grid td .quitar { color: var(--rojo); padding: 0 6px; }
+.frm-grid .vacio td { color: var(--texto-3); text-align: center; padding: 10px; }
+.frm-pie #frmAcciones { display: flex; gap: 8px; margin-right: auto; flex-wrap: wrap; }
+.frm-aviso { padding: 6px 10px; border-radius: 4px; background: var(--ambar-suave); border: 1px solid var(--ambar-borde); color: var(--ambar); }
+
 /* ---------- Parámetros ---------- */
 .ob-parametros { display: flex; flex-direction: column; gap: 10px; padding: 16px; max-width: 520px; }
 .ob-parametros label { display: grid; grid-template-columns: 240px 1fr; align-items: center; }

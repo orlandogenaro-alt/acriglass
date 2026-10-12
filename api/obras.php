@@ -14,6 +14,8 @@
 // GET ?accion=facturacion&id=N       2-Facturacion: documentos de cobro de AW + Microsip vía la API de Easy-Glass
 // GET ?accion=conceptos&id=N         Conceptos/Tareas del presupuesto de la obra
 // GET ?accion=adjunto&id=N           descarga un archivo adjunto de la obra
+// GET ?accion=documento&tipo=orden|mo|gasto&id=obra&doc=N   documento con su detalle
+// GET ?accion=catalogos_obra&id=N    empleados, conceptos de gasto, unidades, órdenes y artículos del presupuesto
 define('ACRI_API', true);
 require __DIR__ . '/../includes/sesion.php';
 require __DIR__ . '/../includes/servicios.php';
@@ -181,7 +183,7 @@ function descripcionesMicrosip(array &$articulos): ?string
 function estatusLetra($e, bool $orden = false): string
 {
     $e = trim((string) $e);
-    $mapa = $orden ? ['P' => 'Produccion', 'O' => 'Por liberar', 'F' => 'Fin Produccion', 'C' => 'Cancelado'] : ['C' => 'Cancelado'];
+    $mapa = $orden ? ['P' => 'Produccion', 'O' => 'Por liberar', 'F' => 'Fin Produccion', 'C' => 'Cancelado'] : ['C' => 'Cancelado', 'A' => 'Activo'];
     return $mapa[strtoupper($e)] ?? $e;
 }
 
@@ -261,6 +263,75 @@ function listado(string $tipo, int $id): array
                    from archivos_adjuntos where suerido_id = ? order by archivo_id', [$id]);
     }
     error('Listado no válido.');
+}
+
+// Un documento de la obra con su detalle, para abrirlo en su diálogo (doble clic en la pestaña)
+function documento(string $tipo, int $obra, int $id): array
+{
+    switch ($tipo) {
+        case 'orden':
+            $o = bd_fila('AW', 'select docto_orden_obra_id as id, folio, estatus, nom_cliente, fecha, fecha_entrega, descripcion, importe_neto
+                                  from doctos_orden_obra where docto_orden_obra_id = ? and obra_id = ?', [$id, $obra]);
+            if (!$o) break;
+            $o['estatus_2'] = trim((string) $o['estatus']);
+            $o['estatus'] = estatusLetra($o['estatus'], true);
+            $o['partidas'] = bd_filas('AW', 'select articulo_id, clave_articulo, descripcion, unidades, um, precio_unitario, precio_total, notas_adic
+                                               from doctos_orden_obra_det where docto_orden_obra_id = ? order by pos, docto_orden_obra_det_id', [$id]);
+            return $o;
+
+        case 'mo':
+            $m = bd_fila('AW', 'select empleado_asignado_obra_id as id, fecha, estatus, docto_orden_obra_id, nom_unidad, importe_mo, imp_mo_real, notas
+                                  from empleados_asignados_a_obra where empleado_asignado_obra_id = ? and obra_id = ?', [$id, $obra]);
+            if (!$m) break;
+            $m['estatus'] = estatusLetra($m['estatus']);
+            $m['empleados'] = bd_filas('AW', 'select id_empleado, nombre, costo_x_hrs, hrs_trabajo, hrs_trabajo_real
+                                                from empleados_asignados_a_obra_det where empleado_asignado_obra_id = ? order by empleado_asignado_a_obra_det_id', [$id]);
+            return $m;
+
+        case 'gasto':
+            $g = bd_fila('AW', 'select g.gasto_adicional_id as id, c.nombre as concepto, g.estatus, g.docto_orden_obra_id, g.nom_unidad, g.importe, g.notas, g.fecha_creacion
+                                  from gastos_adicionales_obra g left join conceptos_gastos_obra c on c.concepto_gasto_id = g.concepto_gasto_id
+                                 where g.gasto_adicional_id = ? and g.obra_id = ?', [$id, $obra]);
+            if (!$g) break;
+            $g['estatus'] = estatusLetra($g['estatus']);
+            $g['fecha'] = substr((string) $g['fecha_creacion'], 0, 10);
+            $g['detalle'] = bd_filas('AW', 'select c.nombre as concepto, d.imp_presupuestado, d.imp_real
+                                              from gastos_adicionales_obra_det d left join conceptos_gastos_obra c on c.concepto_gasto_id = d.concepto_gasto_id
+                                             where d.gasto_adicional_id = ? order by d.gasto_adicional_obra_det_id', [$id]);
+            $g['personal'] = bd_filas('AW', 'select id_empleado, nombre_empleado as nombre from personal_consumo_en_obra
+                                              where consumo_material_obra_id = ? order by personal_consumo_obra_id', [$id]);
+            return $g;
+    }
+    error('El documento ya no existe.', 404);
+}
+
+// Catálogos de los diálogos de la obra; si una tabla no existe en esta base, su lista queda vacía
+function catalogosObra(int $obra): array
+{
+    $r = ['avisos' => []];
+    $leer = function (string $clave, string $sql, array $p = []) use (&$r) {
+        try {
+            $r[$clave] = bd_filas('AW', $sql, $p);
+        } catch (Throwable $e) {
+            $r[$clave] = [];
+            $r['avisos'][] = bd_mensaje_error($e);
+        }
+    };
+    $leer('empleados', "select empleado_id as id, numero_empleado, nombre, sueldo_diario from empleados_obra
+                         where coalesce(estatus, 'A') <> 'B' order by nombre");
+    $leer('conceptos_gasto', 'select concepto_gasto_id as id, nombre from conceptos_gastos_obra order by nombre');
+    $leer('unidades', 'select unidad_trans_id as id, nombre from unidades_transporte order by nombre');
+    $leer('ordenes', "select docto_orden_obra_id as id, folio, descripcion from doctos_orden_obra where obra_id = ? and estatus <> 'C' order by folio", [$obra]);
+    // Artículos de Materia Prima del presupuesto: base de la explosión de material
+    $leer('articulos', "select m.id_articulo as articulo_id, m.clave_articulo as clave, m.nom_articulo as nombre, m.unid_medida as um,
+                               m.unidades as uds, m.precio_unit as costo_unit, m.folio
+                          from reg_obras o
+                          join doctos_sugerido_obra_det d on d.docto_sugerido_obra_id = o.sugerido_id and trim(d.tipo_concepto) = 'MP'
+                          join doctos_suge_obra_det_mat m on m.docto_sugerido_obra_det_id = d.docto_sugerido_obra_det_id
+                         where o.obra_id = ?
+                         order by m.docto_suge_obra_det_mat_id", [$obra]);
+    $r['cliente'] = (string) bd_valor('AW', 'select b.cliente from reg_obras a join doctos_sugerido_obra b on b.docto_sugerido_obra_id = a.sugerido_id where a.obra_id = ?', [$obra]);
+    return $r;
 }
 
 // Cruce de un folio de Easy-Glass con Microsip (API v1 /microsip-folio): [datos, error]
@@ -362,6 +433,7 @@ function facturacion(int $obraId): array
             $f = ['id' => $d['id'], 'tipo' => $tipo, 'tipo_docto' => [0 => 'Pago en Efectivo', 1 => 'Nota de Cargo', 2 => 'Anticipo'][$tipo] ?? "Tipo $tipo",
                   'folio' => $d['folio'], 'estatus' => $d['estatus'], 'cliente' => $d['notas'], 'fecha' => $d['fecha'], 'importe' => $imp, 'detalle' => []];
             // Nota de cargo: suma a los cargos · Efectivo y anticipo: abonan
+            if (strcasecmp(trim((string) $d['estatus']), 'Cancelado') === 0) $imp = 0;   // cancelado: no afecta el saldo
             $filas[] = $tipo === 1
                 ? $f + ['factura' => '', 'imp_factura' => 0, 'cargos' => $imp, 'creditos' => 0, 'saldo' => $imp]
                 : $f + ['factura' => $tipo === 0 ? 'DEP.EFECTIVO' : 'ANTICIPO', 'imp_factura' => 0, 'cargos' => 0, 'creditos' => $imp, 'saldo' => -$imp];
@@ -579,6 +651,12 @@ try {
 
         case 'conceptos':
             responder(['ok' => true] + conceptosTareas((int) ($_GET['id'] ?? 0)));
+
+        case 'documento':
+            responder(['ok' => true, 'documento' => documento((string) ($_GET['tipo'] ?? ''), (int) ($_GET['id'] ?? 0), (int) ($_GET['doc'] ?? 0))]);
+
+        case 'catalogos_obra':
+            responder(['ok' => true] + catalogosObra((int) ($_GET['id'] ?? 0)));
 
         case 'catalogos':
             responder(['ok' => true,

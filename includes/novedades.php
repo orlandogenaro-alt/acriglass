@@ -6,6 +6,9 @@ return [
     [
         'fecha' => '2026-10-12',
         'cambios' => [
+            ['nuevo',      'Obra: capturas en la web', 'Ya no se usa el sistema de escritorio: Nueva Orden de Trabajo (con partidas, liberar a producción, fin de producción y cancelar), Nueva Cotización para Facturación, Nuevo Documento de Cobro (efectivo, nota de cargo, anticipo), agregar artículos a la Explosión de Material (o importarlos del presupuesto) y corregir sus unidades y costo, Asignar Mano de Obra por empleado y horas, y Gastos Adicionales con importes y personal. Doble clic en un renglón lo abre.'],
+            ['correccion', 'Obra: la imagen no se guardaba en línea', 'El sitio en línea respondía «HTTP 404» al guardar la imagen de la obra.'],
+            ['mejora',     'Obra: tablas en la base en línea', 'Script Consultas/supabase_obras.sql con las tablas de órdenes, facturación, explosión, salidas, mano de obra, consumos, gastos y adjuntos.'],
             ['nuevo',  'Obra: Guardar y Modificar', 'Guardar escribe la obra, sus responsables, el % de gastos de administración y el avance en AW, y deja el presupuesto Aceptado. Modificar pide el permiso «Modificar obras» o la autorización de otro usuario.'],
             ['nuevo',  'Obra: estatus como en el sistema de escritorio', '(1) Ejecución solo desde Planificación, (2) Obra Terminada solo desde Ejecución (avance al 99 %), (3) Finalizar solo desde Obra Terminada: las órdenes en producción pasan a Fin de Producción, las no liberadas y las salidas pendientes se cancelan. Cancelar y Finalizar piden «Cerrar obras»; Modificar Estatus lo autoriza un administrador. Los movimientos de Microsip del cierre se siguen haciendo en el escritorio.'],
             ['nuevo',  'Obra: Imagen de Obra', 'Se carga con Examinar, con clic en el recuadro o arrastrando la foto; se guarda al momento y las fotos grandes se reducen solas. También se puede quitar.'],

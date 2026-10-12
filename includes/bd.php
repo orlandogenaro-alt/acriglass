@@ -220,6 +220,40 @@ function bd_insertar(string $clave, string $tabla, string $colId, array $campos,
         . implode(', ', array_fill(0, count($campos), '?')) . ") returning $colId", array_values($campos));
 }
 
+// bd_insertar con columnas binarias: $binarias son nombres de columna de $campos que van como BLOB / bytea
+function bd_insertar_binario(string $clave, string $tabla, string $colId, array $campos, array $binarias, string $generador = 'id_catalogos'): int
+{
+    $firebird = bd_motor($clave) === 'firebird';
+    if ($firebird) {
+        if (!preg_match('/^[a-z_][a-z0-9_$]*$/i', $generador)) throw new InvalidArgumentException('Generador no válido.');
+        $campos = [$colId => (int) bd_valor($clave, "select gen_id($generador, 1) from rdb\$database")] + $campos;
+    }
+    $sql = "insert into $tabla (" . implode(', ', array_keys($campos)) . ') values (' . implode(', ', array_fill(0, count($campos), '?')) . ')';
+    $pos = array_keys(array_intersect(array_keys($campos), $binarias));
+    if ($firebird) {
+        bd_ejecutar_binario($clave, $sql, array_values($campos), $pos);
+        return (int) $campos[$colId];
+    }
+    $convierte = bd_convierte(bd_config($clave));
+    $st = bd_pdo($clave)->prepare("$sql returning $colId");
+    foreach (array_values($campos) as $i => $v) {
+        $tipo = $v === null ? PDO::PARAM_NULL : (in_array($i, $pos, true) ? PDO::PARAM_LOB : (is_int($v) ? PDO::PARAM_INT : PDO::PARAM_STR));
+        if ($tipo === PDO::PARAM_STR && $convierte && is_string($v)) $v = mb_convert_encoding($v, 'Windows-1252', 'UTF-8');
+        $st->bindValue($i + 1, $v, $tipo);
+    }
+    $st->execute();
+    return (int) $st->fetchColumn();
+}
+
+// Siguiente folio de un generador de AW (en Supabase, la secuencia con el mismo nombre)
+function bd_folio(string $clave, string $generador): int
+{
+    if (!preg_match('/^[a-z_][a-z0-9_$]*$/i', $generador)) throw new InvalidArgumentException('Generador no válido.');
+    return (int) (bd_motor($clave) === 'firebird'
+        ? bd_valor($clave, "select gen_id($generador, 1) from rdb\$database")
+        : bd_valor($clave, "select nextval('$generador')"));
+}
+
 // Motor de la conexión ('firebird', 'pgsql', …); en la nube AW es Supabase
 function bd_motor(string $clave): string
 {

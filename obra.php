@@ -10,7 +10,7 @@ $obraId = max(0, (int) ($_GET['id'] ?? 0));
 $listados = [
     'facturacion' => [
         'titulo'   => '2-Facturacion',
-        'botones'  => [['nueva-cot', 'Nueva Cotizacion', '＋'], ['asignar-cot', 'Asignar Cotizacion Microsip', '🔗'], ['consultar', 'Consultar', '🔎']],
+        'botones'  => [['nueva-cot', 'Nueva Cotizacion', '＋'], ['asignar-cot', 'Asignar Cotizacion Microsip', '🔗'], ['nuevo-cobro', 'Nuevo Documento de Cobro', '💵'], ['consultar', 'Consultar', '🔎']],
         'columnas' => [['Folio', 'folio', 'txt'], ['Tipo Docto', 'tipo_docto', 'txt'], ['Estatus', 'estatus', 'txt'], ['Cliente', 'cliente', 'txt'],
                        ['Fecha', 'fecha', 'fecha'], ['Importe', 'importe', 'dinero'], ['Factura', 'factura', 'txt'], ['Imp.Factura', 'imp_factura', 'dinero'],
                        ['Cargos', 'cargos', 'dinero'], ['Creditos', 'creditos', 'dinero'], ['Saldo', 'saldo', 'dinero']],
@@ -39,7 +39,7 @@ $listados = [
     ],
     'mano' => [
         'titulo'   => '6-Mano de Obra',
-        'botones'  => [['consultar', 'Consultar', '🔎']],
+        'botones'  => [['nueva-mo', 'Asignar Mano de Obra', '＋'], ['consultar', 'Consultar', '🔎']],
         'columnas' => [['Fecha', 'fecha', 'fecha'], ['Estatus', 'estatus', 'txt'], ['Folio OT', 'folio', 'txt'], ['Unidad', 'nom_unidad', 'txt'],
                        ['Importe MO', 'importe_mo', 'dinero'], ['Importe MO Real', 'importe_mo_real', 'dinero'], ['Notas', 'notas', 'txt']],
         'totales'  => [['totMoPres', 'MO presupuestada', 'importe_mo'], ['totMoReal', 'MO real', 'importe_mo_real']],
@@ -343,6 +343,22 @@ function iconoPestana() {
         <label>Total: <output id="ctTotal">$0.00</output></label>
     </div>
 </section>
+
+<!-- ============ DIÁLOGO DE CAPTURA (orden de trabajo, cotización, cobro, explosión, mano de obra, gasto) ============ -->
+<dialog class="hs-dialogo frm-dialogo" id="frmDialogo">
+    <form id="frmForm" novalidate>
+        <div class="hs-cabecera">
+            <strong id="frmTitulo"></strong>
+            <button type="button" class="hs-cerrar" data-frm-cerrar title="Cerrar">✕</button>
+        </div>
+        <div class="frm-cuerpo" id="frmCuerpo"></div>
+        <div class="hs-pie frm-pie">
+            <span id="frmAcciones"></span>
+            <button type="button" class="hs-btn" data-frm-cerrar>Cerrar</button>
+            <button type="submit" class="hs-btn principal" id="frmGuardar">Guardar</button>
+        </div>
+    </form>
+</dialog>
 
 <!-- ============ AUTORIZACIÓN DE OTRO USUARIO (Dialog225) ============ -->
 <dialog class="hs-dialogo au-dialogo" id="auDialogo">

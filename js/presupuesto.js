@@ -1174,6 +1174,11 @@
             if (!presupuestoId) { alert('El presupuesto todavía no se guarda: ya puedes capturarlo.'); return; }
             if (!window.ACRI_PUEDE_MODIFICAR) { avisoSoloLectura(); return; }
             if (soloLectura) {
+                var est = $('estatus').textContent.trim();
+                if (est === 'Aceptado' || est === 'Cancelado') {
+                    alert('En el estatus actual del presupuesto (' + est + ') ya no es posible hacer modificaciones.');
+                    return;
+                }
                 soloLectura = false;
                 aplicarModo();
                 $('cliente').focus();
@@ -1206,12 +1211,12 @@
         'registrar-obra': function () {
             if (obraId) { abrirObra(obraId, $('obra').textContent); return; }
             if (guardando) return;
-            // La obra se liga a un presupuesto guardado: si es nuevo o tiene cambios, primero se guarda
-            var listo = Promise.resolve(true);
-            if (!presupuestoId || cambios) {
-                if (!confirm('Para registrar la obra primero se guardará el presupuesto. ¿Continuar?')) return;
-                listo = guardar();
-            }
+            var est = $('estatus').textContent.trim();
+            if (est === 'Cancelado' || est === 'Rechazado') { alert('El presupuesto está ' + est + ': no se puede registrar la obra.'); return; }
+            if (!presupuestoId) { alert('Es necesario guardar el presupuesto para registrar la obra.'); return; }
+            if (!confirm('El presupuesto se actualizará a estatus Aceptado y ya no será posible hacerle cambios. ¿Deseas continuar?')) return;
+            // Si tiene cambios sin guardar, primero se guardan
+            var listo = cambios ? guardar() : Promise.resolve(true);
             listo.then(function (ok) {
                 if (!ok) return;
                 var nombre = prompt('Nombre de la obra:', $('proyecto').value.trim() || $('cliente').value.trim());
@@ -1219,6 +1224,9 @@
                 return pedirPresupuestos('registrar_obra', { id: presupuestoId, nom_obra: nombre.trim() }).then(function (j) {
                     obraId = j.obra_id;
                     $('obra').textContent = j.nom_obra || 'Obra ' + j.obra_id;
+                    if (j.estatus) pintarEstatus(j.estatus);
+                    soloLectura = true;
+                    aplicarModo();
                     if (enPestana) window.parent.postMessage({ tipo: 'guardado', id: presupuestoId }, location.origin);
                     if (j.nueva) alert('Obra «' + $('obra').textContent + '» registrada. Se abrirá en Obras.');
                     abrirObra(j.obra_id, $('obra').textContent);

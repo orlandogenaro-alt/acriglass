@@ -159,7 +159,8 @@ function guardar(array $d): array
 }
 
 // Registra la obra del presupuesto (reg_obras) y la liga al presupuesto (doctos_sugerido_obra.obra_id).
-// Si ya tiene obra, regresa la existente. El vendedor del presupuesto queda como responsable.
+// Si ya tiene obra, regresa la existente. El vendedor del presupuesto queda como responsable
+// y el presupuesto pasa a Aceptado.
 function registrarObra(array $d): array
 {
     if (!tienePermiso('NUEVO_OBRA', 'ADMIN_USER')) error('No tienes permiso para registrar obras (NUEVO_OBRA).', 403);
@@ -168,7 +169,8 @@ function registrarObra(array $d): array
     $p = bd_fila('AW', 'select docto_sugerido_obra_id, folio, cliente, proyecto, ubicacion, vendedor_obra_id, estatus, obra_id
                           from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]);
     if (!$p) error('El presupuesto ya no existe (¿lo eliminaron?).', 404);
-    if (strcasecmp(trim((string) $p['estatus']), 'Cancelado') === 0) error('El presupuesto está cancelado: no se puede registrar la obra.');
+    $estatus = trim((string) $p['estatus']);
+    if (in_array(mb_strtoupper($estatus), ['CANCELADO', 'RECHAZADO'], true)) error("El presupuesto está $estatus: no se puede registrar la obra.");
 
     // Ya registrada (por obra_id o por una obra que apunte al presupuesto)
     $obraId = (int) $p['obra_id'];
@@ -177,7 +179,7 @@ function registrarObra(array $d): array
     if ($obraId) {
         if ((int) $p['obra_id'] !== $obraId) bd_ejecutar('AW', 'update doctos_sugerido_obra set obra_id = ? where docto_sugerido_obra_id = ?', [$obraId, $id]);
         $nom = (string) bd_valor('AW', 'select nom_obra from reg_obras where obra_id = ?', [$obraId]);
-        return ['obra_id' => $obraId, 'nom_obra' => $nom, 'nueva' => false];
+        return ['obra_id' => $obraId, 'nom_obra' => $nom, 'nueva' => false, 'estatus' => $estatus];
     }
 
     $nombre = texto($d['nom_obra'] ?? '', 200) ?? texto($p['proyecto'], 200) ?? texto($p['cliente'], 200);
@@ -198,7 +200,8 @@ function registrarObra(array $d): array
     $pdo->beginTransaction();
     try {
         $obraId = bd_insertar('AW', 'reg_obras', 'obra_id', $obra);
-        bd_ejecutar('AW', 'update doctos_sugerido_obra set obra_id = ? where docto_sugerido_obra_id = ?', [$obraId, $id]);
+        // Como en el sistema de escritorio: al registrar la obra el presupuesto queda Aceptado
+        bd_ejecutar('AW', "update doctos_sugerido_obra set obra_id = ?, estatus = 'Aceptado' where docto_sugerido_obra_id = ?", [$obraId, $id]);
         if ((int) $p['vendedor_obra_id']) {
             bd_insertar('AW', 'responsables_de_obra', 'res_obra_id', [
                 'obra_id' => $obraId, 'vendedor_obra_id' => (int) $p['vendedor_obra_id'], 'fecha_hora_asig' => date('Y-m-d H:i:s'),
@@ -209,7 +212,7 @@ function registrarObra(array $d): array
         if ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
-    return ['obra_id' => $obraId, 'nom_obra' => $nombre, 'nueva' => true];
+    return ['obra_id' => $obraId, 'nom_obra' => $nombre, 'nueva' => true, 'estatus' => 'Aceptado'];
 }
 
 function eliminar(int $id): void

@@ -281,12 +281,19 @@ function documento(string $tipo, int $obra, int $id): array
             return $o;
 
         case 'mo':
-            $m = bd_fila('AW', 'select empleado_asignado_obra_id as id, fecha, estatus, docto_orden_obra_id, nom_unidad, importe_mo, imp_mo_real, notas
+            $m = bd_fila('AW', 'select empleado_asignado_obra_id as id, fecha, estatus, docto_orden_obra_id, unidad_transporte_id, nom_unidad, importe_mo, imp_mo_real, notas
                                   from empleados_asignados_a_obra where empleado_asignado_obra_id = ? and obra_id = ?', [$id, $obra]);
             if (!$m) break;
             $m['estatus'] = estatusLetra($m['estatus']);
             $m['empleados'] = bd_filas('AW', 'select id_empleado, nombre, costo_x_hrs, hrs_trabajo, hrs_trabajo_real
                                                 from empleados_asignados_a_obra_det where empleado_asignado_obra_id = ? order by empleado_asignado_a_obra_det_id', [$id]);
+            // Bitácora (consulta_bitacora_mov_t): la tabla puede no existir aún en la base en línea
+            try {
+                $m['bitacora'] = array_map(fn($b) => trim($b['usuario'] . ' ' . substr((string) $b['fecha_hora'], 0, 19) . ' ' . $b['notas']), bd_filas('AW',
+                    'select usuario, fecha_hora, notas from bitacora_movimientos_sis_costos where id_optimizacion = ? order by fecha_hora', [$id]));
+            } catch (Throwable $e) {
+                $m['bitacora'] = [];
+            }
             return $m;
 
         case 'gasto':

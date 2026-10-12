@@ -2,6 +2,7 @@
 require __DIR__ . '/includes/sesion.php';
 require_once __DIR__ . '/includes/bd.php';
 require __DIR__ . '/includes/conceptos-tareas.php';
+require __DIR__ . '/includes/membrete.php';
 
 // Obra existente (AW.REG_OBRAS); 0 = nueva. Los catálogos y los datos se cargan desde js/obra.js
 $obraId = max(0, (int) ($_GET['id'] ?? 0));
@@ -68,6 +69,13 @@ if (!modoConfiguracion()) {
     } catch (Throwable $e) {
         error_log('AcriGlass obra responsables: ' . $e->getMessage());
     }
+}
+// Logo y empresa para los formatos impresos (Salida de personal a obra)
+try {
+    $membrete = membreteImpresion();
+} catch (Throwable $e) {
+    error_log('AcriGlass obra membrete: ' . $e->getMessage());
+    $membrete = ACRI_MEMBRETE_DEFECTO + ['logo' => imagenSistema('logo'), 'logo_propio' => false];
 }
 // Permisos que la pantalla revisa antes de pedir la autorización de otro usuario
 $permisos = array_values(array_filter(['NUEVO_OBRA', 'MODIFICAR_OBRA', 'CERRAR_OBRA', 'ADMIN_USER'], fn($p) => tienePermiso($p)));
@@ -362,6 +370,78 @@ function iconoPestana() {
     </form>
 </dialog>
 
+<!-- ============ COSTO DE MANO DE OBRA (Dialog275) ============ -->
+<dialog class="hs-dialogo mo-dialogo" id="moDialogo">
+    <div class="hs-cabecera">
+        <strong>Costo de Mano de Obra</strong>
+        <button type="button" class="hs-cerrar" data-mo="cerrar" title="Cerrar">✕</button>
+    </div>
+    <div class="toolbar mo-toolbar">
+        <button type="button" class="tb" data-mo="guardar">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#3b7dc4"/><rect x="7" y="3" width="10" height="7" fill="#dfeefc"/><rect x="7" y="14" width="10" height="7" fill="#fff"/></svg>
+            <span>Guardar</span>
+        </button>
+        <button type="button" class="tb" data-mo="guardar-salir">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#333"/><rect x="7" y="3" width="10" height="7" fill="#dfeefc"/></svg>
+            <span>Guardar y Salir</span>
+        </button>
+        <span class="sep"></span>
+        <button type="button" class="tb" data-mo="imprimir">
+            <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="7" fill="#fff" stroke="#666"/><rect x="2" y="9" width="20" height="9" rx="2" fill="#8a8a8a"/><rect x="6" y="14" width="12" height="8" fill="#fff" stroke="#666"/></svg>
+            <span>Imprimir</span>
+        </button>
+        <button type="button" class="tb" data-mo="modificar">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="16" height="18" fill="#dfeefc" stroke="#3b7dc4"/><path d="M8 20l1-4 9-9 3 3-9 9z" fill="#f5c542" stroke="#8a6d1e"/></svg>
+            <span>Modificar</span>
+        </button>
+        <button type="button" class="tb" data-mo="cancelar">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#fff" stroke="#d32f2f" stroke-width="2"/><path d="M6 6l12 12" stroke="#d32f2f" stroke-width="2"/></svg>
+            <span>Cancelar</span>
+        </button>
+        <span class="sep"></span>
+        <button type="button" class="tb" data-mo="bitacora">
+            <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="1" fill="#6d9e3a" stroke="#4a6e26"/><rect x="8" y="5" width="8" height="4" fill="#f5c542"/><path d="M8 13h8M8 16h8" stroke="#fff"/></svg>
+            <span>Bitacora</span>
+        </button>
+        <button type="button" class="tb" data-mo="cerrar">
+            <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="#e53935" stroke-width="2.5" stroke-linecap="round"/></svg>
+            <span>Cerrar</span>
+        </button>
+    </div>
+    <div class="mo-cuerpo">
+        <div class="mo-fila">
+            <label>Folio de la OT <select id="moOrden" class="mo-edit"></select></label>
+            <label class="mo-der">Fecha de Trabajo: <input type="date" id="moFecha" class="mo-edit"></label>
+        </div>
+        <div class="mo-fila">
+            <label class="mo-largo">Unidad: <select id="moUnidad" class="mo-edit"></select></label>
+            <div class="mo-der mo-estatus"><span>Estatus:</span><b id="moEstatus">Normal</b></div>
+        </div>
+        <div class="mo-fila">
+            <label class="mo-largo">Personal de Obra: <select id="moPersonal" class="mo-edit"></select></label>
+            <button type="button" class="hs-btn mo-mas mo-edit" id="moAgregar" title="Agregar al personal">+</button>
+        </div>
+        <div class="mo-grid">
+            <table>
+                <thead><tr><th>Nombre</th><th>Costo_x_Hrs</th><th>Hrs.de_Trab.</th><th>Hrs.Trab.Real</th><th>Costo.Total</th><th></th></tr></thead>
+                <tbody id="moFilas"></tbody>
+            </table>
+        </div>
+        <div class="mo-importe">Importe: <input id="moImporte" readonly> <input id="moImpReal" readonly></div>
+        <label class="mo-notas">Notas: <textarea id="moNotas" rows="5" maxlength="300" class="mo-edit"></textarea></label>
+    </div>
+</dialog>
+
+<!-- Bitácora del documento (Dialog58) -->
+<dialog class="hs-dialogo mo-bitacora" id="moBitacora">
+    <div class="hs-cabecera">
+        <strong>Bitacora</strong>
+        <button type="button" class="hs-cerrar" data-mo-bit-cerrar title="Cerrar">✕</button>
+    </div>
+    <textarea id="moBitTexto" readonly></textarea>
+    <div class="hs-pie"><span></span><button type="button" class="hs-btn" data-mo-bit-cerrar>Cerrar</button></div>
+</dialog>
+
 <!-- ============ AUTORIZACIÓN DE OTRO USUARIO (Dialog225) ============ -->
 <dialog class="hs-dialogo au-dialogo" id="auDialogo">
     <form id="auForm">
@@ -382,6 +462,7 @@ function iconoPestana() {
     </form>
 </dialog>
 
+<script>window.ACRI_MEMBRETE = <?= json_encode($membrete, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
 <script src="<?= recurso('js/conceptos-tareas.js') ?>"></script>
 <script src="<?= recurso('js/obra.js') ?>"></script>
 </body>

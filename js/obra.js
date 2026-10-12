@@ -869,44 +869,204 @@
         });
     }
 
-    // 6-Mano de obra asignada (Dialog275)
-    function dialogoManoObra(mo) {
+    // 6-Mano de obra asignada: Costo de Mano de Obra (Dialog275)
+    var SIN_UNIDAD = 'SIN UNIDAD DE TRANSPORTE REQUERIDA';
+    var mo = { id: 0, filas: [], estatus: 'Normal', editable: true, cat: null };
+
+    function moOpciones(el, ops, valor) {
+        el.innerHTML = ops.map(function (o) {
+            return '<option value="' + escapar(o.v) + '"' + (String(o.v) === String(valor) ? ' selected' : '') + '>' + escapar(o.t) + '</option>';
+        }).join('');
+    }
+    function moTextoSel(el) { return el.selectedIndex >= 0 ? el.options[el.selectedIndex].text : ''; }
+    // habilita_controles
+    function moHabilita(val) {
+        mo.editable = val;
+        $('moDialogo').querySelectorAll('.mo-edit, [data-mo="guardar"], [data-mo="guardar-salir"]').forEach(function (el) { el.disabled = !val; });
+        moPintar();
+    }
+    function moPonerEstatus(e) {
+        mo.estatus = e;
+        $('moEstatus').textContent = e;
+        $('moEstatus').classList.toggle('cancelado', e === 'Cancelado');
+    }
+    // grid_responsables: Nombre, Costo_x_Hrs, Hrs.de_Trab., Hrs.Trab.Real, Costo.Total
+    function moPintar() {
+        var dis = mo.editable ? '' : ' disabled';
+        $('moFilas').innerHTML = mo.filas.length ? mo.filas.map(function (f, i) {
+            return '<tr data-i="' + i + '"><td>' + escapar(f.nombre) + '</td>' +
+                ['costo_x_hrs', 'hrs_trabajo', 'hrs_trabajo_real'].map(function (c) {
+                    return '<td style="width:92px"><input type="number" step="any" data-col="' + c + '" value="' + escapar(f[c]) + '"' + dis + '></td>';
+                }).join('') +
+                '<td class="num" style="width:96px">' + (dinero(num(f.costo_x_hrs) * num(f.hrs_trabajo)) || '$0.00') + '</td>' +
+                '<td style="width:26px">' + (mo.editable ? '<button type="button" class="quitar" title="Quitar">🗑</button>' : '') + '</td></tr>';
+        }).join('') : '<tr class="vacio"><td colspan="6">Elija al personal de obra y presione +</td></tr>';
+        moTotales();
+    }
+    // calcula_total_mo
+    function moTotales() {
+        var t1 = 0, t2 = 0;
+        mo.filas.forEach(function (f) {
+            t1 += num(f.costo_x_hrs) * num(f.hrs_trabajo);
+            t2 += num(f.costo_x_hrs) * num(f.hrs_trabajo_real);
+        });
+        $('moImporte').value = dinero(t1) || '$0.00';
+        $('moImpReal').value = dinero(t2) || '$0.00';
+    }
+
+    // carga_inicial; doc = documento guardado (doble clic en 6-Mano de Obra): se consulta y se desbloquea con Modificar
+    function dialogoManoObra(doc) {
         catalogosObra().then(function (cat) {
-            var cancelado = mo && mo.estatus === 'Cancelado';
-            formulario({
-                titulo: mo ? 'Mano de Obra · ' + fechaDMY(dia(mo.fecha)) + (cancelado ? ' · Cancelado' : '') : 'Asignar Mano de Obra',
-                soloLectura: cancelado || !obraAbierta(),
-                campos: [
-                    { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: mo ? dia(mo.fecha) : hoy() },
-                    { id: 'docto_orden_obra_id', etiqueta: 'Orden de trabajo', tipo: 'select', opciones: opcionesOrdenes(cat), valor: mo ? mo.docto_orden_obra_id : '' },
-                    { id: 'nom_unidad', etiqueta: 'Unidad', tipo: 'lista', opciones: listaNombres(cat.unidades), valor: mo ? mo.nom_unidad : '' },
-                    { id: 'notas', etiqueta: 'Notas', tipo: 'textarea', valor: mo ? mo.notas : '' }
-                ],
-                grids: [{
-                    id: 'empleados', titulo: 'Empleados', filas: mo ? mo.empleados : [{}],
-                    columnas: [
-                        { id: 'nombre', etiqueta: 'Empleado', tipo: 'lista', opciones: listaEmpleados(cat), alElegir: function (f, e) {
-                            f.id_empleado = e ? e.id : '';
-                            if (e && !num(f.costo_x_hrs)) f.costo_x_hrs = Math.round(e.sueldo / 8 * 100) / 100;   // sueldo diario / 8 h
-                        } },
-                        { id: 'costo_x_hrs', etiqueta: 'Costo x Hr', tipo: 'number', ancho: '100px' },
-                        { id: 'hrs_trabajo', etiqueta: 'Hrs', tipo: 'number', ancho: '80px' },
-                        { id: 'hrs_trabajo_real', etiqueta: 'Hrs Real', tipo: 'number', ancho: '80px' },
-                        { id: 'importe', etiqueta: 'Importe', ancho: '110px', total: true, calc: function (f) { return num(f.costo_x_hrs) * num(f.hrs_trabajo); } },
-                        { id: 'importe_real', etiqueta: 'Importe Real', ancho: '110px', total: true, calc: function (f) { return num(f.costo_x_hrs) * num(f.hrs_trabajo_real); } }
-                    ]
-                }],
-                acciones: mo && !cancelado && obraAbierta() ? [{ texto: '✕ Cancelar asignación', fn: function () {
-                    if (!confirm('¿Cancelar esta asignación de mano de obra?')) return Promise.resolve(false);
-                    return guardarCon('cancelar_mo', { doc_id: mo.id }).then(function () { cargarListado('mano', 'mano'); });
-                } }] : [],
-                guardar: function (d) {
-                    d.mo_id = mo ? mo.id : 0;
-                    return guardarCon('guardar_mo', d).then(function () { cargarListado('mano', 'mano'); });
-                }
-            });
+            mo.cat = cat;
+            mo.id = doc ? doc.id : 0;
+            mo.filas = doc ? doc.empleados.map(function (e) { return Object.assign({}, e); }) : [];
+            moOpciones($('moOrden'), [{ v: '', t: '' }].concat(cat.ordenes.map(function (o) { return { v: o.id, t: o.folio }; })),
+                doc ? (doc.docto_orden_obra_id || '') : (cat.ordenes[0] ? cat.ordenes[0].id : ''));
+            var unidad = 0;
+            if (doc) unidad = num(doc.unidad_transporte_id) || (cat.unidades.filter(function (u) { return u.nombre === doc.nom_unidad; })[0] || { id: 0 }).id;
+            moOpciones($('moUnidad'), [{ v: 0, t: SIN_UNIDAD }].concat(cat.unidades.map(function (u) { return { v: u.id, t: u.nombre }; })), unidad);
+            moOpciones($('moPersonal'), cat.empleados.map(function (e) { return { v: e.id, t: e.nombre }; }), '');
+            $('moFecha').value = doc ? dia(doc.fecha) : hoy();
+            $('moNotas').value = doc ? (doc.notas || '') : '';
+            moPonerEstatus(doc && doc.estatus === 'Cancelado' ? 'Cancelado' : 'Normal');
+            moHabilita(!doc && obraAbierta());
+            $('moDialogo').showModal();
         }).catch(avisarError);
     }
+
+    // Button2 (+): sueldo diario / 8 h y 1 hr de trabajo
+    $('moAgregar').addEventListener('click', function () {
+        var sel = $('moPersonal');
+        if (!sel.value) return;
+        if (mo.filas.some(function (f) { return String(f.id_empleado) === sel.value; })) {
+            alert('El empleado seleccionado ya se encuentra asignado en el presupuesto');
+            return;
+        }
+        var e = mo.cat.empleados.filter(function (x) { return String(x.id) === sel.value; })[0];
+        var costo = Math.round(num(e.sueldo_diario) / 8 * 100) / 100;
+        mo.filas.push({ id_empleado: e.id, nombre: e.nombre, costo_x_hrs: costo, hrs_trabajo: 1, hrs_trabajo_real: 0 });
+        moPintar();
+    });
+    // CellEndEdit: recalcula el renglón y los importes
+    $('moFilas').addEventListener('input', function (e) {
+        var tr = e.target.closest('tr[data-i]');
+        if (!tr || !e.target.dataset.col) return;
+        var f = mo.filas[tr.dataset.i];
+        f[e.target.dataset.col] = e.target.value;
+        tr.querySelector('td.num').textContent = dinero(num(f.costo_x_hrs) * num(f.hrs_trabajo)) || '$0.00';
+        moTotales();
+    });
+    $('moFilas').addEventListener('click', function (e) {
+        if (!e.target.closest('.quitar')) return;
+        mo.filas.splice(e.target.closest('tr').dataset.i, 1);
+        moPintar();
+    });
+
+    // toll_guardar2 (Guardar: queda bloqueado) y tol_guardar (Guardar y Salir)
+    function moGuardar(salir) {
+        if (!mo.filas.length) {
+            alert('Aún no se ha asignado personal a la obra. Agregue personal para poder guardar los cambios.');
+            return;
+        }
+        var d = {
+            id: obraId, mo_id: mo.id, fecha: $('moFecha').value, docto_orden_obra_id: $('moOrden').value,
+            unidad_transporte_id: $('moUnidad').value, nom_unidad: moTextoSel($('moUnidad')),
+            notas: $('moNotas').value, empleados: mo.filas
+        };
+        conAutorizacion(function (a) {
+            return enviar('guardar_mo', Object.assign({ autoriza: a }, d));
+        }, mo.id ? 'Modificar la mano de obra asignada requiere el permiso «Modificar mano de obra asignada a la obra».'
+                 : 'Esta captura requiere el permiso «Modificar obras».').then(function (j) {
+            mo.id = j.mo_id;
+            cargarListado('mano', 'mano');
+            if (salir) $('moDialogo').close();
+            else moHabilita(false);
+        }).catch(avisarError);
+    }
+
+    // tool_modificar
+    function moModificar() {
+        if (!validaEstatusObra()) return;
+        if (mo.estatus === 'Cancelado') { alert('No es posible modificar un documento cancelado'); return; }
+        moHabilita(true);
+    }
+
+    // ToolStripButton1: archivar como cancelado con su motivo
+    function moCancelar() {
+        if (!validaEstatusObra()) return;
+        if (!mo.id) { alert('El documento aún no se ha guardado.'); return; }
+        if (mo.estatus === 'Cancelado') { alert('El documento ya está cancelado.'); return; }
+        if (!confirm('¿Deseas archivar como cancelado este documento?')) return;
+        var motivo = prompt('INGRESA EL MOTIVO DE CANCELACION: ', '');
+        if (motivo === null) return;
+        conAutorizacion(function (a) {
+            return enviar('cancelar_mo', { id: obraId, doc_id: mo.id, motivo: motivo, autoriza: a });
+        }, 'Cancelar la mano de obra asignada requiere el permiso «Cancelar mano de obra asignada a la obra».').then(function () {
+            moPonerEstatus('Cancelado');
+            moHabilita(false);
+            cargarListado('mano', 'mano');
+        }).catch(avisarError);
+    }
+
+    // ToolStripButton6: bitácora del documento (Dialog58)
+    function moBitacora() {
+        var mostrar = function (lineas) { $('moBitTexto').value = lineas.join('\n'); $('moBitacora').showModal(); };
+        if (!mo.id) { mostrar([]); return; }
+        pedir('accion=documento&tipo=mo&id=' + encodeURIComponent(obraId) + '&doc=' + encodeURIComponent(mo.id))
+            .then(function (j) { mostrar(j.documento.bitacora || []); }).catch(avisarError);
+    }
+
+    // imprime_salida_de_personal_a_obra (CN-REG-35)
+    function moImprimir() {
+        if (!mo.id) { alert('Guarda el documento para poder imprimirlo.'); return; }
+        var m = window.ACRI_MEMBRETE || {};
+        var logo = m.logo ? '<img src="' + escapar(new URL(m.logo, location.href).href) + '">' : '';
+        var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Salida de Personal a Obra ' + mo.id + '</title><style>' +
+            '@page{size:letter;margin:12mm}body{font:13px Arial,sans-serif;color:#000;margin:0}' +
+            '.hoja{border:1px solid #000;min-height:250mm;position:relative}' +
+            '.cab{display:grid;grid-template-columns:170px 1fr;border-bottom:1px solid #000}' +
+            '.logo{display:flex;align-items:center;justify-content:center;padding:6px;border-right:1px solid #000}.logo img{max-width:150px;max-height:80px}' +
+            '.r1{display:flex;justify-content:space-between;padding:4px 10px;border-bottom:1px solid #000}.r1 b{font-size:16px}' +
+            '.r2{display:grid;grid-template-columns:1fr 1fr 1.2fr}.r2>div{padding:4px 10px;font-weight:bold;font-size:12px}.r2>div+div{border-left:1px solid #000}' +
+            '.sec{padding:6px 10px}.obra{font-size:15px;font-weight:bold}.est{float:right;text-align:center;font-weight:bold;margin-right:60px}.est b{display:block;font-size:20px}' +
+            '.barra{border-top:8px solid #000;margin:10px 0 6px}.per{padding:4px 10px}.per div{padding:3px 10px}' +
+            '.firmas{position:absolute;left:10px;right:150px;top:110mm;display:flex;gap:16px}.firmas div{flex:1;border-top:1px solid #000;padding:2px 0 0 10px}' +
+            '</style></head><body><div class="hoja"><div class="cab"><div class="logo">' + logo + '</div><div>' +
+            '<div class="r1"><div><b>' + escapar(m.empresa || 'MEGALUMINIO SERVICIOS SA DE CV') + '</b><br>SALIDA DE PERSONAL A OBRA</div>' +
+            '<div style="text-align:right"><b>Docto_id: ' + mo.id + '</b><br><small>Fecha Imp. ' + escapar(new Date().toLocaleString('es-MX')) + '</small></div></div>' +
+            '<div class="r2"><div>Codigo: CN-REG-35</div><div>FOLIO OT:<br>&nbsp;&nbsp;' + escapar(moTextoSel($('moOrden'))) + '</div>' +
+            '<div>Fecha: ' + escapar(fechaDMY($('moFecha').value)) + '</div></div></div></div>' +
+            '<div class="sec"><div class="est">ESTATUS:<b>' + escapar(mo.estatus) + '</b></div>' +
+            '<div class="obra">Obra: ' + escapar($('nombreObra').value) + '</div><br>' +
+            '<b>Unidad de Transporte: ' + escapar(moTextoSel($('moUnidad'))) + '</b></div>' +
+            '<div class="barra"></div><div class="per"><b>PERSONAL ASIGNADO A TRABAJAR EN OBRA: </b>' +
+            mo.filas.map(function (f) { return '<div>' + escapar(f.nombre) + '</div>'; }).join('') + '</div>' +
+            '<div class="sec">Descripcion: ' + escapar($('moNotas').value) + '</div>' +
+            '<div class="firmas"><div>REALIZO</div><div>RECIBIO</div><div>REVISO</div><div>AUTORIZO</div></div>' +
+            '</div></body></html>';
+        var w = window.open('', '_blank');
+        if (!w) { alert('El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes de este sitio.'); return; }
+        w.document.write(html);
+        w.document.close();
+        w.onload = function () { w.focus(); w.print(); };
+    }
+
+    var MO_BOTONES = {
+        'guardar': function () { moGuardar(false); },
+        'guardar-salir': function () { moGuardar(true); },
+        'imprimir': moImprimir,
+        'modificar': moModificar,
+        'cancelar': moCancelar,
+        'bitacora': moBitacora,
+        'cerrar': function () { $('moDialogo').close(); }
+    };
+    $('moDialogo').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-mo]');
+        if (b && !b.disabled) MO_BOTONES[b.dataset.mo]();
+    });
+    document.querySelectorAll('[data-mo-bit-cerrar]').forEach(function (b) {
+        b.addEventListener('click', function () { $('moBitacora').close(); });
+    });
 
     // 8-Gastos adicionales (Dialog274)
     function dialogoGasto(g) {

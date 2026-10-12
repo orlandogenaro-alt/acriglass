@@ -10,6 +10,8 @@ const ACRI_PERMISOS = [
     'NUEVO_OBRA'              => 'Registrar obras',
     'MODIFICAR_OBRA'          => 'Modificar obras',
     'CERRAR_OBRA'             => 'Cerrar obras',
+    'MODIFICAR_ASIGNAR_MO'    => 'Modificar mano de obra asignada a la obra',
+    'CANCELAR_ASIGNAR_MO'     => 'Cancelar mano de obra asignada a la obra',
     'NUEVO_EMPLEADOS_OBRA'    => 'Alta y cambios de empleados de obra',
     'NUEVO_TIPO_EMPLEADO'     => 'Alta y cambios de tipos de empleado',
 ];

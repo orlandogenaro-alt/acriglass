@@ -204,3 +204,36 @@
 @media print {
     .ob-btn, #sliderAvance { display: none !important; }
 }
+
+/* ---------- Costo de Mano de Obra (Dialog275) ---------- */
+.mo-dialogo { width: min(620px, calc(100vw - 24px)); }
+.mo-dialogo[open] { display: flex; flex-direction: column; }
+.mo-toolbar { padding: 4px 8px; box-shadow: none; flex-wrap: wrap; }
+.mo-toolbar .tb:disabled { opacity: .4; cursor: default; background: none; color: var(--texto-2); }
+.mo-cuerpo { overflow: auto; padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+.mo-fila { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mo-fila label { display: flex; align-items: center; gap: 8px; color: var(--texto-2); }
+.mo-fila select, .mo-fila input { height: 28px; padding: 0 6px; }
+#moOrden { width: 140px; }
+.mo-largo { flex: 1; min-width: 240px; }
+.mo-largo select { flex: 1; min-width: 0; }
+.mo-der { margin-left: auto; }
+.mo-estatus { display: flex; flex-direction: column; align-items: center; min-width: 130px; color: var(--texto-2); }
+.mo-estatus b { font-size: 20px; color: var(--texto); }
+.mo-estatus b.cancelado { color: var(--rojo); }
+.mo-mas { min-height: 26px; width: 30px; padding: 0; }
+.mo-grid { border: 1px solid var(--borde); border-radius: var(--radio); min-height: 170px; max-height: 260px; overflow: auto; }
+.mo-grid table { width: 100%; border-collapse: collapse; }
+.mo-grid th { position: sticky; top: 0; background: var(--cab); color: var(--cab-texto); font-weight: 400; font-size: 12px; text-align: left; padding: 4px 6px; }
+.mo-grid td { border-top: 1px solid var(--linea); padding: 2px 4px; }
+.mo-grid td input { width: 100%; height: 24px; padding: 0 4px; text-align: right; }
+.mo-grid td.num { text-align: right; padding: 0 6px; white-space: nowrap; }
+.mo-grid td .quitar { color: var(--rojo); padding: 0 4px; }
+.mo-grid .vacio td { color: var(--texto-3); text-align: center; padding: 14px; border: 0; }
+.mo-importe { display: flex; justify-content: flex-end; align-items: center; gap: 8px; color: var(--texto-2); }
+.mo-importe input { width: 110px; height: 26px; padding: 0 6px; text-align: right; background: var(--sub); }
+.mo-notas { display: flex; align-items: flex-start; gap: 8px; color: var(--texto-2); }
+.mo-notas textarea { flex: 1; padding: 4px 8px; resize: vertical; }
+.mo-dialogo :disabled { background: var(--sub); color: var(--texto-2); }
+.mo-bitacora { width: min(560px, calc(100vw - 24px)); }
+.mo-bitacora textarea { display: block; width: calc(100% - 32px); height: 260px; margin: 14px 16px 0; padding: 6px 8px; font-family: Consolas, monospace; font-size: 12px; resize: vertical; }

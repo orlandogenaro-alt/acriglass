@@ -6,6 +6,7 @@ return [
     [
         'fecha' => '2026-10-12',
         'cambios' => [
+            ['mejora',     'Obra: Costo de Mano de Obra como en el sistema de escritorio', 'Asignar Mano de Obra ahora es la ventana del sistema de escritorio: barra con Guardar, Guardar y Salir, Imprimir (Salida de personal a obra), Modificar, Cancelar (pide el motivo) y Bitácora; Folio de la OT, Fecha de Trabajo, Unidad, Estatus y Personal de Obra con el botón + (sueldo diario / 8 h). Modificar pide el permiso «Modificar mano de obra asignada» y Cancelar el de «Cancelar mano de obra asignada», o la autorización de otro usuario.'],
             ['correccion', 'Presupuesto: «txt is not defined» al abrirlo', 'Al abrir un presupuesto guardado aparecía «No se pudo abrir el presupuesto: txt is not defined».'],
             ['nuevo',      'Obra: clic derecho en 2-Facturación', 'Clic derecho en una cotización asignada: Ver o Eliminar de la obra. En un documento de cobro: Ver o Cancelar documento.'],
             ['correccion', 'Obra: asignar un folio de Easy-Glass', 'Asignar Cotización Microsip respondía «No existe en Microsip» con un presupuesto de Easy-Glass que aún no pasa a Microsip. Ahora se liga como EG0009783 con su cliente e importe, y la pestaña 2-Facturación lo cruza con Microsip cuando ya exista el pedido.'],

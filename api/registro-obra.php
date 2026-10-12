@@ -436,10 +436,11 @@ function guardarManoObra(array $d): array
 {
     $obra = (int) ($d['id'] ?? 0);
     validaEstatusObra($obra);
-    exigirOAutorizar($d, 'MODIFICAR_OBRA');
     $moId = (int) ($d['mo_id'] ?? 0);
+    // Nueva: como las demás capturas de la obra · Modificar: MODIFICAR_ASIGNAR_MO (tool_modificar)
+    exigirOAutorizar($d, $moId ? 'MODIFICAR_ASIGNAR_MO' : 'MODIFICAR_OBRA');
     if ($moId && estatusLetraDoc(documentoDeObra('empleados_asignados_a_obra', 'empleado_asignado_obra_id', $moId, $obra, 'La asignación de mano de obra')) === 'C') {
-        error('La asignación está cancelada.');
+        error('No es posible modificar un documento cancelado');
     }
     $det = [];
     $vistos = [];
@@ -455,10 +456,11 @@ function guardarManoObra(array $d): array
         $det[] = ['id_empleado' => $emp ?: null, 'nombre' => $nombre, 'costo_x_hrs' => $costo, 'hrs_trabajo' => $hrs, 'hrs_trabajo_real' => $real,
                   'costo_tot_pres' => numero($costo * $hrs), 'cost_tot_real' => numero($costo * $real)];
     }
-    if (!$det) error('Agrega al menos un empleado.');
+    if (!$det) error('Aún no se ha asignado personal a la obra. Agregue personal para poder guardar los cambios.');
     $enc = [
         'fecha' => fecha($d['fecha'] ?? '') ?? date('Y-m-d'),
         'docto_orden_obra_id' => (int) ($d['docto_orden_obra_id'] ?? 0) ?: null,
+        'unidad_transporte_id' => (int) ($d['unidad_transporte_id'] ?? 0),
         'nom_unidad' => texto($d['nom_unidad'] ?? '', 100),
         'notas' => texto($d['notas'] ?? '', 300),
         'importe_mo' => numero(array_sum(array_column($det, 'costo_tot_pres'))),
@@ -479,7 +481,33 @@ function guardarManoObra(array $d): array
         if ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
+    bitacora($moId, 'Estatus:Normal Importe: $' . number_format($enc['importe_mo'], 2));
     return ['mo_id' => $moId];
+}
+
+// ToolStripButton1 (Dialog275): CANCELAR_ASIGNAR_MO y el motivo queda en la bitácora
+function cancelarManoObra(array $d): void
+{
+    $obra = (int) ($d['id'] ?? 0);
+    validaEstatusObra($obra);
+    exigirOAutorizar($d, 'CANCELAR_ASIGNAR_MO');
+    $moId = (int) ($d['doc_id'] ?? 0);
+    if (estatusLetraDoc(documentoDeObra('empleados_asignados_a_obra', 'empleado_asignado_obra_id', $moId, $obra, 'La asignación de mano de obra')) === 'C') {
+        error('El documento ya está cancelado.');
+    }
+    bd_ejecutar('AW', "update empleados_asignados_a_obra set estatus = 'C' where empleado_asignado_obra_id = ? and obra_id = ?", [$moId, $obra]);
+    bitacora($moId, 'Estatus: Cancelado Motivo: ' . trim((string) ($d['motivo'] ?? '')));
+}
+
+// guarda_bitacora_costos_prod: si falla no detiene la captura (igual que en VB)
+function bitacora(int $id, string $notas): void
+{
+    try {
+        bd_ejecutar('AW', 'insert into bitacora_movimientos_sis_costos (id_optimizacion, num_optimizacion, usuario, fecha_hora, notas) values (?, ?, ?, ?, ?)',
+            [$id, $id, usuario(), date('Y-m-d H:i:s'), mb_substr($notas, 0, 100)]);
+    } catch (Throwable $e) {
+        error_log('AcriGlass bitácora: ' . $e->getMessage());
+    }
 }
 
 function estatusLetraDoc(array $f): string
@@ -547,7 +575,7 @@ function guardarGasto(array $d): array
     return ['gasto_id' => $gastoId];
 }
 
-// Cancelar una asignación de mano de obra o un gasto adicional (no suman en los totales)
+// Cancelar un gasto adicional (no suma en los totales)
 function cancelarDocumento(array $d, string $tabla, string $colId): void
 {
     $obra = (int) ($d['id'] ?? 0);
@@ -723,7 +751,7 @@ try {
         case 'guardar_mo':
             responder(['ok' => true] + guardarManoObra(entrada()));
         case 'cancelar_mo':
-            cancelarDocumento(entrada(), 'empleados_asignados_a_obra', 'empleado_asignado_obra_id');
+            cancelarManoObra(entrada());
             responder(['ok' => true]);
         case 'guardar_gasto':
             responder(['ok' => true] + guardarGasto(entrada()));

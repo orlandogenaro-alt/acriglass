@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-10-14',
+        'cambios' => [
+            ['nuevo', 'Presupuesto: datos de la obra en el encabezado', 'Entre los datos del cliente y el folio se capturan los datos de la ventana Nueva obra: Nombre, Teléfono, Mail, Dirección, Colonia, C. P., Ciudad, Estado, Descripción, Observaciones, Obra bloqueada y Obra maestra. Se guardan con el presupuesto y al «Registrar Obra» llenan el nombre, la dirección completa y las notas de la obra. El Id de Negocio, Folio, Fecha, Vendedor y Obra pasan a la derecha. Requiere la columna DATOS_OBRA: Consultas/aw_presupuesto_datos_obra.sql en AW-Management y Consultas/supabase_presupuesto_datos_obra.sql en Supabase.'],
+        ],
+    ],
+    [
         'fecha' => '2026-10-12',
         'cambios' => [
             ['mejora',     'Obra: capturas más fáciles de usar', 'En Mano de Obra, Gastos, Cotización y las demás capturas de la obra: una línea de ayuda dice qué hacer (capturar y Guardar, Modificar para cambiar, o que está cancelado); los botones que no aplican se apagan y cada uno explica lo que hace al pasar el mouse; si cierras con cambios sin guardar te pregunta antes de perderlos (también con Esc); un aviso verde confirma «Se guardó correctamente»; no se aceptan cantidades negativas y el cursor va al dato que falta. Cada pestaña con listado dice cómo abrir sus renglones.'],

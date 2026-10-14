@@ -816,6 +816,7 @@
             estatus: $('estatus').textContent.trim(),
             id_hs: $('idNegocio').textContent.trim(),
             notas: $('descripcion').value,
+            obra_datos: datosObra(),
             utilidad_por: num($('pctUtilidad').value),
             totales: {
                 cos_primo: mp + mo,
@@ -832,6 +833,27 @@
             relacionados: extras.relacionados.map(function (r) { return { sugerido_id: r.sugerido_id }; }),
             tareas: ct.exportar().tareas
         };
+    }
+
+    // Datos de la obra del encabezado (ventana Nueva obra): se guardan con el presupuesto y llenan la obra al registrarla
+    var CAMPOS_OBRA = { nombre: 'obraNombre', descripcion: 'obraDescripcion', direccion: 'obraDireccion', colonia: 'obraColonia',
+                        codigo_postal: 'obraCp', ciudad: 'obraCiudad', estado: 'obraEstado', telefono: 'obraTelefono',
+                        mail: 'obraMail', observaciones: 'obraObservaciones' };
+    function datosObra() {
+        var d = {};
+        Object.keys(CAMPOS_OBRA).forEach(function (k) { d[k] = $(CAMPOS_OBRA[k]).value; });
+        d.bloqueada = $('obraBloqueada').checked;
+        d.maestra = $('obraMaestra').checked;
+        return d;
+    }
+    function ponerDatosObra(d) {
+        Object.keys(CAMPOS_OBRA).forEach(function (k) {
+            // Ciudad y Estado conservan su valor por omisión si el presupuesto no los trae
+            if (d[k] !== null && d[k] !== undefined) $(CAMPOS_OBRA[k]).value = d[k];
+            else if (k !== 'ciudad' && k !== 'estado') $(CAMPOS_OBRA[k]).value = '';
+        });
+        $('obraBloqueada').checked = !!d.bloqueada;
+        $('obraMaestra').checked = !!d.maestra;
     }
 
     // Regresa una promesa que se resuelve con true si se guardó
@@ -979,7 +1001,7 @@
         var listo = cambios ? guardar() : Promise.resolve(true);
         listo.then(function (ok) {
             if (!ok) return;
-            var nombre = prompt('Nombre de la obra:', $('proyecto').value.trim() || $('cliente').value.trim());
+            var nombre = prompt('Nombre de la obra:', $('obraNombre').value.trim() || $('proyecto').value.trim() || $('cliente').value.trim());
             if (nombre === null) return;
             return pedirPresupuestos('registrar_obra', { id: presupuestoId, nom_obra: nombre.trim(), autoriza: autoriza }).then(function (j) {
                 obraId = j.obra_id;
@@ -1145,6 +1167,7 @@
             obraId = parseInt(p.obra_id, 10) || 0;
             $('obra').textContent = obraId ? (p.nom_obra || 'Obra ' + obraId) : '';
             $('descripcion').value = p.notas || '';
+            ponerDatosObra(p.obra_datos || {});
             ponerNegocio(p.id_hs && p.id_hs !== '0' ? p.id_hs : '0');
             if (p.estatus) pintarEstatus(String(p.estatus).trim());
             if (p.utilidad_neta_por !== null && p.utilidad_neta_por !== undefined) $('pctUtilidad').value = num(p.utilidad_neta_por);

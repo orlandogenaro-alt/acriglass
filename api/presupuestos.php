@@ -58,6 +58,20 @@ function vendedorId(?string $nombre): ?int
     return $id ?: bd_insertar('AW', 'vendedores_obras', 'vendedor_obra_id', ['nombre' => $nombre, 'estatus' => 'A']);
 }
 
+// Datos de la obra del encabezado (ventana Nueva obra) como JSON; null si no se capturó nada
+const CAMPOS_OBRA = ['nombre' => 200, 'descripcion' => 500, 'direccion' => 200, 'colonia' => 100, 'codigo_postal' => 10,
+                     'ciudad' => 100, 'estado' => 100, 'telefono' => 30, 'mail' => 150, 'observaciones' => 500];
+
+function datosObra($d): ?string
+{
+    $d = is_array($d) ? $d : [];
+    $r = [];
+    foreach (CAMPOS_OBRA as $k => $largo) $r[$k] = texto($d[$k] ?? '', $largo);
+    $r['bloqueada'] = !empty($d['bloqueada']);
+    $r['maestra'] = !empty($d['maestra']);
+    return array_filter($r) ? json_encode($r, JSON_UNESCAPED_UNICODE) : null;
+}
+
 // Estatus guardado del presupuesto (error si ya no existe)
 function estatusActual(int $id): string
 {
@@ -195,6 +209,7 @@ function guardar(array $d): array
     $idHs = preg_replace('/\D/', '', (string) ($d['id_hs'] ?? ''));
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'id_hs')) $enc['id_hs'] = $idHs !== '' && $idHs !== '0' ? $idHs : null;
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'correo_electronico')) $enc['correo_electronico'] = texto($d['email'] ?? '', 150);
+    if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'datos_obra')) $enc['datos_obra'] = datosObra($d['obra_datos'] ?? []);
 
     $pdo = bd_pdo('AW');
     $pdo->beginTransaction();
@@ -282,18 +297,40 @@ function registrarObra(array $d): array
         return ['obra_id' => $obraId, 'nom_obra' => $nom, 'nueva' => false, 'estatus' => $estatus];
     }
 
-    $nombre = texto($d['nom_obra'] ?? '', 200) ?? texto($p['proyecto'], 200) ?? texto($p['cliente'], 200);
+    // Datos de la obra capturados en el presupuesto: dirección completa y notas (descripción, contacto, observaciones)
+    $o = [];
+    if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'datos_obra')) {
+        $o = json_decode((string) bd_valor('AW', 'select datos_obra from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]), true) ?: [];
+    }
+    $direccion = implode(', ', array_filter([
+        $o['direccion'] ?? null,
+        !empty($o['colonia']) ? 'Col. ' . $o['colonia'] : null,
+        !empty($o['codigo_postal']) ? 'C.P. ' . $o['codigo_postal'] : null,
+        $o['ciudad'] ?? null,
+        ($o['estado'] ?? null) !== ($o['ciudad'] ?? null) ? ($o['estado'] ?? null) : null,
+    ]));
+    $notas = implode("\n", array_filter([
+        $o['descripcion'] ?? null,
+        !empty($o['telefono']) ? 'Tel. ' . $o['telefono'] : null,
+        !empty($o['mail']) ? 'Mail: ' . $o['mail'] : null,
+        $o['observaciones'] ?? null,
+        !empty($o['bloqueada']) ? 'Obra bloqueada' : null,
+        !empty($o['maestra']) ? 'Obra maestra' : null,
+    ]));
+
+    $nombre = texto($d['nom_obra'] ?? '', 200) ?? texto($o['nombre'] ?? '', 200) ?? texto($p['proyecto'], 200) ?? texto($p['cliente'], 200);
     $obra = [
         'sugerido_id'      => $id,
         'nom_obra'         => $nombre,
-        'direccion'        => texto($p['ubicacion'], 200),
+        'direccion'        => texto($direccion, 200) ?? texto($p['ubicacion'], 200),
         'contacto'         => texto($p['cliente'], 150),
         'fecha_ini'        => date('Y-m-d'),
         'estatus'          => 'Planificacion',
         'fecha_creacion'   => date('Y-m-d H:i:s'),
         'usuario_creacion' => mb_substr((string) ($_SESSION['usuario'] ?? ''), 0, 50),
     ];
-    if ($autorizo !== null) $obra['notas'] = mb_substr("Registro autorizado por $autorizo.", 0, 200);
+    if ($autorizo !== null) $notas = trim($notas . "\nRegistro autorizado por $autorizo.");
+    if ($notas !== '') $obra['notas'] = $notas;
     if (bd_tiene_columna('AW', 'reg_obras', 'gasto_administrativo')) $obra['gasto_administrativo'] = 26;
     if (bd_tiene_columna('AW', 'reg_obras', 'avance_obra')) $obra['avance_obra'] = 0;
 

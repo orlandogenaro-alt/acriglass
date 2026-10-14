@@ -160,7 +160,7 @@ select option { background: var(--tarjeta); color: var(--texto); }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* Campo de captura estándar */
-.enc-izq input, #fecha, .vendedor select, .desc textarea, .hs-buscar input,
+.enc-izq input, .enc-obra input:not([type=checkbox]), #fecha, .vendedor select, .desc textarea, .hs-buscar input,
 .ob-campo input, .ob-campo textarea, .ob-resp select, .ob-fechas input,
 .ob-adjuntar input[type=text], .ob-parametros input, .ob-parametros select {
     border: 1px solid var(--borde-2);
@@ -169,7 +169,7 @@ select option { background: var(--tarjeta); color: var(--texto); }
     color: var(--texto);
     transition: border-color .15s, box-shadow .15s;
 }
-.enc-izq input:focus, #fecha:focus, .vendedor select:focus, .desc textarea:focus, .hs-buscar input:focus,
+.enc-izq input:focus, .enc-obra input:focus, #fecha:focus, .vendedor select:focus, .desc textarea:focus, .hs-buscar input:focus,
 .ob-campo input:focus, .ob-campo textarea:focus, .ob-resp select:focus, .ob-fechas input:focus,
 .ob-adjuntar input[type=text]:focus, .ob-parametros input:focus, .ob-parametros select:focus,
 .pct:focus, #tSUB:focus {
@@ -337,14 +337,14 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .encabezado {
     display: flex;
     flex-wrap: wrap;
-    gap: 14px 48px;
+    gap: 14px 28px;
     padding: 16px 20px;
     background: var(--tarjeta);
     border: 1px solid var(--borde);
     border-radius: var(--radio);
     box-shadow: var(--sombra);
 }
-.enc-izq { flex: 1 1 420px; max-width: 540px; display: flex; flex-direction: column; gap: 10px; }
+.enc-izq { flex: 1 1 340px; max-width: 480px; display: flex; flex-direction: column; gap: 10px; }
 .enc-izq label {
     display: grid;
     grid-template-columns: 82px 1fr;
@@ -368,10 +368,28 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .mini:hover { background: var(--azul-suave); border-color: var(--azul-borde); color: var(--azul-texto); }
 .mini.activo { background: var(--ambar-suave); border-color: var(--ambar-borde); color: var(--ambar); }
 
+/* Datos de la obra: 3 campos por renglón; Descripción y Observaciones a media fila */
+.enc-obra {
+    flex: 3 1 560px;
+    display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px 16px; align-content: start;
+    padding-left: 28px;
+    border-left: 1px solid var(--borde);
+}
+.enc-obra > label {
+    grid-column: span 2;
+    display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: center;
+    color: var(--texto-2); font-weight: 600; white-space: nowrap;
+}
+.enc-obra > label.ancho { grid-column: span 3; }
+.enc-obra input:not([type=checkbox]) { height: 32px; padding: 0 10px; width: 100%; font-weight: 400; }
+.obra-checks { grid-column: span 2; display: flex; align-items: center; gap: 18px; }
+.obra-checks label { display: flex; align-items: center; gap: 6px; color: var(--texto-2); font-weight: 600; white-space: nowrap; cursor: pointer; }
+.obra-checks input { width: 15px; height: 15px; accent-color: var(--azul); cursor: pointer; }
+
 .enc-der {
-    flex: 1 1 380px;
+    flex: 0 1 340px;
     display: flex; flex-direction: column; gap: 10px;
-    padding-left: 32px;
+    padding-left: 28px;
     border-left: 1px solid var(--borde);
 }
 .negocio {
@@ -576,7 +594,9 @@ output, #tSUB, .pct {
 @media (max-width: 800px) {
     .vista { padding: 10px; }
     .pie { grid-template-columns: 1fr; grid-template-areas: "primo" "tot" "desc"; }
-    .enc-der { padding-left: 0; border-left: none; padding-top: 12px; border-top: 1px solid var(--borde); }
+    .enc-der, .enc-obra { padding-left: 0; border-left: none; padding-top: 12px; border-top: 1px solid var(--borde); }
+    .enc-obra { grid-template-columns: minmax(0, 1fr); }
+    .enc-obra > label, .enc-obra > label.ancho, .obra-checks { grid-column: auto; }
     .totales .t-fila { grid-template-columns: 16px 1fr 80px 120px 32px; }
 }
 

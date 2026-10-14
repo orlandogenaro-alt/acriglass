@@ -200,6 +200,24 @@ $secciones = [
             <label>Ubicacion: <input type="text" id="ubicacion"></label>
         </div>
 
+        <!-- Datos de la obra (ventana Nueva obra): se usan al «Registrar Obra» -->
+        <div class="enc-obra">
+            <label>Nombre: <input type="text" id="obraNombre" maxlength="200" placeholder="Nombre de la obra"></label>
+            <label>Teléfono: <input type="text" id="obraTelefono" maxlength="30"></label>
+            <label>Mail: <input type="email" id="obraMail" maxlength="150"></label>
+            <label>Dirección: <input type="text" id="obraDireccion" maxlength="200"></label>
+            <label>Colonia: <input type="text" id="obraColonia" maxlength="100"></label>
+            <label>C. P.: <input type="text" id="obraCp" maxlength="10"></label>
+            <label>Ciudad: <input type="text" id="obraCiudad" maxlength="100" value="Ciudad de México"></label>
+            <label>Estado: <input type="text" id="obraEstado" maxlength="100" value="Ciudad de México"></label>
+            <div class="obra-checks">
+                <label><input type="checkbox" id="obraBloqueada"> Obra bloqueada</label>
+                <label><input type="checkbox" id="obraMaestra"> Obra maestra</label>
+            </div>
+            <label class="ancho">Descripción: <input type="text" id="obraDescripcion" maxlength="500"></label>
+            <label class="ancho">Observaciones: <input type="text" id="obraObservaciones" maxlength="500"></label>
+        </div>
+
         <div class="enc-der">
             <div class="negocio">Id de Negocio: <a href="#" id="idNegocio" title="Abrir el negocio en HubSpot">0</a></div>
             <div class="fila">

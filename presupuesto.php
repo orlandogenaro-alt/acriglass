@@ -160,6 +160,10 @@ $secciones = [
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>
         <span>Duplicar</span>
     </button>
+    <button class="tb" data-accion="prueba" title="Llena un presupuesto nuevo con datos de PRUEBA en todos los apartados y explica de dónde sale cada dato. No guarda nada.">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M9 3h6M10 3v6L4.5 18.5A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.5-2.5L14 9V3"/><path d="M7 15h10"/></svg>
+        <span>Prueba</span>
+    </button>
     <span class="sep"></span>
     <div class="tb-drop">
         <button class="tb" data-accion="estatus">
@@ -545,6 +549,25 @@ $secciones = [
     <div class="hs-pie">
         <span class="extra-ayuda">Los cambios se aplican al momento.</span>
         <button type="button" class="hs-btn principal" data-pu-cerrar>Listo</button>
+    </div>
+</dialog>
+
+<!-- ============ PRUEBA: DE DÓNDE SALE CADA DATO ============ -->
+<dialog class="hs-dialogo pr-dialogo" id="prDialogo">
+    <div class="hs-cabecera">
+        <strong>Prueba cargada: de dónde sale cada dato</strong>
+        <button type="button" class="hs-cerrar" data-pr-cerrar title="Cerrar">✕</button>
+    </div>
+    <p class="pu-dlg-ayuda">Se llenaron todos los apartados con datos de <b>PRUEBA</b>. Recorre las pestañas de la izquierda (Materia Prima, Mano de Obra, Gastos de Operacion, Conceptos/Tareas y Análisis P.U.) para verlos. <b>No se guardó nada</b>: si presionas Guardar se crea un presupuesto PRUEBA normal, que después puedes Cancelar y Eliminar.</p>
+    <div class="extra-caja pr-tabla">
+        <table class="grid mini-grid">
+            <thead><tr><th>Apartado</th><th>Qué se cargó</th><th>De dónde sale la información</th></tr></thead>
+            <tbody id="prGuia"></tbody>
+        </table>
+    </div>
+    <div class="hs-pie">
+        <span></span>
+        <button type="button" class="hs-btn principal" data-pr-cerrar>Entendido</button>
     </div>
 </dialog>
 

@@ -1581,7 +1581,116 @@
         });
     }
 
+    // ---------- Prueba: llena todos los apartados con datos de PRUEBA y explica de dónde sale cada dato ----------
+    // Usa los catálogos reales (conceptos, empleados, tipos de comisión) para que se vea de dónde se toman. No guarda.
+    function cargarPrueba() {
+        function primero(sec, filtro) { return (CATALOGO[sec] || []).filter(function (c) { return c.activo && filtro(c); })[0]; }
+        var esFijo = function (c) { return [FIJOS.mano_obra, FIJOS.comisiones, FIJOS_PU.mp, FIJOS_PU.mo].map(clave).indexOf(clave(c.nombre)) >= 0; };
+        var cMP = primero('mp', function (c) { return !c.auto && !esFijo(c); });
+        var cGO = primero('go', function (c) { return !c.auto && !c.seguro; });
+        var cSeg = primero('go', function (c) { return c.seguro; });
+        var emp = EMPLEADOS[0], com = TIPOS_COMISION[0];
+        var guia = [];
+
+        // Encabezado y datos de la obra
+        $('cliente').value = 'PRUEBA';
+        $('email').value = 'prueba@prueba.com';
+        $('proyecto').value = 'PRUEBA - Caseta de vigilancia';
+        $('ubicacion').value = 'PRUEBA - Querétaro';
+        ponerDatosObra({ nombre: 'PRUEBA', telefono: '4420000000', mail: 'prueba@prueba.com', direccion: 'Calle Prueba 123', colonia: 'Centro',
+                         codigo_postal: '76000', ciudad: 'Querétaro', estado: 'Querétaro', descripcion: 'Obra de PRUEBA', observaciones: 'Generada con el botón Prueba' });
+        $('descripcion').value = 'PRUEBA: presupuesto de ejemplo para ver cómo funciona cada apartado.';
+        guia.push(['Encabezado', 'Cliente, Email, Proyecto y Ubicación «PRUEBA»',
+            'Se capturan a mano. El correo, el cliente y el Id de Negocio normalmente se traen de HubSpot con el botón naranja junto a Email.']);
+        guia.push(['Datos de la obra', 'Nombre, dirección, colonia, C.P., ciudad…',
+            'Se capturan a mano y se guardan con el presupuesto; al «Registrar Obra» llenan el nombre, la dirección y las notas de la obra.']);
+        guia.push(['Vendedor', $('vendedor').value,
+            'Catálogo de vendedores de obra de AW-Management (vendedores_obras); si no hay, los vendedores activos de Easy-Glass.']);
+
+        // Materia Prima / Gastos de Operacion: renglones capturados por importe
+        datos = { mp: [], mo: [], go: [] };
+        datos.mp.push({ id: ++consecutivo, concepto: cMP ? cMP.nombre : 'PRUEBA MATERIAL', presupuesto: 10000, importar: false, folio: '' });
+        guia.push(['Materia Prima', (cMP ? cMP.nombre : 'PRUEBA MATERIAL') + ' por $10,000.00',
+            'El concepto sale del catálogo Administrador › Conceptos de Materia Prima' + (cMP ? '' : ' (está vacío, por eso se usó un nombre de prueba)') +
+            '. El importe se captura a mano, o con «Importar» desde un documento de Microsip (folio).']);
+        datos.go.push({ id: ++consecutivo, concepto: cGO ? cGO.nombre : 'PRUEBA GASTO', presupuesto: 1500, importar: false, folio: '' });
+        guia.push(['Gastos de Operacion', (cGO ? cGO.nombre : 'PRUEBA GASTO') + ' por $1,500.00',
+            'Catálogo Administrador › Conceptos de Gastos de Operacion. Los marcados como cálculo automático se calculan solos con un % del subtotal.']);
+
+        // Mano de Obra: empleados × días y comisiones
+        extras = { empleados: [], comisiones: [], seguros: [], relacionados: [] };
+        if (emp) {
+            extras.empleados.push({ empleado_id: +emp.empleado_id, clave: emp.numero_empleado, nombre: emp.nombre, sueldo: num(emp.sueldo_diario), dias: 5, total: 0 });
+            guia.push(['Mano de Obra · Empleados', emp.nombre + ' × 5 días × $' + fmt(num(emp.sueldo_diario)),
+                'Empleados de obra activos de AW-Management (empleados_obra) con su sueldo diario. Sueldo × días pasa solo al renglón «' + FIJOS.mano_obra + '».']);
+        } else {
+            guia.push(['Mano de Obra · Empleados', 'Nada', 'No hay empleados de obra activos en AW-Management (empleados_obra).']);
+        }
+        if (com) {
+            extras.comisiones.push({ tipo_id: +com.tipo_empleado_id, nombre: com.nombre, porcentaje: num(com.porcentaje), total: 0 });
+            guia.push(['Mano de Obra · Comisiones', com.nombre + ' ' + num(com.porcentaje) + ' %',
+                'Tipos de empleado con comisión de AW-Management (tipos_empleados_comisiones). El % se cobra sobre el Subtotal y pasa al renglón «' + FIJOS.comisiones + '».']);
+        } else {
+            guia.push(['Mano de Obra · Comisiones', 'Nada', 'No hay tipos de empleado con comisión en AW-Management (tipos_empleados_comisiones).']);
+        }
+        if (cSeg) {
+            extras.seguros.push({ concepto: cSeg.nombre, porcentaje_1: 10, porcentaje_2: 5, total: 0 });
+            guia.push(['Gastos de Operacion · Anexo de seguro', cSeg.nombre + ': 10 % × 5 %',
+                'Conceptos de Gastos de Operacion marcados como seguro. Subtotal × %1 × %2 pasa a ese concepto en Gastos de Operacion.']);
+        } else {
+            guia.push(['Gastos de Operacion · Anexo de seguro', 'Nada', 'Ningún concepto de Gastos de Operacion está marcado como seguro.']);
+        }
+
+        // Análisis P.U.: dos conceptos con su análisis
+        var mo = emp ? { tipo: 'MO', descripcion: emp.nombre, unidad: 'jornal', rinde: 8, costo: num(emp.sueldo_diario) || 800 }
+                     : { tipo: 'MO', descripcion: 'PRUEBA Instalador', unidad: 'jornal', rinde: 8, costo: 800 };
+        ponerAnalisisPU({
+            fsr: 1, hm: 0, fin: 0, util: null,
+            conceptos: [
+                { clave: 'C-001', partida: 'PRUEBA Cancelería', descripcion: 'PRUEBA - Cancel de baño', unidad: 'm²', cantidad: 10, insumos: [
+                    { tipo: 'MAT', descripcion: 'PRUEBA Vidrio templado 6 mm', unidad: 'm²', cantidad: 1.05, costo: 650 },
+                    { tipo: 'MAT', descripcion: 'PRUEBA Perfil de aluminio', unidad: 'm', cantidad: 3.2, costo: 120 },
+                    mo,
+                    { tipo: 'EQ', descripcion: 'PRUEBA Andamio', unidad: 'día', cantidad: 0.1, costo: 150 }] },
+                { clave: 'C-002', partida: 'PRUEBA Acabados', descripcion: 'PRUEBA - Muro de tablaroca', unidad: 'm²', cantidad: 20, insumos: [
+                    { tipo: 'MAT', descripcion: 'PRUEBA Tablaroca', unidad: 'pza', cantidad: 0.35, costo: 220 },
+                    { tipo: 'MO', descripcion: 'PRUEBA Tablarroquero', unidad: 'jornal', rinde: 12, costo: 750 }] }
+            ]
+        });
+        guia.push(['Análisis P.U.', '«PRUEBA - Cancel de baño» 10 m² y «PRUEBA - Muro de tablaroca» 20 m², con sus insumos',
+            'Se capturan en la pestaña Análisis P.U. con «Analizar». Los precios se sugieren de los empleados, de los artículos importados y de otros presupuestos. ' +
+            'Lo analizado pasa solo a los renglones «' + FIJOS_PU.mp + '» (Materia Prima) y «' + FIJOS_PU.mo + '» (Mano de Obra).']);
+        guia.push(['Conceptos/Tareas', 'Un Concepto/Tarea por cada renglón de MP / MO / GO',
+            'Se generan solos con lo capturado en Materia Prima, Mano de Obra y Gastos de Operacion; ahí se les ponen fechas, responsable y avance (Gantt).']);
+        guia.push(['Utilidad Neta', num($('pctUtilidad').value) + ' %',
+            'Parámetro de costos 101 de AW-Management (parametros_costos_sug). Es margen sobre el precio: Subtotal = Costo ÷ (1 − %).']);
+        guia.push(['Totales', 'Costo Primo, Gastos, Utilidad, Subtotal, IVA y Total',
+            'Se calculan solos: MP + MO = Costo Primo; + Gastos de Operacion + Utilidad = Subtotal; + IVA 16 % = Total.']);
+        guia.push(['Sugeridos relacionados e Id de Negocio', 'Nada',
+            'Los sugeridos relacionados se ligan por folio después de guardar; el Id de Negocio se trae de HubSpot.']);
+        guia.push(['Al presionar Guardar', 'Presupuesto PRUEBA con folio nuevo',
+            'Se guarda en AW-Management: doctos_sugerido_obra (encabezado y datos de la obra), doctos_sugerido_obra_det (renglones), mano_obra_detalle, ' +
+            'comisiones_obra_det, anexos_obra_seguro, conceptos_tareas y el Análisis P.U. en la columna ANALISIS_PU.']);
+
+        ct.cargar([]);
+        marcarCambio();
+        calcularTotales();
+        render();
+        $('prGuia').innerHTML = guia.map(function (g) {
+            return '<tr><td>' + escapar(g[0]) + '</td><td>' + escapar(g[1]) + '</td><td>' + escapar(g[2]) + '</td></tr>';
+        }).join('');
+        $('prDialogo').showModal();
+    }
+    document.querySelectorAll('[data-pr-cerrar]').forEach(function (b) {
+        b.addEventListener('click', function () { $('prDialogo').close(); });
+    });
+
     var acciones = {
+        'prueba': function () {
+            if (presupuestoId) { alert('La prueba se carga en un presupuesto nuevo, para no tocar este. Abre «Nuevo presupuesto» y presiona Prueba.'); return; }
+            if (cambios && !confirm('Se reemplazará lo que capturaste en pantalla por los datos de PRUEBA. ¿Continuar?')) return;
+            cargarPrueba();
+        },
         'guardar': function () {
             if (soloLectura && !cambios) { alert('No hay cambios que guardar. Presiona «Modificar» para cambiar el presupuesto.'); return; }
             guardar().then(function (ok) { if (ok) alert('Presupuesto guardado con folio ' + $('folio').value + '.'); });

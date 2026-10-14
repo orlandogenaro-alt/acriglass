@@ -1,9 +1,10 @@
 (function () {
     var IVA = 0.16;
-    var NOMBRES = { mp: 'Materia Prima', mo: 'Mano de Obra', go: 'Gastos de Operacion', ct: 'Conceptos/Tareas y Previsualización' };
+    var NOMBRES = { mp: 'Materia Prima', mo: 'Mano de Obra', go: 'Gastos de Operacion', ct: 'Conceptos/Tareas y Previsualización', pu: 'Análisis de Precios Unitarios' };
     var AYUDAS = {
         grid: 'Ctrl + I para agregar un nuevo Concepto',
-        ct: 'Se generan en automático con los conceptos de Materia Prima, Mano de Obra y Gastos de Operacion'
+        ct: 'Se generan en automático con los conceptos de Materia Prima, Mano de Obra y Gastos de Operacion',
+        pu: 'Como Neodata, con lo capturado en el presupuesto: no cambia el Subtotal ni el Total'
     };
 
     // Conceptos por sección (en memoria hasta tener base de datos)
@@ -27,11 +28,14 @@
     }
     function suma(lista) { return lista.reduce(function (s, r) { return s + num(r.presupuesto); }, 0); }
     function marcarCambio() { cambios = true; }
+    var SIGLAS = { mp: 'MP', mo: 'MO', go: 'GO' };
+    function txt(v) { return String(v || '').replace(/\s+/g, ' ').trim(); }
 
     // ---------- Rejilla ----------
     function render() {
         renderExtras();
         if (seccion === 'ct') { renderCt(); return; }
+        if (seccion === 'pu') { renderPu(); return; }
         var filas = datos[seccion];
         if (!filas.length) {
             tbody.innerHTML = '<tr class="vacio-fila"><td colspan="10">Sin conceptos. Presiona Ctrl + I para agregar uno.</td></tr>';
@@ -82,6 +86,7 @@
     function refrescarCalculados() {
         var subtotal = calcularTotales();
         if (seccion === 'ct') return;
+        if (seccion === 'pu') { renderPu(); return; }
         var filas = datos[seccion];
         // Los cálculos agregaron un renglón fijo (mano de obra, comisiones, seguro): se vuelve a pintar
         if (tbody.querySelectorAll('tr[data-i]').length !== filas.length) { render(); return; }
@@ -103,6 +108,7 @@
     }
 
     function agregarConcepto() {
+        if (seccion === 'pu') return;   // el análisis se arma solo con MP / MO / GO
         if (soloLectura) { avisoSoloLectura(); return; }
         if (seccion === 'ct') { ct.abrirNuevo(); return; }
         datos[seccion].push({ id: ++consecutivo, concepto: '', presupuesto: 0, importar: false, folio: '' });
@@ -147,11 +153,12 @@
             document.querySelectorAll('.sec-tab').forEach(function (x) { x.classList.remove('activo'); });
             t.classList.add('activo');
             seccion = t.dataset.sec;
-            var ct = seccion === 'ct';
+            var ct = seccion === 'ct', pu = seccion === 'pu';
             $('secNombre').textContent = NOMBRES[seccion] + ':';
-            $('secAyuda').textContent = AYUDAS[ct ? 'ct' : 'grid'];
-            document.querySelector('.grid-caja').hidden = ct;
+            $('secAyuda').textContent = AYUDAS[ct ? 'ct' : pu ? 'pu' : 'grid'];
+            document.querySelector('.grid-caja').hidden = ct || pu;
             $('ctPanel').hidden = !ct;
+            $('puPanel').hidden = !pu;
             render();
         });
     });
@@ -303,6 +310,171 @@
         pintarTotalesExtras();
         return subtotal;
     }
+
+    // ---------- Análisis de Precios Unitarios (lógica de Neodata) ----------
+    // Vista paralela: usa lo capturado en MP / MO / GO, empleados, comisiones y anexo de seguro, y NO cambia
+    // el Subtotal del Form46. Neodata calcula en cascada sobre el costo directo:
+    //   Costo directo = Materia Prima + Mano de Obra (sueldos × FSR) + Herramienta menor (% de la mano de obra)
+    //   + Indirectos      = Gastos de Operacion (sin el anexo de seguro)
+    //   + Financiamiento  = (CD + Ind) × %fin
+    //   + Utilidad        = (CD + Ind + Fin) × %util
+    //   + Cargos adicionales: % del precio de venta (comisiones y anexo de seguro, que el Form46 cobra sobre el subtotal)
+    //   = Precio de venta; factor de sobrecosto = Precio de venta / CD; P.U. de cada concepto = su CD × factor / cantidad
+    var FACTORES_PU = { fsr: 1, hm: 0, fin: 0, util: null };   // util null = equivalente a la Utilidad Neta del Form46
+    var factoresPU = Object.assign({}, FACTORES_PU);
+    var CAMPOS_PU = { fsr: 'puFsr', hm: 'puHm', fin: 'puFin', util: 'puUtil' };
+
+    function ponerFactoresPU(f) {
+        f = f || {};
+        factoresPU = {
+            fsr: num(f.fsr) > 0 ? num(f.fsr) : 1,
+            hm: num(f.hm),
+            fin: num(f.fin),
+            util: f.util === null || f.util === undefined || f.util === '' ? null : num(f.util)
+        };
+        Object.keys(CAMPOS_PU).forEach(function (k) { $(CAMPOS_PU[k]).value = factoresPU[k] === null ? '' : factoresPU[k]; });
+    }
+
+    function calcularPU() {
+        var t = recalcular();
+        var fsr = factoresPU.fsr > 0 ? factoresPU.fsr : 1, hm = factoresPU.hm / 100, fin = factoresPU.fin / 100;
+        var seguros = {};
+        extras.seguros.forEach(function (s) { seguros[clave(s.concepto)] = true; });
+        // Cargos adicionales como % del precio: los mismos porcentajes que el Form46 aplica al subtotal
+        var ca = 0;
+        extras.comisiones.forEach(function (c) { ca += num(c.porcentaje); });
+        extras.seguros.forEach(function (s) { ca += num(s.porcentaje_1) * num(s.porcentaje_2) / 100; });
+        ca = Math.min(ca, 99) / 100;
+
+        var r = { mp: 0, mo: 0, fsr: 0, hm: 0, ind: 0, ca: ca, conceptos: [] };
+        ['mp', 'mo'].forEach(function (sec) {
+            datos[sec].forEach(function (f) {
+                var k = clave(f.concepto), base = num(f.presupuesto);
+                if (sec === 'mo' && k === clave(FIJOS.comisiones)) return;   // es cargo adicional
+                if (!k && !base) return;
+                var cd = base, ajuste = 0;
+                if (sec === 'mo') {
+                    // El FSR (prestaciones, IMSS, días no trabajados) se aplica a los sueldos de los empleados
+                    if (extras.empleados.length && k === clave(FIJOS.mano_obra)) ajuste = base * (fsr - 1);
+                    cd = (base + ajuste) * (1 + hm);
+                    r.fsr += ajuste;
+                    r.hm += (base + ajuste) * hm;
+                }
+                r[sec] += base;
+                r.conceptos.push({ sec: sec, fila: f, cd: cd });
+            });
+        });
+        datos.go.forEach(function (f) { if (!seguros[clave(f.concepto)]) r.ind += num(f.presupuesto); });
+
+        r.cd = r.mp + r.mo + r.fsr + r.hm;
+        r.fin = (r.cd + r.ind) * fin;
+        // Utilidad equivalente: con FSR 1, sin herramienta ni financiamiento, da el mismo subtotal que el Form46
+        var m = num($('pctUtilidad').value) / 100;
+        r.utilAuto = 1 - m - ca > 0 ? m / (1 - m - ca) * 100 : 0;
+        r.utilPct = factoresPU.util === null ? r.utilAuto : factoresPU.util;
+        r.util = (r.cd + r.ind + r.fin) * r.utilPct / 100;
+        r.pv = (r.cd + r.ind + r.fin + r.util) / (1 - ca);
+        r.cargos = r.pv * ca;
+        r.factor = r.cd > 0 ? r.pv / r.cd : 0;
+        r.subtotal = t.subtotal;
+        return r;
+    }
+
+    function pct(n) { return n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' %'; }
+    function cant(n) { return n.toLocaleString('es-MX', { maximumFractionDigits: 4 }); }
+
+    function renderPu() {
+        var r = calcularPU();
+        var base = r.cd + r.ind;
+        $('puUtil').placeholder = r.utilAuto.toFixed(2) + ' (auto)';
+        $('puInd').textContent = pct(r.cd > 0 ? r.ind / r.cd * 100 : 0);
+        $('puCa').textContent = pct(r.ca * 100);
+
+        var filas = [
+            ['Materia Prima', r.mp],
+            ['Mano de Obra (sin comisiones)', r.mo],
+            r.fsr ? ['Ajuste por FSR (× ' + cant(factoresPU.fsr) + ')', r.fsr] : null,
+            r.hm ? ['Herramienta menor (' + pct(factoresPU.hm) + ' de la M.O.)', r.hm] : null,
+            ['Costo directo', r.cd, 'total'],
+            ['Indirectos (' + pct(r.cd > 0 ? r.ind / r.cd * 100 : 0) + ' del CD)', r.ind],
+            ['Financiamiento (' + pct(factoresPU.fin) + ')', r.fin],
+            ['Utilidad (' + pct(r.utilPct) + ')', r.util],
+            ['Cargos adicionales (' + pct(r.ca * 100) + ' del precio)', r.cargos],
+            ['Precio de venta', r.pv, 'total'],
+            ['Factor de sobrecosto', null, 'factor'],
+            ['Subtotal del presupuesto (Form46)', r.subtotal, 'ref'],
+            ['Diferencia', r.pv - r.subtotal, 'ref']
+        ].filter(Boolean);
+        $('puResumen').innerHTML = filas.map(function (f) {
+            var v = f[2] === 'factor' ? cant(Math.round(r.factor * 10000) / 10000) : fmt(f[1]);
+            return '<tr' + (f[2] ? ' class="pu-' + f[2] + '"' : '') + '><td class="ro izq">' + escapar(f[0]) + '</td><td class="ro">' + v + '</td></tr>';
+        }).join('');
+
+        // Catálogo de conceptos agrupado por partida (el agrupador de Conceptos/Tareas); debajo, sus insumos
+        var tareas = {};
+        ct.exportar().tareas.forEach(function (x) { if (x.origen) tareas[x.origen] = x; });
+        var partidas = [], porPartida = {};
+        r.conceptos.forEach(function (c) {
+            var tr = tareas[c.sec + ':' + c.fila.id] || {};
+            var p = txt(tr.agrupador) || NOMBRES[c.sec];
+            if (!porPartida[p]) { porPartida[p] = []; partidas.push(p); }
+            porPartida[p].push({ c: c, t: tr });
+        });
+        var html = '';
+        partidas.forEach(function (p) {
+            var imp = porPartida[p].reduce(function (s, x) { return s + x.c.cd * r.factor; }, 0);
+            html += '<tr class="pu-partida"><td class="ro izq" colspan="6">' + escapar(p) + '</td><td class="ro">' + fmt(imp) + '</td></tr>';
+            porPartida[p].forEach(function (x) {
+                var c = x.c, cantidad = num(x.t.cantidad) || 1, importe = c.cd * r.factor;
+                html += '<tr><td class="id">' + escapar(x.t.clave || SIGLAS[c.sec] + '-' + c.fila.id) + '</td>' +
+                    '<td class="ro izq">' + escapar(c.fila.concepto) + '</td><td class="ro izq">' + escapar(x.t.unidad || 'Lote') + '</td>' +
+                    '<td class="ro">' + cant(cantidad) + '</td><td class="ro">' + fmt(c.cd) + '</td>' +
+                    '<td class="ro">' + fmt(importe / cantidad) + '</td><td class="ro">' + fmt(importe) + '</td></tr>';
+                (c.fila.articulos || []).forEach(function (a) {
+                    html += '<tr class="pu-insumo"><td class="id"></td><td class="ro izq">' + escapar(txt(a.clave_articulo) || txt(a.nom_articulo)) +
+                        (txt(a.clave_articulo) && txt(a.nom_articulo) ? ' · ' + escapar(txt(a.nom_articulo)) : '') + '</td>' +
+                        '<td class="ro izq">' + escapar(txt(a.unid_medida)) + '</td><td class="ro">' + cant(num(a.unidades)) + '</td>' +
+                        '<td class="ro">' + fmt(num(a.precio_total)) + '</td><td class="ro">' + fmt(num(a.precio_unit)) + '</td><td class="ro"></td></tr>';
+                });
+            });
+        });
+        $('puConceptos').innerHTML = html || '<tr class="vacio-fila"><td colspan="7">Captura conceptos en Materia Prima o Mano de Obra.</td></tr>';
+
+        // Explosión de insumos: los artículos importados de todo el presupuesto, sumados por clave y unidad
+        var insumos = {}, lista = [];
+        ['mp', 'mo', 'go'].forEach(function (sec) {
+            datos[sec].forEach(function (f) {
+                (f.articulos || []).forEach(function (a) {
+                    var k = clave(txt(a.clave_articulo) || txt(a.nom_articulo)) + '|' + clave(a.unid_medida);
+                    if (!insumos[k]) {
+                        insumos[k] = { clave: txt(a.clave_articulo), nombre: txt(a.nom_articulo), um: txt(a.unid_medida), cantidad: 0, importe: 0, secs: {} };
+                        lista.push(insumos[k]);
+                    }
+                    insumos[k].cantidad += num(a.unidades);
+                    insumos[k].importe += num(a.precio_total);
+                    insumos[k].secs[SIGLAS[sec]] = true;
+                });
+            });
+        });
+        lista.sort(function (a, b) { return b.importe - a.importe; });
+        var totalIns = lista.reduce(function (s, i) { return s + i.importe; }, 0);
+        $('puInsumos').innerHTML = lista.length ? lista.map(function (i) {
+            return '<tr><td class="id">' + escapar(i.clave) + '</td><td class="ro izq">' + escapar(i.nombre) + '</td>' +
+                '<td class="ro izq">' + escapar(Object.keys(i.secs).join(', ')) + '</td><td class="ro izq">' + escapar(i.um) + '</td>' +
+                '<td class="ro">' + cant(i.cantidad) + '</td><td class="ro">' + fmt(i.cantidad ? i.importe / i.cantidad : 0) + '</td>' +
+                '<td class="ro">' + fmt(i.importe) + '</td><td class="ro">' + (totalIns ? pct(i.importe / totalIns * 100) : '') + '</td></tr>';
+        }).join('') : '<tr class="vacio-fila"><td colspan="8">Sin insumos: importa documentos en los conceptos para ver la explosión.</td></tr>';
+    }
+
+    Object.keys(CAMPOS_PU).forEach(function (k) {
+        $(CAMPOS_PU[k]).addEventListener('input', function () {
+            var v = this.value.trim();
+            factoresPU[k] = k === 'util' && v === '' ? null : num(v);
+            if (k === 'fsr' && factoresPU.fsr <= 0) factoresPU.fsr = 1;
+            marcarCambio();
+            renderPu();
+        });
+    });
 
     // ---------- Empleados, comisiones y anexo de seguro (debajo de Mano de Obra / Gastos de Operacion) ----------
     var EMPLEADOS = window.ACRI_EMPLEADOS || [];
@@ -697,7 +869,7 @@
 
     function aplicarModo() {
         document.body.classList.toggle('solo-lectura', soloLectura);
-        document.querySelectorAll('.encabezado input, .encabezado select, #descripcion, #pctUtilidad, #tSUB, #buscarHubspot')
+        document.querySelectorAll('.encabezado input, .encabezado select, #descripcion, #pctUtilidad, #tSUB, #buscarHubspot, #puPanel input')
             .forEach(function (el) { el.disabled = soloLectura; });
         $('modo').hidden = !soloLectura;
         var b = document.querySelector('.tb[data-accion="modificar"]');
@@ -817,6 +989,7 @@
             id_hs: $('idNegocio').textContent.trim(),
             notas: $('descripcion').value,
             obra_datos: datosObra(),
+            analisis_pu: factoresPU,
             utilidad_por: num($('pctUtilidad').value),
             totales: {
                 cos_primo: mp + mo,
@@ -1168,6 +1341,7 @@
             $('obra').textContent = obraId ? (p.nom_obra || 'Obra ' + obraId) : '';
             $('descripcion').value = p.notas || '';
             ponerDatosObra(p.obra_datos || {});
+            ponerFactoresPU(p.analisis_pu);
             ponerNegocio(p.id_hs && p.id_hs !== '0' ? p.id_hs : '0');
             if (p.estatus) pintarEstatus(String(p.estatus).trim());
             if (p.utilidad_neta_por !== null && p.utilidad_neta_por !== undefined) $('pctUtilidad').value = num(p.utilidad_neta_por);

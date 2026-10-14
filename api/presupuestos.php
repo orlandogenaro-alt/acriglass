@@ -72,6 +72,21 @@ function datosObra($d): ?string
     return array_filter($r) ? json_encode($r, JSON_UNESCAPED_UNICODE) : null;
 }
 
+// Factores del Análisis de Precios Unitarios (lógica de Neodata) como JSON; null si son los de por omisión.
+// fsr: factor de salario real · hm: % herramienta menor · fin: % financiamiento · util: % utilidad (null = equivalente al Form46)
+function analisisPU($d): ?string
+{
+    $d = is_array($d) ? $d : [];
+    $fsr = numero($d['fsr'] ?? 1, 4);
+    $r = [
+        'fsr'  => $fsr > 0 && $fsr < 10 ? $fsr : 1.0,
+        'hm'   => max(0, min(100, numero($d['hm'] ?? 0, 4))),
+        'fin'  => max(0, min(100, numero($d['fin'] ?? 0, 4))),
+        'util' => isset($d['util']) && is_numeric($d['util']) ? max(0, min(1000, numero($d['util'], 4))) : null,
+    ];
+    return $r['fsr'] == 1 && !$r['hm'] && !$r['fin'] && $r['util'] === null ? null : json_encode($r);
+}
+
 // Estatus guardado del presupuesto (error si ya no existe)
 function estatusActual(int $id): string
 {
@@ -210,6 +225,7 @@ function guardar(array $d): array
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'id_hs')) $enc['id_hs'] = $idHs !== '' && $idHs !== '0' ? $idHs : null;
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'correo_electronico')) $enc['correo_electronico'] = texto($d['email'] ?? '', 150);
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'datos_obra')) $enc['datos_obra'] = datosObra($d['obra_datos'] ?? []);
+    if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'analisis_pu')) $enc['analisis_pu'] = analisisPU($d['analisis_pu'] ?? []);
 
     $pdo = bd_pdo('AW');
     $pdo->beginTransaction();

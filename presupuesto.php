@@ -80,6 +80,7 @@ $secciones = [
     'mo' => 'Mano de Obra',
     'go' => 'Gastos de Operacion',
     'ct' => 'Conceptos/Tareas',
+    'pu' => 'Análisis P.U.',
 ];
 ?>
 <!DOCTYPE html>
@@ -251,6 +252,50 @@ $secciones = [
 
             <!-- Conceptos/Tareas: se generan solos con lo capturado en MP / MO / GO -->
             <?php ctPanel(true); ?>
+
+            <!-- Análisis de Precios Unitarios (lógica de Neodata): vista paralela, no cambia el Subtotal del Form46 -->
+            <div class="pu-panel" id="puPanel" hidden>
+                <div class="extra pu-factores">
+                    <div class="extra-barra">
+                        <strong>Factores</strong>
+                        <label title="Factor de Salario Real: prestaciones, IMSS y días no trabajados sobre los sueldos de los empleados">FSR
+                            <input type="number" id="puFsr" class="num" step="0.0001" min="0" value="1"></label>
+                        <label title="Herramienta menor: % sobre la mano de obra">Herr. menor %
+                            <input type="number" id="puHm" class="num" step="0.01" min="0" value="0"></label>
+                        <label title="Financiamiento: % sobre costo directo + indirectos">Financiamiento %
+                            <input type="number" id="puFin" class="num" step="0.01" min="0" value="0"></label>
+                        <label title="Utilidad sobre costo directo + indirectos + financiamiento. Vacío = equivalente a la Utilidad Neta del presupuesto">Utilidad %
+                            <input type="number" id="puUtil" class="num" step="0.01" min="0"></label>
+                        <span class="extra-ayuda">Indirectos (Gastos de Operacion): <b id="puInd">0.00 %</b> · Cargos adicionales (comisiones y seguro): <b id="puCa">0.00 %</b></span>
+                    </div>
+                </div>
+                <div class="pu-cuerpo">
+                    <section class="extra pu-resumen">
+                        <div class="extra-barra"><strong>Integración del precio</strong></div>
+                        <div class="extra-caja">
+                            <table class="grid mini-grid"><tbody id="puResumen"></tbody></table>
+                        </div>
+                    </section>
+                    <section class="extra pu-conceptos">
+                        <div class="extra-barra"><strong>Catálogo de conceptos</strong><span class="extra-ayuda">Partida = agrupador de Conceptos/Tareas · debajo de cada concepto, sus insumos</span></div>
+                        <div class="extra-caja">
+                            <table class="grid mini-grid">
+                                <thead><tr><th class="c-id">Clave</th><th>Concepto</th><th>Unidad</th><th class="c-num">Cantidad</th><th class="c-num">Costo directo</th><th class="c-num">P.U.</th><th class="c-num">Importe</th></tr></thead>
+                                <tbody id="puConceptos"></tbody>
+                            </table>
+                        </div>
+                    </section>
+                    <section class="extra pu-insumos">
+                        <div class="extra-barra"><strong>Explosión de insumos</strong><span class="extra-ayuda">Artículos importados de todo el presupuesto, sumados por clave y unidad</span></div>
+                        <div class="extra-caja">
+                            <table class="grid mini-grid">
+                                <thead><tr><th class="c-id">Clave</th><th>Insumo</th><th>Sección</th><th>Unidad</th><th class="c-num">Cantidad</th><th class="c-num">Costo prom.</th><th class="c-num">Importe</th><th class="c-pct">%</th></tr></thead>
+                                <tbody id="puInsumos"></tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </div>
 
             <div class="grid-caja">
                 <table class="grid" id="grid">

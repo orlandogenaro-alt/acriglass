@@ -522,6 +522,28 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .sug-panel .extra-barra .ct-btn { margin-left: auto; }
 .sug-panel .extra-caja { flex: 1; max-height: none; }
 
+/* Análisis de Precios Unitarios (Neodata) */
+.pu-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: auto; }
+.pu-factores label { display: inline-flex; align-items: center; gap: 6px; color: var(--texto-2); }
+.pu-factores input { width: 84px; height: 28px; padding: 0 6px; text-align: right; background: var(--input); color: var(--texto); border: 1px solid var(--borde-2); border-radius: 4px; }
+.pu-factores input:disabled { opacity: .6; }
+.pu-factores .extra-ayuda { margin-left: auto; }
+.pu-factores .extra-ayuda b { color: var(--enfasis); font-variant-numeric: tabular-nums; }
+.pu-cuerpo { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 10px; }
+.pu-cuerpo .extra-caja { max-height: 360px; }
+.pu-insumos { grid-column: 1 / -1; }
+.pu-resumen .extra-caja { max-height: none; }
+.pu-resumen tr.pu-total td { font-weight: 700; color: var(--enfasis); border-top: 1px solid var(--borde-2); }
+.pu-resumen tr.pu-factor td { font-weight: 700; color: var(--azul-texto); }
+.pu-resumen tr.pu-ref td { color: var(--texto-3); font-size: 12px; }
+.pu-conceptos tr.pu-partida td { background: var(--sub) !important; font-weight: 700; color: var(--enfasis); }
+.pu-conceptos tr.pu-insumo td { height: 26px; font-size: 12px; color: var(--texto-3); }
+.pu-conceptos tr.pu-insumo td.izq { padding-left: 22px; color: var(--texto-2); }
+@media (max-width: 900px) {
+    .pu-cuerpo { grid-template-columns: minmax(0, 1fr); }
+    .pu-factores .extra-ayuda { margin-left: 0; }
+}
+
 /* Quitar flechas de input number */
 input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 input[type=number] { -moz-appearance: textfield; }

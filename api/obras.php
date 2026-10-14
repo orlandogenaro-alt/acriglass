@@ -624,6 +624,9 @@ try {
             // Datos de la obra del encabezado (ventana Nueva obra), guardados como JSON
             $p['obra_datos'] = bd_tiene_columna('AW', 'doctos_sugerido_obra', 'datos_obra')
                 ? json_decode((string) bd_valor('AW', 'select datos_obra from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]), true) : null;
+            // Factores del Análisis de Precios Unitarios (Neodata), guardados como JSON
+            $p['analisis_pu'] = bd_tiene_columna('AW', 'doctos_sugerido_obra', 'analisis_pu')
+                ? json_decode((string) bd_valor('AW', 'select analisis_pu from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]), true) : null;
             // Renglones de Materia Prima / Mano de Obra / Gastos de Operacion con el nombre de su concepto
             $p['conceptos'] = bd_filas('AW',
                 "select d.docto_sugerido_obra_det_id, d.tipo_concepto, d.concepto_id, d.presupuesto, d.docto_imp_id, d.folio, d.notas,

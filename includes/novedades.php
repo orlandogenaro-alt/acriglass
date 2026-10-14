@@ -6,6 +6,8 @@ return [
     [
         'fecha' => '2026-10-14',
         'cambios' => [
+            ['nuevo', 'Presupuesto: Análisis de Precios Unitarios como Neodata', 'Nueva pestaña Análisis P.U. con la lógica de Neodata sobre lo que ya se captura: costo directo (Materia Prima + Mano de Obra con FSR + herramienta menor), indirectos (Gastos de Operacion), financiamiento, utilidad y cargos adicionales (comisiones y anexo de seguro), con el factor de sobrecosto, el catálogo de conceptos por partida con su P.U. e insumos, y la explosión de insumos. Es una vista paralela: el Subtotal y el Total del presupuesto no cambian; muestra la diferencia contra ellos. Con la utilidad vacía usa la equivalente a la Utilidad Neta. Para guardar los factores: Consultas/aw_presupuesto_analisis_pu.sql en AW-Management y Consultas/supabase_presupuesto_analisis_pu.sql en Supabase.'],
+            ['correccion', 'Presupuesto: Guardar e Imprimir Detalle', 'Guardar un presupuesto con conceptos e Imprimir Detalle con artículos importados marcaban error desde que Conceptos/Tareas pasó a su propio archivo.'],
             ['nuevo', 'Presupuesto: datos de la obra en el encabezado', 'Entre los datos del cliente y el folio se capturan los datos de la ventana Nueva obra: Nombre, Teléfono, Mail, Dirección, Colonia, C. P., Ciudad, Estado, Descripción, Observaciones, Obra bloqueada y Obra maestra. Se guardan con el presupuesto y al «Registrar Obra» llenan el nombre, la dirección completa y las notas de la obra. El Id de Negocio, Folio, Fecha, Vendedor y Obra pasan a la derecha. Requiere la columna DATOS_OBRA: Consultas/aw_presupuesto_datos_obra.sql en AW-Management y Consultas/supabase_presupuesto_datos_obra.sql en Supabase.'],
         ],
     ],

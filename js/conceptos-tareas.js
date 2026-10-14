@@ -429,7 +429,8 @@ window.AcriTareas = function (op) {
 
     function adjPedir(params, cuerpo) {
         var url = 'api/adjuntos.php' + (cuerpo ? '' : '?' + params);
-        return fetch(url, cuerpo ? { method: 'POST', body: cuerpo } : {}).then(function (r) {
+        var token = (document.querySelector('meta[name="acri-token"]') || {}).content || '';
+        return fetch(url, cuerpo ? { method: 'POST', body: cuerpo, headers: { 'X-Acri-Token': token } } : {}).then(function (r) {
             if (r.status === 401) { (window.top || window).location.href = 'index.php'; throw new Error('Sesión expirada'); }
             return r.json().catch(function () { throw new Error('Respuesta no válida del servidor (HTTP ' + r.status + ').'); });
         }).then(function (j) {

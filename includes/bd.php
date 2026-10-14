@@ -24,8 +24,11 @@ const ACRI_MOTORES = [
 
 define('ACRI_EASYGLASS_BD', dirname(ACRI_RAIZ) . '/Easy-glass php/config/bases_datos.config.php');
 
-function bd_conexiones(): array
+// Se lee una sola vez por petición (en la nube cada lectura es una consulta a Supabase); bd_guardar la renueva
+function bd_conexiones(bool $renovar = false): array
 {
+    static $cache = null;
+    if ($cache !== null && !$renovar) return $cache;
     $todas = configLeer('bases-datos');
     if (ACRI_NUBE) {
         $todas['AW'] = nube_config() + [
@@ -38,13 +41,14 @@ function bd_conexiones(): array
             'de_entorno' => true,
         ];
     }
-    return $todas;
+    return $cache = $todas;
 }
 
 // Guarda las conexiones sin las que vienen de variables de entorno
 function bd_guardar(array $todas): void
 {
     configGuardar('bases-datos', array_filter($todas, fn($c) => empty($c['de_entorno'])));
+    bd_conexiones(true);
 }
 
 // Conexiones de Easy-Glass Boss por clave (vacío si no está instalado en este servidor)

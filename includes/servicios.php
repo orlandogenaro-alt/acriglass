@@ -70,74 +70,124 @@ function api_token_oauth(array $s): array
     return $t;
 }
 
+// Petición cURL lista para mandar (credencial, URL base, encabezados y cuerpo del servicio); error si no se puede armar
+function api_preparar(string $clave, string $metodo, string $ruta, $datos, array $encabezados)
+{
+    $s = api_config($clave);
+    if (empty($s['activa'])) throw new RuntimeException("El servicio '$clave' está desactivado.");
+    if (($s['url'] ?? '') === '' && !preg_match('#^https?://#i', $ruta)) throw new RuntimeException('El servicio no tiene URL base.');
+
+    $cred = $s['credencial'] ?? '';
+    $auth = $s['auth'] ?? 'ninguna';
+    if (in_array($auth, ['header', 'bearer', 'query', 'basic'], true) && $cred === '') {
+        throw new RuntimeException('Falta capturar la credencial del servicio.');
+    }
+
+    $h = ['Accept: application/json'];
+    switch ($auth) {
+        case 'header': $h[] = $s['auth_campo'] . ': ' . $cred; break;
+        case 'bearer': $h[] = 'Authorization: Bearer ' . $cred; break;
+        case 'basic':  $h[] = 'Authorization: Basic ' . base64_encode($cred); break;
+        case 'oauth2':
+            $tok = api_token_oauth($s);
+            $h[] = 'Authorization: Bearer ' . $tok['access_token'];
+            $ruta = str_replace('{realm}', rawurlencode((string) $tok['relam_id']), $ruta);
+            break;
+    }
+
+    $url = api_url($s['url'] ?? '', $ruta);
+    if ($auth === 'query') {
+        $url .= (strpos($url, '?') === false ? '?' : '&') . rawurlencode($s['auth_campo']) . '=' . rawurlencode($cred);
+    }
+
+    $ch = curl_init($url);
+    $op = [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CUSTOMREQUEST  => strtoupper($metodo),
+        CURLOPT_TIMEOUT        => max(1, (int) ($s['espera'] ?? 30)),
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_USERAGENT      => 'AcriGlass/1.0',
+    ];
+    if ($datos !== null) {
+        if (is_array($datos)) {
+            $op[CURLOPT_POSTFIELDS] = json_encode($datos, JSON_UNESCAPED_UNICODE);
+            $h[] = 'Content-Type: application/json';
+        } else {
+            $op[CURLOPT_POSTFIELDS] = (string) $datos;
+        }
+    }
+    $op[CURLOPT_HTTPHEADER] = array_merge($h, $encabezados);
+    curl_setopt_array($ch, $op);
+    return $ch;
+}
+
+// Respuesta en la forma de api_http
+function api_resultado($cuerpo, int $codigo, ?string $errCurl, float $inicio): array
+{
+    $ms = (int) round((microtime(true) - $inicio) * 1000);
+    if ($cuerpo === false || $cuerpo === null) return ['ok' => false, 'codigo' => 0, 'datos' => null, 'cuerpo' => '', 'error' => 'Sin respuesta: ' . $errCurl, 'ms' => $ms];
+    $json = json_decode($cuerpo, true);
+    $ok = $codigo >= 200 && $codigo < 300;
+    return ['ok' => $ok, 'codigo' => $codigo, 'datos' => $json ?? $cuerpo, 'cuerpo' => $cuerpo, 'error' => $ok ? null : "El servicio respondió HTTP $codigo", 'ms' => $ms];
+}
+
 function api_http(string $clave, string $metodo = 'GET', string $ruta = '', $datos = null, array $encabezados = []): array
 {
     $inicio = microtime(true);
-    $resp = function (bool $ok, int $codigo, $datosResp, string $cuerpo, ?string $error) use ($inicio) {
-        return ['ok' => $ok, 'codigo' => $codigo, 'datos' => $datosResp, 'cuerpo' => $cuerpo, 'error' => $error,
-                'ms' => (int) round((microtime(true) - $inicio) * 1000)];
-    };
-
     try {
-        $s = api_config($clave);
-        if (empty($s['activa'])) throw new RuntimeException("El servicio '$clave' está desactivado.");
-        if (($s['url'] ?? '') === '' && !preg_match('#^https?://#i', $ruta)) throw new RuntimeException('El servicio no tiene URL base.');
-
-        $cred = $s['credencial'] ?? '';
-        $auth = $s['auth'] ?? 'ninguna';
-        if (in_array($auth, ['header', 'bearer', 'query', 'basic'], true) && $cred === '') {
-            throw new RuntimeException('Falta capturar la credencial del servicio.');
-        }
-
-        $h = ['Accept: application/json'];
-        switch ($auth) {
-            case 'header': $h[] = $s['auth_campo'] . ': ' . $cred; break;
-            case 'bearer': $h[] = 'Authorization: Bearer ' . $cred; break;
-            case 'basic':  $h[] = 'Authorization: Basic ' . base64_encode($cred); break;
-            case 'oauth2':
-                $tok = api_token_oauth($s);
-                $h[] = 'Authorization: Bearer ' . $tok['access_token'];
-                $ruta = str_replace('{realm}', rawurlencode((string) $tok['relam_id']), $ruta);
-                break;
-        }
-
-        $url = api_url($s['url'] ?? '', $ruta);
-        if ($auth === 'query') {
-            $url .= (strpos($url, '?') === false ? '?' : '&') . rawurlencode($s['auth_campo']) . '=' . rawurlencode($cred);
-        }
-
-        $ch = curl_init($url);
-        $op = [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CUSTOMREQUEST  => strtoupper($metodo),
-            CURLOPT_TIMEOUT        => max(1, (int) ($s['espera'] ?? 30)),
-            CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_USERAGENT      => 'AcriGlass/1.0',
-        ];
-        if ($datos !== null) {
-            if (is_array($datos)) {
-                $op[CURLOPT_POSTFIELDS] = json_encode($datos, JSON_UNESCAPED_UNICODE);
-                $h[] = 'Content-Type: application/json';
-            } else {
-                $op[CURLOPT_POSTFIELDS] = (string) $datos;
-            }
-        }
-        $op[CURLOPT_HTTPHEADER] = array_merge($h, $encabezados);
-        curl_setopt_array($ch, $op);
-
+        $ch = api_preparar($clave, $metodo, $ruta, $datos, $encabezados);
         $cuerpo = curl_exec($ch);
         $codigo = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $errCurl = curl_errno($ch) ? curl_error($ch) : null;
         curl_close($ch);
-
-        if ($cuerpo === false) return $resp(false, 0, null, '', 'Sin respuesta: ' . $errCurl);
-        $json = json_decode($cuerpo, true);
-        $ok = $codigo >= 200 && $codigo < 300;
-        return $resp($ok, $codigo, $json ?? $cuerpo, $cuerpo, $ok ? null : "El servicio respondió HTTP $codigo");
+        return api_resultado($cuerpo, $codigo, $errCurl, $inicio);
     } catch (Throwable $e) {
-        return $resp(false, 0, null, '', $e->getMessage());
+        return ['ok' => false, 'codigo' => 0, 'datos' => null, 'cuerpo' => '', 'error' => $e->getMessage(), 'ms' => (int) round((microtime(true) - $inicio) * 1000)];
     }
+}
+
+function api_id($ch): int { return is_object($ch) ? spl_object_id($ch) : (int) $ch; }
+
+// Varios GET al mismo servicio al mismo tiempo (hasta $simultaneas a la vez): [llave => ruta] → [llave => respuesta de api_http].
+// Evita esperar una llamada tras otra (p. ej. un folio de Microsip tras otro en Facturación).
+function api_http_varios(string $clave, array $rutas, int $simultaneas = 8): array
+{
+    $res = [];
+    $inicio = microtime(true);
+    $pendientes = $rutas;
+    $mh = curl_multi_init();
+    $activos = [];
+    $agregar = function () use (&$pendientes, &$activos, &$res, $mh, $clave, $inicio) {
+        $k = array_key_first($pendientes);
+        $ruta = $pendientes[$k];
+        unset($pendientes[$k]);
+        try {
+            $ch = api_preparar($clave, 'GET', $ruta, null, []);
+            curl_multi_add_handle($mh, $ch);
+            $activos[api_id($ch)] = [$k, $ch];
+        } catch (Throwable $e) {
+            $res[$k] = ['ok' => false, 'codigo' => 0, 'datos' => null, 'cuerpo' => '', 'error' => $e->getMessage(), 'ms' => 0];
+        }
+    };
+    while ($pendientes && count($activos) < $simultaneas) $agregar();
+    while ($activos) {
+        curl_multi_exec($mh, $corriendo);
+        if (curl_multi_select($mh, 1.0) === -1) usleep(10000);
+        while ($info = curl_multi_info_read($mh)) {
+            $ch = $info['handle'];
+            [$k] = $activos[api_id($ch)];
+            unset($activos[api_id($ch)]);
+            $errCurl = $info['result'] !== CURLE_OK ? curl_error($ch) : null;
+            $cuerpo = $info['result'] === CURLE_OK ? curl_multi_getcontent($ch) : false;
+            $res[$k] = api_resultado($cuerpo, (int) curl_getinfo($ch, CURLINFO_HTTP_CODE), $errCurl, $inicio);
+            curl_multi_remove_handle($mh, $ch);
+            curl_close($ch);
+            if ($pendientes) $agregar();
+        }
+    }
+    curl_multi_close($mh);
+    return $res;
 }
 
 // Estado de la credencial para mostrar en la lista (nunca devuelve el valor)

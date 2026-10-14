@@ -98,7 +98,7 @@
         f.append('accion', accion);
         f.append('tipo', 'membrete');
         if (archivo) f.append('archivo', archivo);
-        return pedir('api/imagenes.php', { method: 'POST', body: f }).then(function (j) {
+        return pedir('api/imagenes.php', { method: 'POST', body: f, headers: { 'X-Acri-Token': token } }).then(function (j) {
             return pedir('api/membrete.php?accion=leer').then(function (r) { r.aviso = j.aviso; return r; });
         });
     }

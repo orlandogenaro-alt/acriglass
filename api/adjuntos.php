@@ -18,6 +18,11 @@ require __DIR__ . '/../includes/sesion.php';
 require __DIR__ . '/../includes/respuesta.php';
 
 exigirPermiso('MODULO_SUGERIDOS_OBRA', 'NUEVO_OBRA', 'MODIFICAR_OBRA', 'CERRAR_OBRA', 'ADMIN_USER');
+// Subir, preparar, confirmar y quitar cambian datos: token de la página y permiso de captura (no basta con consultar)
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    exigirCsrf();
+    exigirPermiso('NUEVO_SUGERIDO_OBRA', 'MODIFICAR_SUGERIDO_OBRA', 'NUEVO_OBRA', 'MODIFICAR_OBRA', 'ADMIN_USER');
+}
 session_write_close();
 
 const ADJ_MAX_MB = 25;

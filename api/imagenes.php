@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 exigirPermiso('ADMIN_USER');
+exigirCsrf();
 
 $mb = 1024 * 1024;
 $reglas = [

@@ -29,11 +29,13 @@ function iniciarSesion(string $usuario, array $permisos, bool $modoConfig = fals
 
 if ($usuario === '' || $contrasena === '') volver('vacio');
 
-// Administrador maestro: entra aunque no exista en AW (solo se guarda el hash de la contraseña)
+// Administrador maestro: entra aunque no exista en AW. El hash de su contraseña no va en el código:
+// variable de entorno ACRI_ADMIN_HASH (Vercel) o config/admin.json { "hash": … } (servidor local, fuera de git).
+// Sin hash configurado el usuario maestro queda desactivado.
 const ACRI_ADMIN_USUARIO = 'SYSDBA';
-const ACRI_ADMIN_HASH    = '$2y$10$ATW5kTJTkOxn6GiR00wMG.aso/Y.n4nFpIWmMyr.Typ2LBx1BsO1q';
 if (strcasecmp($usuario, ACRI_ADMIN_USUARIO) === 0) {
-    if (!password_verify($contrasena, ACRI_ADMIN_HASH)) volver('datos');
+    $hashAdmin = (string) (getenv('ACRI_ADMIN_HASH') ?: (configLeer('admin')['hash'] ?? ''));
+    if ($hashAdmin === '' || !password_verify($contrasena, $hashAdmin)) volver('datos');
     iniciarSesion(ACRI_ADMIN_USUARIO, ['ADMIN_USER' => true]);
 }
 

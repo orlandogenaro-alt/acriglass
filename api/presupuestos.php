@@ -21,6 +21,8 @@ exigirCsrf();
 exigirPermiso('NUEVO_SUGERIDO_OBRA', 'MODIFICAR_SUGERIDO_OBRA', 'NUEVO_OBRA', 'MODIFICAR_OBRA', 'ADMIN_USER');
 session_write_close();
 
+const IVA = 0.16;   // igual que js/presupuesto.js
+
 // Catálogo de conceptos de cada sección: tabla, columna id
 const CATALOGOS = [
     'MP' => ['conceptos_mat_prima_obra', 'concepto_mat_prima_id'],
@@ -217,6 +219,8 @@ function guardar(array $d): array
     if ($id) {
         $estatus = estatusActual($id);
         if (estatusBloqueaCambios($estatus)) error("El presupuesto está $estatus: ya no es posible hacerle modificaciones.");
+        // «Modificar» del Form46: el permiso o la autorización de otro usuario, revisados aquí y no solo en la pantalla
+        if (!tienePermiso('MODIFICAR_SUGERIDO_OBRA', 'ADMIN_USER')) autorizacion($d['autoriza'] ?? null, 'MODIFICAR_SUGERIDO_OBRA');
     }
 
     $conceptos = [];
@@ -233,7 +237,25 @@ function guardar(array $d): array
         $conceptos[] = $c;
     }
 
-    $t = $d['totales'] ?? [];
+    // Totales del Form46 calculados aquí con los renglones (no se confía en lo que manda el navegador):
+    // subtotal = costo / (1 − %util); el del navegador solo se acepta si cuadra (lo usa el subtotal capturado a mano)
+    $util = numero($d['utilidad_por'] ?? 0, 4);
+    if ($util < 0 || $util >= 100) error('La Utilidad Neta debe ser de 0 a 99.99 %.');
+    $suma = ['MP' => 0.0, 'MO' => 0.0, 'GO' => 0.0];
+    foreach ($conceptos as $c) $suma[$c['tipo']] += numero($c['presupuesto'] ?? 0);
+    $costo = $suma['MP'] + $suma['MO'] + $suma['GO'];
+    $esperado = $costo / (1 - $util / 100);
+    $subtotal = numero($d['totales']['subtotal'] ?? $esperado);
+    if (abs($subtotal - $esperado) > max(1, $esperado * 0.0001)) {
+        error('Los totales del presupuesto no cuadran con sus conceptos (subtotal ' . number_format($subtotal, 2) . ' contra '
+            . number_format($esperado, 2) . '). Recarga la página e intenta de nuevo.');
+    }
+    $iva = round($subtotal * IVA, 2);
+    // Comisiones y anexo de seguro: porcentajes del subtotal
+    foreach ($d['comisiones'] ?? [] as $i => $c) $d['comisiones'][$i]['total'] = round($subtotal * numero($c['porcentaje'] ?? 0, 4) / 100, 2);
+    foreach ($d['seguros'] ?? [] as $i => $s) {
+        $d['seguros'][$i]['total'] = round($subtotal * numero($s['porcentaje_1'] ?? 0) * numero($s['porcentaje_2'] ?? 0) / 10000, 2);
+    }
     $enc = [
         'fecha'             => $fecha,
         'cliente'           => $cliente,
@@ -241,13 +263,13 @@ function guardar(array $d): array
         'ubicacion'         => texto($d['ubicacion'] ?? '', 150),
         'vendedor_obra_id'  => null,
         'estatus'           => $estatus,
-        'utilidad_neta_por' => numero($d['utilidad_por'] ?? 0, 4),
-        'cos_primo'         => numero($t['cos_primo'] ?? 0),
-        'gas_operacion'     => numero($t['gas_operacion'] ?? 0),
-        'utilidad_neta'     => numero($t['utilidad_neta'] ?? 0),
-        'subtotal'          => numero($t['subtotal'] ?? 0),
-        'iva'               => numero($t['iva'] ?? 0),
-        'total'             => numero($t['total'] ?? 0),
+        'utilidad_neta_por' => $util,
+        'cos_primo'         => round($suma['MP'] + $suma['MO'], 2),
+        'gas_operacion'     => round($suma['GO'], 2),
+        'utilidad_neta'     => round($subtotal - $costo, 2),
+        'subtotal'          => $subtotal,
+        'iva'               => $iva,
+        'total'             => round($subtotal + $iva, 2),
         'notas'             => texto($d['notas'] ?? '', 32000),
     ];
     $idHs = preg_replace('/\D/', '', (string) ($d['id_hs'] ?? ''));

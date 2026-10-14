@@ -3,7 +3,8 @@
     var enPestana = window.parent !== window;
 
     function enviar(datos) {
-        return fetch(API, { method: 'POST', body: datos, credentials: 'same-origin' })
+        var token = (document.querySelector('meta[name="acri-token"]') || {}).content || '';
+        return fetch(API, { method: 'POST', body: datos, credentials: 'same-origin', headers: { 'X-Acri-Token': token } })
             .then(function (r) {
                 return r.json().catch(function () { throw new Error('Respuesta inválida del servidor (' + r.status + ').'); });
             })

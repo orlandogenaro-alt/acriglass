@@ -1274,6 +1274,7 @@
     // ---------- Guardar en AW-Management (api/presupuestos.php) ----------
     var presupuestoId = parseInt(document.body.dataset.presupuesto, 10) || 0;
     var guardando = false;
+    var autorizaModificar = null;   // { usuario, contrasena } de quien autorizó «Modificar» (se revisa otra vez al guardar)
     var token = (document.querySelector('meta[name="acri-token"]') || {}).content || '';
 
     function pedirPresupuestos(accion, cuerpo) {
@@ -1355,6 +1356,7 @@
             id_hs: $('idNegocio').textContent.trim(),
             notas: $('descripcion').value,
             obra_datos: datosObra(),
+            autoriza: presupuestoId ? autorizaModificar : null,
             analisis_pu: exportarAnalisis(),
             utilidad_por: num($('pctUtilidad').value),
             totales: {
@@ -1410,6 +1412,12 @@
             $(correo.length <= 10 ? 'email' : 'proyecto').focus();
             return Promise.resolve(false);
         }
+        var util = num($('pctUtilidad').value);
+        if (util < 0 || util >= 100) {
+            alert('La Utilidad Neta debe ser de 0 a 99.99 %.');
+            $('pctUtilidad').focus();
+            return Promise.resolve(false);
+        }
         var incompletos = conceptosIncompletosPU();
         if (incompletos.length && !confirm('Hay ' + incompletos.length + ' concepto(s) del Análisis P.U. sin terminar (' +
                 incompletos.slice(0, 3).map(function (c) { return (c.descripcion || c.clave) + ': ' + revisionConcepto(c).toLowerCase(); }).join('; ') +
@@ -1422,6 +1430,7 @@
             document.body.dataset.presupuesto = j.id;
             $('folio').value = j.folio;
             cambios = false;
+            autorizaModificar = null;
             // Ya guardado vuelve a solo lectura: para otro cambio se presiona «Modificar»
             soloLectura = true;
             aplicarModo();
@@ -1718,7 +1727,7 @@
                 if (!confirm('No tienes el permiso para Modificar presupuestos. ¿Deseas que lo autorice otro usuario?')) return;
                 pedirAutorizacion('Modificar el presupuesto requiere el permiso «Modificar presupuestos».').then(function (a) {
                     if (!a) return;
-                    pedirPresupuestos('autorizar', { autoriza: a }).then(habilitar)
+                    pedirPresupuestos('autorizar', { autoriza: a }).then(function () { autorizaModificar = a; habilitar(); })
                         .catch(function (err) { alert('No se autorizó: ' + err.message); });
                 });
                 return;

@@ -19,6 +19,7 @@ function insignia(bool $propia): string
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="acri-token" content="<?= e($_SESSION['csrf']) ?>">
     <title>Imagen del Sistema · AcriGlass</title>
     <link rel="icon" href="<?= e($imagenes['favicon']['url']) ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">

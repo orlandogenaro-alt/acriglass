@@ -359,12 +359,24 @@ function catalogosObra(int $obra): array
 }
 
 // Cruce de un folio de Easy-Glass con Microsip (API v1 /microsip-folio): [datos, error]
-function microsipFolio($folio): array
+// Respuestas ya consultadas en esta petición (precargarMicrosip las pide todas al mismo tiempo)
+function microsipFolio($folio, ?array $precarga = null): array
 {
-    $r = api_http('EASYGLASS', 'GET', '/microsip-folio/' . rawurlencode((string) $folio));
+    static $cache = [];
+    if ($precarga !== null) { $cache = $precarga + $cache; return []; }
+    $k = (int) $folio;
+    $r = $cache[$k] ?? api_http('EASYGLASS', 'GET', '/microsip-folio/' . rawurlencode((string) $folio));
     if (!$r['ok']) return [null, $r['error'] ?: 'sin respuesta'];
     $d = $r['datos']['datos'] ?? null;
     return is_array($d) ? [$d, null] : [null, 'respuesta sin datos'];
+}
+
+// Pide a la API de Easy-Glass todos los folios de una vez (en paralelo) en lugar de uno tras otro
+function precargarMicrosip(array $folios): void
+{
+    $rutas = [];
+    foreach (array_unique(array_filter(array_map('intval', $folios))) as $f) $rutas[$f] = '/microsip-folio/' . $f;
+    if (count($rutas) > 1) microsipFolio(0, api_http_varios('EASYGLASS', $rutas));
 }
 
 // Renglón de facturación de un folio de Easy-Glass: pedido, facturas y cobranza de Microsip.
@@ -436,12 +448,36 @@ function facturacion(int $obraId): array
         $filas[] = $base + ['eg_folio' => ($k && !$err) ? $k : 0, 'factura' => 'NO FACTUR','imp_factura' => 0, 'cargos' => $imp, 'creditos' => 0, 'saldo' => $imp, 'detalle' => []];
     };
 
+    // Documentos a cruzar con Microsip: cotizaciones asignadas y folios de Easy-Glass del negocio de HubSpot
+    $cotizaciones = $foliosEg = [];
     try {
-        foreach (bd_filas('AW',
+        $cotizaciones = bd_filas('AW',
             'select docto_orden_obra_id as id, folio, estatus, nom_cliente, fecha, importe_neto
-               from doctos_microsip_obra where obra_id = ? order by fecha, folio', [$obraId]) as $c) {
-            // El folio EG0009256 es de un pedido de Easy-Glass: se cruza con Microsip
-            $folioEasy = preg_match('/^EG0*(\d+)$/i', trim((string) $c['folio']), $mm) ? $mm[1] : 0;
+               from doctos_microsip_obra where obra_id = ? order by fecha, folio', [$obraId]);
+    } catch (Throwable $e) {
+        $avisos[] = 'Cotizaciones asignadas: ' . bd_mensaje_error($e);
+    }
+    [$p, $deal] = presupuestoDeObra($obraId);
+    if ($deal) {
+        try {
+            $foliosEg = foliosEasyGlass($deal);
+            if (count($foliosEg) > 40) {
+                $avisos[] = 'El negocio tiene ' . count($foliosEg) . ' folios de Easy-Glass; solo se cruzan los primeros 40 con Microsip.';
+                $foliosEg = array_slice($foliosEg, 0, 40);
+            }
+        } catch (Throwable $e) {
+            $avisos[] = 'Easy-Glass: ' . bd_mensaje_error($e);
+        }
+    } elseif ($p) {
+        $avisos[] = "El presupuesto folio {$p['folio']} no está ligado a un negocio de HubSpot: no se buscan sus folios de Easy-Glass.";
+    }
+    // El folio EG0009256 es de un pedido de Easy-Glass: se cruza con Microsip
+    $folioDe = fn($c) => preg_match('/^EG0*(\d+)$/i', trim((string) $c['folio']), $mm) ? $mm[1] : 0;
+    precargarMicrosip(array_merge(array_map($folioDe, $cotizaciones), array_column($foliosEg, 'folio')));
+
+    try {
+        foreach ($cotizaciones as $c) {
+            $folioEasy = $folioDe($c);
             $cruzar(['id' => $c['id'], 'tipo' => -1, 'tipo_docto' => 'Cotizacion Microsip', 'folio' => $c['folio'], 'estatus' => estatusLetra($c['estatus']),
                      'cliente' => $c['nom_cliente'], 'fecha' => $c['fecha'], 'importe' => (float) $c['importe_neto']], $folioEasy);
         }
@@ -467,23 +503,9 @@ function facturacion(int $obraId): array
         $avisos[] = 'Documentos de cobro: ' . bd_mensaje_error($e);
     }
 
-    [$p, $deal] = presupuestoDeObra($obraId);
-    if ($deal) {
-        try {
-            $folios = foliosEasyGlass($deal);
-            if (count($folios) > 40) {
-                $avisos[] = 'El negocio tiene ' . count($folios) . ' folios de Easy-Glass; solo se cruzan los primeros 40 con Microsip.';
-                $folios = array_slice($folios, 0, 40);
-            }
-            foreach ($folios as $f) {
-                $cruzar(['id' => $f['suerido_id'], 'tipo' => 9, 'tipo_docto' => 'Easy-Glass · ' . ($f['tipo'] ?: 'Presupuesto'), 'folio' => $f['folio'],
-                         'estatus' => $f['estatus'], 'cliente' => $f['nom_cliente'], 'fecha' => $f['fecha'], 'importe' => (float) $f['importe_con_iva']], $f['folio']);
-            }
-        } catch (Throwable $e) {
-            $avisos[] = 'Easy-Glass: ' . bd_mensaje_error($e);
-        }
-    } elseif ($p) {
-        $avisos[] = "El presupuesto folio {$p['folio']} no está ligado a un negocio de HubSpot: no se buscan sus folios de Easy-Glass.";
+    foreach ($foliosEg as $f) {
+        $cruzar(['id' => $f['suerido_id'], 'tipo' => 9, 'tipo_docto' => 'Easy-Glass · ' . ($f['tipo'] ?: 'Presupuesto'), 'folio' => $f['folio'],
+                 'estatus' => $f['estatus'], 'cliente' => $f['nom_cliente'], 'fecha' => $f['fecha'], 'importe' => (float) $f['importe_con_iva']], $f['folio']);
     }
     if (!$filas) $avisos[] = 'No existen Cotizaciones asignadas a esta obra.';
     return ['filas' => $filas, 'avisos' => $avisos];

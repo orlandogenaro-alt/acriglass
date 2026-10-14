@@ -72,8 +72,9 @@ function datosObra($d): ?string
     return array_filter($r) ? json_encode($r, JSON_UNESCAPED_UNICODE) : null;
 }
 
-// Factores del Análisis de Precios Unitarios (lógica de Neodata) como JSON; null si son los de por omisión.
+// Análisis de Precios Unitarios (como Neodata) como JSON; null si no hay conceptos y los factores son los de por omisión.
 // fsr: factor de salario real · hm: % herramienta menor · fin: % financiamiento · util: % utilidad (null = equivalente al Form46)
+// conceptos: [{ clave, partida, descripcion, unidad, cantidad, insumos: [{ tipo MAT|MO|EQ, descripcion, unidad, cantidad, rinde, costo }] }]
 function analisisPU($d): ?string
 {
     $d = is_array($d) ? $d : [];
@@ -83,8 +84,36 @@ function analisisPU($d): ?string
         'hm'   => max(0, min(100, numero($d['hm'] ?? 0, 4))),
         'fin'  => max(0, min(100, numero($d['fin'] ?? 0, 4))),
         'util' => isset($d['util']) && is_numeric($d['util']) ? max(0, min(1000, numero($d['util'], 4))) : null,
+        'conceptos' => [],
     ];
-    return $r['fsr'] == 1 && !$r['hm'] && !$r['fin'] && $r['util'] === null ? null : json_encode($r);
+    foreach (array_slice((array) ($d['conceptos'] ?? []), 0, 1000) as $c) {
+        if (!is_array($c)) continue;
+        $insumos = [];
+        foreach (array_slice((array) ($c['insumos'] ?? []), 0, 200) as $i) {
+            if (!is_array($i)) continue;
+            $insumos[] = [
+                'tipo'        => in_array($i['tipo'] ?? '', ['MAT', 'MO', 'EQ'], true) ? $i['tipo'] : 'MAT',
+                'descripcion' => texto($i['descripcion'] ?? '', 200) ?? '',
+                'unidad'      => texto($i['unidad'] ?? '', 20) ?? '',
+                'cantidad'    => max(0, numero($i['cantidad'] ?? 0, 6)),
+                'rinde'       => max(0, numero($i['rinde'] ?? 0, 4)),
+                'costo'       => max(0, numero($i['costo'] ?? 0, 4)),
+            ];
+        }
+        $concepto = [
+            'clave'       => texto($c['clave'] ?? '', 20) ?? '',
+            'partida'     => texto($c['partida'] ?? '', 100) ?? '',
+            'descripcion' => texto($c['descripcion'] ?? '', 300) ?? '',
+            'unidad'      => texto($c['unidad'] ?? '', 20) ?? '',
+            'cantidad'    => max(0, numero($c['cantidad'] ?? 0, 4)),
+            'insumos'     => $insumos,
+        ];
+        // Renglón totalmente vacío: no se guarda
+        if ($concepto['descripcion'] === '' && !$concepto['cantidad'] && !$insumos) continue;
+        $r['conceptos'][] = $concepto;
+    }
+    if ($r['fsr'] == 1 && !$r['hm'] && !$r['fin'] && $r['util'] === null && !$r['conceptos']) return null;
+    return json_encode($r, JSON_UNESCAPED_UNICODE);
 }
 
 // Estatus guardado del presupuesto (error si ya no existe)
@@ -225,7 +254,13 @@ function guardar(array $d): array
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'id_hs')) $enc['id_hs'] = $idHs !== '' && $idHs !== '0' ? $idHs : null;
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'correo_electronico')) $enc['correo_electronico'] = texto($d['email'] ?? '', 150);
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'datos_obra')) $enc['datos_obra'] = datosObra($d['obra_datos'] ?? []);
-    if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'analisis_pu')) $enc['analisis_pu'] = analisisPU($d['analisis_pu'] ?? []);
+    if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'analisis_pu')) {
+        $enc['analisis_pu'] = analisisPU($d['analisis_pu'] ?? []);
+    } elseif (!empty($d['analisis_pu']['conceptos'])) {
+        // Sin la columna se perderían los conceptos analizados (y sus importes en MP / MO al volver a abrirlo)
+        error('Para guardar el Análisis P.U. falta preparar la base: corre Consultas/aw_presupuesto_analisis_pu.sql (AW-Management) '
+            . 'o Consultas/supabase_presupuesto_analisis_pu.sql (Supabase), o quita los conceptos de la pestaña Análisis P.U.');
+    }
 
     $pdo = bd_pdo('AW');
     $pdo->beginTransaction();

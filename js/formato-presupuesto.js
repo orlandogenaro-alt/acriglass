@@ -3,7 +3,10 @@
 // FormatoPresupuesto(doc, membrete, detalle) → HTML
 //   doc = { folio, fecha (aaaa-mm-dd), estatus, cliente, proyecto, ubicacion, vendedor, elaboro, notas,
 //           secciones: [{ titulo, conceptos: [{ concepto, importe, folio, articulos: [{ nombre, unidades, um, total }] }] }],
-//           utilidad_pct, subtotal, iva_pct }
+//           utilidad_pct, subtotal, iva_pct,
+//           titulo?, catalogo?: { partidas: [{ nombre, conceptos: [{ clave, descripcion, unidad, cantidad, pu, importe, cd,
+//                                  insumos: [{ tipo, descripcion, unidad, cantidad, costo, importe }] }] }], factor, detalle } }
+//   Con catalogo se imprime el presupuesto por precios unitarios (Análisis P.U.) en lugar de las secciones.
 window.FormatoPresupuesto = function (doc, m, detalle) {
     function esc(s) {
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -36,7 +39,7 @@ window.FormatoPresupuesto = function (doc, m, detalle) {
             '<div class="fp-logo">' + (m.logo ? '<img src="' + esc(m.logo) + '" alt="">' : '') +
                 (m.empresa ? '<b>' + esc(m.empresa) + '</b>' : '') +
                 (m.datos ? '<small>' + esc(m.datos).replace(/\n/g, '<br>') + '</small>' : '') + '</div>' +
-            '<div class="fp-titulo"><h1>' + esc(detalle ? m.titulo_detalle : m.titulo) + '</h1>' +
+            '<div class="fp-titulo"><h1>' + esc(doc.titulo || (detalle ? m.titulo_detalle : m.titulo)) + '</h1>' +
                 '<div class="fp-folio"><b>Folio: ' + esc(doc.folio || 0) + '</b><small>Fe.Imp:' + ahora() + '</small></div></div>' +
             '<div class="fp-codigo"><b>Codigo: ' + esc(m.codigo) + '</b></div>' +
             '<div class="fp-rev"><b>Revision: ' + esc(m.revision) + '</b></div>' +
@@ -77,7 +80,36 @@ window.FormatoPresupuesto = function (doc, m, detalle) {
             '</table>';
     }).join('');
 
-    var resumen = '<div class="fp-resumen">' +
+    // ---------- Presupuesto por precios unitarios ----------
+    if (doc.catalogo) {
+        var cat = doc.catalogo;
+        cuerpo = '<table class="fp-sec fp-cat"><thead><tr><th>Clave</th><th>Concepto</th><th>Unidad</th><th class="num">Cantidad</th>' +
+            '<th class="num">P.U.</th><th class="num">Importe</th></tr></thead><tbody>' +
+            cat.partidas.map(function (p) {
+                var tot = p.conceptos.reduce(function (t, c) { return t + n(c.importe); }, 0);
+                return '<tr class="fp-partida"><td colspan="5">' + esc(p.nombre) + '</td><td class="num">' + dinero(tot) + '</td></tr>' +
+                    p.conceptos.map(function (c) {
+                        var h = '<tr class="fp-concepto"><td>' + esc(c.clave) + '</td><td>' + esc(c.descripcion) + '</td><td>' + esc(c.unidad) + '</td>' +
+                            '<td class="num">' + cant(c.cantidad) + '</td><td class="num">' + dinero(c.pu) + '</td><td class="num">' + dinero(c.importe) + '</td></tr>';
+                        if (cat.detalle && c.insumos && c.insumos.length) {
+                            h += '<tr class="fp-det"><td colspan="6"><table>' +
+                                '<thead><tr><th>Tipo</th><th>Insumo</th><th>UM</th><th class="num">Cantidad</th><th class="num">Costo</th><th class="num">Importe</th></tr></thead><tbody>' +
+                                c.insumos.map(function (i) {
+                                    return '<tr><td>' + esc(i.tipo) + '</td><td>' + esc(i.descripcion) + '</td><td>' + esc(i.unidad) + '</td>' +
+                                        '<td class="num">' + (n(i.cantidad) ? String(Math.round(n(i.cantidad) * 10000) / 10000) : '') + '</td>' +
+                                        '<td class="num">' + (n(i.costo) ? dinero(i.costo) : '') + '</td><td class="num">' + dinero(i.importe) + '</td></tr>';
+                                }).join('') +
+                                '<tr class="fp-cd"><td colspan="6">Costo directo ' + dinero(c.cd) + ' × factor de sobrecosto ' +
+                                    String(Math.round(n(cat.factor) * 10000) / 10000) + ' = P.U. ' + dinero(c.pu) + '</td></tr>' +
+                                '</tbody></table></td></tr>';
+                        }
+                        return h;
+                    }).join('');
+            }).join('') +
+            '</tbody><tfoot><tr><td colspan="6">IMPORTE TOTAL (sin IVA): ' + dinero(subtotal) + '</td></tr></tfoot></table>';
+    }
+
+    var resumen = doc.catalogo ? '' : '<div class="fp-resumen">' +
         '<span>Costo Primo:</span><b>' + dinero(primo) + '</b>' +
         '<span>+ Gastos de operacion:</span><b>' + dinero(gastos) + '</b>' +
         '<span>= Costo Total:</span><b>' + dinero(costo) + '</b>' +

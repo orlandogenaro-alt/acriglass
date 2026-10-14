@@ -524,24 +524,58 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 
 /* Análisis de Precios Unitarios (Neodata) */
 .pu-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: auto; }
-.pu-factores label { display: inline-flex; align-items: center; gap: 6px; color: var(--texto-2); }
-.pu-factores input { width: 84px; height: 28px; padding: 0 6px; text-align: right; background: var(--input); color: var(--texto); border: 1px solid var(--borde-2); border-radius: 4px; }
-.pu-factores input:disabled { opacity: .6; }
-.pu-factores .extra-ayuda { margin-left: auto; }
-.pu-factores .extra-ayuda b { color: var(--enfasis); font-variant-numeric: tabular-nums; }
-.pu-cuerpo { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 10px; }
-.pu-cuerpo .extra-caja { max-height: 360px; }
+.pu-pasos { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 8px 12px; list-style: none; background: var(--azul-suave); border: 1px solid var(--azul-borde); border-radius: 4px; font-size: 12.5px; color: var(--texto); }
+.pu-pasos li { display: flex; align-items: center; gap: 6px; }
+.pu-pasos b { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--azul); color: #fff; font-size: 11px; }
+.pu-pasos em { font-style: normal; font-weight: 700; }
+.pu-cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 330px); gap: 10px; }
+.pu-cuerpo .extra-caja { max-height: 420px; }
 .pu-insumos { grid-column: 1 / -1; }
+.pu-insumos .extra-caja { max-height: 260px; }
 .pu-resumen .extra-caja { max-height: none; }
 .pu-resumen tr.pu-total td { font-weight: 700; color: var(--enfasis); border-top: 1px solid var(--borde-2); }
 .pu-resumen tr.pu-factor td { font-weight: 700; color: var(--azul-texto); }
 .pu-resumen tr.pu-ref td { color: var(--texto-3); font-size: 12px; }
+.pu-resumen tr.pu-dif td { color: var(--ambar); font-weight: 700; font-size: 12px; }
+.pu-resumen tr.pu-nota td { height: auto; padding: 6px 8px; font-size: 11.5px; color: var(--texto-3); white-space: normal; }
+.pu-avanzado { border-top: 1px solid var(--borde); font-size: 12px; color: var(--texto-2); }
+.pu-avanzado summary { padding: 8px; cursor: pointer; color: var(--azul-texto); font-weight: 600; }
+.pu-avanzado label { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 8px; }
+.pu-avanzado input { width: 90px; height: 28px; padding: 0 6px; text-align: right; background: var(--input); color: var(--texto); border: 1px solid var(--borde-2); border-radius: 4px; }
+.pu-avanzado input:disabled { opacity: .6; }
+.pu-avanzado p { margin: 6px 8px 10px; color: var(--texto-3); }
+.pu-avanzado b { color: var(--enfasis); }
 .pu-conceptos tr.pu-partida td { background: var(--sub) !important; font-weight: 700; color: var(--enfasis); }
-.pu-conceptos tr.pu-insumo td { height: 26px; font-size: 12px; color: var(--texto-3); }
-.pu-conceptos tr.pu-insumo td.izq { padding-left: 22px; color: var(--texto-2); }
+.pu-conceptos tr.pu-otro td { color: var(--texto-3); }
+.pu-conceptos tfoot td { height: 32px; font-weight: 700; color: var(--enfasis); border-top: 1px solid var(--borde-2); background: var(--sub); }
+.pu-rev { font-size: 12px; white-space: nowrap; }
+.pu-rev.ok { color: var(--verde) !important; }
+.pu-rev.falta { color: var(--ambar) !important; font-weight: 600; }
+.pu-acciones { display: flex; align-items: center; gap: 4px; padding: 0 4px !important; white-space: nowrap; }
+.pu-acciones .ct-btn { margin: 0; height: 26px; padding: 0 10px; }
+.pu-mini { width: 26px; height: 26px; border-radius: 4px; color: var(--texto-3); }
+.pu-mini:hover:not(:disabled) { background: var(--fila-hover); color: var(--texto); }
+.pu-mini.borrar { height: 26px; }
+.pu-mini:disabled { opacity: .4; cursor: default; }
+.pu-dialogo { width: min(1060px, calc(100vw - 24px)); }
+.pu-dlg-concepto { display: grid; grid-template-columns: minmax(0, 1fr) 110px 110px 200px; gap: 8px; padding: 12px 16px 0; font-size: 12.5px; color: var(--texto-2); }
+.pu-dlg-concepto label { display: flex; flex-direction: column; gap: 3px; }
+.pu-dlg-concepto input { height: 30px; padding: 0 8px; background: var(--input); color: var(--texto); border: 1px solid var(--borde-2); border-radius: 4px; }
+.pu-dlg-ayuda { margin: 10px 16px 0; padding: 8px 10px; background: var(--azul-suave); border: 1px solid var(--azul-borde); border-radius: 4px; font-size: 12.5px; color: var(--texto); }
+.pu-dlg-botones { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px 0; }
+.pu-dlg-botones .ct-btn { margin: 0; }
+.pu-dlg-tabla { margin: 8px 16px 0; max-height: 300px; border: 1px solid var(--borde); border-radius: 4px; }
+.pu-dlg-tabla input[readonly] { color: var(--azul-texto); font-style: italic; }
+.pu-na { display: block; text-align: center; color: var(--texto-3); }
+.pu-dlg-totales { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 10px 16px 0; font-size: 12.5px; color: var(--texto-2); }
+.pu-dlg-totales b { color: var(--enfasis); font-variant-numeric: tabular-nums; }
+.pu-dlg-totales .pu-pu { color: var(--enfasis); font-size: 13.5px; }
+.pu-dlg-totales .pu-pu b { color: var(--azul-texto); }
+.pu-dlg-totales .pu-falta { color: var(--ambar); font-weight: 600; }
 @media (max-width: 900px) {
     .pu-cuerpo { grid-template-columns: minmax(0, 1fr); }
-    .pu-factores .extra-ayuda { margin-left: 0; }
+    .pu-dlg-concepto { grid-template-columns: 1fr 1fr; }
+    .pu-dlg-concepto .ancho { grid-column: 1 / -1; }
 }
 
 /* Quitar flechas de input number */

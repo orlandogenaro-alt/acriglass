@@ -54,6 +54,38 @@ if (!modoConfiguracion()) {
     }
 }
 
+// Análisis P.U.: conceptos e insumos ya capturados en otros presupuestos, para copiarlos sin volver a armarlos
+// (lo más reciente gana). { conceptos: [{descripcion, unidad, partida, folio, insumos}], insumos: [{tipo, descripcion, unidad, costo}] }
+$bibliotecaPU = ['conceptos' => [], 'insumos' => []];
+if (!modoConfiguracion()) {
+    try {
+        if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'analisis_pu')) {
+            $sql = 'select %s docto_sugerido_obra_id as id, folio, analisis_pu from doctos_sugerido_obra
+                     where analisis_pu is not null and docto_sugerido_obra_id <> ? order by docto_sugerido_obra_id desc %s';
+            $sql = bd_motor('AW') === 'firebird' ? sprintf($sql, 'first 200', '') : sprintf($sql, '', 'limit 200');
+            $vistosC = $vistosI = [];
+            foreach (bd_filas('AW', $sql, [$presupuestoId]) as $f) {
+                $a = json_decode((string) $f['analisis_pu'], true);
+                foreach (($a['conceptos'] ?? []) as $c) {
+                    $k = mb_strtoupper(trim((string) ($c['descripcion'] ?? ''))) . '|' . mb_strtoupper(trim((string) ($c['unidad'] ?? '')));
+                    if (empty($c['insumos']) || $k === '|' || isset($vistosC[$k]) || count($vistosC) >= 400) continue;
+                    $vistosC[$k] = 1;
+                    $bibliotecaPU['conceptos'][] = ['descripcion' => $c['descripcion'], 'unidad' => $c['unidad'] ?? '', 'partida' => $c['partida'] ?? '',
+                                                    'folio' => (int) $f['folio'], 'insumos' => $c['insumos']];
+                    foreach ($c['insumos'] as $i) {
+                        $ki = ($i['tipo'] ?? '') . '|' . mb_strtoupper(trim((string) ($i['descripcion'] ?? '')));
+                        if (trim((string) ($i['descripcion'] ?? '')) === '' || isset($vistosI[$ki]) || count($vistosI) >= 800) continue;
+                        $vistosI[$ki] = 1;
+                        $bibliotecaPU['insumos'][] = ['tipo' => $i['tipo'] ?? 'MAT', 'descripcion' => $i['descripcion'], 'unidad' => $i['unidad'] ?? '', 'costo' => (float) ($i['costo'] ?? 0)];
+                    }
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('AcriGlass presupuesto biblioteca P.U.: ' . $e->getMessage());
+    }
+}
+
 // Estatus del menú «Actualizar Estatus» (Administrador › Estatus de Presupuestos)
 try {
     $estatus = estatusPresupuesto();
@@ -116,6 +148,8 @@ $secciones = [
         <div class="menu">
             <button data-imprimir="normal">Imprimir</button>
             <button data-imprimir="detalle">Imprimir Detalle</button>
+            <button data-imprimir="pu">Imprimir Precios Unitarios</button>
+            <button data-imprimir="pu-detalle">Imprimir Análisis de P.U.</button>
         </div>
     </div>
     <button class="tb" data-accion="modificar">
@@ -253,48 +287,63 @@ $secciones = [
             <!-- Conceptos/Tareas: se generan solos con lo capturado en MP / MO / GO -->
             <?php ctPanel(true); ?>
 
-            <!-- Análisis de Precios Unitarios (lógica de Neodata): vista paralela, no cambia el Subtotal del Form46 -->
+            <!-- Análisis de Precios Unitarios (como Neodata): conceptos con cantidad × P.U. y su análisis de insumos.
+                 Lo que se captura aquí pasa solo a Materia Prima y Mano de Obra; lo capturado por importe se respeta. -->
             <div class="pu-panel" id="puPanel" hidden>
-                <div class="extra pu-factores">
-                    <div class="extra-barra">
-                        <strong>Factores</strong>
-                        <label title="Factor de Salario Real: prestaciones, IMSS y días no trabajados sobre los sueldos de los empleados">FSR
-                            <input type="number" id="puFsr" class="num" step="0.0001" min="0" value="1"></label>
-                        <label title="Herramienta menor: % sobre la mano de obra">Herr. menor %
-                            <input type="number" id="puHm" class="num" step="0.01" min="0" value="0"></label>
-                        <label title="Financiamiento: % sobre costo directo + indirectos">Financiamiento %
-                            <input type="number" id="puFin" class="num" step="0.01" min="0" value="0"></label>
-                        <label title="Utilidad sobre costo directo + indirectos + financiamiento. Vacío = equivalente a la Utilidad Neta del presupuesto">Utilidad %
-                            <input type="number" id="puUtil" class="num" step="0.01" min="0"></label>
-                        <span class="extra-ayuda">Indirectos (Gastos de Operacion): <b id="puInd">0.00 %</b> · Cargos adicionales (comisiones y seguro): <b id="puCa">0.00 %</b></span>
-                    </div>
-                </div>
+                <ol class="pu-pasos">
+                    <li><b>1</b> Agrega cada trabajo de la obra con su <em>unidad</em> y <em>cantidad</em> (ej. «Cancel de baño», m², 12).</li>
+                    <li><b>2</b> Presiona <em>Analizar</em> y anota lo que lleva <em>una</em> unidad: materiales, mano de obra y equipo.</li>
+                    <li><b>3</b> El precio unitario y el total salen solos y pasan a Materia Prima y Mano de Obra.</li>
+                </ol>
                 <div class="pu-cuerpo">
+                    <section class="extra pu-conceptos">
+                        <div class="extra-barra">
+                            <strong>Catálogo de conceptos</strong>
+                            <button type="button" class="ct-btn" id="puAgregar">+ Agregar concepto</button>
+                            <span class="extra-ayuda">Si el concepto ya se hizo en otro presupuesto, elígelo de la lista al escribirlo y se copia su análisis.</span>
+                        </div>
+                        <div class="extra-caja">
+                            <table class="grid mini-grid">
+                                <thead><tr><th class="c-id">Clave</th><th>Partida</th><th>Concepto</th><th>Unidad</th><th class="c-num">Cantidad</th><th class="c-num">P.U.</th><th class="c-num">Importe</th><th>Revisión</th><th></th></tr></thead>
+                                <tbody id="puConceptos"></tbody>
+                                <tfoot><tr class="pu-total"><td colspan="6" class="ro">Total del catálogo (precio de venta sin IVA)</td><td class="ro" id="puTotalCat">0.00</td><td colspan="2"></td></tr></tfoot>
+                            </table>
+                        </div>
+                    </section>
                     <section class="extra pu-resumen">
                         <div class="extra-barra"><strong>Integración del precio</strong></div>
                         <div class="extra-caja">
                             <table class="grid mini-grid"><tbody id="puResumen"></tbody></table>
                         </div>
-                    </section>
-                    <section class="extra pu-conceptos">
-                        <div class="extra-barra"><strong>Catálogo de conceptos</strong><span class="extra-ayuda">Partida = agrupador de Conceptos/Tareas · debajo de cada concepto, sus insumos</span></div>
-                        <div class="extra-caja">
-                            <table class="grid mini-grid">
-                                <thead><tr><th class="c-id">Clave</th><th>Concepto</th><th>Unidad</th><th class="c-num">Cantidad</th><th class="c-num">Costo directo</th><th class="c-num">P.U.</th><th class="c-num">Importe</th></tr></thead>
-                                <tbody id="puConceptos"></tbody>
-                            </table>
-                        </div>
+                        <details class="pu-avanzado">
+                            <summary>Ajustes avanzados (solo si sabes qué son)</summary>
+                            <label title="Factor de Salario Real: multiplica los sueldos por prestaciones, IMSS y días no trabajados. 1 = sin cambio; lo usual es entre 1.3 y 1.7">Factor de salario real (FSR)
+                                <input type="number" id="puFsr" class="num" step="0.0001" min="0" value="1"></label>
+                            <label title="Desgaste de herramienta pequeña: % sobre la mano de obra. Lo usual es 3 %">Herramienta menor %
+                                <input type="number" id="puHm" class="num" step="0.01" min="0" value="0"></label>
+                            <label title="Costo del dinero mientras se cobra la obra: % sobre costo directo + indirectos">Financiamiento %
+                                <input type="number" id="puFin" class="num" step="0.01" min="0" value="0"></label>
+                            <label title="Utilidad sobre costo directo + indirectos + financiamiento. Vacío = la equivalente a la Utilidad Neta del presupuesto">Utilidad %
+                                <input type="number" id="puUtil" class="num" step="0.01" min="0"></label>
+                            <p>Indirectos = Gastos de Operacion: <b id="puInd">0.00 %</b> del costo directo · Cargos adicionales = comisiones y seguro: <b id="puCa">0.00 %</b> del precio.</p>
+                        </details>
                     </section>
                     <section class="extra pu-insumos">
-                        <div class="extra-barra"><strong>Explosión de insumos</strong><span class="extra-ayuda">Artículos importados de todo el presupuesto, sumados por clave y unidad</span></div>
+                        <div class="extra-barra"><strong>Explosión de insumos</strong><span class="extra-ayuda">Todo lo que lleva la obra, sumado: insumos de los análisis y artículos importados</span></div>
                         <div class="extra-caja">
                             <table class="grid mini-grid">
-                                <thead><tr><th class="c-id">Clave</th><th>Insumo</th><th>Sección</th><th>Unidad</th><th class="c-num">Cantidad</th><th class="c-num">Costo prom.</th><th class="c-num">Importe</th><th class="c-pct">%</th></tr></thead>
+                                <thead><tr><th>Insumo</th><th>Tipo</th><th>Unidad</th><th class="c-num">Cantidad</th><th class="c-num">Costo prom.</th><th class="c-num">Importe</th><th class="c-pct">%</th></tr></thead>
                                 <tbody id="puInsumos"></tbody>
                             </table>
                         </div>
                     </section>
                 </div>
+                <datalist id="puUnidades"><option>m²</option><option>m</option><option>ml</option><option>pza</option><option>jgo</option><option>lote</option><option>kg</option><option>m³</option><option>lt</option><option>hr</option><option>jornal</option><option>día</option><option>servicio</option><option>viaje</option></datalist>
+                <datalist id="puPartidas"></datalist>
+                <datalist id="puSugConceptos"></datalist>
+                <datalist id="puSugMAT"></datalist>
+                <datalist id="puSugMO"></datalist>
+                <datalist id="puSugEQ"></datalist>
             </div>
 
             <div class="grid-caja">
@@ -468,6 +517,37 @@ $secciones = [
 
 <?php ctDialogos($vendedores); ?>
 
+<!-- ============ ANÁLISIS DEL PRECIO UNITARIO DE UN CONCEPTO ============ -->
+<dialog class="hs-dialogo pu-dialogo" id="puDialogo">
+    <div class="hs-cabecera">
+        <strong>Análisis del precio unitario</strong>
+        <button type="button" class="hs-cerrar" data-pu-cerrar title="Cerrar">✕</button>
+    </div>
+    <div class="pu-dlg-concepto">
+        <label class="ancho">Concepto: <input type="text" id="puDConcepto" maxlength="300" list="puSugConceptos"></label>
+        <label>Unidad: <input type="text" id="puDUnidad" maxlength="20" list="puUnidades"></label>
+        <label>Cantidad: <input type="number" id="puDCantidad" class="num" step="0.01" min="0"></label>
+        <label>Partida: <input type="text" id="puDPartida" maxlength="100" list="puPartidas" placeholder="ej. Cancelería"></label>
+    </div>
+    <p class="pu-dlg-ayuda" id="puDAyuda"></p>
+    <div class="pu-dlg-botones">
+        <button type="button" class="ct-btn" data-pu-insumo="MAT">+ Material</button>
+        <button type="button" class="ct-btn" data-pu-insumo="MO">+ Mano de obra</button>
+        <button type="button" class="ct-btn" data-pu-insumo="EQ">+ Equipo / herramienta</button>
+    </div>
+    <div class="extra-caja pu-dlg-tabla">
+        <table class="grid mini-grid">
+            <thead><tr><th>Tipo</th><th>Descripción</th><th>Unidad</th><th class="c-num" id="puDColCant">Cantidad</th><th class="c-num" title="Solo mano de obra: cuántas unidades del concepto hace en una jornada">Rinde por jornada</th><th class="c-num">Costo unitario</th><th class="c-num">Importe</th><th class="c-del"></th></tr></thead>
+            <tbody id="puDInsumos"></tbody>
+        </table>
+    </div>
+    <div class="pu-dlg-totales" id="puDTotales"></div>
+    <div class="hs-pie">
+        <span class="extra-ayuda">Los cambios se aplican al momento.</span>
+        <button type="button" class="hs-btn principal" data-pu-cerrar>Listo</button>
+    </div>
+</dialog>
+
 <!-- ============ AUTORIZACIÓN DE OTRO USUARIO (Dialog225) ============ -->
 <dialog class="hs-dialogo au-dialogo" id="auDialogo">
     <form id="auForm">
@@ -501,6 +581,7 @@ $secciones = [
     window.ACRI_FIJOS = <?= json_encode($fijos, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_EMPLEADOS = <?= json_encode($empleados, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_TIPOS_COMISION = <?= json_encode($tiposComision, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.ACRI_BIBLIOTECA_PU = <?= json_encode($bibliotecaPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <script src="<?= recurso('js/formato-presupuesto.js') ?>"></script>
 <script src="<?= recurso('js/conceptos-tareas.js') ?>"></script>

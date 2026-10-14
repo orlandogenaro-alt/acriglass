@@ -90,6 +90,17 @@
 .fp-det td { padding: 0 4px; }
 .fp-det th:first-child, .fp-det td:first-child { width: 64%; }
 
+/* Presupuesto por precios unitarios (Análisis P.U.) */
+.fp-cat { width: 100%; }
+.fp-cat > thead th:first-child { width: 9%; }
+.fp-cat > thead th.num { width: 12%; }
+.fp-cat td.num, .fp-cat th.num { text-align: right; }
+.fp-cat .fp-partida td { padding-top: 4px; font-weight: 700; color: var(--fp-color); border-bottom: 1px solid var(--fp-color); }
+.fp-cat > tfoot td { padding-left: 4px; text-align: right; }
+.fp-cat .fp-det th:first-child, .fp-cat .fp-det td:first-child { width: 16%; }
+.fp-cat .fp-det td.num { text-align: right; }
+.fp-cat .fp-cd td { font-style: italic; text-align: right; border-top: 1px dotted #999; }
+
 /* Costo total */
 .fp-resumen {
     display: grid;

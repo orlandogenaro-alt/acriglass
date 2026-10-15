@@ -17,6 +17,9 @@
 // POST ?accion=agregar_explosion / actualizar_explosion   explosión de material (Dialog230)
 // POST ?accion=guardar_mo / cancelar_mo           mano de obra asignada (Dialog275)
 // POST ?accion=guardar_gasto / cancelar_gasto     gasto adicional (Dialog274)
+// POST ?accion=guardar_pedido / eliminar_pedido   11-Parametros › Pedidos relacionados       (migración 012)
+// POST ?accion=guardar_costos_adic / eliminar_costo_adic   11-Parametros › Costos adicionales (migración 012)
+// POST ?accion=guardar_comision / cancelar_comision   6-Mano de Obra › Comisiones (Dialog29, NUEVA_COMISION_OBRA; migración 012)
 // Todas: { id: obra_id, …, autoriza? }; requieren MODIFICAR_OBRA o la autorización de otro usuario
 define('ACRI_API', true);
 require __DIR__ . '/../includes/sesion.php';
@@ -833,6 +836,171 @@ function enviarMicrosip(array $d): array
     return ['folio' => $folioEg, 'simular' => $simular, 'resultado' => $datos['datos'] ?? $datos];
 }
 
+// ---------- Tablas de la migración 012 ----------
+function exigirTabla(string $tabla): void
+{
+    if (!bd_tiene_tabla('AW', $tabla)) error("Falta la tabla $tabla en la base: aplica la migración 012 (php herramientas/migrar.php --aplicar).");
+}
+
+// ---------- 11-Parametros › Pedidos relacionados (Dialog230 ban 44 / elimina_pedido_relacionado_a_una_obra) ----------
+const TIPOS_PEDIDO = ['PV', 'PE', 'OC', 'OT'];
+function guardarPedido(array $d): array
+{
+    exigirTabla('documentos_relac_obras');
+    $obra = (int) ($d['id'] ?? 0);
+    validaEstatusObra($obra);
+    exigirOAutorizar($d, 'MODIFICAR_OBRA');
+    $tipo = strtoupper(trim((string) ($d['tipo_docto'] ?? 'PV')));
+    if (!in_array($tipo, TIPOS_PEDIDO, true)) error('Tipo de documento no válido.');
+    $folio = texto($d['folio'] ?? '', 20);
+    if ($folio === null) error('Indica el folio del pedido.');
+    $uds = numero($d['unidades'] ?? 0);
+    $imp = numero($d['importe'] ?? 0);
+    if ($uds < 0 || $imp < 0) error('Las unidades y el importe no pueden ser negativos.');
+    $pedidoId = (int) ($d['pedido_id'] ?? 0);
+    $repetido = (int) bd_valor('AW', 'select count(*) from documentos_relac_obras where obra_id = ? and tipo_docto = ? and upper(trim(folio)) = upper(?) and docto_relac_obra_id <> ?',
+        [$obra, $tipo, $folio, $pedidoId]);
+    if ($repetido) error("El folio $folio ya está relacionado con la obra.");
+    $campos = ['tipo_docto' => $tipo, 'docto_id' => (int) ($d['docto_id'] ?? 0) ?: null, 'folio' => $folio, 'unidades' => $uds, 'importe' => $imp];
+    if ($pedidoId) {
+        $n = bd_ejecutar('AW', 'update documentos_relac_obras set ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($campos))) .
+            ' where docto_relac_obra_id = ? and obra_id = ?', array_merge(array_values($campos), [$pedidoId, $obra]));
+        if (!$n) error('El pedido ya no existe.', 404);
+    } else {
+        $pedidoId = bd_insertar('AW', 'documentos_relac_obras', 'docto_relac_obra_id', $campos + ['obra_id' => $obra, 'usuario_creacion' => usuario()]);
+    }
+    return ['pedido_id' => $pedidoId];
+}
+
+function eliminarPedido(array $d): void
+{
+    exigirTabla('documentos_relac_obras');
+    $obra = (int) ($d['id'] ?? 0);
+    validaEstatusObra($obra);
+    exigirOAutorizar($d, 'MODIFICAR_OBRA');
+    if (!bd_ejecutar('AW', 'delete from documentos_relac_obras where docto_relac_obra_id = ? and obra_id = ?', [(int) ($d['pedido_id'] ?? 0), $obra])) {
+        error('El pedido ya no existe.', 404);
+    }
+}
+
+// ---------- 11-Parametros › Costos adicionales (guarda_conceptos_gas_adic_obra) ----------
+// La lista completa: los conceptos que ya no vienen se quitan y los demás se dan de alta o se actualizan
+function guardarCostosAdic(array $d): array
+{
+    exigirTabla('gastos_oper_adic_obra');
+    $obra = (int) ($d['id'] ?? 0);
+    validaEstatusObra($obra);
+    exigirOAutorizar($d, 'MODIFICAR_OBRA');
+    $filas = [];
+    foreach ((array) ($d['conceptos'] ?? []) as $c) {
+        $cid = (int) ($c['concepto_id'] ?? 0);
+        if (!$cid) continue;
+        $nombre = bd_valor('AW', 'select descripcion from conceptos_gas_operacion_obra where concepto_gas_operacion_obra_id = ?', [$cid]);
+        if ($nombre === null || $nombre === false) error('Uno de los conceptos de Gastos de Operación ya no existe.');
+        if (isset($filas[$cid])) error("El concepto $nombre está dos veces.");
+        $pct = numero($c['porcentaje'] ?? 0, 4);
+        if ($pct < 0 || $pct > 100) error("El % de $nombre debe estar entre 0 y 100.");
+        $filas[$cid] = ['concepto' => mb_substr(trim((string) $nombre), 0, 80), 'porcentaje' => $pct];
+    }
+    $pdo = bd_pdo('AW');
+    $pdo->beginTransaction();
+    try {
+        $ids = array_keys($filas);
+        bd_ejecutar('AW', 'delete from gastos_oper_adic_obra where obra_id = ?' .
+            ($ids ? ' and concepto_gas_operacion_obra_id not in (' . implode(',', array_fill(0, count($ids), '?')) . ')' : ''), array_merge([$obra], $ids));
+        foreach ($filas as $cid => $f) {
+            $n = bd_ejecutar('AW', 'update gastos_oper_adic_obra set concepto = ?, porcentaje = ? where obra_id = ? and concepto_gas_operacion_obra_id = ?',
+                [$f['concepto'], $f['porcentaje'], $obra, $cid]);
+            if (!$n) bd_insertar('AW', 'gastos_oper_adic_obra', 'gasto_oper_adic_obra_id', $f + ['obra_id' => $obra, 'concepto_gas_operacion_obra_id' => $cid]);
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+    return ['conceptos' => count($filas)];
+}
+
+function eliminarCostoAdic(array $d): void
+{
+    exigirTabla('gastos_oper_adic_obra');
+    $obra = (int) ($d['id'] ?? 0);
+    validaEstatusObra($obra);
+    exigirOAutorizar($d, 'MODIFICAR_OBRA');
+    if (!bd_ejecutar('AW', 'delete from gastos_oper_adic_obra where gasto_oper_adic_obra_id = ? and obra_id = ?', [(int) ($d['costo_id'] ?? 0), $obra])) {
+        error('El costo adicional ya no existe.', 404);
+    }
+}
+
+// ---------- 6-Mano de Obra › Comisiones (Dialog29) ----------
+// tipo_id 1 = administrativos · 2 = operativos. Neto de cada empleado = importe a pagar − descuentos.
+function guardarComision(array $d): array
+{
+    exigirTabla('pago_comis_por_obra_enca');
+    $obra = (int) ($d['id'] ?? 0);
+    validaEstatusObra($obra);
+    exigirOAutorizar($d, 'NUEVA_COMISION_OBRA');
+    $comId = (int) ($d['comision_id'] ?? 0);
+    if ($comId) {
+        $e = bd_valor('AW', 'select estatus from pago_comis_por_obra_enca where pago_comis_por_obra_enca_id = ? and obra_id = ?', [$comId, $obra]);
+        if ($e === null || $e === false) error('La comisión ya no existe.', 404);
+        if (trim((string) $e) === 'Cancelado') error('No es posible modificar un documento cancelado');
+    }
+    $det = [];
+    $vistos = [];
+    foreach ((array) ($d['empleados'] ?? []) as $e) {
+        $nombre = texto($e['nombre'] ?? '', 150);
+        if ($nombre === null) continue;
+        $emp = (int) ($e['empleado_id'] ?? 0);
+        if ($emp && isset($vistos[$emp])) error("El empleado $nombre está dos veces.");
+        $vistos[$emp] = 1;
+        $f = ['empleado_id' => $emp ?: null, 'nombre' => $nombre, 'hrs_trabajadas' => numero($e['hrs_trabajadas'] ?? 0),
+              'por_comision' => numero($e['por_comision'] ?? 0), 'importe_pagar' => numero($e['importe_pagar'] ?? 0), 'descuentos' => numero($e['descuentos'] ?? 0)];
+        if (min($f['hrs_trabajadas'], $f['por_comision'], $f['importe_pagar'], $f['descuentos']) < 0) error("El empleado $nombre tiene cantidades negativas.");
+        if ($f['por_comision'] > 100) error("El % de comisión de $nombre no puede pasar de 100.");
+        if ($f['descuentos'] > $f['importe_pagar']) error("Los descuentos de $nombre son mayores que su importe a pagar.");
+        $det[] = $f;
+    }
+    if (!$det) error('Agrega al menos un empleado a la comisión.');
+    $enc = [
+        'fecha' => fecha($d['fecha'] ?? '') ?? date('Y-m-d'),
+        'tipo_id' => (int) ($d['tipo_id'] ?? 2) === 1 ? 1 : 2,
+        'notas' => texto($d['notas'] ?? '', 200),
+        'importe_neto' => numero(array_sum(array_map(fn($f) => $f['importe_pagar'] - $f['descuentos'], $det))),
+    ];
+    $pdo = bd_pdo('AW');
+    $pdo->beginTransaction();
+    try {
+        if ($comId) {
+            bd_ejecutar('AW', 'update pago_comis_por_obra_enca set ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($enc))) . ' where pago_comis_por_obra_enca_id = ?',
+                array_merge(array_values($enc), [$comId]));
+        } else {
+            $comId = bd_insertar('AW', 'pago_comis_por_obra_enca', 'pago_comis_por_obra_enca_id', $enc + ['obra_id' => $obra, 'estatus' => 'Normal', 'usuario_creacion' => usuario()]);
+        }
+        reemplazarDetalle('pago_comis_por_obra', 'pago_comis_por_obra_det', 'pago_comis_por_obra_enca_id', $comId, $det);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+    bitacora($comId, 'Comisiones ' . ($enc['tipo_id'] === 1 ? 'administrativos' : 'operativos') . ' Importe: $' . number_format($enc['importe_neto'], 2));
+    return ['comision_id' => $comId, 'importe_neto' => $enc['importe_neto']];
+}
+
+function cancelarComision(array $d): void
+{
+    exigirTabla('pago_comis_por_obra_enca');
+    $obra = (int) ($d['id'] ?? 0);
+    validaEstatusObra($obra);
+    exigirOAutorizar($d, 'NUEVA_COMISION_OBRA');
+    $comId = (int) ($d['doc_id'] ?? 0);
+    $e = bd_valor('AW', 'select estatus from pago_comis_por_obra_enca where pago_comis_por_obra_enca_id = ? and obra_id = ?', [$comId, $obra]);
+    if ($e === null || $e === false) error('La comisión ya no existe.', 404);
+    if (trim((string) $e) === 'Cancelado') error('El documento ya está cancelado.');
+    bd_ejecutar('AW', "update pago_comis_por_obra_enca set estatus = 'Cancelado' where pago_comis_por_obra_enca_id = ?", [$comId]);
+    bitacora($comId, 'Estatus: Cancelado Motivo: ' . trim((string) ($d['motivo'] ?? '')));
+}
+
 try {
     switch ($_GET['accion'] ?? '') {
         case 'guardar':
@@ -899,6 +1067,21 @@ try {
             responder(['ok' => true] + guardarGasto(entrada()));
         case 'cancelar_gasto':
             cancelarConMotivo(entrada(), 'gastos_adicionales_obra', 'gasto_adicional_id', 'ELIMINAR_GASTO_DE_OBRA', 'El gasto');
+            responder(['ok' => true]);
+        case 'guardar_pedido':
+            responder(['ok' => true] + guardarPedido(entrada()));
+        case 'eliminar_pedido':
+            eliminarPedido(entrada());
+            responder(['ok' => true]);
+        case 'guardar_costos_adic':
+            responder(['ok' => true] + guardarCostosAdic(entrada()));
+        case 'eliminar_costo_adic':
+            eliminarCostoAdic(entrada());
+            responder(['ok' => true]);
+        case 'guardar_comision':
+            responder(['ok' => true] + guardarComision(entrada()));
+        case 'cancelar_comision':
+            cancelarComision(entrada());
             responder(['ok' => true]);
     }
     error('Acción no válida.');

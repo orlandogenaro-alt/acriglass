@@ -9,8 +9,10 @@ require __DIR__ . '/includes/membrete.php';
 $obraId = max(0, (int) ($_GET['id'] ?? 0));
 
 // Pestañas con listado (basadas en Dialog243 de VB). Las llena js/obra.js con api/obras.php
-// botones: [accion, texto, icono]  ·  columnas: [encabezado, campo, formato (txt|fecha|dinero|num)]
-// totales: [id, texto, campo que se suma]; no suman los renglones Cancelados
+// botones: [accion, texto, icono, modo?]  ·  columnas: [encabezado, campo, formato (txt|fecha|dinero|num)]
+// totales: [id, texto, campo que se suma, modo?]; no suman los renglones Cancelados
+// modos: subpestañas de la pestaña (las columnas de cada una están en js/obra.js); un botón o total con modo solo se ve en ella
+// aparte: la pestaña va en su lugar de la barra de pestañas (no junto a las demás de listado)
 $listados = [
     'facturacion' => [
         'titulo'   => '2-Facturacion',
@@ -22,32 +24,37 @@ $listados = [
     ],
     'ordenes' => [
         'titulo'   => '3-Orden Trabajo',
-        'botones'  => [['nueva-ot', 'Nueva Orden de Trabajo', '＋'], ['consultar', 'Consultar', '🔎']],
+        'modos'    => ['ordenes' => 'Ordenes de Trabajo', 'produccion' => 'Produccion'],
+        'botones'  => [['nueva-ot', 'Nueva Orden de Trabajo', '＋', 'ordenes'], ['consultar', 'Consultar', '🔎']],
         'columnas' => [['Folio', 'folio', 'txt'], ['Estatus', 'estatus', 'txt'], ['Fecha', 'fecha', 'fecha'], ['Fecha Entrega', 'fecha_entrega', 'fecha'],
                        ['Importe', 'importe_neto', 'dinero'], ['Descripcion', 'descripcion', 'txt']],
-        'totales'  => [['totOrdenes', 'Importe', 'importe_neto']],
+        'totales'  => [['totOrdenes', 'Importe', 'importe_neto', 'ordenes']],
     ],
     'explosion' => [
         'titulo'   => '4-Explosion Material',
-        'botones'  => [['nueva-explosion', 'Nuevo', '＋'], ['explosion-presupuesto', 'Desde el presupuesto', '🧮'], ['consultar', 'Consultar', '🔎'],
-                       ['eliminar-explosion', 'Eliminar seleccionados', '✕']],
+        'botones'  => [['nueva-explosion', 'Nuevo', '＋'], ['explosion-presupuesto', 'Desde el presupuesto', '🧮'], ['importar-explosion', 'Importar', '📥'],
+                       ['consultar', 'Consultar', '🔎'], ['eliminar-explosion', 'Eliminar seleccionados', '✕']],
         'columnas' => [['Clave', 'clave', 'txt'], ['Nombre', 'nombre', 'txt'], ['U.M.', 'um', 'txt'], ['Uds', 'uds', 'num'], ['Costo Unit.', 'costo_unit', 'dinero'],
                        ['Costo Total', 'costo_tot', 'dinero'], ['U.M. ML/M2', 'um_ml_m2', 'txt'], ['Tipo Docto', 'tipo_docto', 'txt'], ['Folio', 'folio', 'txt']],
         'totales'  => [['totExplosion', 'Importe', 'costo_tot']],
     ],
     'salidas' => [
         'titulo'   => '5-Salidas Material',
-        'botones'  => [['salidas-doctos', 'Documentos', '📄'], ['salidas-detalle', 'Detalle de articulos', '📦'], ['exportar', 'Exportar a Excel', '📗']],
+        'botones'  => [['salidas-doctos', 'Documentos', '📄'], ['salidas-detalle', 'Detalle de articulos', '📦'], ['imprimir-salidas', 'Imprimir', '🖨'],
+                       ['exportar', 'Exportar a Excel', '📗']],
         'columnas' => [['Folio', 'folio_microsip', 'txt'], ['OT', 'ot', 'txt'], ['Fecha', 'fecha', 'fecha'], ['Estatus', 'estatus', 'txt'],
                        ['Concepto', 'nom_concepto', 'txt'], ['Almacen', 'nom_almacen', 'txt'], ['Costo Total', 'cos_tot', 'dinero']],
         'totales'  => [['totSalidas', 'Total salidas', 'cos_tot']],
     ],
     'mano' => [
         'titulo'   => '6-Mano de Obra',
-        'botones'  => [['nueva-mo', 'Asignar Mano de Obra', '＋'], ['consultar', 'Consultar', '🔎']],
+        'modos'    => ['mano' => 'Mano de Obra', 'comisiones' => 'Comisiones'],
+        'botones'  => [['nueva-mo', 'Asignar Mano de Obra', '＋', 'mano'], ['nueva-comis-admin', 'Comisión Administrativos', '＋', 'comisiones'],
+                       ['nueva-comis-oper', 'Comisión Operativos', '＋', 'comisiones'], ['consultar', 'Consultar', '🔎']],
         'columnas' => [['Fecha', 'fecha', 'fecha'], ['Estatus', 'estatus', 'txt'], ['Folio OT', 'folio', 'txt'], ['Unidad', 'nom_unidad', 'txt'],
                        ['Importe MO', 'importe_mo', 'dinero'], ['Importe MO Real', 'importe_mo_real', 'dinero'], ['Notas', 'notas', 'txt']],
-        'totales'  => [['totMoPres', 'MO presupuestada', 'importe_mo'], ['totMoReal', 'MO real', 'importe_mo_real']],
+        'totales'  => [['totMoPres', 'MO presupuestada', 'importe_mo', 'mano'], ['totMoReal', 'MO real', 'importe_mo_real', 'mano'],
+                       ['totComis', 'Total comisiones', 'importe_neto', 'comisiones']],
     ],
     'consumos' => [
         'titulo'   => '7-Consumos',
@@ -61,13 +68,21 @@ $listados = [
                        ['Unidad', 'nom_unidad', 'txt'], ['Importe', 'importe', 'dinero'], ['Importe Real', 'importe_real', 'dinero'], ['Notas', 'notas', 'txt']],
         'totales'  => [['totGastos', 'Total gastos', 'importe'], ['totGastosReal', 'Total real', 'importe_real']],
     ],
+    'microsip' => [
+        'titulo'   => '10-Mov.Microsip',
+        'aparte'   => true,
+        'botones'  => [['consultar', 'Mostrar', '🔎'], ['exportar', 'Exportar a Excel', '📗']],
+        'columnas' => [['Docto_In_Id', 'docto_in_id', 'txt'], ['Folio', 'folio', 'txt'], ['Concepto', 'concepto', 'txt'], ['Fecha', 'fecha', 'fecha'],
+                       ['Almacen', 'almacen', 'txt'], ['Naturaleza', 'naturaleza', 'txt'], ['OT', 'ot', 'txt'], ['Estatus', 'estatus', 'txt']],
+    ],
 ];
 // Pista bajo los botones de cada pestaña para quien apenas usa el sistema
 $pistas = [
     'facturacion' => 'Clic en un renglón para ver sus documentos de Microsip · doble clic para abrirlo · clic derecho para más opciones (eliminar, cancelar o enviar a Microsip).',
     'ordenes'     => 'Doble clic en una orden de trabajo para verla, liberarla a producción o cancelarla.',
     'explosion'   => 'Doble clic en una partida para corregir sus unidades o su costo · selecciona renglones para eliminarlos.',
-    'mano'        => 'Doble clic en una asignación para verla, modificarla, imprimirla o cancelarla.',
+    'mano'        => 'Doble clic en una asignación o comisión para verla, modificarla, imprimirla o cancelarla.',
+    'microsip'    => 'Documentos de inventario de Microsip (salidas y traspasos) de las órdenes de trabajo de la obra. Naturaleza: E = entrada · S = salida.',
     'gastos'      => 'Doble clic en un gasto para verlo, modificarlo, imprimirlo o cancelarlo.',
 ];
 $hoy = date('Y-m-d');
@@ -165,9 +180,13 @@ function iconoPestana() {
         <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#fff" stroke="#666"/><path d="M7 16l3-4 3 2 4-6" fill="none" stroke="#22c55e" stroke-width="1.8"/></svg>
         <span>Estimaciones</span>
     </button>
-    <button class="tb" data-accion="imprimir">
+    <button class="tb" data-accion="imprimir" title="Analítica de ejecución por obra: presupuestado contra real, utilidad y facturación">
         <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="7" fill="#fff" stroke="#666"/><rect x="2" y="9" width="20" height="9" rx="2" fill="#8a8a8a"/><rect x="6" y="14" width="12" height="8" fill="#fff" stroke="#666"/></svg>
         <span>Imprimir</span>
+    </button>
+    <button class="tb" data-accion="imprimir-detalle" title="Analítica con el detalle: artículos, mano de obra, comisiones y gastos de la obra">
+        <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="7" fill="#fff" stroke="#666"/><rect x="2" y="9" width="20" height="9" rx="2" fill="#8a8a8a"/><rect x="6" y="14" width="12" height="8" fill="#fff" stroke="#666"/><path d="M8 17h8M8 19.5h6" stroke="#3b7dc4"/></svg>
+        <span>Imprimir Detalle</span>
     </button>
     <span class="sep"></span>
     <button class="tb paso paso-1" data-accion="ejecucion">
@@ -213,11 +232,11 @@ function iconoPestana() {
 <!-- Pestañas del documento -->
 <nav class="doc-tabs ob-tabs">
     <button class="doc-tab activo" data-vista="datos"><?= iconoPestana() ?> 1-Datos</button>
-    <?php foreach ($listados as $clave => $l): ?>
+    <?php foreach ($listados as $clave => $l): if (!empty($l['aparte'])) continue; ?>
     <button class="doc-tab" data-vista="<?= $clave ?>"><?= iconoPestana() ?> <?= e($l['titulo']) ?></button>
     <?php endforeach; ?>
     <button class="doc-tab" data-vista="adjuntos"><?= iconoPestana() ?> 9-Adjuntos</button>
-    <button class="doc-tab" data-vista="microsip"><?= iconoPestana() ?> 10-Mov.Microsip</button>
+    <button class="doc-tab" data-vista="microsip"><?= iconoPestana() ?> <?= e($listados['microsip']['titulo']) ?></button>
     <button class="doc-tab" data-vista="parametros"><?= iconoPestana() ?> 11-Parametros</button>
     <button class="doc-tab" data-vista="relacionados"><?= iconoPestana() ?> 12-HubSpot / Easy-Glass</button>
     <button class="doc-tab" data-vista="conceptos"><?= iconoPestana() ?> 13-Conceptos/Tareas</button>
@@ -293,10 +312,18 @@ function iconoPestana() {
 
 <!-- ============ PESTAÑAS CON LISTADO (2 a 8) ============ -->
 <?php foreach ($listados as $clave => $l): ?>
-<section class="vista ob-listado" data-vista="<?= $clave ?>">
+<?php $modo0 = isset($l['modos']) ? array_key_first($l['modos']) : null; ?>
+<section class="vista ob-listado" data-vista="<?= $clave ?>"<?= $modo0 ? ' data-modo="' . e($modo0) . '"' : '' ?>>
+    <?php if ($modo0): ?>
+    <nav class="cot-tabs ob-modos">
+        <?php foreach ($l['modos'] as $m => $t): ?>
+        <button type="button" data-modo-tab="<?= e($m) ?>"<?= $m === $modo0 ? ' class="activo"' : '' ?>><?= e($t) ?></button>
+        <?php endforeach; ?>
+    </nav>
+    <?php endif; ?>
     <div class="ob-subbarra">
         <?php foreach ($l['botones'] as $b): ?>
-        <button type="button" class="ob-btn" data-sub="<?= $b[0] ?>"><?= $b[2] ?> <?= e($b[1]) ?></button>
+        <button type="button" class="ob-btn" data-sub="<?= $b[0] ?>"<?= isset($b[3]) ? ' data-solo-modo="' . e($b[3]) . '"' : '' ?>><?= $b[2] ?> <?= e($b[1]) ?></button>
         <?php endforeach; ?>
         <span class="ob-estado" data-estado></span>
     </div>
@@ -325,7 +352,7 @@ function iconoPestana() {
     <?php if (!empty($l['totales'])): ?>
     <div class="ob-totales">
         <?php foreach ($l['totales'] as $t): ?>
-        <label><?= e($t[1]) ?>: <output id="<?= $t[0] ?>">$0.00</output></label>
+        <label<?= isset($t[3]) ? ' data-solo-modo="' . e($t[3]) . '"' : '' ?>><?= e($t[1]) ?>: <output id="<?= $t[0] ?>">$0.00</output></label>
         <?php endforeach; ?>
     </div>
     <?php endif; ?>
@@ -351,23 +378,53 @@ function iconoPestana() {
     </div>
 </section>
 
-<!-- ============ 10-MOV.MICROSIP ============ -->
-<section class="vista" data-vista="microsip">
-    <div class="vacio">
-        <p>Movimientos de Microsip</p>
-        <small>Aquí se verán los movimientos generados en Microsip al finalizar la obra.</small>
-    </div>
-</section>
-
-<!-- ============ 11-PARAMETROS ============ -->
-<section class="vista" data-vista="parametros">
-    <div class="ob-parametros">
-        <label>% Gastos de Administracion de Obra:
-            <input type="number" id="gasAdminObra" class="num editable" min="0" step="0.01" value="0">
-        </label>
-        <label>Concepto de Gastos de Operacion:
-            <select id="conGasOper" class="editable"><option value="">Cargando…</option></select>
-        </label>
+<!-- ============ 11-PARAMETROS (pedidos relacionados y costos adicionales) ============ -->
+<section class="vista ob-listado" data-vista="parametros">
+    <div class="ob-rel-cajas">
+        <fieldset class="ob-rel-caja">
+            <legend>Pedidos Relacionados</legend>
+            <div class="ob-subbarra">
+                <button type="button" class="ob-btn" id="pedMostrar">🔎 Mostrar</button>
+                <button type="button" class="ob-btn ped-edit" id="pedAgregar" disabled>＋ Agregar Pedido</button>
+                <button type="button" class="ob-btn" id="pedModificar">✎ Modificar</button>
+                <button type="button" class="ob-btn ped-edit" id="pedEliminar" disabled>✕ Eliminar</button>
+                <span class="ob-estado" id="pedEstado"></span>
+            </div>
+            <div class="grid-caja">
+                <table class="grid ob-grid">
+                    <thead><tr><th class="sel-col"></th><th>Tipo</th><th>Folio</th><th>Uds.</th><th>Importe</th></tr></thead>
+                    <tbody id="pedFilas"><tr class="vacio-fila"><td colspan="5">Presiona Mostrar.</td></tr></tbody>
+                </table>
+            </div>
+            <div class="ob-totales"><label>Total: <output id="pedTotal">$0.00</output></label></div>
+            <div class="ob-parametros">
+                <label>% Gastos de Operacion:
+                    <input type="number" id="gasAdminObra" class="num editable" min="0" step="0.01" value="0"
+                           title="% de administración de la obra sobre la materia prima (sin cristal) y la mano de obra reales. Se guarda con Guardar de la obra.">
+                </label>
+            </div>
+        </fieldset>
+        <fieldset class="ob-rel-caja">
+            <legend>Costos Adicionales</legend>
+            <div class="ob-subbarra">
+                <button type="button" class="ob-btn cad-edit" id="cadGuardar" disabled>💾 Guardar</button>
+                <button type="button" class="ob-btn" id="cadMostrar">🔎 Mostrar</button>
+                <button type="button" class="ob-btn" id="cadModificar">✎ Modificar</button>
+                <button type="button" class="ob-btn cad-edit" id="cadEliminar" disabled>✕ Eliminar</button>
+                <span class="ob-estado" id="cadEstado"></span>
+            </div>
+            <div class="ob-subbarra">
+                <label>Gastos Adicionales: <select id="conGasOper" class="cad-edit" disabled><option value="">Cargando…</option></select></label>
+                <button type="button" class="ob-btn cad-edit" id="cadAgregar" disabled>Agregar</button>
+            </div>
+            <div class="grid-caja">
+                <table class="grid ob-grid">
+                    <thead><tr><th class="sel-col"></th><th>Id_con</th><th>Concepto</th><th>% Porce.</th></tr></thead>
+                    <tbody id="cadFilas"><tr class="vacio-fila"><td colspan="4">Presiona Mostrar.</td></tr></tbody>
+                </table>
+            </div>
+            <p class="ob-pista">💡 Cada costo adicional es su % sobre lo facturado sin IVA y entra en los Gastos de Operación reales de la analítica (Imprimir).</p>
+        </fieldset>
     </div>
 </section>
 

@@ -14,6 +14,7 @@ const ACRI_PERMISOS = [
     'CANCELAR_ASIGNAR_MO'     => 'Cancelar mano de obra asignada a la obra',
     'MODIFICAR_GASTO_OBRA'    => 'Modificar gastos adicionales de la obra',
     'ELIMINAR_GASTO_DE_OBRA'  => 'Cancelar gastos adicionales de la obra',
+    'NUEVA_COMISION_OBRA'     => 'Calcular y cancelar comisiones de la obra',
     'ENVIAR_MICROSIP_OBRA'    => 'Enviar presupuestos de Easy-Glass a Microsip (Pedido y Orden de compra)',
     'NUEVO_EMPLEADOS_OBRA'    => 'Alta y cambios de empleados de obra',
     'NUEVO_TIPO_EMPLEADO'     => 'Alta y cambios de tipos de empleado',

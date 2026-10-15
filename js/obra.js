@@ -648,6 +648,8 @@
     function cargarListado(clave, tipo, vacio) {
         var vista = vistaDe(clave);
         if (!obraId) return;
+        // Pestaña con subpestañas: solo se pinta si lo pedido es lo de la subpestaña que se ve
+        if (MODOS[clave] && MODOS[clave][vista.dataset.modo].tipo !== tipo) { cargado[clave] = false; return Promise.resolve(); }
         cargado[clave] = true;
         estado(vista, 'Consultando…');
         return pedir('accion=listado&tipo=' + tipo + '&id=' + encodeURIComponent(obraId)).then(function (j) {
@@ -1410,7 +1412,7 @@
             '<div>Fecha: ' + escapar(o.fecha) + (o.concepto ? '<br><span style="font-weight:400">Concepto: ' + escapar(o.concepto) + '</span>' : '') + '</div></div></div></div>' +
             '<div class="sec"><div class="est">ESTATUS:<b>' + escapar(o.estatus) + '</b></div>' +
             '<div class="obra">Obra: ' + escapar($('nombreObra').value) + '</div><br>' +
-            '<b>Unidad de Transporte: ' + escapar(o.unidad) + '</b></div>' +
+            (o.unidad != null ? '<b>Unidad de Transporte: ' + escapar(o.unidad) + '</b>' : '') + '</div>' +
             '<div class="barra"></div>' + (o.total ? '<div class="total">Total: ' + escapar(o.total) + '</div>' : '') +
             '<div class="per">' + o.cuerpo + '</div>' +
             '<div class="sec">Descripcion: ' + escapar(o.descripcion) + '</div>' +
@@ -1647,8 +1649,11 @@
 
     // Doble clic en un renglón de cada pestaña
     var DOBLE_CLIC = {
-        ordenes: function (f) { abrirDocumento('orden', f.id, dialogoOrden); },
-        mano: function (f) { abrirDocumento('mo', f.id, dialogoManoObra); },
+        ordenes: function (f) { abrirDocumento('orden', f.orden_id || f.id, dialogoOrden); },
+        mano: function (f) {
+            if (vistaDe('mano').dataset.modo === 'comisiones') abrirDocumento('comision', f.id, function (d) { dialogoComision(d); });
+            else abrirDocumento('mo', f.id, dialogoManoObra);
+        },
         gastos: function (f) { abrirDocumento('gasto', f.id, dialogoGasto); },
         explosion: dialogoPartidaExplosion,
         facturacion: function (f) {
@@ -1663,7 +1668,13 @@
             var v = vista.dataset.vista;
             if (CARGAS[v]) CARGAS[v]();
         },
-        'exportar': function () { exportar(vistaDe('salidas'), 'Materiales de Obra ' + $('nombreObra').value); },
+        'exportar': function (vista) {
+            exportar(vista, (vista.dataset.vista === 'microsip' ? 'Movimientos Microsip ' : 'Materiales de Obra ') + $('nombreObra').value);
+        },
+        'imprimir-salidas': function () { if (requiereObra()) imprimirExplosionSalidas(); },
+        'importar-explosion': function () { if (puedeCapturar()) dialogoImportarExplosion(); },
+        'nueva-comis-admin': function () { if (puedeCapturar()) dialogoComision(null, 1); },
+        'nueva-comis-oper': function () { if (puedeCapturar()) dialogoComision(null, 2); },
         'nueva-cot': function () {
             if (puedeCapturar('Es necesario guardar la obra para registrar una Cotizacion para Facturacion.')) dialogoCotizacion(null);
         },
@@ -1696,7 +1707,7 @@
             var b = e.target.closest('[data-sub]');
             if (b && subAcciones[b.dataset.sub]) { subAcciones[b.dataset.sub](vista); return; }
             var tr = e.target.closest('tbody tr:not(.vacio-fila)');
-            if (!tr || !tr.dataset.i || e.target.closest('a, button')) return;
+            if (!tr || !tr.dataset.i || e.target.closest('a, button, input, select')) return;
             tr.classList.toggle('sel');
             if (vista.dataset.vista === 'facturacion') {
                 var f = (datosListado.facturacion || [])[tr.dataset.i];
@@ -1945,16 +1956,521 @@
     $('actualizarCt').addEventListener('click', function () { if (requiereObra()) cargarConceptos(); });
     $('abrirPresupuesto').addEventListener('click', abrirPresupuesto);
 
+    // ---------- Subpestañas: 3-Orden Trabajo (Ordenes / Produccion) y 6-Mano de Obra (Mano de Obra / Comisiones) ----------
+    var MODOS = {
+        ordenes: {
+            ordenes: {
+                tipo: 'ordenes', vacio: 'No existen ordenes de trabajo asignadas a esta obra',
+                columnas: [['Folio', 'folio', 'txt'], ['Estatus', 'estatus', 'txt'], ['Fecha', 'fecha', 'fecha'], ['Fecha Entrega', 'fecha_entrega', 'fecha'],
+                           ['Importe', 'importe_neto', 'dinero'], ['Descripcion', 'descripcion', 'txt']],
+                totales: [['totOrdenes', 'Importe', 'importe_neto']]
+            },
+            // retorna_material_a_producir_por_obra (ToolStripButton8)
+            produccion: {
+                tipo: 'produccion', vacio: 'Las ordenes de trabajo de esta obra no tienen material a producir',
+                columnas: [['Folio OT', 'folio', 'txt'], ['Estatus', 'estatus', 'txt'], ['Clave', 'clave_articulo', 'txt'], ['Descripcion', 'descripcion', 'txt'],
+                           ['Unidades', 'unidades', 'num'], ['Uds. Producidas', 'uds_prod', 'num'], ['U.M.', 'um', 'txt'], ['Notas', 'notas_adic', 'txt']],
+                totales: []
+            }
+        },
+        mano: {
+            mano: {
+                tipo: 'mano',
+                columnas: [['Fecha', 'fecha', 'fecha'], ['Estatus', 'estatus', 'txt'], ['Folio OT', 'folio', 'txt'], ['Unidad', 'nom_unidad', 'txt'],
+                           ['Importe MO', 'importe_mo', 'dinero'], ['Importe MO Real', 'importe_mo_real', 'dinero'], ['Notas', 'notas', 'txt']],
+                totales: [['totMoPres', 'MO presupuestada', 'importe_mo'], ['totMoReal', 'MO real', 'importe_mo_real']]
+            },
+            // retorna_empleados_para_pago_comisiones_por_obra (ToolStripButton29)
+            comisiones: {
+                tipo: 'comisiones', vacio: 'No existen comisiones calculadas para esta obra',
+                columnas: [['Fecha', 'fecha', 'fecha'], ['Estatus', 'estatus', 'txt'], ['Tipo', 'tipo_comis', 'txt'], ['Importe Neto', 'importe_neto', 'dinero'],
+                           ['Notas', 'notas', 'txt'], ['Usuario', 'usuario_creacion', 'txt']],
+                totales: [['totComis', 'Total comisiones', 'importe_neto']]
+            }
+        }
+    };
+    // Botones y totales de la subpestaña visible
+    function marcarModo(vista) {
+        vista.querySelectorAll('[data-modo-tab]').forEach(function (b) { b.classList.toggle('activo', b.dataset.modoTab === vista.dataset.modo); });
+        vista.querySelectorAll('[data-solo-modo]').forEach(function (el) { el.hidden = el.dataset.soloModo !== vista.dataset.modo; });
+    }
+    function cargarModo(clave, modo) {
+        var vista = vistaDe(clave);
+        if (modo) vista.dataset.modo = modo;
+        marcarModo(vista);
+        var m = MODOS[clave][vista.dataset.modo];
+        cambiarColumnas(vista, m.columnas, m.totales);
+        datosListado[clave] = [];
+        pintarListado(vista, [], obraId ? 'Consultando…' : 'Guarda la obra para consultar.');
+        return cargarListado(clave, m.tipo, m.vacio);
+    }
+    document.querySelectorAll('.ob-modos').forEach(function (nav) {
+        var vista = nav.closest('.vista');
+        marcarModo(vista);
+        nav.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-modo-tab]');
+            if (b && b.dataset.modoTab !== vista.dataset.modo) cargarModo(vista.dataset.vista, b.dataset.modoTab);
+        });
+    });
+
+    // ---------- 6-Mano de Obra › Comisiones (Dialog29): administrativos (tipo 1) u operativos (tipo 2) ----------
+    // Operativos nace con los empleados que trabajaron en la obra y sus horas (retorna_empleados_asignados_por_obra_resumen)
+    var PERMISO_COMIS = 'Calcular comisiones requiere el permiso «Calcular y cancelar comisiones de la obra».';
+    function dialogoComision(doc, tipoNuevo) {
+        var tipo = doc ? parseInt(doc.tipo_id, 10) : tipoNuevo;
+        var resumen = !doc && tipo === 2 ? pedir('accion=listado&tipo=mo_resumen&id=' + encodeURIComponent(obraId)) : Promise.resolve({ filas: [] });
+        Promise.all([catalogosObra(), resumen]).then(function (r) {
+            var cat = r[0], horas = r[1].filas;
+            var cancelado = !!doc && String(doc.estatus).trim() === 'Cancelado';
+            var filas = doc ? doc.empleados : horas.map(function (e) {
+                return { empleado_id: e.id_empleado, nombre: e.nombre, hrs_trabajadas: e.hrs_trab, por_comision: 0, importe_pagar: 0, descuentos: 0 };
+            });
+            if (!filas.length) filas = [{}];
+            var acciones = [];
+            if (doc) acciones.push({ texto: '🖨 Imprimir', fn: function () { imprimirComision(doc); } });
+            if (doc && !cancelado && obraAbierta()) acciones.push({ texto: '✕ Cancelar comisión', fn: function () {
+                if (!confirm('¿Deseas archivar como cancelado este documento?')) return Promise.resolve(false);
+                var motivo = prompt('INGRESA EL MOTIVO DE CANCELACION: ', '');
+                if (motivo === null) return Promise.resolve(false);
+                return conAutorizacion(function (a) {
+                    return enviar('cancelar_comision', { id: obraId, doc_id: doc.id, motivo: motivo, autoriza: a });
+                }, PERMISO_COMIS).then(function () {
+                    notificar('La comisión quedó cancelada.');
+                    cargarModo('mano', 'comisiones');
+                });
+            } });
+            formulario({
+                titulo: (tipo === 1 ? 'Calculo de Comisiones Administrativos' : 'Calculo de Comisiones Operativos') +
+                        (doc ? ' · ' + doc.id + ' · ' + doc.estatus : ''),
+                aviso: cancelado ? 'Comisión cancelada: solo se puede consultar.'
+                    : !doc && tipo === 2 && !horas.length ? 'La obra aún no tiene mano de obra asignada: agrega a los empleados a mano.'
+                    : 'Neto de cada empleado = importe a pagar − descuentos. El total entra como mano de obra real en la analítica.',
+                soloLectura: cancelado || !obraAbierta(),
+                campos: [
+                    { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: doc ? dia(doc.fecha) : hoy() },
+                    { id: 'notas', etiqueta: 'Notas', tipo: 'textarea', valor: doc ? doc.notas : '' }
+                ],
+                grids: [{
+                    id: 'empleados', titulo: 'Empleados', filas: filas,
+                    columnas: [
+                        { id: 'nombre', etiqueta: 'Empleado', tipo: 'lista', opciones: cat.empleados.map(function (e) { return { t: e.nombre, id: e.id }; }),
+                          alElegir: function (f, item) { f.empleado_id = item ? item.id : ''; } },
+                        { id: 'hrs_trabajadas', etiqueta: 'Hrs. trabajadas', tipo: 'number', ancho: '100px' },
+                        { id: 'por_comision', etiqueta: '% Comisión', tipo: 'number', ancho: '90px' },
+                        { id: 'importe_pagar', etiqueta: 'Importe a pagar', tipo: 'number', ancho: '120px', total: true },
+                        { id: 'descuentos', etiqueta: 'Descuentos', tipo: 'number', ancho: '110px', total: true },
+                        { id: 'neto', etiqueta: 'Neto', ancho: '110px', total: true, calc: function (f) { return num(f.importe_pagar) - num(f.descuentos); } }
+                    ]
+                }],
+                acciones: acciones,
+                guardar: function (d) {
+                    var emp = d.empleados.filter(function (f) { return String(f.nombre || '').trim(); });
+                    if (!emp.length) { alert('Agrega al menos un empleado a la comisión.'); return false; }
+                    if (hayNegativos(emp, ['hrs_trabajadas', 'por_comision', 'importe_pagar', 'descuentos'])) { alert('Hay cantidades negativas en la lista.'); return false; }
+                    return conAutorizacion(function (a) {
+                        return enviar('guardar_comision', { id: obraId, comision_id: doc ? doc.id : 0, tipo_id: tipo, fecha: d.fecha, notas: d.notas, empleados: emp, autoriza: a });
+                    }, PERMISO_COMIS).then(function () { cargarModo('mano', 'comisiones'); });
+                }
+            });
+        }).catch(avisarError);
+    }
+
+    function imprimirComision(c) {
+        var tot = 0;
+        var filas = c.empleados.map(function (e) {
+            var neto = num(e.importe_pagar) - num(e.descuentos);
+            tot += neto;
+            return '<tr><td>' + escapar(e.nombre) + '</td><td class="n">' + numero(e.hrs_trabajadas) + '</td><td class="n">' + numero(e.por_comision) + ' %</td>' +
+                '<td class="n">' + dinero(e.importe_pagar) + '</td><td class="n">' + dinero(e.descuentos) + '</td><td class="n">' + dinero(neto) + '</td></tr>';
+        }).join('');
+        imprimirFormato({
+            titulo: parseInt(c.tipo_id, 10) === 1 ? 'CALCULO DE COMISIONES ADMINISTRATIVOS' : 'CALCULO DE COMISIONES OPERATIVOS',
+            id: c.id, folioOt: '', fecha: fechaDMY(dia(c.fecha)), estatus: c.estatus, unidad: null, descripcion: c.notas || '', total: dinero(tot),
+            cuerpo: '<style>.cm{width:100%;border-collapse:collapse;margin-top:60px}.cm th,.cm td{border:1px solid #000;padding:2px 6px}.cm .n{text-align:right}</style>' +
+                '<table class="cm"><thead><tr><th>Empleado</th><th>Hrs.</th><th>% Comisión</th><th>Importe</th><th>Descuentos</th><th>Neto</th></tr></thead><tbody>' + filas + '</tbody></table>'
+        });
+    }
+
+    // ---------- 4-Explosion de material › Importar: renglones copiados de Excel o un archivo CSV ----------
+    // Columnas en orden: Clave, Nombre, U.M., Uds, Costo Unit. Un encabezado (Uds no numérica) se salta.
+    function leerTabla(texto) {
+        var lineas = String(texto || '').replace(/\r/g, '').split('\n').filter(function (l) { return l.trim(); });
+        var sep = lineas.some(function (l) { return l.indexOf('\t') >= 0; }) ? '\t' : (lineas.some(function (l) { return l.indexOf(';') >= 0; }) ? ';' : ',');
+        return lineas.map(function (l) {
+            var cols = [], actual = '', comillas = false;
+            for (var i = 0; i < l.length; i++) {
+                var ch = l[i];
+                if (ch === '"') { if (comillas && l[i + 1] === '"') { actual += '"'; i++; } else comillas = !comillas; }
+                else if (ch === sep && !comillas) { cols.push(actual); actual = ''; }
+                else actual += ch;
+            }
+            cols.push(actual);
+            return cols.map(function (c) { return c.trim(); });
+        });
+    }
+    function numeroTexto(v) { return parseFloat(String(v || '').replace(/[$\s,]/g, '')); }
+    function dialogoImportarExplosion() {
+        formulario({
+            titulo: 'Explosión de Material · Importar',
+            aviso: 'Copia de Excel las columnas Clave, Nombre, U.M., Uds y Costo Unit. (en ese orden) y pégalas aquí, o elige un archivo CSV con esas columnas. Si el primer renglón es el encabezado, se salta.',
+            campos: [{ id: 'texto', etiqueta: 'Renglones', tipo: 'textarea', ancho: true }],
+            acciones: [{ texto: '📂 Elegir CSV…', fn: function () {
+                var inp = document.createElement('input');
+                inp.type = 'file';
+                inp.accept = '.csv,.txt,text/csv,text/plain';
+                inp.onchange = function () {
+                    var f = inp.files[0];
+                    if (!f) return;
+                    f.text().then(function (t) {
+                        var area = document.querySelector('#frmCuerpo [data-campo="texto"]');
+                        area.value = t.replace(/^﻿/, '');
+                        $('frmDialogo')._sucio = true;
+                    });
+                };
+                inp.click();
+            } }],
+            guardar: function (d) {
+                var partidas = [], malas = [];
+                leerTabla(d.texto).forEach(function (c, i) {
+                    var uds = numeroTexto(c[3]), cu = numeroTexto(c[4]);
+                    if (isNaN(uds)) { if (i > 0 || c.length < 4) malas.push(i + 1); return; }   // el encabezado no cuenta
+                    if (!c[1]) { malas.push(i + 1); return; }
+                    partidas.push({ clave: c[0], nombre: c[1], um: c[2] || '', uds: uds, costo_unit: isNaN(cu) ? 0 : cu, tipo_docto: 'IMPORTACION' });
+                });
+                if (!partidas.length) { alert('No se encontró ningún renglón con nombre y unidades numéricas.'); return false; }
+                if (hayNegativos(partidas, ['uds', 'costo_unit'])) { alert('Hay unidades o costos negativos. Corrígelos para importar.'); return false; }
+                var total = partidas.reduce(function (s, p) { return s + p.uds * p.costo_unit; }, 0);
+                if (!confirm('Se agregarán ' + partidas.length + ' artículos a la explosión por ' + dinero(total) + '.' +
+                    (malas.length ? '\n\nSe omiten los renglones ' + malas.join(', ') + ' (sin nombre o con unidades no numéricas).' : '') + '\n\n¿Continuar?')) return false;
+                return guardarCon('agregar_explosion', { partidas: partidas }).then(function (j) {
+                    notificar('Se importaron ' + j.agregadas + ' artículos.', 'ok');
+                    cargarListado('explosion', 'explosion', 'No existen datos para mostrar');
+                });
+            }
+        });
+    }
+
+    // ---------- 11-Parametros › Pedidos relacionados y Costos adicionales ----------
+    var catGasOper = [];
+    var pedidos = [], costosAdic = [], pedEdit = false, cadEdit = false;
+    var TIPOS_PEDIDO = [{ v: 'PV', t: 'Pedido de venta' }, { v: 'PE', t: 'Pedido Easy-Glass' }, { v: 'OC', t: 'Orden de compra' }, { v: 'OT', t: 'Otro' }];
+
+    function pintarPedidos() {
+        var tot = 0;
+        $('pedFilas').innerHTML = pedidos.length ? pedidos.map(function (p, i) {
+            tot += num(p.costo_tot);
+            return '<tr data-i="' + i + '"><td class="sel-col"></td><td class="txt">' + escapar(p.tipo) + '</td><td class="txt">' + escapar(p.folio) + '</td>' +
+                '<td class="num">' + numero(p.uds) + '</td><td class="num">' + dinero(p.costo_tot) + '</td></tr>';
+        }).join('') : '<tr class="vacio-fila"><td colspan="5">Sin pedidos relacionados.</td></tr>';
+        $('pedTotal').textContent = dinero(tot) || '$0.00';
+    }
+    function cargarPedidos() {
+        $('pedEstado').textContent = 'Consultando…';
+        return pedir('accion=listado&tipo=pedidos&id=' + encodeURIComponent(obraId)).then(function (j) {
+            pedidos = j.filas;
+            pintarPedidos();
+            $('pedEstado').textContent = pedidos.length + ' pedido(s)' + (pedEdit ? ' · doble clic para modificar' : '');
+        }).catch(function (err) { $('pedEstado').textContent = '⚠ ' + err.message; });
+    }
+    // habilita_controles3
+    function habilitaPedidos(val) {
+        pedEdit = val;
+        document.querySelectorAll('.ped-edit').forEach(function (b) { b.disabled = !val; });
+        $('pedModificar').disabled = val;
+    }
+    function dialogoPedido(p) {
+        formulario({
+            titulo: p ? 'Pedido relacionado · ' + p.folio : 'Agregar Pedido relacionado',
+            campos: [
+                { id: 'tipo_docto', etiqueta: 'Tipo', tipo: 'select', opciones: TIPOS_PEDIDO, valor: p ? String(p.tipo_docto).trim() : 'PV' },
+                { id: 'folio', etiqueta: 'Folio', valor: p ? p.folio : '' },
+                { id: 'unidades', etiqueta: 'Unidades (m²)', tipo: 'number', valor: p ? p.uds : '' },
+                { id: 'importe', etiqueta: 'Importe (costo)', tipo: 'number', valor: p ? p.costo_tot : '' }
+            ],
+            guardar: function (d) {
+                if (!d.folio.trim()) { alert('Indica el folio del pedido.'); return false; }
+                return guardarCon('guardar_pedido', { pedido_id: p ? p.id : 0, tipo_docto: d.tipo_docto, folio: d.folio.trim(), unidades: d.unidades, importe: d.importe })
+                    .then(cargarPedidos);
+            }
+        });
+    }
+    $('pedMostrar').addEventListener('click', function () { if (requiereObra()) cargarPedidos(); });
+    $('pedModificar').addEventListener('click', function () {
+        if (!requiereObra() || !validaEstatusObra()) return;
+        habilitaPedidos(true);
+        $('pedEstado').textContent = 'Agrega, elimina o haz doble clic en un pedido para modificarlo.';
+    });
+    $('pedAgregar').addEventListener('click', function () { if (validaEstatusObra()) dialogoPedido(null); });
+    $('pedFilas').addEventListener('dblclick', function (e) {
+        var tr = e.target.closest('tr[data-i]');
+        if (!tr) return;
+        if (!pedEdit) { alert('Presiona Modificar para cambiar los pedidos relacionados.'); return; }
+        dialogoPedido(pedidos[tr.dataset.i]);
+    });
+    // ToolStripButton38: elimina los pedidos seleccionados
+    $('pedEliminar').addEventListener('click', function () {
+        if (!validaEstatusObra()) return;
+        var sel = Array.prototype.map.call($('pedFilas').querySelectorAll('tr.sel'), function (tr) { return pedidos[tr.dataset.i]; });
+        if (!sel.length) { alert('Selecciona el pedido a eliminar.'); return; }
+        if (!confirm(sel.length === 1 ? '¿Deseas eliminar el pedido seleccionado ?' : '¿Deseas eliminar los ' + sel.length + ' pedidos seleccionados ?')) return;
+        sel.reduce(function (p, x) {
+            return p.then(function () { return guardarCon('eliminar_pedido', { pedido_id: x.id }); });
+        }, Promise.resolve()).then(cargarPedidos).catch(function (err) { avisarError(err); cargarPedidos(); });
+    });
+
+    function pintarCostosAdic() {
+        var dis = cadEdit ? '' : ' disabled';
+        $('cadFilas').innerHTML = costosAdic.length ? costosAdic.map(function (c, i) {
+            return '<tr data-i="' + i + '"><td class="sel-col"></td><td class="txt">' + escapar(c.concepto_id) + '</td><td class="txt">' + escapar(c.concepto) + '</td>' +
+                '<td><input type="number" class="num" step="any" min="0" max="100" data-pct value="' + escapar(c.porcentaje) + '"' + dis + '></td></tr>';
+        }).join('') : '<tr class="vacio-fila"><td colspan="4">Sin costos adicionales.</td></tr>';
+    }
+    function cargarCostosAdic() {
+        $('cadEstado').textContent = 'Consultando…';
+        return pedir('accion=listado&tipo=costos_adic&id=' + encodeURIComponent(obraId)).then(function (j) {
+            costosAdic = j.filas;
+            pintarCostosAdic();
+            $('cadEstado').textContent = costosAdic.length + ' concepto(s)';
+        }).catch(function (err) { $('cadEstado').textContent = '⚠ ' + err.message; });
+    }
+    // habilita_controles23
+    function habilitaCostosAdic(val) {
+        cadEdit = val;
+        document.querySelectorAll('.cad-edit').forEach(function (b) { b.disabled = !val; });
+        $('cadModificar').disabled = val;
+        pintarCostosAdic();
+    }
+    $('cadMostrar').addEventListener('click', function () {
+        if (!requiereObra()) return;
+        if (cadEdit && !confirm('Se perderán los cambios que no guardaste. ¿Volver a consultar?')) return;
+        habilitaCostosAdic(false);
+        cargarCostosAdic();
+    });
+    $('cadModificar').addEventListener('click', function () {
+        if (!requiereObra() || !validaEstatusObra()) return;
+        habilitaCostosAdic(true);
+        $('cadEstado').textContent = 'Agrega conceptos, captura su % y presiona Guardar.';
+    });
+    $('cadFilas').addEventListener('input', function (e) {
+        if (!e.target.matches('[data-pct]')) return;
+        costosAdic[e.target.closest('tr').dataset.i].porcentaje = e.target.value;
+    });
+    // Button3: el concepto con su % de cálculo del catálogo (retorna_porcentaje_gastos_de_operacion)
+    $('cadAgregar').addEventListener('click', function () {
+        var sel = $('conGasOper');
+        if (!sel.value) return;
+        if (costosAdic.some(function (c) { return String(c.concepto_id) === sel.value; })) { alert('Ese concepto ya está en la lista.'); return; }
+        var c = catGasOper.filter(function (x) { return String(x.id) === sel.value; })[0] || {};
+        costosAdic.push({ id: 0, concepto_id: sel.value, concepto: sel.options[sel.selectedIndex].text, porcentaje: num(c.porcentaje) });
+        pintarCostosAdic();
+    });
+    // ToolStripButton31: los guardados se borran en la base; los recién agregados solo de la lista
+    $('cadEliminar').addEventListener('click', function () {
+        var sel = Array.prototype.map.call($('cadFilas').querySelectorAll('tr.sel'), function (tr) { return costosAdic[tr.dataset.i]; });
+        if (!sel.length) { alert('Selecciona el gasto adicional a eliminar.'); return; }
+        if (!confirm('¿Deseas eliminar el gasto adicional seleccionado ?')) return;
+        var guardados = sel.filter(function (c) { return num(c.id) > 0; });
+        guardados.reduce(function (p, x) {
+            return p.then(function () { return guardarCon('eliminar_costo_adic', { costo_id: x.id }); });
+        }, Promise.resolve()).then(function () {
+            costosAdic = costosAdic.filter(function (c) { return sel.indexOf(c) < 0; });
+            pintarCostosAdic();
+        }).catch(avisarError);
+    });
+    // ToolStripButton24 (guarda_conceptos_gas_adic_obra)
+    $('cadGuardar').addEventListener('click', function () {
+        if (costosAdic.some(function (c) { return num(c.porcentaje) < 0 || num(c.porcentaje) > 100; })) { alert('Cada % debe estar entre 0 y 100.'); return; }
+        guardarCon('guardar_costos_adic', { conceptos: costosAdic.map(function (c) { return { concepto_id: c.concepto_id, porcentaje: c.porcentaje }; }) })
+            .then(function () {
+                notificar('Se guardaron los costos adicionales.', 'ok');
+                habilitaCostosAdic(false);
+                cargarCostosAdic();
+            }).catch(avisarError);
+    });
+    function cargarParametros() {
+        if (!obraId) return;
+        cargado.parametros = true;
+        habilitaPedidos(false);
+        habilitaCostosAdic(false);
+        return Promise.all([cargarPedidos(), cargarCostosAdic()]);
+    }
+
+    // ---------- Formatos impresos (Form4 del escritorio) ----------
+    function ventanaImpresion(titulo, css, cuerpo) {
+        var w = window.open('', '_blank');
+        if (!w) { alert('El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes de este sitio.'); return; }
+        w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escapar(titulo) + '</title><style>' +
+            'body{font:11px Arial,sans-serif;color:#000;margin:0}table{width:100%;border-collapse:collapse}th,td{padding:2px 5px;vertical-align:top}' +
+            '.n{text-align:right;white-space:nowrap}.b{font-weight:bold}.cab{display:grid;grid-template-columns:170px 1fr;border:1px solid #000}' +
+            '.logo{display:flex;align-items:center;justify-content:center;padding:6px;border-right:1px solid #000}.logo img{max-width:150px;max-height:70px}' +
+            '.cel{border-bottom:1px solid #000;padding:3px 8px}.fila{display:flex}.fila>div{flex:1;padding:3px 8px;border-left:1px solid #000}.fila>div:first-child{border-left:0}' +
+            'h1{font-size:15px;margin:0}h2{font-size:12px;margin:10px 0 2px;padding:2px 5px;background:#eee;border:1px solid #000}' +
+            '.t td,.t th{border:1px solid #999}.t th{background:#f2f2f2;text-align:left}.t tfoot td{font-weight:bold;border-top:2px solid #000}' +
+            '.firmas{display:flex;gap:14px;margin-top:40px}.firmas div{flex:1;border-top:1px solid #000;text-align:center;padding-top:2px;font-weight:bold}' +
+            '.neg{color:#c00}.avisos{color:#555;font-size:10px;margin-top:6px}' + css + '</style></head><body>' + cuerpo + '</body></html>');
+        w.document.close();
+        w.onload = function () { w.focus(); w.print(); };
+    }
+    // Encabezado: logo, empresa, título, Id de la obra, fecha de impresión, código y renglón de datos
+    function encabezadoImpresion(titulo, codigo, datos) {
+        var m = window.ACRI_MEMBRETE || {};
+        var logo = m.logo ? '<img src="' + escapar(new URL(m.logo, location.href).href) + '">' : '';
+        return '<div class="cab"><div class="logo">' + logo + '</div><div>' +
+            '<div class="cel fila" style="padding:0"><div><h1>' + escapar(m.empresa || 'MEGALUMINIO SERVICIOS SA DE CV') + '</h1>' + escapar(titulo) + '</div>' +
+            '<div style="flex:0 0 220px;text-align:right"><b>Id_Obra: ' + obraId + '</b><br><small>Fe.Imp: ' + escapar(new Date().toLocaleString('es-MX')) + '</small></div></div>' +
+            '<div class="fila"><div class="b">Codigo: ' + codigo + '</div>' + datos.map(function (d) {
+                return '<div><b>' + escapar(d[0]) + ':</b><br>' + escapar(d[1]) + '</div>';
+            }).join('') + '</div></div></div>';
+    }
+    function difCelda(v) { return '<td class="n' + (v < 0 ? ' neg' : '') + '">' + dinero(v) + '</td>'; }
+
+    // imprime_analitica_de_obra / imprime_analitica_de_obra_detalle (CT-REG-13)
+    function imprimirAnalitica(detalle) {
+        pedir('accion=analitica&id=' + encodeURIComponent(obraId) + (detalle ? '&detalle=1' : '')).then(function (a) {
+            var o = a.obra, html = '';
+            html += encabezadoImpresion('ANALITICA DE EJECUCION POR OBRA' + (detalle ? ' DETALLE' : ''), 'CT-REG-13', [
+                ['Obra', o.nom_obra], ['Cliente', o.cliente || ''], ['Vendedor', o.vendedor || ''], ['Contacto', o.contacto || ''],
+                ['Estatus', o.estatus], ['Fecha termino', fechaDMY(dia(o.fecha_fin))]
+            ]);
+            html += '<p><b>Presupuesto folio:</b> ' + escapar(o.folio || '—') + ' · <b>Orden de Trabajo (RS):</b> ' + escapar(a.ordenes.join(' ') || '—') +
+                ' · <b>% Gastos de operación (administración):</b> ' + numero(a.pct_admin) + ' %</p>';
+            var tot = {};
+            function seccion(clave, titulo) {
+                var p = 0, r = 0;
+                var filas = a[clave].map(function (l) {
+                    p += l.presupuesto; r += l.real;
+                    return '<tr><td>' + escapar(l.concepto) + '</td><td class="n">' + dinero(l.presupuesto) + '</td><td class="n">' + dinero(l.real) + '</td>' + difCelda(l.presupuesto - l.real) + '</tr>';
+                }).join('') || '<tr><td colspan="4">Sin movimientos.</td></tr>';
+                tot[clave] = { p: p, r: r };
+                return '<h2>' + titulo + '</h2><table class="t"><thead><tr><th>Concepto</th><th class="n">Imp. Presupuestado</th><th class="n">Imp. Real</th><th class="n">Diferencia $</th></tr></thead>' +
+                    '<tbody>' + filas + '</tbody><tfoot><tr><td>TOTAL ' + titulo + '</td><td class="n">' + dinero(p) + '</td><td class="n">' + dinero(r) + '</td>' + difCelda(p - r) + '</tr></tfoot></table>';
+            }
+            html += seccion('mp', 'MATERIA PRIMA') + seccion('mo', 'MANO DE OBRA') + seccion('go', 'GASTOS DE OPERACION');
+            // Resumen: presupuestado (costo + utilidad del presupuesto) contra real (costo real y lo facturado sin IVA)
+            var costoP = tot.mp.p + tot.mo.p + tot.go.p, costoR = tot.mp.r + tot.mo.r + tot.go.r;
+            var u = num(o.utilidad_neta_por);
+            var totalP = num(o.subtotal) > 0 ? num(o.subtotal) : (u < 100 ? costoP / ((100 - u) / 100) : costoP);
+            var filasRes = [
+                ['Subtotal (materia prima + mano de obra)', tot.mp.p + tot.mo.p, tot.mp.r + tot.mo.r],
+                ['+ Gastos de operación', tot.go.p, tot.go.r],
+                ['= Costo total', costoP, costoR],
+                ['+ Utilidad neta' + (u ? ' (' + numero(u) + ' %)' : ''), totalP - costoP, a.facturado_sin_iva - costoR],
+                ['= Total antes de IVA (presupuesto / facturado)', totalP, a.facturado_sin_iva]
+            ];
+            html += '<h2>RESUMEN</h2><table class="t"><thead><tr><th></th><th class="n">Presupuestado</th><th class="n">Real</th><th class="n">Diferencia $</th></tr></thead><tbody>' +
+                filasRes.map(function (f) { return '<tr' + (f[0].charAt(0) === '=' ? ' class="b"' : '') + '><td>' + escapar(f[0]) + '</td><td class="n">' + dinero(f[1]) + '</td><td class="n">' + dinero(f[2]) + '</td>' + difCelda(f[1] - f[2]) + '</tr>'; }).join('') +
+                '</tbody></table>';
+            // Estatus del proceso de facturación
+            var saldo = 0;
+            html += '<h2>ESTATUS DEL PROCESO DE FACTURACION</h2><table class="t"><thead><tr><th>Folio</th><th>Tipo</th><th>Estatus</th><th>Cliente</th><th>Factura</th>' +
+                '<th class="n">Imp. Factura</th><th class="n">Cargos</th><th class="n">Créditos</th><th class="n">Saldo</th></tr></thead><tbody>' +
+                (a.facturacion.map(function (f) {
+                    if (String(f.estatus).trim() !== 'Cancelado') saldo += num(f.saldo);
+                    return '<tr><td>' + escapar(f.folio) + '</td><td>' + escapar(f.tipo_docto) + '</td><td>' + escapar(f.estatus) + '</td><td>' + escapar(f.cliente) + '</td>' +
+                        '<td>' + escapar(f.factura) + '</td><td class="n">' + dinero(f.imp_factura) + '</td><td class="n">' + dinero(f.cargos) + '</td>' +
+                        '<td class="n">' + dinero(f.creditos) + '</td><td class="n">' + dinero(f.saldo) + '</td></tr>';
+                }).join('') || '<tr><td colspan="9">Sin documentos de facturación.</td></tr>') +
+                '</tbody><tfoot><tr><td colspan="8">Saldo</td><td class="n">' + dinero(saldo) + '</td></tr></tfoot></table>';
+
+            if (detalle && a.detalle) {
+                var d = a.detalle;
+                var tabla = function (titulo, cols, filas) {
+                    var suma = cols.map(function () { return 0; });
+                    var cuerpo = filas.map(function (f) {
+                        return '<tr>' + cols.map(function (c, k) {
+                            var v = f[c[1]];
+                            if (c[2] === '$') { suma[k] += num(v); return '<td class="n">' + dinero(v) + '</td>'; }
+                            if (c[2] === 'n') return '<td class="n">' + numero(v) + '</td>';
+                            if (c[2] === 'f') return '<td>' + fechaDMY(dia(v)) + '</td>';
+                            return '<td>' + escapar(v) + '</td>';
+                        }).join('') + '</tr>';
+                    }).join('') || '<tr><td colspan="' + cols.length + '">Sin registros.</td></tr>';
+                    var pie = cols.some(function (c) { return c[2] === '$'; }) ? '<tfoot><tr>' + cols.map(function (c, k) {
+                        return c[2] === '$' ? '<td class="n">' + dinero(suma[k]) + '</td>' : '<td>' + (k === 0 ? 'Total' : '') + '</td>';
+                    }).join('') + '</tr></tfoot>' : '';
+                    return '<h2>' + titulo + '</h2><table class="t"><thead><tr>' + cols.map(function (c) {
+                        return '<th' + (c[2] === '$' || c[2] === 'n' ? ' class="n"' : '') + '>' + c[0] + '</th>';
+                    }).join('') + '</tr></thead><tbody>' + cuerpo + '</tbody>' + pie + '</table>';
+                };
+                html += tabla('DETALLE · MATERIALES ENTREGADOS A OBRA', [['OT', 'ot'], ['Folio Microsip', 'folio_microsip'], ['Fecha', 'fecha', 'f'], ['Clave', 'clave_art'],
+                    ['Artículo', 'nom_art'], ['Uds', 'unidades', 'n'], ['U.M.', 'unid_med'], ['Costo', 'costo_total', '$']], d.salidas);
+                html += tabla('DETALLE · MANO DE OBRA ASIGNADA', [['Fecha', 'fecha', 'f'], ['OT', 'folio'], ['Unidad', 'nom_unidad'], ['Importe MO', 'importe_mo', '$'],
+                    ['Importe real', 'importe_real', '$'], ['Notas', 'notas']], d.mano);
+                if (d.comisiones.length) html += tabla('DETALLE · COMISIONES', [['Fecha', 'fecha', 'f'], ['Notas', 'notas'], ['Importe neto', 'importe_neto', '$']], d.comisiones);
+                html += tabla('DETALLE · GASTOS ADICIONALES', [['Fecha', 'fecha', 'f'], ['Concepto', 'concepto'], ['Importe', 'importe', '$'], ['Importe real', 'importe_real', '$'],
+                    ['Notas', 'notas']], d.gastos);
+                if (d.costos_adic.length) html += tabla('DETALLE · COSTOS ADICIONALES (% SOBRE ' + dinero(a.facturado_sin_iva) + ' FACTURADO SIN IVA)',
+                    [['Concepto', 'concepto'], ['%', 'porcentaje', 'n'], ['Importe', 'importe', '$']], d.costos_adic);
+            }
+            if (o.notas) html += '<p><b>Notas:</b> ' + escapar(o.notas) + '</p>';
+            html += '<div class="firmas"><div>ELABORO</div><div>REVISO</div><div>REVISO</div><div>AUTORIZO</div></div>' +
+                '<div class="firmas" style="margin-top:28px"><div>Nombre y Firma</div><div>Nombre y Firma</div><div>Nombre y Firma</div><div>Nombre y Firma</div></div>';
+            if (a.avisos.length) html += '<div class="avisos">Avisos: ' + a.avisos.map(escapar).join(' · ') + '</div>';
+            ventanaImpresion('Analítica obra ' + obraId, '@page{size:letter;margin:10mm}', html);
+        }).catch(avisarError);
+    }
+
+    // ToolStripButton30: explosión de materiales contra salidas a obra y material extra en producción (CT-REG-03)
+    function imprimirExplosionSalidas() {
+        var q = function (t) { return pedir('accion=listado&tipo=' + t + '&id=' + encodeURIComponent(obraId)); };
+        Promise.all([q('explosion'), q('salidas_det')]).then(function (r) {
+            var explo = r[0].filas, sal = r[1].filas.filter(function (s) { return !/^c/i.test(String(s.estatus || '').trim()); });
+            if (!explo.length) { alert('No se asignó la explosión de materiales a la obra. Relaciónela para poder continuar con el reporte.'); return; }
+            var filas = explo.map(function (x) {
+                return { id: num(x.articulo_id), clave: x.clave, nombre: x.nombre, um: x.um, uds: num(x.uds), costo: num(x.costo_tot),
+                         clave_s: '', nombre_s: '', um_s: '', uds_s: 0, costo_s: 0 };
+            });
+            sal.forEach(function (s) {
+                var nom = String(s.nom_art || '').trim().toUpperCase();
+                var f = filas.filter(function (y) { return (y.id && y.id === num(s.articulo_id)) || String(y.nombre || '').trim().toUpperCase() === nom; })[0];
+                if (!f) { f = { id: 0, clave: '', nombre: '', um: '', uds: 0, costo: 0, clave_s: '', nombre_s: '', um_s: '', uds_s: 0, costo_s: 0 }; filas.push(f); }
+                f.clave_s = s.clave_art; f.nombre_s = s.nom_art; f.um_s = s.unid_med;
+                f.uds_s += num(s.uds); f.costo_s += num(s.costo_total);
+            });
+            var tE = 0, tS = 0, extra = [];
+            var cuerpo = filas.map(function (f) {
+                tE += f.costo; tS += f.costo_s;
+                if (f.uds - f.uds_s < 0) {
+                    var ue = Math.abs(f.uds - f.uds_s);
+                    extra.push({ clave: f.clave_s, nombre: f.nombre_s, uds: ue, costo: f.uds === 0 ? Math.abs(f.costo_s) : Math.abs(f.costo_s / f.uds_s * ue) });
+                }
+                return '<tr><td>' + escapar(f.clave) + '</td><td>' + escapar(f.nombre) + '</td><td class="n">' + numero(f.uds) + '</td><td>' + escapar(f.um) + '</td><td class="n">' + dinero(f.costo) + '</td>' +
+                    '<td>' + escapar(f.clave_s) + '</td><td>' + escapar(f.nombre_s) + '</td><td>' + escapar(f.um_s) + '</td><td class="n">' + numero(f.uds_s) + '</td><td class="n">' + dinero(f.costo_s) + '</td>' +
+                    '<td class="n">' + numero(f.uds - f.uds_s) + '</td>' + difCelda(f.costo - f.costo_s) + '</tr>';
+            }).join('');
+            var tUx = 0, tCx = 0;
+            var cuerpoExtra = extra.map(function (x) {
+                tUx += x.uds; tCx += x.costo;
+                return '<tr><td>' + escapar(x.clave) + '</td><td>' + escapar(x.nombre) + '</td><td class="n">' + numero(x.uds) + '</td><td class="n">' + dinero(x.costo) + '</td></tr>';
+            }).join('') || '<tr><td colspan="4">Sin material extra.</td></tr>';
+            var html = encabezadoImpresion('EXPLOSION DE MATERIALES · OBRA: ' + $('nombreObra').value, 'CT-REG-03', [
+                ['Estatus', estatus], ['Fecha Inicio', fechaDMY($('fechaInicio').value)], ['Fecha Termino', fechaDMY($('fechaTermino').value)], ['Contacto', $('contacto').value]
+            ]) +
+                '<table class="t" style="margin-top:8px"><thead><tr><th colspan="5">EXPLOSION DE MATERIALES</th><th colspan="5">SALIDAS DE MATERIALES A OBRA</th><th colspan="2">DIFERENCIA</th></tr>' +
+                '<tr><th>Clave</th><th>Descripcion</th><th class="n">Uds</th><th>UM</th><th class="n">Costo.tot</th><th>Clave</th><th>Descripcion</th><th>UM</th><th class="n">Uds</th>' +
+                '<th class="n">Costo.tot</th><th class="n">Dif.Uds</th><th class="n">Dif.Costo</th></tr></thead><tbody>' + cuerpo + '</tbody>' +
+                '<tfoot><tr><td colspan="4">Totales</td><td class="n">' + dinero(tE) + '</td><td colspan="4"></td><td class="n">' + dinero(tS) + '</td><td></td>' + difCelda(tE - tS) + '</tr></tfoot></table>' +
+                '<table style="width:280px;margin:10px 0 0 auto"><tr><td class="b">Cotizado:</td><td class="n">' + dinero(tE) + '</td></tr><tr><td class="b">Real Utilizado:</td><td class="n">' + dinero(tS) + '</td></tr>' +
+                '<tr><td class="b" style="border-top:1px solid #000">Diferencia:</td><td class="n b" style="border-top:1px solid #000">' + dinero(tE - tS) + '</td></tr></table>' +
+                '<h2>MATERIAL EXTRA EN PRODUCCION</h2><table class="t"><thead><tr><th>Clave</th><th>Descripcion</th><th class="n">Uds.Extra</th><th class="n">Costo.Tot.Extra</th></tr></thead>' +
+                '<tbody>' + cuerpoExtra + '</tbody><tfoot><tr><td colspan="2">Totales</td><td class="n">' + numero(tUx) + '</td><td class="n">' + dinero(tCx) + '</td></tr></tfoot></table>' +
+                '<div class="firmas"><div>REALIZO</div><div>REVISO</div><div>AUTORIZO</div></div>';
+            ventanaImpresion('Explosión de materiales obra ' + obraId, '@page{size:letter landscape;margin:8mm}', html);
+        }).catch(avisarError);
+    }
+
     // Qué se consulta al abrir cada pestaña
     var CARGAS = {
         facturacion: cargarFacturacion,
-        ordenes:     function () { return cargarListado('ordenes', 'ordenes', 'No existen ordenes de trabajo asignadas a esta obra'); },
+        ordenes:     function () { return cargarModo('ordenes'); },
         explosion:   function () { return cargarListado('explosion', 'explosion', 'No existen datos para mostrar'); },
         salidas:     function () { return cargarSalidas(); },
-        mano:        function () { return cargarListado('mano', 'mano'); },
+        mano:        function () { return cargarModo('mano'); },
         consumos:    function () { return cargarListado('consumos', 'consumos'); },
         gastos:      function () { return cargarListado('gastos', 'gastos'); },
         adjuntos:    cargarAdjuntos,
+        microsip:    function () { return cargarListado('microsip', 'microsip', 'No existen movimientos de Microsip para esta obra'); },
+        parametros:  cargarParametros,
         relacionados: cargarRelacionados,
         conceptos:   cargarConceptos
     };
@@ -2018,7 +2534,8 @@
     var acciones = {
         'guardar': function () { guardaObra().then(function (ok) { if (ok) habilitaControles(false); }); },
         'guardar-cerrar': function () { guardaObra().then(function (ok) { if (ok) cerrarVentana(); }); },
-        'imprimir': function () { window.print(); },
+        'imprimir': function () { if (requiereObra('Es necesario guardar la obra para imprimir su analítica.')) imprimirAnalitica(false); },
+        'imprimir-detalle': function () { if (requiereObra('Es necesario guardar la obra para imprimir su analítica.')) imprimirAnalitica(true); },
         // Estimaciones de la obra (estimaciones-obra.php) en su propia pestaña
         'estimaciones': function () {
             if (!requiereObra('Es necesario guardar la obra para registrar estimaciones.')) return;
@@ -2080,6 +2597,7 @@
     function cargarCatalogos() {
         return pedir('accion=catalogos').then(function (j) {
             llenarSelect($('responsable'), j.responsables, 'nombre');
+            catGasOper = j.conceptos_gas_oper;
             llenarSelect($('conGasOper'), j.conceptos_gas_oper, 'descripcion');
         }).catch(function (err) {
             $('responsable').innerHTML = '<option value="">(no se pudo cargar)</option>';

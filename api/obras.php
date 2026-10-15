@@ -10,11 +10,12 @@
 // GET ?accion=imagen&id=N            imagen de la obra
 // GET ?accion=catalogos              responsables y conceptos de gastos de operación
 // GET ?accion=relacionados&id=N      negocio de HubSpot y folios de Easy-Glass ligados a la obra
-// GET ?accion=listado&id=N&tipo=T    pestañas 3 a 9 del Dialog243 (ordenes, explosion, salidas, salidas_det,
-//                                    mano, consumos, gastos, adjuntos)
+// GET ?accion=listado&id=N&tipo=T    pestañas 3 a 11 del Dialog243 (ordenes, produccion, explosion, salidas, salidas_det,
+//                                    mano, mo_resumen, comisiones, consumos, gastos, adjuntos, microsip, pedidos, costos_adic)
+// GET ?accion=analitica&id=N[&detalle=1]  Analítica de ejecución por obra (presupuestado contra real)
 // GET ?accion=facturacion&id=N       2-Facturacion: documentos de cobro de AW + Microsip vía la API de Easy-Glass
 // GET ?accion=adjunto&id=N           descarga un archivo adjunto de la obra
-// GET ?accion=documento&tipo=orden|mo|gasto|cot&id=obra&doc=N   documento con su detalle
+// GET ?accion=documento&tipo=orden|mo|gasto|cot|comision&id=obra&doc=N   documento con su detalle
 // GET ?accion=clientes_eg&q=T        Busca Cliente (API de Easy-Glass)
 // GET ?accion=quejas&folio=F&cliente=N   Quejas de Cliente de una cotización
 // GET ?accion=catalogos_obra&id=N    empleados, conceptos de gasto, unidades, órdenes y artículos del presupuesto
@@ -206,7 +207,7 @@ function listado(string $tipo, int $id): array
         case 'explosion':   // retorna_explocion_mat_obra_id (algunas columnas solo existen en la base nueva)
             return array_map(function ($f) {
                 return [
-                    'id' => $f['explocion_mat_obra_id'], 'clave' => $f['clave'], 'nombre' => $f['nombre'], 'um' => $f['um'],
+                    'id' => $f['explocion_mat_obra_id'], 'articulo_id' => $f['articulo_id'], 'clave' => $f['clave'], 'nombre' => $f['nombre'], 'um' => $f['um'],
                     'uds' => $f['uds'], 'costo_unit' => $f['costo_unit'], 'costo_tot' => $f['costo_tot'],
                     'um_ml_m2' => $f['uni_med_ml_mq'] ?? '', 'tipo_docto' => $f['tipo_docto'] ?? '', 'folio' => $f['folio'] ?? '',
                 ];
@@ -223,7 +224,7 @@ function listado(string $tipo, int $id): array
 
         case 'salidas_det':   // retorna_doctos_salidas_por_obra_det
             return bd_filas('AW',
-                'select s.estatus, d.clave_art, d.nom_art, d.unidades as uds, d.unid_med, s.nom_almacen, d.costo_total
+                'select s.estatus, d.articulo_id, d.clave_art, d.nom_art, d.unidades as uds, d.unid_med, s.nom_almacen, d.costo_total
                    from doctos_solicitudes_det d
                    join dvd_solicitudes_material s on s.docto_solicitud_id = d.docto_solicitud_id
                    join doctos_orden_obra o on o.docto_orden_obra_id = s.docto_orden_obra_id
@@ -264,8 +265,233 @@ function listado(string $tipo, int $id): array
             return bd_filas('AW',
                 'select archivo_id as id, nombre_archivo, descripcion_corta, fecha_creacion, usuario_creacion
                    from archivos_adjuntos where suerido_id = ? order by archivo_id', [$id]);
+
+        case 'produccion':   // retorna_material_a_producir_por_obra: partidas de las órdenes de trabajo (3-Orden Trabajo › Produccion)
+            $prod = bd_tiene_columna('AW', 'doctos_orden_obra_det', 'uds_prod') ? 'coalesce(d.uds_prod, 0)' : '0';
+            return array_map(function ($f) { $f['estatus'] = estatusLetra($f['estatus'], true); return $f; }, bd_filas('AW',
+                "select d.docto_orden_obra_det_id as id, o.docto_orden_obra_id as orden_id, d.articulo_id, o.folio, o.estatus, d.clave_articulo, d.descripcion,
+                        d.unidades, $prod as uds_prod, d.um, d.notas_adic
+                   from doctos_orden_obra_det d
+                   join doctos_orden_obra o on o.docto_orden_obra_id = d.docto_orden_obra_id
+                  where o.obra_id = ?
+                  order by o.folio, coalesce(d.pos, 0), d.docto_orden_obra_det_id", [$id]));
+
+        case 'mo_resumen':   // retorna_empleados_asignados_por_obra_resumen: horas reales de cada empleado (comisiones de operativos)
+            return bd_filas('AW',
+                "select d.id_empleado, d.nombre, coalesce(sum(coalesce(nullif(d.hrs_trabajo_real, 0), d.hrs_trabajo)), 0) as hrs_trab
+                   from empleados_asignados_a_obra_det d
+                   join empleados_asignados_a_obra e on e.empleado_asignado_obra_id = d.empleado_asignado_obra_id
+                  where e.obra_id = ? and trim(coalesce(e.estatus, '')) <> 'C'
+                  group by d.id_empleado, d.nombre
+                  order by d.nombre", [$id]);
+
+        case 'microsip':   // retorna_movimientos_microsip_reposicion: documentos de inventario de Microsip de la obra
+            return array_map(function ($f) {
+                $c = mb_strtolower((string) $f['concepto']);
+                $f['naturaleza'] = (int) $f['tipo_mov'] === 1 || strpos($c, 'entrada') !== false ? 'E' : 'S';
+                return $f;
+            }, bd_filas('AW',
+                "select s.docto_solicitud_id as id, s.docto_in_id, s.folio_microsip as folio, s.nom_concepto as concepto, s.fecha,
+                        s.nom_almacen as almacen, s.tipo_mov, s.estatus, o.folio as ot
+                   from dvd_solicitudes_material s
+                   join doctos_orden_obra o on o.docto_orden_obra_id = s.docto_orden_obra_id
+                  where o.obra_id = ? and coalesce(s.docto_in_id, 0) > 0
+                  order by s.fecha, s.docto_in_id", [$id]));
+
+        case 'comisiones':   // retorna_empleados_para_pago_comisiones_por_obra
+            exigirTabla('pago_comis_por_obra_enca');
+            return array_map(function ($f) {
+                $f['tipo_comis'] = (int) $f['tipo_id'] === 1 ? 'Administrativos' : 'Operativos';
+                return $f;
+            }, bd_filas('AW',
+                'select pago_comis_por_obra_enca_id as id, fecha, estatus, tipo_id, importe_neto, notas, usuario_creacion
+                   from pago_comis_por_obra_enca where obra_id = ? order by fecha, pago_comis_por_obra_enca_id', [$id]));
+
+        case 'pedidos':   // retorna_pedidos_relacionados_en_una_obra
+            exigirTabla('documentos_relac_obras');
+            return array_map(function ($f) {
+                $f['tipo'] = TIPOS_PEDIDO[trim((string) $f['tipo_docto'])] ?? $f['tipo_docto'];
+                return $f;
+            }, bd_filas('AW',
+                'select docto_relac_obra_id as id, tipo_docto, docto_id, folio, unidades as uds, importe as costo_tot
+                   from documentos_relac_obras where obra_id = ? order by docto_relac_obra_id', [$id]));
+
+        case 'costos_adic':   // retorna_gastos_oper_adic_en_una_obra
+            exigirTabla('gastos_oper_adic_obra');
+            return bd_filas('AW',
+                'select g.gasto_oper_adic_obra_id as id, g.concepto_gas_operacion_obra_id as concepto_id,
+                        coalesce(c.descripcion, g.concepto) as concepto, g.porcentaje
+                   from gastos_oper_adic_obra g
+                   left join conceptos_gas_operacion_obra c on c.concepto_gas_operacion_obra_id = g.concepto_gas_operacion_obra_id
+                  where g.obra_id = ? order by g.gasto_oper_adic_obra_id', [$id]);
     }
     error('Listado no válido.');
+}
+
+// Tipos de documento de los pedidos relacionados (11-Parametros)
+const TIPOS_PEDIDO = ['PV' => 'Pedido de venta', 'PE' => 'Pedido Easy-Glass', 'OC' => 'Orden de compra', 'OT' => 'Otro'];
+
+// Tablas de la migración 012: mientras no se aplique, la pestaña lo dice en lugar de fallar
+function exigirTabla(string $tabla): void
+{
+    if (!bd_tiene_tabla('AW', $tabla)) error("Falta la tabla $tabla en la base: aplica la migración 012 (php herramientas/migrar.php --aplicar).");
+}
+
+// ---------- Analítica de ejecución por obra (imprime_analitica_de_obra / _detalle, CT-REG-13) ----------
+// Presupuestado contra real de Materia Prima, Mano de Obra y Gastos de Operación, costo total, utilidad y facturación.
+// El material real se asigna al concepto de Materia Prima del presupuesto que trae el mismo artículo; lo que no
+// está en el presupuesto queda como «Otros materiales». Los gastos de administración son su % sobre materia prima
+// (sin cristal) y mano de obra reales, y los costos adicionales su % sobre lo facturado sin IVA, como en el escritorio.
+function analitica(int $obraId, bool $detalle): array
+{
+    $o = bd_fila('AW',
+        'select a.obra_id, a.sugerido_id, a.nom_obra, a.contacto, a.estatus, a.fecha_ini, a.fecha_fin, a.gasto_administrativo,
+                b.folio, b.cliente, b.proyecto, b.notas, b.utilidad_neta_por, b.subtotal, v.nombre as vendedor
+           from reg_obras a
+           left join doctos_sugerido_obra b on b.docto_sugerido_obra_id = a.sugerido_id
+           left join vendedores_obras v on v.vendedor_obra_id = b.vendedor_obra_id
+          where a.obra_id = ?', [$obraId]);
+    if (!$o) error('La obra no existe.', 404);
+    $sug = (int) $o['sugerido_id'];
+    $r = ['obra' => $o, 'avisos' => [], 'mp' => [], 'mo' => [], 'go' => []];
+    $iva = 16.0;
+    if ($sug && bd_tiene_columna('AW', 'doctos_sugerido_obra', 'iva_pct')) {
+        $iva = (float) bd_valor('AW', 'select iva_pct from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$sug]);
+    }
+    $r['iva_pct'] = $iva;
+
+    // Presupuestado por concepto
+    $conceptos = $sug ? bd_filas('AW',
+        "select d.docto_sugerido_obra_det_id as det_id, trim(d.tipo_concepto) as tipo, d.presupuesto,
+                coalesce(cmp.descripcion, cmo.descripcion, cgo.descripcion, '(sin concepto)') as concepto
+           from doctos_sugerido_obra_det d
+           left join conceptos_mat_prima_obra cmp on trim(d.tipo_concepto) = 'MP' and cmp.concepto_mat_prima_id = d.concepto_id
+           left join conceptos_mano_obra cmo on trim(d.tipo_concepto) = 'MO' and cmo.concepto_mano_obra_id = d.concepto_id
+           left join conceptos_gas_operacion_obra cgo on trim(d.tipo_concepto) = 'GO' and cgo.concepto_gas_operacion_obra_id = d.concepto_id
+          where d.docto_sugerido_obra_id = ?
+          order by d.docto_sugerido_obra_det_id", [$sug]) : [];
+    $lineas = ['MP' => [], 'MO' => [], 'GO' => []];
+    $detConcepto = [];
+    foreach ($conceptos as $c) {
+        if (!isset($lineas[$c['tipo']])) continue;
+        $k = mb_strtoupper(trim($c['concepto']));
+        $lineas[$c['tipo']][$k] ??= ['concepto' => trim($c['concepto']), 'presupuesto' => 0.0, 'real' => 0.0];
+        $lineas[$c['tipo']][$k]['presupuesto'] += (float) $c['presupuesto'];
+        $detConcepto[(int) $c['det_id']] = $k;
+    }
+    $sumar = function (string $tipo, string $concepto, float $imp) use (&$lineas) {
+        $k = mb_strtoupper(trim($concepto));
+        $lineas[$tipo][$k] ??= ['concepto' => trim($concepto), 'presupuesto' => 0.0, 'real' => 0.0];
+        $lineas[$tipo][$k]['real'] += $imp;
+    };
+
+    // Materia prima real: salidas de material de las órdenes de la obra, por el concepto del presupuesto de su artículo
+    $porArticulo = [];
+    if ($sug) {
+        foreach (bd_filas('AW',
+            "select m.docto_sugerido_obra_det_id as det_id, m.id_articulo, upper(trim(m.clave_articulo)) as clave
+               from doctos_suge_obra_det_mat m
+               join doctos_sugerido_obra_det d on d.docto_sugerido_obra_det_id = m.docto_sugerido_obra_det_id
+              where d.docto_sugerido_obra_id = ? and trim(d.tipo_concepto) = 'MP'", [$sug]) as $a) {
+            $k = $detConcepto[(int) $a['det_id']] ?? null;
+            if (!$k) continue;
+            if ((int) $a['id_articulo']) $porArticulo['id' . (int) $a['id_articulo']] = $k;
+            if ($a['clave'] !== '') $porArticulo['cl' . $a['clave']] = $k;
+        }
+    }
+    $salidas = bd_filas('AW',
+        "select d.articulo_id, d.clave_art, d.nom_art, d.unidades, d.unid_med, d.costo_total, s.folio_microsip, o.folio as ot, s.fecha
+           from doctos_solicitudes_det d
+           join dvd_solicitudes_material s on s.docto_solicitud_id = d.docto_solicitud_id
+           join doctos_orden_obra o on o.docto_orden_obra_id = s.docto_orden_obra_id
+          where o.obra_id = ? and trim(coalesce(s.estatus, '')) not in ('C', 'Cancelado')
+          order by d.nom_art", [$obraId]);
+    $mpSinCristal = 0.0;
+    foreach ($salidas as $s) {
+        $k = $porArticulo['id' . (int) $s['articulo_id']] ?? $porArticulo['cl' . mb_strtoupper(trim((string) $s['clave_art']))] ?? null;
+        $concepto = $k ? $lineas['MP'][$k]['concepto'] : 'OTROS MATERIALES';
+        $sumar('MP', $concepto, (float) $s['costo_total']);
+        if (mb_strtoupper($concepto) !== 'CRISTAL') $mpSinCristal += (float) $s['costo_total'];
+    }
+
+    // Mano de obra real: asignaciones de personal no canceladas (importe real)
+    $mo = bd_filas('AW',
+        "select e.empleado_asignado_obra_id as id, e.fecha, e.nom_unidad, e.notas, e.importe_mo, coalesce(e.imp_mo_real, 0) as importe_real, o.folio
+           from empleados_asignados_a_obra e
+           left join doctos_orden_obra o on o.docto_orden_obra_id = e.docto_orden_obra_id
+          where e.obra_id = ? and trim(coalesce(e.estatus, '')) <> 'C'
+          order by e.fecha, e.empleado_asignado_obra_id", [$obraId]);
+    $moReal = array_sum(array_map(fn($f) => (float) $f['importe_real'], $mo));
+    // Si el presupuesto tiene un solo concepto de mano de obra, lo real va contra él
+    $unicoMo = count($lineas['MO']) === 1 ? reset($lineas['MO'])['concepto'] : 'MANO DE OBRA ASIGNADA';
+    if ($moReal) $sumar('MO', $unicoMo, $moReal);
+    // Comisiones calculadas en la obra (migración 012)
+    $comisiones = [];
+    if (bd_tiene_tabla('AW', 'pago_comis_por_obra_enca')) {
+        $comisiones = bd_filas('AW', "select pago_comis_por_obra_enca_id as id, fecha, tipo_id, importe_neto, notas
+                                         from pago_comis_por_obra_enca where obra_id = ? and estatus <> 'Cancelado' order by fecha", [$obraId]);
+        foreach ($comisiones as $c) $sumar('MO', 'COMISIONES', (float) $c['importe_neto']);
+    }
+
+    // Facturación (la misma de 2-Facturacion: AW + Microsip por la API de Easy-Glass)
+    $fac = ['filas' => [], 'avisos' => []];
+    try {
+        $fac = facturacion($obraId);
+    } catch (Throwable $e) {
+        $r['avisos'][] = 'Facturación: ' . bd_mensaje_error($e);
+    }
+    $r['avisos'] = array_merge($r['avisos'], $fac['avisos'] ?? []);
+    $facturado = 0.0;
+    foreach ($fac['filas'] as $f) {
+        if (trim((string) ($f['estatus'] ?? '')) === 'Cancelado') continue;
+        // Cotizaciones de Microsip y folios de Easy-Glass: lo facturado (o el pedido) · Notas de cargo: su importe
+        if (in_array((int) $f['tipo'], [-1, 1, 9], true)) $facturado += (float) ($f['cargos'] ?? $f['importe'] ?? 0);
+    }
+    $facturadoSinIva = round($facturado / (1 + $iva / 100), 2);
+
+    // Gastos de operación reales: gastos adicionales, administración de la obra y costos adicionales
+    $gastos = bd_filas('AW',
+        "select g.gasto_adicional_id as id, coalesce(cg.nombre, 'GASTOS ADICIONALES') as concepto, g.fecha_creacion as fecha, g.importe, g.notas,
+                (select coalesce(sum(d.imp_real), 0) from gastos_adicionales_obra_det d where d.gasto_adicional_id = g.gasto_adicional_id) as importe_real
+           from gastos_adicionales_obra g
+           left join conceptos_gastos_obra cg on cg.concepto_gasto_id = g.concepto_gasto_id
+          where g.obra_id = ? and trim(coalesce(g.estatus, '')) <> 'C'
+          order by g.fecha_creacion", [$obraId]);
+    foreach ($gastos as $g) $sumar('GO', $g['concepto'], (float) $g['importe_real']);
+    $pctAdmin = $o['gasto_administrativo'] === null ? 26.0 : (float) $o['gasto_administrativo'];
+    $admin = round($pctAdmin / 100 * ($mpSinCristal + $moReal), 2);
+    if ($admin) $sumar('GO', 'GASTOS DE ADMINISTRACION DE OBRA', $admin);
+    $costosAdic = [];
+    if (bd_tiene_tabla('AW', 'gastos_oper_adic_obra')) {
+        $costosAdic = bd_filas('AW',
+            'select coalesce(c.descripcion, g.concepto) as concepto, g.porcentaje
+               from gastos_oper_adic_obra g
+               left join conceptos_gas_operacion_obra c on c.concepto_gas_operacion_obra_id = g.concepto_gas_operacion_obra_id
+              where g.obra_id = ?', [$obraId]);
+        foreach ($costosAdic as &$c) {
+            $c['importe'] = round((float) $c['porcentaje'] / 100 * $facturadoSinIva, 2);
+            $sumar('GO', $c['concepto'], $c['importe']);
+        }
+        unset($c);
+    }
+
+    foreach (['MP' => 'mp', 'MO' => 'mo', 'GO' => 'go'] as $t => $k) {
+        $r[$k] = array_values(array_map(function ($l) {
+            $l['presupuesto'] = round($l['presupuesto'], 2);
+            $l['real'] = round($l['real'], 2);
+            return $l;
+        }, $lineas[$t]));
+    }
+    $r['pct_admin'] = $pctAdmin;
+    $r['facturado'] = round($facturado, 2);
+    $r['facturado_sin_iva'] = $facturadoSinIva;
+    $r['facturacion'] = array_map(fn($f) => array_intersect_key($f, array_flip(
+        ['folio', 'tipo', 'tipo_docto', 'estatus', 'cliente', 'importe', 'factura', 'imp_factura', 'cargos', 'creditos', 'saldo'])), $fac['filas']);
+    $r['ordenes'] = array_column(bd_filas('AW', "select folio from doctos_orden_obra where obra_id = ? and estatus <> 'C' order by folio", [$obraId]), 'folio');
+    if ($detalle) {
+        $r['detalle'] = ['salidas' => $salidas, 'mano' => $mo, 'comisiones' => $comisiones, 'gastos' => $gastos, 'costos_adic' => $costosAdic];
+    }
+    return $r;
 }
 
 // Un documento de la obra con su detalle, para abrirlo en su diálogo (doble clic en la pestaña)
@@ -325,6 +551,15 @@ function documento(string $tipo, int $obra, int $id): array
                                               where consumo_material_obra_id = ? order by personal_consumo_obra_id', [$id]);
             $g['bitacora'] = bitacoraDocumento($id);
             return $g;
+
+        case 'comision':   // abre_calculo_comis (Dialog29)
+            exigirTabla('pago_comis_por_obra_enca');
+            $c = bd_fila('AW', 'select pago_comis_por_obra_enca_id as id, fecha, tipo_id, estatus, importe_neto, notas, usuario_creacion, fecha_creacion
+                                  from pago_comis_por_obra_enca where pago_comis_por_obra_enca_id = ? and obra_id = ?', [$id, $obra]);
+            if (!$c) break;
+            $c['empleados'] = bd_filas('AW', 'select empleado_id, nombre, hrs_trabajadas, por_comision, importe_pagar, descuentos
+                                                from pago_comis_por_obra where pago_comis_por_obra_enca_id = ? order by pago_comis_por_obra_det', [$id]);
+            return $c;
     }
     error('El documento ya no existe.', 404);
 }
@@ -747,6 +982,9 @@ try {
         case 'facturacion':
             responder(['ok' => true] + facturacion((int) ($_GET['id'] ?? 0)));
 
+        case 'analitica':   // Imprimir (analítica) e Imprimir Detalle
+            responder(['ok' => true] + analitica((int) ($_GET['id'] ?? 0), !empty($_GET['detalle'])));
+
         case 'documento':
             responder(['ok' => true, 'documento' => documento((string) ($_GET['tipo'] ?? ''), (int) ($_GET['id'] ?? 0), (int) ($_GET['doc'] ?? 0))]);
 
@@ -782,7 +1020,9 @@ try {
         case 'catalogos':
             responder(['ok' => true,
                 'responsables' => bd_filas('AW', "select vendedor_obra_id as id, nombre from vendedores_obras where estatus = 'A' order by nombre"),
-                'conceptos_gas_oper' => bd_filas('AW', 'select concepto_gas_operacion_obra_id as id, clave, descripcion from conceptos_gas_operacion_obra order by descripcion'),
+                'conceptos_gas_oper' => bd_filas('AW', 'select concepto_gas_operacion_obra_id as id, clave, descripcion, ' .
+                    (bd_tiene_columna('AW', 'conceptos_gas_operacion_obra', 'porcentaje_calculo') ? 'coalesce(porcentaje_calculo, 0)' : '0') .
+                    ' as porcentaje from conceptos_gas_operacion_obra order by descripcion'),
             ]);
     }
     error('Acción no válida.');

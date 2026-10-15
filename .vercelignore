@@ -3,3 +3,7 @@ Consultas/
 uploads/
 config/
 .env*
+# Solo para el equipo de desarrollo (línea de comandos): migraciones, herramientas y pruebas
+migraciones/
+herramientas/
+pruebas/

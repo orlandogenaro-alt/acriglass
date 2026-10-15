@@ -127,7 +127,10 @@ function bd_abrir(array $c): PDO
         PDO::ATTR_CASE               => PDO::CASE_LOWER,
     ];
     // El pooler de Supabase (modo transacción) no admite sentencias preparadas del lado del servidor
-    if (($c['motor'] ?? '') === 'pgsql') $opciones[PDO::ATTR_EMULATE_PREPARES] = true;
+    if (($c['motor'] ?? '') === 'pgsql') {
+        $opciones[PDO::ATTR_EMULATE_PREPARES] = true;
+        return new AcriPdo(bd_dsn($c), $c['usuario'] ?? '', $c['contrasena'] ?? '', $opciones);
+    }
     return new PDO(bd_dsn($c), $c['usuario'] ?? '', $c['contrasena'] ?? '', $opciones);
 }
 
@@ -180,32 +183,75 @@ function bd_valor(string $clave, string $sql, array $params = [])
     return $f ? reset($f) : null;
 }
 
+// true si existe la tabla (las tablas de migraciones/ solo están en Supabase, no en AW)
+function bd_tiene_tabla(string $clave, string $tabla): bool
+{
+    static $cache = [];
+    $k = "$clave.$tabla";
+    if (isset($cache[$k])) return $cache[$k];
+    switch (bd_motor($clave)) {
+        case 'firebird':
+            return $cache[$k] = (int) bd_valor($clave, 'select count(*) from rdb$relations where rdb$relation_name = ?', [strtoupper($tabla)]) > 0;
+        case 'pgsql':
+            return $cache[$k] = (bool) bd_valor($clave, 'select to_regclass(?) is not null', ['public.' . strtolower($tabla)]);
+        default:
+            return $cache[$k] = (int) bd_valor($clave, 'select count(*) from information_schema.tables where table_name = ?', [$tabla]) > 0;
+    }
+}
+
+// true si la base tiene la bitácora de auditoría (migraciones/001_auditoria.sql); solo PostgreSQL / Supabase
+function bd_auditoria(string $clave): bool
+{
+    return bd_motor($clave) === 'pgsql' && bd_tiene_tabla($clave, 'auditoria');
+}
+
+// Corre una escritura. Con bitácora y fuera de una transacción, la envuelve en una para que la base
+// sepa qué usuario la hizo (AcriPdo::beginTransaction); dentro de una transacción la corre tal cual.
+function bd_escribir(string $clave, callable $fn)
+{
+    $pdo = bd_pdo($clave);
+    if ($pdo->inTransaction() || !bd_auditoria($clave)) return $fn();
+    $pdo->beginTransaction();
+    try {
+        $r = $fn();
+        $pdo->commit();
+        return $r;
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+}
+
 // insert / update / delete; regresa los renglones afectados
 function bd_ejecutar(string $clave, string $sql, array $params = []): int
 {
-    $st = bd_pdo($clave)->prepare($sql);
-    $st->execute(bd_texto_entrada(bd_config($clave), $params));
-    return $st->rowCount();
+    return bd_escribir($clave, function () use ($clave, $sql, $params) {
+        $st = bd_pdo($clave)->prepare($sql);
+        $st->execute(bd_texto_entrada(bd_config($clave), $params));
+        return $st->rowCount();
+    });
 }
 
 // insert / update con columnas binarias (imágenes, archivos). $binarios: posiciones (desde 0) de $params
 // que se mandan tal cual como BLOB / bytea, sin convertirlas a Windows-1252
 function bd_ejecutar_binario(string $clave, string $sql, array $params, array $binarios): int
 {
-    $convierte = bd_convierte(bd_config($clave));
-    $st = bd_pdo($clave)->prepare($sql);
-    foreach (array_values($params) as $i => $v) {
-        if ($v === null) $tipo = PDO::PARAM_NULL;
-        elseif (in_array($i, $binarios, true)) $tipo = PDO::PARAM_LOB;
-        elseif (is_int($v)) $tipo = PDO::PARAM_INT;
-        else {
-            $tipo = PDO::PARAM_STR;
-            if ($convierte && is_string($v)) $v = mb_convert_encoding($v, 'Windows-1252', 'UTF-8');
+    return bd_escribir($clave, function () use ($clave, $sql, $params, $binarios) {
+        $convierte = bd_convierte(bd_config($clave));
+        $st = bd_pdo($clave)->prepare($sql);
+        foreach (array_values($params) as $i => $v) {
+            if ($v === null) $tipo = PDO::PARAM_NULL;
+            elseif (in_array($i, $binarios, true)) $tipo = PDO::PARAM_LOB;
+            elseif (is_int($v)) $tipo = PDO::PARAM_INT;
+            else {
+                $tipo = PDO::PARAM_STR;
+                if ($convierte && is_string($v)) $v = mb_convert_encoding($v, 'Windows-1252', 'UTF-8');
+            }
+            $st->bindValue($i + 1, $v, $tipo);
         }
-        $st->bindValue($i + 1, $v, $tipo);
-    }
-    $st->execute();
-    return $st->rowCount();
+        $st->execute();
+        return $st->rowCount();
+    });
 }
 
 // Inserta un renglón y regresa su id. En Firebird el id sale de GEN_ID($generador) (ID_CATALOGOS por omisión,
@@ -220,8 +266,8 @@ function bd_insertar(string $clave, string $tabla, string $colId, array $campos,
             . implode(', ', array_fill(0, count($campos), '?')) . ')', array_values($campos));
         return $id;
     }
-    return (int) bd_valor($clave, "insert into $tabla (" . implode(', ', array_keys($campos)) . ') values ('
-        . implode(', ', array_fill(0, count($campos), '?')) . ") returning $colId", array_values($campos));
+    return (int) bd_escribir($clave, fn() => bd_valor($clave, "insert into $tabla (" . implode(', ', array_keys($campos)) . ') values ('
+        . implode(', ', array_fill(0, count($campos), '?')) . ") returning $colId", array_values($campos)));
 }
 
 // bd_insertar con columnas binarias: $binarias son nombres de columna de $campos que van como BLOB / bytea
@@ -238,15 +284,17 @@ function bd_insertar_binario(string $clave, string $tabla, string $colId, array 
         bd_ejecutar_binario($clave, $sql, array_values($campos), $pos);
         return (int) $campos[$colId];
     }
-    $convierte = bd_convierte(bd_config($clave));
-    $st = bd_pdo($clave)->prepare("$sql returning $colId");
-    foreach (array_values($campos) as $i => $v) {
-        $tipo = $v === null ? PDO::PARAM_NULL : (in_array($i, $pos, true) ? PDO::PARAM_LOB : (is_int($v) ? PDO::PARAM_INT : PDO::PARAM_STR));
-        if ($tipo === PDO::PARAM_STR && $convierte && is_string($v)) $v = mb_convert_encoding($v, 'Windows-1252', 'UTF-8');
-        $st->bindValue($i + 1, $v, $tipo);
-    }
-    $st->execute();
-    return (int) $st->fetchColumn();
+    return (int) bd_escribir($clave, function () use ($clave, $sql, $campos, $pos, $colId) {
+        $convierte = bd_convierte(bd_config($clave));
+        $st = bd_pdo($clave)->prepare("$sql returning $colId");
+        foreach (array_values($campos) as $i => $v) {
+            $tipo = $v === null ? PDO::PARAM_NULL : (in_array($i, $pos, true) ? PDO::PARAM_LOB : (is_int($v) ? PDO::PARAM_INT : PDO::PARAM_STR));
+            if ($tipo === PDO::PARAM_STR && $convierte && is_string($v)) $v = mb_convert_encoding($v, 'Windows-1252', 'UTF-8');
+            $st->bindValue($i + 1, $v, $tipo);
+        }
+        $st->execute();
+        return $st->fetchColumn();
+    });
 }
 
 // Siguiente folio de un generador de AW (en Supabase, la secuencia con el mismo nombre)

@@ -64,5 +64,33 @@ function autorizacion($a, string $permiso): string
     if (empty($r['permisos'][$permiso]) && empty($r['permisos']['ADMIN_USER'])) {
         error("El usuario {$r['login']} tampoco tiene el permiso para «{$desc}».", 403);
     }
+    autorizacionRegistrada($permiso, (string) $r['login']);
     return (string) $r['login'];
+}
+
+// Deja constancia de la autorización en la tabla autorizaciones (migraciones/002_autorizaciones.sql), si existe.
+// El documento sale de la pantalla que la pidió (presupuestos / registro-obra) y del id de la petición.
+function autorizacionRegistrada(string $permiso, string $quienAutorizo): void
+{
+    try {
+        if (!bd_tiene_tabla('AW', 'autorizaciones')) return;
+        $script = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''), '.php');
+        $tipo = ['presupuestos' => 'presupuesto', 'registro-obra' => 'obra'][$script] ?? $script;
+        $cuerpo = json_decode((string) file_get_contents('php://input'), true);
+        $docId = (int) (is_array($cuerpo) ? ($cuerpo['id'] ?? 0) : ($_POST['id'] ?? 0));
+        bd_insertar('AW', 'autorizaciones', 'autorizacion_id', [
+            'documento_tipo'   => mb_substr($tipo, 0, 30),
+            'documento_id'     => $docId ?: null,
+            'accion'           => mb_substr($permiso . (isset($_GET['accion']) ? ' · ' . $_GET['accion'] : ''), 0, 60),
+            'estatus'          => 'aprobada',
+            'solicitada_por'   => mb_substr((string) ($_SESSION['usuario'] ?? ''), 0, 50),
+            'fecha_solicitud'  => date('c'),   // con zona horaria: la columna es timestamptz
+            'resuelta_por'     => mb_substr($quienAutorizo, 0, 50),
+            'fecha_resolucion' => date('c'),
+            'comentario'       => 'Autorización de otro usuario con su usuario y contraseña',
+        ]);
+    } catch (Throwable $e) {
+        // La constancia no detiene la operación autorizada
+        error_log('AcriGlass autorizaciones: ' . $e->getMessage());
+    }
 }

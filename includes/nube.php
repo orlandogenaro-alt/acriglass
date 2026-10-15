@@ -35,6 +35,21 @@ function nube_config(): array
     ];
 }
 
+// PDO de PostgreSQL que, al abrir cada transacción, le dice a la base quién es el usuario de la sesión
+// (acri.usuario, solo para esa transacción): lo lee la bitácora de auditoría (migraciones/001_auditoria.sql).
+// Va con set_config(…, true) porque el pooler de Supabase comparte las conexiones entre peticiones.
+class AcriPdo extends PDO
+{
+    #[\ReturnTypeWillChange]
+    public function beginTransaction()
+    {
+        $ok = parent::beginTransaction();
+        $usuario = mb_substr((string) ($_SESSION['usuario'] ?? ''), 0, 50);
+        if ($ok && $usuario !== '') $this->prepare("select set_config('acri.usuario', ?, true)")->execute([$usuario]);
+        return $ok;
+    }
+}
+
 function nube_pdo(): PDO
 {
     static $pdo = null;
@@ -42,7 +57,7 @@ function nube_pdo(): PDO
     $c = nube_config();
     [$host, $puerto] = explode(':', $c['servidor'], 2);
     $ssl = acri_env('DB_SSLMODE', 'require');
-    $pdo = new PDO("pgsql:host=$host;port=$puerto;dbname={$c['base']};sslmode=$ssl", $c['usuario'], $c['contrasena'], [
+    $pdo = new AcriPdo("pgsql:host=$host;port=$puerto;dbname={$c['base']};sslmode=$ssl", $c['usuario'], $c['contrasena'], [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_CASE               => PDO::CASE_LOWER,

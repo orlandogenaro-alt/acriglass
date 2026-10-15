@@ -14,6 +14,7 @@ require __DIR__ . '/../includes/permisos.php';
 require __DIR__ . '/../includes/estatus.php';
 require __DIR__ . '/../includes/tareas.php';
 require __DIR__ . '/../includes/presupuesto-obra.php';
+require __DIR__ . '/../includes/calculo.php';
 require __DIR__ . '/../includes/respuesta.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') error('Método no permitido.', 405);
@@ -22,7 +23,6 @@ exigirCsrf();
 exigirPermiso('NUEVO_SUGERIDO_OBRA', 'MODIFICAR_SUGERIDO_OBRA', 'NUEVO_OBRA', 'MODIFICAR_OBRA', 'ADMIN_USER');
 session_write_close();
 
-const IVA = 0.16;   // igual que js/presupuesto.js
 
 // Catálogo de conceptos de cada sección: tabla, columna id
 const CATALOGOS = [
@@ -254,21 +254,21 @@ function guardar(array $d): array
     // Utilidad «costo»: subtotal = costo × (1 + %) · «margen» (Form46): subtotal = costo / (1 − %)
     $util = numero($d['utilidad_por'] ?? 0, 4);
     $margen = ($d['modo_utilidad'] ?? 'margen') === 'margen';
-    if ($util < 0 || $util >= ($margen ? 100 : 1000.0001)) error($margen ? 'Con utilidad de margen, la Utilidad Neta debe ser de 0 a 99.99 %.' : 'La Utilidad Neta debe ser de 0 a 1000 %.');
+    if (!calculoUtilidadValida($util, $margen ? 'margen' : 'costo')) error($margen ? 'Con utilidad de margen, la Utilidad Neta debe ser de 0 a 99.99 %.' : 'La Utilidad Neta debe ser de 0 a 1000 %.');
     $suma = ['MP' => 0.0, 'MO' => 0.0, 'GO' => 0.0];
     foreach ($conceptos as $c) $suma[$c['tipo']] += numero($c['presupuesto'] ?? 0);
     $costo = $suma['MP'] + $suma['MO'] + $suma['GO'];
-    $esperado = $margen ? $costo / (1 - $util / 100) : $costo * (1 + $util / 100);
+    $esperado = calculoSubtotal($costo, $util, $margen ? 'margen' : 'costo');
     $subtotal = numero($d['totales']['subtotal'] ?? $esperado);
-    if (abs($subtotal - $esperado) > max(1, $esperado * 0.0001)) {
+    if (!calculoCuadra($subtotal, $esperado)) {
         error('Los totales del presupuesto no cuadran con sus conceptos (subtotal ' . number_format($subtotal, 2) . ' contra '
             . number_format($esperado, 2) . '). Recarga la página e intenta de nuevo.');
     }
-    $iva = round($subtotal * IVA, 2);
+    $iva = calculoIva($subtotal);
     // Comisiones y anexo de seguro: porcentajes del subtotal
-    foreach ($d['comisiones'] ?? [] as $i => $c) $d['comisiones'][$i]['total'] = round($subtotal * numero($c['porcentaje'] ?? 0, 4) / 100, 2);
+    foreach ($d['comisiones'] ?? [] as $i => $c) $d['comisiones'][$i]['total'] = calculoComision($subtotal, numero($c['porcentaje'] ?? 0, 4));
     foreach ($d['seguros'] ?? [] as $i => $s) {
-        $d['seguros'][$i]['total'] = round($subtotal * numero($s['porcentaje_1'] ?? 0) * numero($s['porcentaje_2'] ?? 0) / 10000, 2);
+        $d['seguros'][$i]['total'] = calculoSeguro($subtotal, numero($s['porcentaje_1'] ?? 0), numero($s['porcentaje_2'] ?? 0));
     }
     $enc = [
         'fecha'             => $fecha,

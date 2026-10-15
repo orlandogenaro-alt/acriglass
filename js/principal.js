@@ -9,7 +9,8 @@
     var formularios = {
         'Presupuestos de Obra': { url: 'presupuesto.php', titulo: 'Presupuesto de Obra' },
         'Obras':                { url: 'obra.php',        titulo: 'Registro de Obra' },
-        'Contrato de Obra':     { url: 'contrato-obra.php', titulo: 'Contrato de Obra' }
+        'Contrato de Obra':     { url: 'contrato-obra.php', titulo: 'Contrato de Obra' },
+        'Estimaciones de Obra': { url: 'estimaciones-obra.php', titulo: 'Estimaciones de Obra' }
     };
 
     // Módulos que ya leen datos reales

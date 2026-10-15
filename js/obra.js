@@ -2019,6 +2019,13 @@
         'guardar': function () { guardaObra().then(function (ok) { if (ok) habilitaControles(false); }); },
         'guardar-cerrar': function () { guardaObra().then(function (ok) { if (ok) cerrarVentana(); }); },
         'imprimir': function () { window.print(); },
+        // Estimaciones de la obra (estimaciones-obra.php) en su propia pestaña
+        'estimaciones': function () {
+            if (!requiereObra('Es necesario guardar la obra para registrar estimaciones.')) return;
+            var titulo = 'Estimaciones · ' + ($('nombreObra').value || obraId);
+            if (window.parent !== window) window.parent.postMessage({ tipo: 'abrir', modulo: 'Estimaciones de Obra', id: obraId, titulo: titulo }, location.origin);
+            else window.open('estimaciones-obra.php?id=' + encodeURIComponent(obraId), '_blank');
+        },
         // Contrato de obra y convenios (contrato-obra.php) en su propia pestaña
         'contrato': function () {
             if (!requiereObra('Es necesario guardar la obra para registrar su contrato.')) return;

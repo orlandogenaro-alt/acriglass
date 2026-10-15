@@ -161,6 +161,10 @@ function iconoPestana() {
         <svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z" fill="#fff" stroke="#666"/><path d="M15 2v5h5" fill="none" stroke="#666"/><path d="M9 12h8M9 15h8M9 18h5" stroke="#3b82f6" stroke-width="1.5"/></svg>
         <span>Contrato</span>
     </button>
+    <button class="tb" data-accion="estimaciones" title="Catálogo del contrato, anticipo y estimaciones de avance">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#fff" stroke="#666"/><path d="M7 16l3-4 3 2 4-6" fill="none" stroke="#22c55e" stroke-width="1.8"/></svg>
+        <span>Estimaciones</span>
+    </button>
     <button class="tb" data-accion="imprimir">
         <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="7" fill="#fff" stroke="#666"/><rect x="2" y="9" width="20" height="9" rx="2" fill="#8a8a8a"/><rect x="6" y="14" width="12" height="8" fill="#fff" stroke="#666"/></svg>
         <span>Imprimir</span>

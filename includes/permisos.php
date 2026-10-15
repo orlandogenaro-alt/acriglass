@@ -20,6 +20,7 @@ const ACRI_PERMISOS = [
     'CATALOGO_INSUMOS'        => 'Alta y cambios del catálogo de insumos y básicos',
     'PRECIOS_INSUMOS'         => 'Capturar precios de insumos',
     'AUTORIZAR_CONVENIOS'     => 'Autorizar convenios, aditivas y órdenes de cambio de obra',
+    'AUTORIZAR_ESTIMACIONES'  => 'Autorizar anticipos y estimaciones de obra',
 ];
 
 // Solo los permisos conocidos, en mayúsculas y sin repetir

@@ -598,13 +598,14 @@ try {
         case 'resumen':
             $pres = [];
             foreach (bd_filas('AW', 'select estatus, count(*) as n from doctos_sugerido_obra where fecha between ? and ? group by estatus', [$ini, $fin]) as $r) {
-                $pres[$r['estatus']] = (int) $r['n'];
+                $k = mb_strtoupper(trim((string) $r['estatus']));
+                $pres[$k] = ($pres[$k] ?? 0) + (int) $r['n'];
             }
             responder(['ok' => true,
-                'presupuestos_pendientes' => $pres['Pendiente'] ?? 0,
-                'presupuestos_aceptados'  => $pres['Aceptado'] ?? 0,
-                // Obras en proceso: todas las que siguen abiertas, sin importar la fecha
-                'obras_en_proceso' => (int) bd_valor('AW', "select count(*) from reg_obras where estatus in ('Planificacion', 'Ejecucion', 'Obra Terminada')"),
+                'presupuestos_pendientes' => $pres['PENDIENTE'] ?? 0,
+                'presupuestos_aceptados'  => $pres['ACEPTADO'] ?? 0,
+                // Obras en proceso: en planificación o ejecución, sin importar la fecha (las terminadas ya no cuentan)
+                'obras_en_proceso' => (int) bd_valor('AW', "select count(*) from reg_obras where estatus in ('Planificacion', 'Ejecucion')"),
             ]);
 
         case 'tablero':
@@ -646,6 +647,9 @@ try {
             // Datos de la obra del encabezado (ventana Nueva obra), guardados como JSON
             $p['obra_datos'] = bd_tiene_columna('AW', 'doctos_sugerido_obra', 'datos_obra')
                 ? json_decode((string) bd_valor('AW', 'select datos_obra from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]), true) : null;
+            // Forma de la utilidad con la que se guardó ('costo' o 'margen'; null en los guardados antes de la columna)
+            $p['utilidad_modo'] = bd_tiene_columna('AW', 'doctos_sugerido_obra', 'utilidad_modo')
+                ? (trim((string) bd_valor('AW', 'select utilidad_modo from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id])) ?: null) : null;
             // Factores del Análisis de Precios Unitarios (Neodata), guardados como JSON
             $p['analisis_pu'] = bd_tiene_columna('AW', 'doctos_sugerido_obra', 'analisis_pu')
                 ? json_decode((string) bd_valor('AW', 'select analisis_pu from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]), true) : null;

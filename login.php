@@ -4,6 +4,7 @@
 // Modo configuración: si la conexión AW aún no tiene contraseña capturada, solo desde el propio
 // servidor se puede entrar para capturarla en Administrador › Bases de datos.
 require_once __DIR__ . '/includes/bd.php';
+require_once __DIR__ . '/includes/intentos.php';
 sesionIniciar();
 
 $usuario    = trim($_POST['usuario'] ?? '');
@@ -15,8 +16,16 @@ function volver(string $error): void
     exit;
 }
 
+// Usuario o contraseña incorrectos: cuenta el fallo para el bloqueo por intentos
+function fallo(string $usuario): void
+{
+    intentosRegistrar($usuario, false);
+    volver('datos');
+}
+
 function iniciarSesion(string $usuario, array $permisos, bool $modoConfig = false): void
 {
+    intentosRegistrar($usuario, true);
     session_regenerate_id(true);
     $_SESSION['usuario']     = $usuario;
     $_SESSION['permisos']    = $permisos;
@@ -28,6 +37,7 @@ function iniciarSesion(string $usuario, array $permisos, bool $modoConfig = fals
 }
 
 if ($usuario === '' || $contrasena === '') volver('vacio');
+if (intentosBloqueo($usuario) > 0) volver('bloqueado');
 
 // Administrador maestro: entra aunque no exista en AW. El hash de su contraseña no va en el código:
 // variable de entorno ACRI_ADMIN_HASH (Vercel) o config/admin.json { "hash": … } (servidor local, fuera de git).
@@ -35,7 +45,7 @@ if ($usuario === '' || $contrasena === '') volver('vacio');
 const ACRI_ADMIN_USUARIO = 'SYSDBA';
 if (strcasecmp($usuario, ACRI_ADMIN_USUARIO) === 0) {
     $hashAdmin = (string) (getenv('ACRI_ADMIN_HASH') ?: (configLeer('admin')['hash'] ?? ''));
-    if ($hashAdmin === '' || !password_verify($contrasena, $hashAdmin)) volver('datos');
+    if ($hashAdmin === '' || !password_verify($contrasena, $hashAdmin)) fallo($usuario);
     iniciarSesion(ACRI_ADMIN_USUARIO, ['ADMIN_USER' => true]);
 }
 
@@ -56,7 +66,7 @@ if (!$aw || ($aw['contrasena'] ?? '') === '') {
 if (ACRI_NUBE) {
     try {
         $u = bd_fila('AW', 'select usuario_id, login, contrasena_hash, estatus from usuarios where upper(trim(login)) = ?', [mb_strtoupper($usuario)]);
-        if (!$u || !password_verify($contrasena, (string) $u['contrasena_hash'])) volver('datos');
+        if (!$u || !password_verify($contrasena, (string) $u['contrasena_hash'])) fallo($usuario);
         if (strtoupper((string) $u['estatus']) === 'B') volver('baja');
         $sql = 'select permiso from permisos_usuarios where usuario_id = ?';
         if (bd_tiene_columna('AW', 'usuarios', 'rol_id')) {
@@ -82,7 +92,7 @@ try {
     volver('bd');
 }
 
-if (!$u || !hash_equals((string) $u['contrasena'], $contrasena)) volver('datos');
+if (!$u || !hash_equals((string) $u['contrasena'], $contrasena)) fallo($usuario);
 if (strtoupper((string) $u['estatus']) === 'B') volver('baja');
 
 // Permisos: cada columna de PERMISOS_USUARIOS con 'T'

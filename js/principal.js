@@ -489,7 +489,7 @@
         pedirDatos('resumen', r[0], r[1]).then(function (j) {
             tarjetas.forEach(function (t) {
                 t.querySelector('.t-valor').textContent = j[t.dataset.indicador];
-                t.querySelector('.t-nota').textContent = t.dataset.indicador === 'obras_en_proceso' ? 'Obras abiertas a la fecha' : 'En el mes actual';
+                t.querySelector('.t-nota').textContent = t.dataset.indicador === 'obras_en_proceso' ? 'En planificación o ejecución' : 'En el mes actual';
             });
         }).catch(function (err) {
             tarjetas.forEach(function (t) { t.querySelector('.t-nota').textContent = '⚠ ' + err.message; });

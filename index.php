@@ -7,6 +7,7 @@ $errores = [
     'vacio'  => 'Escribe tu usuario y contraseña.',
     'datos'  => 'Usuario o contraseña incorrectos.',
     'baja'   => 'Tu usuario está dado de baja.',
+    'bloqueado' => 'Demasiados intentos fallidos con ese usuario. Espera 15 minutos e intenta de nuevo.',
     'bd'     => 'No se pudo conectar con la base de datos de usuarios (AW). Avisa al administrador.',
     'config' => 'El sistema aún no está configurado. Entra desde el servidor para capturar la conexión a la base de datos.',
 ];

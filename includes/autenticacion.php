@@ -9,6 +9,7 @@
 //     → ['estado' => 'baja']    usuario dado de baja
 //   Los errores de base de datos se lanzan como excepción.
 require_once __DIR__ . '/bd.php';
+require_once __DIR__ . '/intentos.php';
 
 function autenticarUsuario(string $usuario, string $contrasena): array
 {
@@ -52,7 +53,10 @@ function autorizacion($a, string $permiso): string
 {
     $desc = defined('ACRI_PERMISOS') ? (ACRI_PERMISOS[$permiso] ?? $permiso) : $permiso;
     if (!is_array($a)) responder(['ok' => false, 'autorizar' => true, 'error' => "No tienes el permiso para «{$desc}» ($permiso)."], 403);
-    $r = autenticarUsuario(trim((string) ($a['usuario'] ?? '')), (string) ($a['contrasena'] ?? ''));
+    $quien = trim((string) ($a['usuario'] ?? ''));
+    if ($espera = intentosBloqueo($quien)) error(intentosMensaje($espera), 429);
+    $r = autenticarUsuario($quien, (string) ($a['contrasena'] ?? ''));
+    intentosRegistrar($quien, $r['estado'] === 'ok');
     if ($r['estado'] !== 'ok') {
         sleep(1);   // frena intentos repetidos de contraseña
         error($r['estado'] === 'baja' ? 'El usuario que autoriza está dado de baja.' : 'Usuario o contraseña de quien autoriza incorrectos.', 403);

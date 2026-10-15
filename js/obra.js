@@ -496,7 +496,9 @@
         avance = parseInt($('sliderAvance').value, 10) || 0;
         pintarAvance();
         if (!requiereObra('Es necesario guardar la obra para actualizar su avance.')) return;
-        enviar('avance', { id: obraId, avance: avance }).then(function (j) {
+        conAutorizacion(function (a) {
+            return enviar('avance', { id: obraId, avance: avance, autoriza: a || autorizaMod || undefined });
+        }, 'Actualizar el avance requiere el permiso «Modificar obras».').then(function (j) {
             alert('Se actualizo correctamente el avance de Obra a ' + j.avance + ' %');
         }).catch(avisarError);
     });

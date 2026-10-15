@@ -10,6 +10,7 @@
     var COLOR = { pagado: '#c98500', cobrado: '#199e70', otros: '#d95926', utilidad: '#3987e5', presupuesto: '#3987e5', ejercido: '#c98500', disponible: '#3a4660' };
     var CLAVE = 'acri-tablero';
     var corrida = 0;   // descarta respuestas de un filtro anterior
+    var IVA = 0.16;    // igual que api/presupuestos.php y Servicios (÷ 1.16)
 
     function pedir(url) {
         return fetch(url).then(function (r) {
@@ -186,7 +187,9 @@
     function pintarFinanciero(d, cob) {
         var pagado = d.materiales + d.mano_obra, otros = d.gastos;
         var cobrado = cob ? cob.cobrado : null;
-        var utilidad = cob ? cobrado - pagado - otros : null;
+        // Lo cobrado trae IVA y los costos no: la utilidad se calcula con lo cobrado sin IVA (igual que Servicios › Estado de resultados)
+        var cobradoNeto = cob ? cobrado / (1 + IVA) : null;
+        var utilidad = cob ? cobradoNeto - pagado - otros : null;
         kpi('pagado', pagado);
         kpi('otros', otros);
         kpi('por_pagar', d.por_pagar);
@@ -196,16 +199,16 @@
         raiz.querySelector('[data-serie="utilidad"]').classList.toggle('perdida', utilidad < 0);
 
         graficaBarras($('grfFinanciero'), [
-            ['Pagado', 'pagado', pagado], ['Cobrado', 'cobrado', cobrado || 0],
+            ['Costo ejercido', 'pagado', pagado], ['Cobrado sin IVA', 'cobrado', cobradoNeto || 0],
             ['Otros gastos', 'otros', otros], [utilidad < 0 ? 'Pérdida' : 'Utilidad', 'utilidad', utilidad || 0]
         ].map(function (b) { return { etiqueta: b[0], barras: [{ serie: b[1], nombre: b[0], valor: b[2] }] }; }), { uno: '' });
 
         // A dónde se fue lo cobrado: pagado, otros gastos y lo que queda de utilidad
         graficaDona($('grfFinPct'), [
-            { serie: 'pagado', nombre: 'Pagado', valor: pagado },
+            { serie: 'pagado', nombre: 'Costo ejercido', valor: pagado },
             { serie: 'otros', nombre: 'Otros gastos', valor: otros },
             { serie: 'utilidad', nombre: 'Utilidad', valor: Math.max(0, utilidad || 0) }
-        ], cobrado ? [pct(utilidad / cobrado), utilidad < 0 ? 'de pérdida' : 'de margen'] : ['—', cob ? 'sin cobranza' : 'calculando cobranza…'],
+        ], cobradoNeto ? [pct(utilidad / cobradoNeto), utilidad < 0 ? 'de pérdida' : 'de margen'] : ['—', cob ? 'sin cobranza' : 'calculando cobranza…'],
         'Sin movimientos');
     }
 

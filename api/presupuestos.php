@@ -13,6 +13,7 @@ require __DIR__ . '/../includes/autenticacion.php';
 require __DIR__ . '/../includes/permisos.php';
 require __DIR__ . '/../includes/estatus.php';
 require __DIR__ . '/../includes/tareas.php';
+require __DIR__ . '/../includes/presupuesto-obra.php';
 require __DIR__ . '/../includes/respuesta.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') error('Método no permitido.', 405);
@@ -41,14 +42,25 @@ function numero($v, int $decimales = 2): float
     return round(is_numeric($v) ? (float) $v : 0.0, $decimales);
 }
 
-// Id del concepto por su descripción; si no está en el catálogo se da de alta
+// Renglones que el presupuesto llena solo (empleados, comisiones y Análisis P.U.): se dan de alta si faltan
+const CONCEPTOS_DEL_SISTEMA = ['MANO DE OBRA INTERNA', 'COMISIONES', 'MATERIALES SEGUN ANALISIS P.U.', 'MANO DE OBRA SEGUN ANALISIS P.U.'];
+
+// Id del concepto por su descripción. Uno que no está en el catálogo solo se da de alta si es del sistema,
+// si el catálogo de la sección está vacío (se captura como texto libre) o si lo guarda un administrador;
+// los demás se dan de alta en Administrador › Conceptos.
 function conceptoId(string $tipo, string $descripcion, array &$cache): int
 {
     $k = $tipo . '|' . mb_strtoupper($descripcion);
     if (isset($cache[$k])) return $cache[$k];
     [$tabla, $col] = CATALOGOS[$tipo];
     $id = (int) bd_valor('AW', "select min($col) from $tabla where upper(trim(descripcion)) = ?", [mb_strtoupper($descripcion)]);
-    if (!$id) $id = bd_insertar('AW', $tabla, $col, ['descripcion' => mb_substr($descripcion, 0, 80)]);
+    if (!$id) {
+        $libre = in_array(mb_strtoupper($descripcion), CONCEPTOS_DEL_SISTEMA, true) || tienePermiso('ADMIN_USER')
+            || !(int) bd_valor('AW', "select count(*) from $tabla");
+        if (!$libre) error("El concepto «{$descripcion}» no está en el catálogo de " . ['MP' => 'Materia Prima', 'MO' => 'Mano de Obra', 'GO' => 'Gastos de Operacion'][$tipo]
+            . '. Pide a un administrador que lo dé de alta en Administrador › Conceptos.');
+        $id = bd_insertar('AW', $tabla, $col, ['descripcion' => mb_substr($descripcion, 0, 80)]);
+    }
     return $cache[$k] = $id;
 }
 
@@ -277,6 +289,7 @@ function guardar(array $d): array
     $idHs = preg_replace('/\D/', '', (string) ($d['id_hs'] ?? ''));
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'id_hs')) $enc['id_hs'] = $idHs !== '' && $idHs !== '0' ? $idHs : null;
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'correo_electronico')) $enc['correo_electronico'] = texto($d['email'] ?? '', 150);
+    if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'utilidad_modo')) $enc['utilidad_modo'] = $margen ? 'margen' : 'costo';
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'datos_obra')) $enc['datos_obra'] = datosObra($d['obra_datos'] ?? []);
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'analisis_pu')) {
         $enc['analisis_pu'] = analisisPU($d['analisis_pu'] ?? []);
@@ -292,6 +305,11 @@ function guardar(array $d): array
         $enc['vendedor_obra_id'] = vendedorId(texto($d['vendedor'] ?? '', 150));
 
         if ($id) {
+            // El estatus se revisa otra vez con el presupuesto apartado (pudieron aceptarlo mientras se capturaba)
+            $b = presupuestoBloquear($id);
+            if (!$b) error('El presupuesto ya no existe (¿lo eliminaron?).', 404);
+            if (estatusBloqueaCambios($b['estatus'])) error("El presupuesto está {$b['estatus']}: ya no es posible hacerle modificaciones.");
+            $enc['estatus'] = $b['estatus'];
             bd_ejecutar('AW', 'update doctos_sugerido_obra set ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($enc)))
                 . ' where docto_sugerido_obra_id = ?', array_merge(array_values($enc), [$id]));
             // Los renglones se reemplazan completos (con sus artículos importados y el detalle del Form46)
@@ -363,9 +381,7 @@ function registrarObra(array $d): array
     if (in_array(mb_strtoupper($estatus), ['CANCELADO', 'RECHAZADO'], true)) error("El presupuesto está $estatus: no se puede registrar la obra.");
 
     // Ya registrada (por obra_id o por una obra que apunte al presupuesto)
-    $obraId = (int) $p['obra_id'];
-    if ($obraId && !bd_valor('AW', 'select count(*) from reg_obras where obra_id = ?', [$obraId])) $obraId = 0;
-    if (!$obraId) $obraId = (int) bd_valor('AW', 'select min(obra_id) from reg_obras where sugerido_id = ?', [$id]);
+    $obraId = presupuestoObra($id, (int) $p['obra_id']);
     if ($obraId) {
         if ((int) $p['obra_id'] !== $obraId) bd_ejecutar('AW', 'update doctos_sugerido_obra set obra_id = ? where docto_sugerido_obra_id = ?', [$obraId, $id]);
         $nom = (string) bd_valor('AW', 'select nom_obra from reg_obras where obra_id = ?', [$obraId]);
@@ -412,6 +428,16 @@ function registrarObra(array $d): array
     $pdo = bd_pdo('AW');
     $pdo->beginTransaction();
     try {
+        // Se vuelve a revisar con el presupuesto apartado: otra petición pudo registrar la obra mientras tanto
+        $b = presupuestoBloquear($id);
+        if (!$b) error('El presupuesto ya no existe (¿lo eliminaron?).', 404);
+        if (in_array(mb_strtoupper($b['estatus']), ['CANCELADO', 'RECHAZADO'], true)) error("El presupuesto está {$b['estatus']}: no se puede registrar la obra.");
+        if ($b['obra_id']) {
+            bd_ejecutar('AW', 'update doctos_sugerido_obra set obra_id = ? where docto_sugerido_obra_id = ?', [$b['obra_id'], $id]);
+            $pdo->commit();
+            $nom = (string) bd_valor('AW', 'select nom_obra from reg_obras where obra_id = ?', [$b['obra_id']]);
+            return ['obra_id' => $b['obra_id'], 'nom_obra' => $nom, 'nueva' => false, 'estatus' => $b['estatus']];
+        }
         $obraId = bd_insertar('AW', 'reg_obras', 'obra_id', $obra);
         // Como en el sistema de escritorio: al registrar la obra el presupuesto queda Aceptado
         bd_ejecutar('AW', "update doctos_sugerido_obra set obra_id = ?, estatus = 'Aceptado' where docto_sugerido_obra_id = ?", [$obraId, $id]);
@@ -438,7 +464,22 @@ function cambiarEstatus(array $d): array
     $antes = estatusActual($id);
     if ($motivo = estatusTransicion($antes, $nuevo)) error($motivo);
     $autorizo = tienePermiso('MODIFICAR_SUGERIDO_OBRA', 'ADMIN_USER') ? null : autorizacion($d['autoriza'] ?? null, 'MODIFICAR_SUGERIDO_OBRA');
-    bd_ejecutar('AW', 'update doctos_sugerido_obra set estatus = ? where docto_sugerido_obra_id = ?', [$nuevo, $id]);
+    $pdo = bd_pdo('AW');
+    $pdo->beginTransaction();
+    try {
+        $b = presupuestoBloquear($id);
+        if (!$b) error('El presupuesto ya no existe (¿lo eliminaron?).', 404);
+        if ($motivo = estatusTransicion($b['estatus'], $nuevo)) error($motivo);
+        // Con obra registrada el presupuesto queda como se aprobó: no se reabre para modificarlo
+        if ($b['obra_id'] && mb_strtoupper($b['estatus']) === 'ACEPTADO' && mb_strtoupper($nuevo) !== 'ACEPTADO') {
+            error("El presupuesto ya tiene una obra registrada: no se puede pasar a $nuevo. Los cambios de alcance se registran en la obra.");
+        }
+        bd_ejecutar('AW', 'update doctos_sugerido_obra set estatus = ? where docto_sugerido_obra_id = ?', [$nuevo, $id]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
     return ['estatus' => $nuevo, 'autorizo' => $autorizo];
 }
 

@@ -252,10 +252,10 @@ function idItem(string $nombre): string
                     <p class="tb-estado" id="tbEstado"></p>
 
                     <div class="tb-kpis">
-                        <div class="tb-kpi" data-serie="pagado"><h3>PAGADO</h3><b data-kpi="pagado">—</b><small>Materiales + mano de obra real</small></div>
-                        <div class="tb-kpi" data-serie="cobrado"><h3>COBRADO</h3><b data-kpi="cobrado">—</b><small>Cobros, anticipos y notas de crédito</small></div>
+                        <div class="tb-kpi" data-serie="pagado"><h3>COSTO EJERCIDO</h3><b data-kpi="pagado">—</b><small>Material surtido + mano de obra real (no son pagos)</small></div>
+                        <div class="tb-kpi" data-serie="cobrado"><h3>COBRADO</h3><b data-kpi="cobrado">—</b><small>Cobros, anticipos y notas de crédito (con IVA)</small></div>
                         <div class="tb-kpi" data-serie="otros"><h3>OTROS GASTOS</h3><b data-kpi="otros">—</b><small>Gastos adicionales reales</small></div>
-                        <div class="tb-kpi" data-serie="utilidad"><h3>UTILIDAD / PÉRDIDA</h3><b data-kpi="utilidad">—</b><small>Cobrado − pagado − otros gastos</small></div>
+                        <div class="tb-kpi" data-serie="utilidad"><h3>UTILIDAD / PÉRDIDA</h3><b data-kpi="utilidad">—</b><small>Cobrado sin IVA − costo ejercido − otros gastos</small></div>
                     </div>
 
                     <div class="tb-fila">

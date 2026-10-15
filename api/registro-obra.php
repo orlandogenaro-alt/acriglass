@@ -23,6 +23,7 @@ require __DIR__ . '/../includes/sesion.php';
 require __DIR__ . '/../includes/servicios.php';
 require __DIR__ . '/../includes/autenticacion.php';
 require __DIR__ . '/../includes/permisos.php';
+require __DIR__ . '/../includes/presupuesto-obra.php';
 require __DIR__ . '/../includes/respuesta.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') error('Método no permitido.', 405);
@@ -129,7 +130,14 @@ function guardar(array $d): array
             $sugerido = (int) bd_valor('AW', 'select sugerido_id from reg_obras where obra_id = ?', [$id]);
         } else {
             $sugerido = (int) ($d['sugerido_id'] ?? 0);
-            $obra += ['sugerido_id' => $sugerido, 'estatus' => 'Planificacion', 'fecha_creacion' => date('Y-m-d H:i:s'), 'usuario_creacion' => usuario()];
+            if ($sugerido) {
+                // Mismas reglas que Registrar Obra desde el presupuesto: un presupuesto, una obra
+                $b = presupuestoBloquear($sugerido);
+                if (!$b) error('El presupuesto de la obra ya no existe.', 404);
+                if (in_array(mb_strtoupper($b['estatus']), ['CANCELADO', 'RECHAZADO'], true)) error("El presupuesto está {$b['estatus']}: no se puede registrar la obra.");
+                if ($b['obra_id']) error("El presupuesto ya tiene registrada la obra #{$b['obra_id']}.");
+            }
+            $obra +=['sugerido_id' => $sugerido, 'estatus' => 'Planificacion', 'fecha_creacion' => date('Y-m-d H:i:s'), 'usuario_creacion' => usuario()];
             $id = bd_insertar('AW', 'reg_obras', 'obra_id', $obra);
         }
         // Responsables: se reemplazan con los de la lista
@@ -656,7 +664,9 @@ function imagen(): array
 function adjuntar(): array
 {
     $id = (int) ($_POST['id'] ?? 0);
-    estatusObra($id);
+    $estatus = estatusObra($id);
+    if (in_array($estatus, ['Finalizacion', 'Cancelado'], true)) error("No es posible modificar una obra que su estatus es: $estatus");
+    if (!tienePermiso('NUEVO_OBRA', 'MODIFICAR_OBRA', 'ADMIN_USER')) error('No tienes el permiso para «Modificar obras».', 403);
     $desc = texto($_POST['descripcion'] ?? '', 49);
     if ($desc === null) error('Ingresar una descripcion corta maximo 50 caracteres.');
     $a = archivoSubido(ADJUNTO_MAX_MB);
@@ -785,7 +795,9 @@ try {
         case 'avance':
             $d = entrada();
             $id = (int) ($d['id'] ?? 0);
-            estatusObra($id);
+            $estatus = estatusObra($id);
+            if (in_array($estatus, ['Finalizacion', 'Cancelado'], true)) error("No es posible modificar una obra que su estatus es: $estatus");
+            exigirOAutorizar($d, 'MODIFICAR_OBRA');
             $avance = max(0, min(100, (int) ($d['avance'] ?? 0)));
             if (!bd_tiene_columna('AW', 'reg_obras', 'avance_obra')) error('La base de AW no tiene la columna AVANCE_OBRA.');
             bd_ejecutar('AW', 'update reg_obras set avance_obra = ? where obra_id = ?', [$avance, $id]);

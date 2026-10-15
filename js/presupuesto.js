@@ -1900,9 +1900,10 @@
                     articulos: c.articulos || []
                 });
             });
-            // Forma de la utilidad con la que se guardó: la que reproduce su subtotal (antes de esta opción todo era margen)
+            // Forma de la utilidad con la que se guardó; en los guardados antes de esa columna, la que reproduce su subtotal
             var costoG = suma(datos.mp) + suma(datos.mo) + suma(datos.go), uG = num(p.utilidad_neta_por) / 100, sG = num(p.subtotal);
-            ponerModoUtilidad(uG > 0 && uG < 1 && Math.abs(sG - costoG / (1 - uG)) < Math.abs(sG - costoG * (1 + uG)) ? 'margen' : 'costo');
+            ponerModoUtilidad(p.utilidad_modo === 'margen' || p.utilidad_modo === 'costo' ? p.utilidad_modo
+                : uG > 0 && uG < 1 && Math.abs(sG - costoG / (1 - uG)) < Math.abs(sG - costoG * (1 + uG)) ? 'margen' : 'costo');
             extras = {
                 empleados: (p.empleados || []).map(function (e) {
                     return { empleado_id: parseInt(e.empleado_id, 10) || 0, clave: e.clave, nombre: e.nombre || '', sueldo: num(e.sueldo), dias: num(e.dias), total: num(e.total) };

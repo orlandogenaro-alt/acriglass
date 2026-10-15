@@ -1,5 +1,6 @@
 <?php
 require __DIR__ . '/includes/sesion.php';
+exigirPermiso('MODULO_SUGERIDOS_OBRA', 'NUEVO_SUGERIDO_OBRA', 'MODIFICAR_SUGERIDO_OBRA', 'NUEVO_OBRA', 'MODIFICAR_OBRA', 'CERRAR_OBRA', 'ADMIN_USER');
 require __DIR__ . '/includes/servicios.php';
 require __DIR__ . '/includes/conceptos.php';
 require __DIR__ . '/includes/estatus.php';

@@ -15,6 +15,7 @@ require __DIR__ . '/../includes/estatus.php';
 require __DIR__ . '/../includes/tareas.php';
 require __DIR__ . '/../includes/presupuesto-obra.php';
 require __DIR__ . '/../includes/calculo.php';
+require __DIR__ . '/../includes/parametros-presupuesto.php';
 require __DIR__ . '/../includes/respuesta.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') error('Método no permitido.', 405);
@@ -264,7 +265,16 @@ function guardar(array $d): array
         error('Los totales del presupuesto no cuadran con sus conceptos (subtotal ' . number_format($subtotal, 2) . ' contra '
             . number_format($esperado, 2) . '). Recarga la página e intenta de nuevo.');
     }
-    $iva = calculoIva($subtotal);
+    // Tasa de IVA: una de Administrador › Parámetros de presupuesto, o la que ya tenía guardada; sin la columna, 16 %
+    $ivaPct = 16.0;
+    if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'iva_pct')) {
+        $ivaPct = is_numeric($d['iva_pct'] ?? null) ? round((float) $d['iva_pct'], 3) : 16.0;
+        $previo = $id ? (float) bd_valor('AW', 'select iva_pct from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]) : null;
+        if (!parametrosIvaValida($ivaPct, parametrosPresupuesto()) && ($previo === null || abs($previo - $ivaPct) >= 0.0001)) {
+            error("La tasa de IVA de {$ivaPct} % no está en Administrador › Parámetros de presupuesto.");
+        }
+    }
+    $iva = calculoIva($subtotal, $ivaPct / 100);
     // Comisiones y anexo de seguro: porcentajes del subtotal
     foreach ($d['comisiones'] ?? [] as $i => $c) $d['comisiones'][$i]['total'] = calculoComision($subtotal, numero($c['porcentaje'] ?? 0, 4));
     foreach ($d['seguros'] ?? [] as $i => $s) {
@@ -290,6 +300,7 @@ function guardar(array $d): array
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'id_hs')) $enc['id_hs'] = $idHs !== '' && $idHs !== '0' ? $idHs : null;
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'correo_electronico')) $enc['correo_electronico'] = texto($d['email'] ?? '', 150);
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'utilidad_modo')) $enc['utilidad_modo'] = $margen ? 'margen' : 'costo';
+    if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'iva_pct')) $enc['iva_pct'] = $ivaPct;
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'datos_obra')) $enc['datos_obra'] = datosObra($d['obra_datos'] ?? []);
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'analisis_pu')) {
         $enc['analisis_pu'] = analisisPU($d['analisis_pu'] ?? []);

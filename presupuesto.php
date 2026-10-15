@@ -7,6 +7,7 @@ require __DIR__ . '/includes/estatus.php';
 require __DIR__ . '/includes/membrete.php';
 require __DIR__ . '/includes/conceptos-tareas.php';
 require __DIR__ . '/includes/pu.php';
+require __DIR__ . '/includes/parametros-presupuesto.php';
 
 // Presupuesto existente a abrir (sin id = nuevo)
 $presupuestoId = max(0, (int) ($_GET['id'] ?? 0));
@@ -87,6 +88,22 @@ if (!modoConfiguracion()) {
         error_log('AcriGlass presupuesto biblioteca P.U.: ' . $e->getMessage());
     }
 }
+
+// Administrador › Parámetros de presupuesto: utilidad, indirectos, financiamiento e IVA de un presupuesto nuevo
+$paramsPres = parametrosPresupuestoDefecto();
+if (!modoConfiguracion()) {
+    try {
+        $paramsPres = parametrosPresupuesto();
+    } catch (Throwable $e) {
+        error_log('AcriGlass presupuesto parámetros: ' . $e->getMessage());
+    }
+}
+if ($paramsPres['utilidad_pct'] !== null) $utilidadDefecto = (float) $paramsPres['utilidad_pct'];
+$paramsJs = [
+    'utilidad_modo' => $paramsPres['utilidad_modo'], 'financiamiento_pct' => (float) $paramsPres['financiamiento_pct'],
+    'indirectos' => array_keys(parametrosIndirectosActivos($paramsPres)),
+    'iva_tasas' => $paramsPres['iva_tasas'], 'iva_defecto' => (float) $paramsPres['iva_defecto'],
+];
 
 // Análisis P.U.: insumos del catálogo (Catalogos › Insumos) con su precio vigente en pesos, para sugerirlos primero.
 // La mano de obra va con su salario base (sin FSR): el análisis le aplica su propio FSR y así no se aplica dos veces.
@@ -516,8 +533,8 @@ $secciones = [
             <div class="t-fila">
                 <b>+</b><span class="t-util">Utilidad Neta
                     <select id="modoUtilidad" title="Cómo se aplica el % de utilidad">
-                        <option value="costo">+ % sobre el costo</option>
-                        <option value="margen">% de margen (Form46)</option>
+                        <option value="costo"<?= $paramsPres['utilidad_modo'] === 'costo' ? ' selected' : '' ?>>+ % sobre el costo</option>
+                        <option value="margen"<?= $paramsPres['utilidad_modo'] === 'margen' ? ' selected' : '' ?>>% de margen (Form46)</option>
                     </select>:</span>
                 <input type="number" id="pctUtilidad" value="<?= e((string) $utilidadDefecto) ?>" min="0" max="1000" step="0.01" class="num pct" title="% de utilidad">
                 <output id="tUT">0</output>
@@ -529,7 +546,12 @@ $secciones = [
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg>
                 </button>
             </div>
-            <div class="t-fila"><b>+</b><span>IVA (<span id="pctIvaTxt">16</span>%):</span> <output id="tIVA">0</output></div>
+            <div class="t-fila"><b>+</b><span class="t-util">IVA
+                    <select id="ivaTasa" title="Tasa de IVA (Administrador › Parámetros de presupuesto)">
+                        <?php foreach ($paramsPres['iva_tasas'] as $t): ?>
+                        <option value="<?= e((string) (float) $t['pct']) ?>"<?= abs((float) $t['pct'] - (float) $paramsPres['iva_defecto']) < 0.0001 ? ' selected' : '' ?>><?= e($t['nombre']) ?></option>
+                        <?php endforeach; ?>
+                    </select> (<span id="pctIvaTxt"><?= e((string) (float) $paramsPres['iva_defecto']) ?></span>%):</span> <output id="tIVA">0</output></div>
             <div class="t-fila"><b>=</b><span>Total:</span> <output id="tTOT" class="fuerte">0</output></div>
         </div>
     </div>
@@ -675,6 +697,7 @@ $secciones = [
     window.ACRI_TIPOS_COMISION = <?= json_encode($tiposComision, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_BIBLIOTECA_PU = <?= json_encode($bibliotecaPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_CATALOGO_PU = <?= json_encode($catalogoPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.ACRI_PARAMETROS_PRES = <?= json_encode($paramsJs, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_CONCEPTOS_PU = <?= json_encode($conceptosPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <script src="<?= recurso('js/formato-presupuesto.js') ?>"></script>

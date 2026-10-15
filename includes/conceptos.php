@@ -75,6 +75,8 @@ function conceptosPresupuesto(): array
             if ($tipo === 'go') {
                 $o['seguro'] = strtoupper(trim((string) $f['es_concepto_seguro'])) === 'T';
                 $o['base_mp'] = in_array($id, $fijos['base_mp'], true);
+                // Indirectos (Administrador › Parámetros de presupuesto): % del costo directo completo (MP + MO sin comisiones)
+                $o['indirecto'] = (bool) preg_match('/^INDIRECTOS( DE (OFICINA|CAMPO))?$/', mb_strtoupper(trim((string) $f['descripcion'])));
             }
             return $o;
         }, bd_filas('AW', "select {$c['id']} as id, descripcion, $estatus as estatus$extra from {$c['tabla']}

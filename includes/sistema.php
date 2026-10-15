@@ -17,6 +17,13 @@ const ACRI_IMG_DEFECTO = [
     'membrete' => null,   // logo de la hoja membretada; sin imagen propia se usa el logo
 ];
 
+// Carpeta de los JSON de configuración en el servidor local. ACRI_CONFIG_DIR solo la usan las pruebas
+// (pruebas/), para no tocar la configuración real.
+function configCarpeta(): string
+{
+    return acri_env('ACRI_CONFIG_DIR', ACRI_RAIZ . '/config');
+}
+
 // Lee / guarda un JSON de config/ (carpeta protegida con .htaccess) o de la tabla configuracion
 function configLeer(string $nombre): array
 {
@@ -25,7 +32,7 @@ function configLeer(string $nombre): array
         $datos = $datos === false ? null : json_decode((string) $datos, true);
         return is_array($datos) ? $datos : [];
     }
-    $archivo = ACRI_RAIZ . '/config/' . $nombre . '.json';
+    $archivo = configCarpeta() . '/' . $nombre . '.json';
     if (!is_file($archivo)) return [];
     $datos = json_decode((string) file_get_contents($archivo), true);
     return is_array($datos) ? $datos : [];
@@ -43,8 +50,8 @@ function configGuardar(string $nombre, array $datos): void
             [$nombre, $json, $_SESSION['usuario'] ?? null]);
         return;
     }
-    if (!is_dir(ACRI_RAIZ . '/config')) mkdir(ACRI_RAIZ . '/config', 0775, true);
-    file_put_contents(ACRI_RAIZ . '/config/' . $nombre . '.json', $json, LOCK_EX);
+    if (!is_dir(configCarpeta())) mkdir(configCarpeta(), 0775, true);
+    file_put_contents(configCarpeta() . '/' . $nombre . '.json', $json, LOCK_EX);
 }
 
 // Resultado de la última prueba de una conexión o servicio (config/pruebas.json)

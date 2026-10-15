@@ -1,5 +1,7 @@
 (function () {
-    var IVA = 0.16;
+    // Tasa de IVA del presupuesto (select ivaTasa; las tasas salen de Administrador › Parámetros de presupuesto)
+    var PARAMETROS = window.ACRI_PARAMETROS_PRES || { iva_defecto: 16, iva_tasas: [], indirectos: [], financiamiento_pct: 0 };
+    var IVA = (PARAMETROS.iva_defecto != null ? Number(PARAMETROS.iva_defecto) : 16) / 100;
     var NOMBRES = { mp: 'Materia Prima', mo: 'Mano de Obra', go: 'Gastos de Operacion', ct: 'Conceptos/Tareas y Previsualización', pu: 'Análisis de Precios Unitarios' };
     var AYUDAS = {
         grid: 'Ctrl + I para agregar un nuevo Concepto',
@@ -214,6 +216,13 @@
     }
 
     // retorna_base_para_calculo_gasto_administrativo_matprima: MP × afecta_gasto_oper + Mano de Obra (sin comisiones)
+    // Base de los indirectos: costo directo completo (toda la Materia Prima y la Mano de Obra sin las comisiones)
+    function baseCostoDirecto() {
+        var b = 0;
+        datos.mp.forEach(function (r) { b += num(r.presupuesto); });
+        datos.mo.forEach(function (r) { if (clave(r.concepto) !== clave(FIJOS.comisiones)) b += num(r.presupuesto); });
+        return b;
+    }
     function baseGastoAdministrativo() {
         var b = 0;
         datos.mp.forEach(function (r) {
@@ -255,12 +264,13 @@
             r.presupuesto = redondear(subtotal * num(i.pct) / 100);
             r.calc = 'auto';
         });
-        var base = null;
+        var base = null, baseCd = null;
         datos.go.forEach(function (r) {
             var i = infoConcepto('go', r.concepto);
             if (!i || !i.auto || num(i.pct) <= 0) return;
             if (i.base_mp && base === null) base = baseGastoAdministrativo();
-            r.presupuesto = redondear((i.base_mp ? base : subtotal) * num(i.pct) / 100);
+            if (i.indirecto && baseCd === null) baseCd = baseCostoDirecto();
+            r.presupuesto = redondear((i.indirecto ? baseCd : i.base_mp ? base : subtotal) * num(i.pct) / 100);
             r.calc = 'auto';
         });
         // calcula_conceptos_anexo7: subtotal × %1 × %2 al concepto de Gastos de Operacion
@@ -350,7 +360,7 @@
     var CATALOGO_PU = window.ACRI_CATALOGO_PU || [];   // Catalogos › Insumos (precio vigente; mano de obra sin FSR)
     var CONCEPTOS_PU = window.ACRI_CONCEPTOS_PU || [];  // Catalogos › Conceptos P.U. con su matriz desarmada (mano de obra sin FSR)
     var CAMPOS_PU = { fsr: 'puFsr', hm: 'puHm', fin: 'puFin' };
-    var analisis = { fsr: 1, hm: 0, fin: 0, util: null, conceptos: [] };   // util null = equivalente a la Utilidad Neta
+    var analisis = { fsr: 1, hm: 0, fin: Number(PARAMETROS.financiamiento_pct) || 0, util: null, conceptos: [] };   // util null = equivalente a la Utilidad Neta
     var uidPU = 0;
     var huboAnalisis = false;   // el presupuesto tuvo conceptos analizados: si se quitan todos, sus renglones quedan en cero
     var editandoPU = null;   // concepto abierto en la ventana de análisis
@@ -1283,7 +1293,7 @@
 
     function aplicarModo() {
         document.body.classList.toggle('solo-lectura', soloLectura);
-        document.querySelectorAll('.encabezado input, .encabezado select, #descripcion, #pctUtilidad, #modoUtilidad, #tSUB, #buscarHubspot, #puPanel input')
+        document.querySelectorAll('.encabezado input, .encabezado select, #descripcion, #pctUtilidad, #modoUtilidad, #ivaTasa, #tSUB, #buscarHubspot, #puPanel input')
             .forEach(function (el) { el.disabled = soloLectura; });
         $('modo').hidden = !soloLectura;
         var b = document.querySelector('.tb[data-accion="modificar"]');
@@ -1408,6 +1418,7 @@
             analisis_pu: exportarAnalisis(),
             utilidad_por: num($('pctUtilidad').value),
             modo_utilidad: modoUtilidad(),
+            iva_pct: Math.round(IVA * 100000) / 1000,
             totales: {
                 cos_primo: mp + mo,
                 gas_operacion: go,
@@ -1554,7 +1565,7 @@
             notas: $('descripcion').value,
             utilidad_pct: num($('pctUtilidad').value),
             subtotal: subtotal,
-            iva_pct: IVA * 100,
+            iva_pct: Math.round(IVA * 100000) / 1000,
             secciones: ['mp', 'mo', 'go'].map(function (sec) {
                 return {
                     titulo: NOMBRES[sec].toUpperCase(),
@@ -1724,7 +1735,7 @@
             'El % por omisión es el parámetro de costos 101 de AW-Management (parametros_costos_sug). Con «+ % sobre el costo»: Subtotal = Costo + %. ' +
             'Con «% de margen (Form46)»: Subtotal = Costo ÷ (1 − %).']);
         guia.push(['Totales', 'Costo Primo, Gastos, Utilidad, Subtotal, IVA y Total',
-            'Se calculan solos: MP + MO = Costo Primo; + Gastos de Operacion + Utilidad = Subtotal; + IVA 16 % = Total.']);
+            'Se calculan solos: MP + MO = Costo Primo; + Gastos de Operacion + Utilidad = Subtotal; + IVA (' + Math.round(IVA * 100000) / 1000 + ' %) = Total.']);
         guia.push(['Sugeridos relacionados e Id de Negocio', 'Nada',
             'Los sugeridos relacionados se ligan por folio después de guardar; el Id de Negocio se trae de HubSpot.']);
         guia.push(['Al presionar Guardar', 'Presupuesto PRUEBA con folio nuevo',
@@ -1917,6 +1928,7 @@
             });
             // Forma de la utilidad con la que se guardó; en los guardados antes de esa columna, la que reproduce su subtotal
             var costoG = suma(datos.mp) + suma(datos.mo) + suma(datos.go), uG = num(p.utilidad_neta_por) / 100, sG = num(p.subtotal);
+            ponerIva(p.iva_pct != null && p.iva_pct !== '' ? p.iva_pct : 16);
             ponerModoUtilidad(p.utilidad_modo === 'margen' || p.utilidad_modo === 'costo' ? p.utilidad_modo
                 : uG > 0 && uG < 1 && Math.abs(sG - costoG / (1 - uG)) < Math.abs(sG - costoG * (1 + uG)) ? 'margen' : 'costo');
             extras = {
@@ -1943,8 +1955,36 @@
         }).catch(function (err) { alert('No se pudo abrir el presupuesto: ' + err.message); });
     }
 
-    render();
+    // Tasa de IVA: se elige por presupuesto; una guardada que ya no está en la lista se conserva como opción
+    function ponerIva(pct) {
+        pct = Number(pct);
+        var sel = $('ivaTasa');
+        if (sel && !Array.prototype.some.call(sel.options, function (o) { return Number(o.value) === pct; })) {
+            sel.insertAdjacentHTML('beforeend', '<option value="' + pct + '">IVA ' + pct + ' %</option>');
+        }
+        if (sel) sel.value = String(Array.prototype.filter.call(sel.options, function (o) { return Number(o.value) === pct; })[0].value);
+        IVA = pct / 100;
+        $('pctIvaTxt').textContent = pct;
+    }
+    if ($('ivaTasa')) $('ivaTasa').addEventListener('change', function () {
+        IVA = Number(this.value) / 100;
+        $('pctIvaTxt').textContent = Number(this.value);
+        marcarCambio();
+        refrescarCalculados();
+    });
+
+    // Presupuesto nuevo: los indirectos configurados en Administrador › Parámetros de presupuesto
+    function ponerIndirectos() {
+        (PARAMETROS.indirectos || []).forEach(function (nombre) {
+            if (!datos.go.some(function (r) { return clave(r.concepto) === clave(nombre); })) {
+                datos.go.push({ id: ++consecutivo, concepto: nombre, presupuesto: 0, importar: false, folio: '' });
+            }
+        });
+    }
+
     var idInicial = parseInt(document.body.dataset.presupuesto, 10) || 0;
+    if (!idInicial) ponerIndirectos();
+    render();
     if (idInicial) {
         // Bloqueado desde el inicio para que no se capture nada mientras carga
         soloLectura = true;

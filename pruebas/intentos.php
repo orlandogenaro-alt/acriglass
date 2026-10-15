@@ -1,16 +1,15 @@
 <?php
-// Freno a contraseñas adivinadas (includes/intentos.php). Corre sobre una copia de includes/ en una
-// carpeta temporal para no tocar config/ del sistema.
+// Freno a contraseñas adivinadas (includes/intentos.php). Guarda en una carpeta temporal (ACRI_CONFIG_DIR)
+// para no tocar config/ del sistema.
 require_once __DIR__ . '/lib.php';
 
 echo "Freno a contraseñas adivinadas\n";
 
 $tmp = sys_get_temp_dir() . '/acri-pruebas-' . bin2hex(random_bytes(4));
-mkdir("$tmp/includes", 0777, true);
 mkdir("$tmp/config", 0777, true);
-foreach (['sistema', 'nube', 'intentos'] as $f) copy(__DIR__ . "/../includes/$f.php", "$tmp/includes/$f.php");
 putenv('DB_HOST');   // modo servidor local: se guarda en config/intentos_login.json
-require "$tmp/includes/intentos.php";
+putenv("ACRI_CONFIG_DIR=$tmp/config");
+require_once __DIR__ . '/../includes/intentos.php';
 
 prueba('sin fallos no hay bloqueo', function () {
     $_SERVER['REMOTE_ADDR'] = '10.0.0.1';
@@ -40,7 +39,7 @@ prueba('un acierto borra los fallos de esa dirección y deja el bloqueo de la ot
     verificar(isset($d['JUAN|10.0.0.1']), 'se perdió el bloqueo de 10.0.0.1');
 });
 
-array_map('unlink', glob("$tmp/*/*"));
-rmdir("$tmp/includes");
+array_map('unlink', glob("$tmp/config/*"));
 rmdir("$tmp/config");
 rmdir($tmp);
+putenv('ACRI_CONFIG_DIR');

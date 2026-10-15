@@ -83,3 +83,5 @@ td { padding: 6px 10px; border-top: 1px solid var(--borde); }
     .tres { grid-template-columns: 1fr; }
     .campo { width: 100%; }
 }
+
+.lista input[type="radio"] { width: auto; }

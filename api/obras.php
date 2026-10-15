@@ -647,6 +647,9 @@ try {
             // Datos de la obra del encabezado (ventana Nueva obra), guardados como JSON
             $p['obra_datos'] = bd_tiene_columna('AW', 'doctos_sugerido_obra', 'datos_obra')
                 ? json_decode((string) bd_valor('AW', 'select datos_obra from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]), true) : null;
+            // Tasa de IVA del presupuesto (migraciones/007; sin la columna, 16 %)
+            $p['iva_pct'] = bd_tiene_columna('AW', 'doctos_sugerido_obra', 'iva_pct')
+                ? (float) bd_valor('AW', 'select iva_pct from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]) : 16.0;
             // Forma de la utilidad con la que se guardó ('costo' o 'margen'; null en los guardados antes de la columna)
             $p['utilidad_modo'] = bd_tiene_columna('AW', 'doctos_sugerido_obra', 'utilidad_modo')
                 ? (trim((string) bd_valor('AW', 'select utilidad_modo from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id])) ?: null) : null;

@@ -20,7 +20,8 @@
         'Clientes':             { api: 'api/clientes.php?accion=listar', ficha: 'clientes', filtros: ['CIUDAD', 'VENDEDOR'], origen: 'Easy-Glass' },
         'Vendedores de Obra':   { api: 'api/catalogos.php?tipo=vendedores&accion=listar', ficha: 'vendedores', filtros: ['ESTATUS'], origen: 'AW-Management' },
         'Empleados':            { api: 'api/catalogos.php?tipo=empleados&accion=listar', ficha: 'empleados', filtros: ['TIPO_EMPLEADO', 'ESTATUS'], origen: 'AW-Management' },
-        'Tipos de Empleados':   { api: 'api/catalogos.php?tipo=tipos&accion=listar', ficha: 'tipos', filtros: [], origen: 'AW-Management' }
+        'Tipos de Empleados':   { api: 'api/catalogos.php?tipo=tipos&accion=listar', ficha: 'tipos', filtros: [], origen: 'AW-Management' },
+        'Insumos':              { api: 'api/insumos.php?accion=listar', ficha: 'insumos', filtros: ['TIPO', 'UNIDAD', 'FAMILIA', 'ESTATUS'], origen: 'Supabase' }
     };
 
     function pendiente() { alert('Función pendiente: se activará al conectar la base de datos.'); }

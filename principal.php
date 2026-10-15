@@ -56,6 +56,7 @@ $menu = [
             ['Vendedores de Obra', '🏢', 'modulo', ['VENDEDOR_OBRA_ID', 'NOMBRE', 'ESTATUS']],
             ['Empleados',          '🧑‍🔧', 'modulo', ['NUMERO_EMPLEADO', 'NOMBRE', 'TIPO_EMPLEADO', 'TELEFONO', 'SUELDO_DIARIO', 'ESTATUS']],
             ['Tipos de Empleados', '🪪', 'modulo', ['TIPO_EMPLEADO_ID', 'CLAVE', 'NOMBRE', 'PORCENTAJE']],
+            ['Insumos',            '🧱', 'modulo', ['CLAVE', 'DESCRIPCION', 'TIPO', 'UNIDAD', 'FAMILIA', 'PRECIO', 'VIGENCIA', 'COSTO', 'ESTATUS']],
         ],
     ],
     [

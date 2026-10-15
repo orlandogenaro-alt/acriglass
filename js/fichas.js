@@ -99,6 +99,25 @@ window.Fichas = (function () {
                 { id: 'nombre', etiqueta: 'Nombre', req: true, completo: true, mayus: true }
             ] }]
         },
+        insumos: {
+            titulo: 'Ficha de Insumo',
+            api: 'api/insumos.php',
+            pestanas: [
+                { titulo: 'General', campos: [
+                    { id: 'clave', etiqueta: 'Clave', req: true, mayus: true },
+                    { id: 'tipo', etiqueta: 'Tipo', tipo: 'select', lista: 'tipos', req: true },
+                    { id: 'descripcion', etiqueta: 'Descripción', req: true, completo: true },
+                    { id: 'unidad_id', etiqueta: 'Unidad', tipo: 'select', lista: 'unidades', vacio: '— Seleccione —', req: true },
+                    { id: 'familia', etiqueta: 'Familia (vidrio, aluminio, herrajes…)', mayus: true },
+                    { id: 'fsr', etiqueta: 'FSR (solo mano de obra)', tipo: 'number' },
+                    { id: 'clave_microsip', etiqueta: 'Clave del artículo en Microsip', mayus: true },
+                    { id: 'notas', etiqueta: 'Notas', tipo: 'textarea', completo: true },
+                    { id: 'activo', etiqueta: 'Activo', tipo: 'check', valor: true }
+                ] },
+                { titulo: 'Precios', render: pestanaPrecios },
+                { titulo: 'Componentes', render: pestanaComponentes }
+            ]
+        },
         clientes: {
             titulo: 'Ficha de Clientes',
             api: 'api/clientes.php',
@@ -271,6 +290,8 @@ window.Fichas = (function () {
             if (el.dataset.auto) return;
             el.disabled = !st.editable;
         });
+        // Controles de las pestañas propias que no son campos (renglones de una tabla, botones)
+        dlg.querySelectorAll('[data-editable]').forEach(function (el) { el.disabled = !st.editable; });
         pintarBotones(false);
     }
 
@@ -409,6 +430,140 @@ window.Fichas = (function () {
             mensaje('Impuesto actualizado.', 'ok');
         }).catch(function (err) { mensaje(err.message, 'error'); });
     });
+
+    // ================= Pestañas propias de la ficha de insumos =================
+    function dinero6(v) { return v == null || v === '' ? 'Pendiente' : '$ ' + moneda(v); }
+
+    // Costo actual, precio nuevo (agrega al historial, no sobrescribe) e historial de precios
+    function pestanaPrecios(sec, c) {
+        var cat = c.st.cat, tc = cat.tipos_cambio || {};
+        var ops = function (lista, sel) {
+            return (lista || []).map(function (o) { return '<option value="' + c.esc(o.id) + '"' + (o.id === sel ? ' selected' : '') + '>' + c.esc(o.nombre) + '</option>'; }).join('');
+        };
+        var costo = '<div class="fi-costo"><b>Costo actual:</b> ' + (cat.costo == null ? '<span class="fi-pendiente">Pendiente</span>' : c.esc(dinero6(cat.costo)) + ' MXN') +
+            (cat.faltan && cat.faltan.length ? '<br><small>Falta precio de: ' + c.esc(cat.faltan.join(', ')) + '</small>' : '') +
+            (c.st.registro && c.st.registro.tipo === 'MO' ? '<br><small>Mano de obra: salario base × FSR ' + c.esc(c.st.registro.fsr) + '</small>' : '') +
+            (tc.USD ? '<br><small>Tipo de cambio USD: ' + c.esc(tc.USD) + '</small>' : '') + '</div>';
+        var nuevo = cat.puede_precios
+            ? '<h4 class="fi-sub">Precio nuevo <small>(sin IVA; se agrega al historial con su fecha, no reemplaza los anteriores)</small></h4>' +
+              '<div class="fi-campos tres">' +
+                '<label class="fi-campo"><span>Precio</span><input type="number" step="any" min="0" data-campo="precio_nuevo"></label>' +
+                '<label class="fi-campo"><span>Moneda</span><select data-campo="moneda_nuevo">' + ops(cat.monedas, 'MXN') + '</select></label>' +
+                '<label class="fi-campo"><span>Vigente desde</span><input type="date" data-campo="vigente_desde" value="' + c.iso(new Date()) + '"></label>' +
+                '<label class="fi-campo"><span>Fuente</span><select data-campo="fuente">' + ops(cat.fuentes, 'captura') + '</select></label>' +
+                '<label class="fi-campo"><span>Proveedor</span><input type="text" data-campo="proveedor"></label>' +
+                '<label class="fi-campo"><span>Notas del precio</span><input type="text" data-campo="notas_precio"></label>' +
+              '</div>'
+            : '<p class="fi-nota">Para capturar precios se necesita el permiso «Capturar precios de insumos».</p>';
+        var hist = (cat.precios || []).map(function (p) {
+            return '<tr><td>' + c.esc(c.fechaDMY(p.vigente_desde)) + '</td><td class="num">' + c.esc(dinero6(p.precio)) + ' ' + c.esc(p.moneda) + '</td><td>' +
+                c.esc(p.fuente) + '</td><td>' + c.esc(p.proveedor || '') + '</td><td>' + c.esc(p.usuario || '') + '</td><td>' + c.esc(p.notas || '') + '</td></tr>';
+        }).join('');
+        sec.innerHTML = costo + nuevo +
+            '<h4 class="fi-sub">Historial de precios</h4>' +
+            '<div class="fi-tabla"><table><thead><tr><th>Vigente desde</th><th class="num">Precio</th><th>Fuente</th><th>Proveedor</th><th>Capturó</th><th>Notas</th></tr></thead><tbody>' +
+            (hist || '<tr><td colspan="6" class="fi-vacio">Sin precios capturados: el insumo queda pendiente en los análisis.</td></tr>') + '</tbody></table></div>';
+    }
+
+    // Componentes de un básico o cuadrilla: insumo, cantidad y % de desperdicio. Se guardan como JSON en el campo 'componentes'.
+    function pestanaComponentes(sec, c) {
+        var filas = (c.st.cat.componentes || []).map(function (f) {
+            return { insumo_id: f.insumo_id, clave: f.clave, descripcion: f.descripcion, unidad: f.unidad, cantidad: f.cantidad,
+                     desperdicio_pct: f.desperdicio_pct, costo: f.costo };
+        });
+        var usadoEn = (c.st.cat.usado_en || []).map(function (u) { return c.esc(u.clave); }).join(', ');
+        sec.innerHTML =
+            '<p class="fi-nota" data-c="aviso"></p>' +
+            '<div data-c="editor">' +
+                '<div class="fi-fila"><label class="fi-campo completo"><span>Agregar insumo (clave o descripción)</span>' +
+                '<input type="text" data-c="buscar" data-editable autocomplete="off" placeholder="Escribe al menos 2 letras…"></label></div>' +
+                '<div class="fi-sugerencias" data-c="sugerencias" hidden></div>' +
+                '<div class="fi-tabla"><table><thead><tr><th>Clave</th><th>Descripción</th><th>Unidad</th><th class="num">Cantidad</th>' +
+                '<th class="num">% Desp.</th><th class="num">Costo</th><th class="num">Importe</th><th></th></tr></thead><tbody></tbody>' +
+                '<tfoot><tr><td colspan="6" class="num"><b>Costo del básico</b></td><td class="num" data-c="total"></td><td></td></tr></tfoot></table></div>' +
+                '<input type="hidden" data-campo="componentes">' +
+            '</div>' +
+            (usadoEn ? '<p class="fi-nota">Se usa en: ' + usadoEn + '</p>' : '');
+        var tbody = sec.querySelector('tbody'), oculto = sec.querySelector('[data-campo="componentes"]');
+        var buscar = sec.querySelector('[data-c="buscar"]'), sug = sec.querySelector('[data-c="sugerencias"]');
+
+        function num(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
+        function importe(f) { return f.costo == null ? null : f.costo * num(f.cantidad) * (1 + num(f.desperdicio_pct) / 100); }
+        function sincronizar() {
+            oculto.value = JSON.stringify(filas.map(function (f) { return { insumo_id: f.insumo_id, cantidad: f.cantidad, desperdicio_pct: f.desperdicio_pct }; }));
+            var total = 0, pendiente = false;
+            filas.forEach(function (f) { var i = importe(f); if (i === null) pendiente = true; else total += i; });
+            sec.querySelector('[data-c="total"]').textContent = filas.length ? (pendiente ? 'Pendiente' : dinero6(total)) : '';
+        }
+        function pintar() {
+            tbody.innerHTML = filas.length ? filas.map(function (f, i) {
+                return '<tr data-i="' + i + '"><td>' + c.esc(f.clave) + '</td><td>' + c.esc(f.descripcion) + '</td><td>' + c.esc(f.unidad) + '</td>' +
+                    '<td class="num"><input type="number" step="any" min="0" data-k="cantidad" data-editable value="' + c.esc(f.cantidad) + '"></td>' +
+                    '<td class="num"><input type="number" step="any" min="0" max="99.99" data-k="desperdicio_pct" data-editable value="' + c.esc(f.desperdicio_pct) + '"></td>' +
+                    '<td class="num">' + c.esc(dinero6(f.costo)) + '</td><td class="num">' + c.esc(dinero6(importe(f))) + '</td>' +
+                    '<td><button type="button" class="fi-btn peligro" data-k="quitar" data-editable title="Quitar">✕</button></td></tr>';
+            }).join('') : '<tr><td colspan="8" class="fi-vacio">Sin componentes. Busca arriba los insumos que lleva una unidad del básico.</td></tr>';
+            tbody.querySelectorAll('[data-editable]').forEach(function (el) { el.disabled = !c.st.editable; });
+            sincronizar();
+        }
+        function esBasico() {
+            var t = dlg.querySelector('[data-campo="tipo"]');
+            return t && t.value === 'BAS';
+        }
+        function revisarTipo() {
+            var bas = esBasico();
+            sec.querySelector('[data-c="editor"]').hidden = !bas;
+            sec.querySelector('[data-c="aviso"]').textContent = bas
+                ? 'El costo del básico es la suma de sus componentes: costo × cantidad × (1 + % desperdicio). En una cuadrilla, la cantidad es cuántos de cada categoría trabajan en una jornada.'
+                : 'Solo los insumos de tipo «Básico / cuadrilla» llevan componentes.';
+        }
+
+        tbody.addEventListener('input', function (e) {
+            var k = e.target.dataset.k, tr = e.target.closest('tr');
+            if (!k || !tr || k === 'quitar') return;
+            filas[+tr.dataset.i][k] = e.target.value;
+            c.st.cambios = true;
+            sincronizar();
+        });
+        tbody.addEventListener('change', function () { pintar(); });
+        tbody.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-k="quitar"]');
+            if (!b || b.disabled) return;
+            filas.splice(+b.closest('tr').dataset.i, 1);
+            c.st.cambios = true;
+            pintar();
+        });
+        var espera = null;
+        buscar.addEventListener('input', function () {
+            clearTimeout(espera);
+            var q = buscar.value.trim();
+            if (q.length < 2) { sug.hidden = true; return; }
+            espera = setTimeout(function () {
+                c.pedir(c.url(c.st.def.api, 'buscar', '&q=' + encodeURIComponent(q) + '&excluir=' + (c.st.id || 0))).then(function (j) {
+                    sug.innerHTML = j.filas.length ? j.filas.map(function (f, i) {
+                        return '<button type="button" data-s="' + i + '">' + c.esc(f.clave) + ' · ' + c.esc(f.descripcion) + ' <small>(' + c.esc(f.unidad) + ', ' +
+                            c.esc(dinero6(f.costo)) + ')</small></button>';
+                    }).join('') : '<p class="fi-vacio">Sin coincidencias.</p>';
+                    sug.hidden = false;
+                    sug.onclick = function (e) {
+                        var b = e.target.closest('[data-s]');
+                        if (!b) return;
+                        var f = j.filas[+b.dataset.s];
+                        if (filas.some(function (x) { return x.insumo_id === f.id; })) { c.mensaje('Ese insumo ya está en los componentes.', 'error'); return; }
+                        filas.push({ insumo_id: f.id, clave: f.clave, descripcion: f.descripcion, unidad: f.unidad, cantidad: 1, desperdicio_pct: 0, costo: f.costo });
+                        c.st.cambios = true;
+                        buscar.value = '';
+                        sug.hidden = true;
+                        pintar();
+                    };
+                }).catch(function (err) { c.mensaje(err.message, 'error'); });
+            }, 250);
+        });
+        var selTipo = dlg.querySelector('[data-campo="tipo"]');
+        if (selTipo) selTipo.addEventListener('change', revisarTipo);
+        pintar();
+        revisarTipo();
+    }
 
     // ================= Pestañas propias de la ficha de clientes =================
     function pestanaCondiciones(sec, c) {

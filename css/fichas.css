@@ -142,3 +142,20 @@
     .fi-campos, .fi-campos.tres, .fi-dos { grid-template-columns: 1fr; }
     .fi-pie .fi-btn { flex: 1 1 45%; }
 }
+
+/* Ficha de insumos: costo, precios y componentes de un básico */
+.fi-costo { padding: 10px 12px; margin-bottom: 12px; border: 1px solid var(--borde); border-radius: 8px; background: var(--fondo-2); font-size: 13px; line-height: 1.6; }
+.fi-costo small { color: var(--texto-suave); }
+.fi-pendiente { color: #fbbf24; font-weight: 800; }
+.fi-sub { margin: 14px 0 8px; font-size: 13px; color: #fff; }
+.fi-sub small { font-weight: 400; color: var(--texto-suave); }
+.fi-nota { margin: 6px 0 10px; font-size: 12.5px; color: var(--texto-suave); }
+.fi-fila .fi-campo.completo { width: 100%; }
+.fi-tabla td input { width: 90px; padding: 4px 6px; text-align: right; }
+.fi-tabla td .fi-btn { padding: 3px 8px; }
+.fi-sugerencias { max-height: 180px; overflow: auto; margin: -8px 0 12px; border: 1px solid var(--borde-2); border-radius: 8px; background: var(--fondo); }
+.fi-sugerencias button { display: block; width: 100%; padding: 7px 10px; text-align: left; font-size: 12.5px; color: var(--texto); border-bottom: 1px solid var(--borde); }
+.fi-sugerencias button:hover { background: var(--item-hover); color: #fff; }
+.fi-sugerencias small { color: var(--texto-suave); }
+.fi-sugerencias .fi-vacio { padding: 8px 10px; }
+@media (max-width: 600px) { .fi-campos.tres { grid-template-columns: 1fr; } }

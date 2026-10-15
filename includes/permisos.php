@@ -17,6 +17,8 @@ const ACRI_PERMISOS = [
     'ENVIAR_MICROSIP_OBRA'    => 'Enviar presupuestos de Easy-Glass a Microsip (Pedido y Orden de compra)',
     'NUEVO_EMPLEADOS_OBRA'    => 'Alta y cambios de empleados de obra',
     'NUEVO_TIPO_EMPLEADO'     => 'Alta y cambios de tipos de empleado',
+    'CATALOGO_INSUMOS'        => 'Alta y cambios del catálogo de insumos y básicos',
+    'PRECIOS_INSUMOS'         => 'Capturar precios de insumos',
 ];
 
 // Solo los permisos conocidos, en mayúsculas y sin repetir

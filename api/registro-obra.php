@@ -221,6 +221,11 @@ function cambiarEstatus(array $d): array
 // y las salidas de material pendientes se cancelan
 function cerrarObra(int $id): array
 {
+    // Los documentos que cambian, para dejar su renglón en la bitácora como en VB (guarda_bitacora_costos_prod)
+    $ordenes = bd_filas('AW', "select docto_orden_obra_id as id, trim(estatus) as estatus from doctos_orden_obra where obra_id = ? and trim(estatus) in ('P', 'O')", [$id]);
+    $salidas = array_column(bd_filas('AW', "select s.docto_solicitud_id as id from dvd_solicitudes_material s
+                                              join doctos_orden_obra o on o.docto_orden_obra_id = s.docto_orden_obra_id
+                                             where o.obra_id = ? and trim(s.estatus) = 'Pendiente'", [$id]), 'id');
     $pdo = bd_pdo('AW');
     $pdo->beginTransaction();
     try {
@@ -237,6 +242,10 @@ function cerrarObra(int $id): array
         if ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
+    foreach ($ordenes as $o) {
+        bitacora((int) $o['id'], $o['estatus'] === 'P' ? 'Estatus: Fin Produccion: Por cierre de Obra ' : 'Estatus: Cancelado: Por cierre de Obra ');
+    }
+    foreach ($salidas as $s) bitacora((int) $s, 'Documento Cancelado');
     return [
         "Órdenes enviadas a Fin de Producción: $fin · canceladas: $canc · salidas de material canceladas: $sal.",
         'Microsip solo se consulta desde la web (API de Easy-Glass): los movimientos de inventario de producto en proceso / producto terminado no se generan aquí.',
@@ -269,8 +278,9 @@ function guardarOrden(array $d): array
 {
     $obra = (int) ($d['id'] ?? 0);
     validaEstatusObra($obra);
-    exigirOAutorizar($d, 'MODIFICAR_OBRA');
     $ordenId = (int) ($d['orden_id'] ?? 0);
+    // Nueva: NUEVO_ORDEN_TRABAJO_OBRA (ToolStripButton37) · Modificar: MODIFICAR_OBRA
+    exigirOAutorizar($d, $ordenId ? 'MODIFICAR_OBRA' : 'NUEVO_ORDEN_TRABAJO_OBRA');
     if ($ordenId) {
         $o = documentoDeObra('doctos_orden_obra', 'docto_orden_obra_id', $ordenId, $obra, 'La orden de trabajo');
         if (trim((string) $o['estatus']) !== 'O') error('Solo se puede modificar una orden que no se ha liberado a producción.');
@@ -346,8 +356,9 @@ function guardarCotizacion(array $d): array
 {
     $obra = (int) ($d['id'] ?? 0);
     validaEstatusObra($obra);
-    exigirOAutorizar($d, 'MODIFICAR_OBRA');
     $docId = (int) ($d['docto_id'] ?? 0);
+    // Nueva: NUEVA_COT_FAC_OBRA (ToolStripButton2) · Modificar: MODIFICAR_OBRA
+    exigirOAutorizar($d, $docId ? 'MODIFICAR_OBRA' : 'NUEVA_COT_FAC_OBRA');
     if ($docId && estatusLetraDoc(documentoDeObra('doctos_microsip_obra', 'docto_orden_obra_id', $docId, $obra, 'La cotización')) === 'C') {
         error('No es posible modificar un documento cancelado');
     }
@@ -419,7 +430,7 @@ function guardarCobro(array $d): array
 {
     $obra = (int) ($d['id'] ?? 0);
     validaEstatusObra($obra);
-    exigirOAutorizar($d, 'MODIFICAR_OBRA');
+    exigirOAutorizar($d, 'NUEVA_COT_FAC_OBRA');   // ToolStripButton26 (Dialog279)
     $tipo = (int) ($d['tipo'] ?? -1);
     if (!in_array($tipo, [0, 1, 2], true)) error('Selecciona el tipo de documento.');
     $importe = numero($d['importe'] ?? 0);
@@ -448,7 +459,7 @@ function agregarExplosion(array $d): array
 {
     $obra = (int) ($d['id'] ?? 0);
     validaEstatusObra($obra);
-    exigirOAutorizar($d, 'MODIFICAR_OBRA');
+    exigirOAutorizar($d, 'NUEVA_EXPLOCION_MAT_OBRA');   // ToolStripButton11
     $extra = array_filter(['uni_med_ml_mq', 'tipo_docto', 'folio'], fn($c) => bd_tiene_columna('AW', 'explocion_material_de_obra', $c));
     $n = 0;
     $pdo = bd_pdo('AW');
@@ -494,7 +505,7 @@ function explosionPresupuesto(array $d): array
         return $r;
     }
     validaEstatusObra($obra);
-    exigirOAutorizar($d, 'MODIFICAR_OBRA');
+    exigirOAutorizar($d, 'NUEVA_EXPLOCION_MAT_OBRA');   // ToolStripButton11
     if (!bd_tiene_columna('AW', 'explocion_material_de_obra', 'tipo_docto')) error('La tabla de explosión no tiene la columna TIPO_DOCTO para marcar el origen.');
     $pdo = bd_pdo('AW');
     $pdo->beginTransaction();
@@ -540,8 +551,8 @@ function guardarManoObra(array $d): array
     $obra = (int) ($d['id'] ?? 0);
     validaEstatusObra($obra);
     $moId = (int) ($d['mo_id'] ?? 0);
-    // Nueva: como las demás capturas de la obra · Modificar: MODIFICAR_ASIGNAR_MO (tool_modificar)
-    exigirOAutorizar($d, $moId ? 'MODIFICAR_ASIGNAR_MO' : 'MODIFICAR_OBRA');
+    // Nueva: NUEVO_ASIGNAR_MO · Modificar: MODIFICAR_ASIGNAR_MO (tool_modificar)
+    exigirOAutorizar($d, $moId ? 'MODIFICAR_ASIGNAR_MO' : 'NUEVO_ASIGNAR_MO');   // ToolStripButton27
     if ($moId && estatusLetraDoc(documentoDeObra('empleados_asignados_a_obra', 'empleado_asignado_obra_id', $moId, $obra, 'La asignación de mano de obra')) === 'C') {
         error('No es posible modificar un documento cancelado');
     }
@@ -633,8 +644,8 @@ function guardarGasto(array $d): array
     $obra = (int) ($d['id'] ?? 0);
     validaEstatusObra($obra);
     $gastoId = (int) ($d['gasto_id'] ?? 0);
-    // Nuevo: como las demás capturas de la obra · Modificar: MODIFICAR_GASTO_OBRA (tool_modificar)
-    exigirOAutorizar($d, $gastoId ? 'MODIFICAR_GASTO_OBRA' : 'MODIFICAR_OBRA');
+    // Nuevo: NUEVO_GASTO_PARA_OBRA · Modificar: MODIFICAR_GASTO_OBRA (tool_modificar)
+    exigirOAutorizar($d, $gastoId ? 'MODIFICAR_GASTO_OBRA' : 'NUEVO_GASTO_PARA_OBRA');   // ToolStripButton18
     if ($gastoId && estatusLetraDoc(documentoDeObra('gastos_adicionales_obra', 'gasto_adicional_id', $gastoId, $obra, 'El gasto')) === 'C') {
         error('No es posible modificar un documento cancelado');
     }
@@ -737,7 +748,7 @@ function eliminarAdjunto(array $d): void
 {
     $id = (int) ($d['id'] ?? 0);
     estatusObra($id);
-    exigirOAutorizar($d, 'MODIFICAR_OBRA');
+    exigirOAutorizar($d, 'ELIMINAR_ADJUNTOS_EN_OBRAS');   // EliminarArchivoToolStripMenuItem
     if (!bd_ejecutar('AW', 'delete from archivos_adjuntos where archivo_id = ? and suerido_id = ?', [(int) ($d['archivo'] ?? 0), $id])) {
         error('El archivo ya no existe.', 404);
     }
@@ -748,7 +759,7 @@ function eliminarExplosion(array $d): array
 {
     $id = (int) ($d['id'] ?? 0);
     validaEstatusObra($id);
-    exigirOAutorizar($d, 'MODIFICAR_OBRA');
+    exigirOAutorizar($d, 'ELIMINAR_EXPLOCION_MAT_OBRA');   // ToolStripButton16
     $partidas = array_values(array_filter(array_map('intval', (array) ($d['partidas'] ?? []))));
     if (!$partidas) error('Selecciona las partidas a eliminar.');
     $n = bd_ejecutar('AW', 'delete from explocion_material_de_obra where obra_id = ? and explocion_mat_obra_id in ('
@@ -761,7 +772,7 @@ function asignarCotizacion(array $d): array
 {
     $id = (int) ($d['id'] ?? 0);
     validaEstatusObra($id);
-    exigirOAutorizar($d, 'MODIFICAR_OBRA');
+    exigirOAutorizar($d, 'NUEVA_COT_FAC_OBRA');   // ToolStripButton15
     $folio = strtoupper(trim((string) ($d['folio'] ?? '')));
     if (!preg_match('/^[A-Z0-9-]{1,12}$/', $folio)) error('Ingresa el Folio de la Cotizacion.');
 
@@ -850,6 +861,7 @@ function guardarPedido(array $d): array
     $obra = (int) ($d['id'] ?? 0);
     validaEstatusObra($obra);
     exigirOAutorizar($d, 'MODIFICAR_OBRA');
+    if (empty($d['pedido_id'])) exigirOAutorizar($d, 'NUEVA_EXPLOCION_MAT_OBRA');   // ToolStripButton35
     $tipo = strtoupper(trim((string) ($d['tipo_docto'] ?? 'PV')));
     if (!in_array($tipo, TIPOS_PEDIDO, true)) error('Tipo de documento no válido.');
     $folio = texto($d['folio'] ?? '', 20);

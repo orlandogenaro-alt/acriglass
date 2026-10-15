@@ -23,13 +23,15 @@ define('ACRI_API', true);
 require __DIR__ . '/../includes/sesion.php';
 require __DIR__ . '/../includes/servicios.php';
 require __DIR__ . '/../includes/tareas.php';
+require_once __DIR__ . '/../includes/permisos.php';
 
 if (modoConfiguracion()) {
     require __DIR__ . '/../includes/respuesta.php';
     error('Modo configuración: aún no hay conexión a AW-Management.', 503);
 }
 // Mismos permisos del módulo de obras en el sistema de escritorio
-exigirPermiso('MODULO_SUGERIDOS_OBRA', 'NUEVO_OBRA', 'MODIFICAR_OBRA', 'CERRAR_OBRA', 'ADMIN_USER');
+// (y los de presupuestos: la pantalla del presupuesto también lee de aquí)
+exigirPermiso('MODULO_SUGERIDOS_OBRA', 'NUEVO_SUGERIDO_OBRA', 'MODIFICAR_SUGERIDO_OBRA', 'NUEVO_OBRA', 'MODIFICAR_OBRA', 'CERRAR_OBRA', 'ADMIN_USER');
 session_write_close();
 
 $accion = $_GET['accion'] ?? '';
@@ -240,7 +242,8 @@ function listado(string $tipo, int $id): array
                   where e.obra_id = ?
                   order by e.fecha, e.empleado_asignado_obra_id', [$id]));
 
-        case 'consumos':   // retorna_salidas_consumos_obra
+        case 'consumos':   // retorna_salidas_consumos_obra (ToolStripButton4: tab_per 247)
+            if (!tienePermiso('LISTAR_CONSUMOS_MAT_OBRA', 'ADMIN_USER')) error('No tiene el permiso para ' . ACRI_PERMISOS['LISTAR_CONSUMOS_MAT_OBRA'] . ' (LISTAR_CONSUMOS_MAT_OBRA).', 403);
             return bd_filas('AW',
                 'select c.consumo_material_obra_id as id, o.folio as folio_orden, c.folio, c.estatus, c.fecha,
                         (select coalesce(sum(d.uds_consumo), 0) from consumos_material_en_obra_det d
@@ -422,15 +425,22 @@ function analitica(int $obraId, bool $detalle): array
           where e.obra_id = ? and trim(coalesce(e.estatus, '')) <> 'C'
           order by e.fecha, e.empleado_asignado_obra_id", [$obraId]);
     $moReal = array_sum(array_map(fn($f) => (float) $f['importe_real'], $mo));
-    // Si el presupuesto tiene un solo concepto de mano de obra, lo real va contra él
-    $unicoMo = count($lineas['MO']) === 1 ? reset($lineas['MO'])['concepto'] : 'MANO DE OBRA ASIGNADA';
-    if ($moReal) $sumar('MO', $unicoMo, $moReal);
-    // Comisiones calculadas en la obra (migración 012)
+    // retorna_mano_obra_asignada_resumen: lo real por tipo de empleado, contra el concepto de mano de obra del mismo nombre
+    foreach (bd_filas('AW',
+        "select coalesce(t.nombre, 'MANO DE OBRA') as tipo, coalesce(sum(d.cost_tot_real), 0) as importe_real
+           from empleados_asignados_a_obra_det d
+           join empleados_asignados_a_obra e on e.empleado_asignado_obra_id = d.empleado_asignado_obra_id
+           left join empleados_obra emp on emp.empleado_id = d.id_empleado
+           left join tipos_empleados_comisiones t on t.tipo_empleado_id = emp.tipo
+          where e.obra_id = ? and trim(coalesce(e.estatus, '')) <> 'C'
+          group by coalesce(t.nombre, 'MANO DE OBRA')", [$obraId]) as $f) {
+        if ((float) $f['importe_real']) $sumar('MO', $f['tipo'], (float) $f['importe_real']);
+    }
+    // Comisiones calculadas en la obra (migración 012): solo en el detalle; la analítica del escritorio no las suma
     $comisiones = [];
     if (bd_tiene_tabla('AW', 'pago_comis_por_obra_enca')) {
         $comisiones = bd_filas('AW', "select pago_comis_por_obra_enca_id as id, fecha, tipo_id, importe_neto, notas
                                          from pago_comis_por_obra_enca where obra_id = ? and estatus <> 'Cancelado' order by fecha", [$obraId]);
-        foreach ($comisiones as $c) $sumar('MO', 'COMISIONES', (float) $c['importe_neto']);
     }
 
     // Facturación (la misma de 2-Facturacion: AW + Microsip por la API de Easy-Glass)
@@ -441,12 +451,9 @@ function analitica(int $obraId, bool $detalle): array
         $r['avisos'][] = 'Facturación: ' . bd_mensaje_error($e);
     }
     $r['avisos'] = array_merge($r['avisos'], $fac['avisos'] ?? []);
-    $facturado = 0.0;
-    foreach ($fac['filas'] as $f) {
-        if (trim((string) ($f['estatus'] ?? '')) === 'Cancelado') continue;
-        // Cotizaciones de Microsip y folios de Easy-Glass: lo facturado (o el pedido) · Notas de cargo: su importe
-        if (in_array((int) $f['tipo'], [-1, 1, 9], true)) $facturado += (float) ($f['cargos'] ?? $f['importe'] ?? 0);
-    }
+    // imp_fac del escritorio: importe de las cotizaciones de Microsip (tipo -1) y notas de cargo (tipo 1) de la obra, entre 1.16
+    $facturado = (float) bd_valor('AW', 'select coalesce(sum(importe_neto), 0) from doctos_microsip_obra where obra_id = ?', [$obraId])
+               + (float) bd_valor('AW', 'select coalesce(sum(importe), 0) from doctos_adic_cobro_obra where obra_id = ? and tipo = 1', [$obraId]);
     $facturadoSinIva = round($facturado / (1 + $iva / 100), 2);
 
     // Gastos de operación reales: gastos adicionales, administración de la obra y costos adicionales
@@ -485,8 +492,10 @@ function analitica(int $obraId, bool $detalle): array
     $r['pct_admin'] = $pctAdmin;
     $r['facturado'] = round($facturado, 2);
     $r['facturado_sin_iva'] = $facturadoSinIva;
-    $r['facturacion'] = array_map(fn($f) => array_intersect_key($f, array_flip(
-        ['folio', 'tipo', 'tipo_docto', 'estatus', 'cliente', 'importe', 'factura', 'imp_factura', 'cargos', 'creditos', 'saldo'])), $fac['filas']);
+    // retorna_cotizaciones_microsip_por_obra2: cotizaciones y documentos de cobro de la obra (sin los folios de HubSpot)
+    $r['facturacion'] = array_values(array_map(fn($f) => array_intersect_key($f, array_flip(
+        ['folio', 'tipo', 'tipo_docto', 'estatus', 'cliente', 'importe', 'factura', 'imp_factura', 'cargos', 'creditos', 'saldo'])),
+        array_filter($fac['filas'], fn($f) => (int) $f['tipo'] !== 9)));
     $r['ordenes'] = array_column(bd_filas('AW', "select folio from doctos_orden_obra where obra_id = ? and estatus <> 'C' order by folio", [$obraId]), 'folio');
     if ($detalle) {
         $r['detalle'] = ['salidas' => $salidas, 'mano' => $mo, 'comisiones' => $comisiones, 'gastos' => $gastos, 'costos_adic' => $costosAdic];
@@ -552,6 +561,28 @@ function documento(string $tipo, int $obra, int $id): array
             $g['bitacora'] = bitacoraDocumento($id);
             return $g;
 
+        case 'salida':   // Form21.abre_salida_materiales: salida de material con sus artículos (solo consulta)
+            $s = bd_fila('AW', 'select s.docto_solicitud_id as id, s.folio_microsip, s.docto_in_id, s.fecha, s.estatus, s.nom_concepto, s.nom_almacen,
+                                       s.descripcion, s.usuario_creador, o.folio as ot
+                                  from dvd_solicitudes_material s
+                                  join doctos_orden_obra o on o.docto_orden_obra_id = s.docto_orden_obra_id
+                                 where s.docto_solicitud_id = ? and o.obra_id = ?', [$id, $obra]);
+            if (!$s) break;
+            $s['articulos'] = bd_filas('AW', 'select clave_art, nom_art, unidades, unid_med, costo_unitario, costo_total
+                                                from doctos_solicitudes_det where docto_solicitud_id = ? order by docto_solicitud_id_det', [$id]);
+            return $s;
+
+        case 'consumo':   // Form21.abre_consumo_material_en_obra (solo consulta)
+            if (!tienePermiso('LISTAR_CONSUMOS_MAT_OBRA', 'ADMIN_USER')) error('No tiene el permiso para ' . ACRI_PERMISOS['LISTAR_CONSUMOS_MAT_OBRA'] . ' (LISTAR_CONSUMOS_MAT_OBRA).', 403);
+            $c = bd_fila('AW', 'select c.consumo_material_obra_id as id, c.folio, c.fecha, c.estatus, c.descripcion, c.usuario_creacion, o.folio as ot
+                                  from consumos_metrial_en_obra c
+                                  left join doctos_orden_obra o on o.docto_orden_obra_id = c.docto_orden_obra_id
+                                 where c.consumo_material_obra_id = ? and c.obra_id = ?', [$id, $obra]);
+            if (!$c) break;
+            $c['articulos'] = bd_filas('AW', 'select clave, descripcion, uds_consumo, unimed from consumos_material_en_obra_det
+                                                where consumo_meterial_obra_id = ? order by consumo_material_obra_det_id', [$id]);
+            return $c;
+
         case 'comision':   // abre_calculo_comis (Dialog29)
             exigirTabla('pago_comis_por_obra_enca');
             $c = bd_fila('AW', 'select pago_comis_por_obra_enca_id as id, fecha, tipo_id, estatus, importe_neto, notas, usuario_creacion, fecha_creacion
@@ -616,7 +647,7 @@ function precargarMicrosip(array $folios): void
 
 // Renglón de facturación de un folio de Easy-Glass: pedido, facturas y cobranza de Microsip.
 // Igual que el escritorio: Cargos = importe facturado (o el del pedido si no hay factura),
-// Creditos = cobros + anticipos + notas de crédito aplicados, más los anticipos por aplicar.
+// Creditos = lo aplicado a la factura (factura − su saldo); sin factura, 0 (ToolStripButton9).
 function filaMicrosip(array $m, array $base): array
 {
     $pedidos = $m['pedidos'] ?? [];
@@ -624,9 +655,8 @@ function filaMicrosip(array $m, array $base): array
     $cob = $m['cobranza'] ?? [];
     $importe = $pedidos ? array_sum(array_map(fn($p) => (float) $p['total_docto'], $pedidos)) : (float) ($base['importe'] ?? 0);
     $impFac = (float) ($cob['total_factura'] ?? array_sum(array_map(fn($f) => (float) $f['importe'], $facturas)));
-    $porAplicar = array_sum(array_map(fn($a) => (float) ($a['importe_por_aplicar'] ?? 0), $m['anticipos'] ?? []));
     $cargos = $impFac > 0 ? $impFac : $importe;
-    $creditos = (float) ($cob['total_aplicado'] ?? 0) + $porAplicar;
+    $creditos = $impFac > 0 ? (float) ($cob['total_aplicado'] ?? 0) : 0.0;
     $p0 = $pedidos[0] ?? [];
     return array_merge($base, [
         'folio'       => $m['folio_microsip'] ?? $base['folio'],
@@ -916,7 +946,7 @@ try {
                 ? json_decode((string) bd_valor('AW', 'select analisis_pu from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]), true) : null;
             // Renglones de Materia Prima / Mano de Obra / Gastos de Operacion con el nombre de su concepto
             $p['conceptos'] = bd_filas('AW',
-                "select d.docto_sugerido_obra_det_id, d.tipo_concepto, d.concepto_id, d.presupuesto, d.docto_imp_id, d.folio, d.notas,
+                "select d.docto_sugerido_obra_det_id, d.tipo_concepto, d.concepto_id, d.presupuesto, d.docto_imp_id, d.folio, d.tipo_docto, d.notas,
                         coalesce(cmp.descripcion, cmo.descripcion, cgo.descripcion) as concepto
                    from doctos_sugerido_obra_det d
                    left join conceptos_mat_prima_obra cmp on trim(d.tipo_concepto) = 'MP' and cmp.concepto_mat_prima_id = d.concepto_id
@@ -926,7 +956,7 @@ try {
                   order by d.docto_sugerido_obra_det_id", [$id]);
             // Artículos del documento importado en cada renglón: dan la descripción, cantidad y unidad del Concepto/Tarea
             $articulos = bd_filas('AW',
-                'select m.docto_sugerido_obra_det_id, m.docto_id, m.folio, m.id_articulo, m.clave_articulo, m.nom_articulo,
+                'select m.docto_sugerido_obra_det_id, m.docto_id, m.fecha, m.folio, m.clave_cliente, m.id_articulo, m.clave_articulo, m.nom_articulo,
                         m.unidades, m.unid_medida, m.precio_unit, m.precio_total
                    from doctos_suge_obra_det_mat m
                    join doctos_sugerido_obra_det d on d.docto_sugerido_obra_det_id = m.docto_sugerido_obra_det_id

@@ -132,6 +132,7 @@
 
     tbody.addEventListener('click', function (e) {
         if (!e.target.classList.contains('borrar')) return;
+        if (!confirm('¿Deseas eliminar del presupuesto el concepto seleccionado ?')) return;   // Form46
         datos[seccion].splice(e.target.closest('tr').dataset.i, 1);
         marcarCambio();
         render();
@@ -1450,6 +1451,7 @@
                     importar: !!r.importar,
                     docto_imp_id: r.docto_imp_id || 0,
                     folio: r.folio || '',
+                    tipo_docto: r.tipo_docto || '',
                     notas: r.notas || '',
                     articulos: r.articulos || []
                 });
@@ -1978,6 +1980,7 @@
                     importar: !!c.docto_imp_id,
                     docto_imp_id: parseInt(c.docto_imp_id, 10) || 0,
                     folio: c.folio || '',
+                    tipo_docto: String(c.tipo_docto || '').trim(),
                     notas: c.notas || '',
                     articulos: c.articulos || []
                 });

@@ -65,12 +65,13 @@ function conceptoId(string $tipo, string $descripcion, array &$cache): int
     return $cache[$k] = $id;
 }
 
-// Id del vendedor de obra por su nombre; si no existe se da de alta
+// Id del vendedor de obra por su nombre; como en Form46 solo se elige del catálogo (no se da de alta aquí)
 function vendedorId(?string $nombre): ?int
 {
     if ($nombre === null) return null;
     $id = (int) bd_valor('AW', 'select min(vendedor_obra_id) from vendedores_obras where upper(trim(nombre)) = ?', [mb_strtoupper($nombre)]);
-    return $id ?: bd_insertar('AW', 'vendedores_obras', 'vendedor_obra_id', ['nombre' => $nombre, 'estatus' => 'A']);
+    if (!$id) error("El vendedor «{$nombre}» no está en el catálogo de vendedores de obra. Pide a un administrador que lo dé de alta.");
+    return $id;
 }
 
 // Datos de la obra del encabezado (ventana Nueva obra) como JSON; null si no se capturó nada
@@ -230,6 +231,8 @@ function guardar(array $d): array
     if (texto($d['proyecto'] ?? '', 200) === null) error('Es necesario capturar el nombre del Proyecto para guardar el presupuesto.');
     // El estatus no cambia al guardar (eso es ?accion=estatus); uno nuevo nace Pendiente
     $estatus = 'Pendiente';
+    // Nuevo: NUEVO_SUGERIDO_OBRA (o la autorización de otro usuario que lo tenga)
+    if (!$id && !tienePermiso('NUEVO_SUGERIDO_OBRA', 'ADMIN_USER')) autorizacion($d['autoriza'] ?? null, 'NUEVO_SUGERIDO_OBRA');
     if ($id) {
         $estatus = estatusActual($id);
         if (estatusBloqueaCambios($estatus)) error("El presupuesto está $estatus: ya no es posible hacerle modificaciones.");
@@ -348,6 +351,7 @@ function guardar(array $d): array
                 'porcentaje'             => numero($c['porcentaje'] ?? 0),
                 'docto_imp_id'           => !empty($c['importar']) && $docto ? $docto : null,
                 'folio'                  => texto($c['folio'] ?? '', 20),
+                'tipo_docto'             => texto($c['tipo_docto'] ?? '', 2),   // CM, ST, SD, SL o SF del documento importado
                 'notas'                  => texto($c['notas'] ?? '', 32000),
                 'tipo_concepto'          => $c['tipo'],
             ]);
@@ -355,7 +359,9 @@ function guardar(array $d): array
                 bd_insertar('AW', 'doctos_suge_obra_det_mat', 'docto_suge_obra_det_mat_id', [
                     'docto_sugerido_obra_det_id' => $detId,
                     'docto_id'       => (int) ($a['docto_id'] ?? 0) ?: null,
+                    'fecha'          => preg_match('/^\d{4}-\d{2}-\d{2}/', (string) ($a['fecha'] ?? '')) ? substr($a['fecha'], 0, 10) : null,
                     'folio'          => texto($a['folio'] ?? '', 10),
+                    'clave_cliente'  => texto($a['clave_cliente'] ?? '', 30),
                     'id_articulo'    => (int) ($a['id_articulo'] ?? 0) ?: null,
                     'clave_articulo' => texto($a['clave_articulo'] ?? '', 30),
                     'nom_articulo'   => texto($a['nom_articulo'] ?? '', 200),

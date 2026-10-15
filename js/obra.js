@@ -90,7 +90,8 @@
     function conAutorizacion(accion, mensaje) {
         return accion(undefined).catch(function (err) {
             if (!err.autorizar) throw err;
-            return pedirAutorizacion(mensaje || err.message).then(function (a) {
+            // El servidor dice qué permiso falta (como VB, cada botón pide el suyo)
+            return pedirAutorizacion(err.message || mensaje).then(function (a) {
                 if (!a) { var c = new Error(''); c.cancelado = true; throw c; }
                 return accion(a);
             });
@@ -623,7 +624,8 @@
         var tots = JSON.parse(tabla.dataset.totales || '[]');
         var sumas = tots.map(function () { return 0; });
         tabla.querySelector('tbody').innerHTML = filas.length ? filas.map(function (f, i) {
-            if (String(f.estatus || '').trim() !== 'Cancelado') {
+            // Como VB: sin los Cancelados solo en mano de obra, comisiones y gastos; las demás suman todo
+            if (SIN_CANCELADOS.indexOf(vista.dataset.vista) < 0 || String(f.estatus || '').trim() !== 'Cancelado') {
                 tots.forEach(function (t, k) { sumas[k] += parseFloat(f[t[2]]) || 0; });
             }
             var tds = cols.map(function (c) { return celda(f, c); }).join('');
@@ -634,6 +636,8 @@
         tots.forEach(function (t, k) { $(t[0]).textContent = dinero(sumas[k]) || '$0.00'; });
         estado(vista, filas.length ? filas.length + ' registro(s)' : '');
     }
+
+    var SIN_CANCELADOS = ['mano', 'gastos'];
 
     function cambiarColumnas(vista, columnas, totales) {
         var tabla = vista.querySelector('table');
@@ -1647,6 +1651,40 @@
             .then(function (j) { dialogo(j.documento); }).catch(avisarError);
     }
 
+    // Form21.abre_salida_materiales / Dialog59: la salida de material con sus artículos, solo consulta
+    function verSalida(d) {
+        formulario({
+            titulo: 'Salida de material ' + (d.folio_microsip || d.id) + ' · ' + d.estatus, soloLectura: true,
+            campos: [
+                { id: 'ot', etiqueta: 'Orden de trabajo', valor: d.ot }, { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: dia(d.fecha) },
+                { id: 'concepto', etiqueta: 'Concepto', valor: d.nom_concepto }, { id: 'almacen', etiqueta: 'Almacén', valor: d.nom_almacen },
+                { id: 'docto', etiqueta: 'Docto_In_Id (Microsip)', valor: d.docto_in_id }, { id: 'usuario', etiqueta: 'Usuario', valor: d.usuario_creador },
+                { id: 'descripcion', etiqueta: 'Descripción', tipo: 'textarea', valor: d.descripcion }
+            ],
+            grids: [{ id: 'articulos', titulo: 'Artículos', filas: d.articulos, columnas: [
+                { id: 'clave_art', etiqueta: 'Clave', ancho: '110px' }, { id: 'nom_art', etiqueta: 'Artículo' },
+                { id: 'unidades', etiqueta: 'Uds', ancho: '80px' }, { id: 'unid_med', etiqueta: 'U.M.', ancho: '70px' },
+                { id: 'costo_unitario', etiqueta: 'Costo Unit.', ancho: '100px' },
+                { id: 'costo_total', etiqueta: 'Costo Total', ancho: '110px', total: true, calc: function (f) { return num(f.costo_total); } }
+            ] }]
+        });
+    }
+    // Form21.abre_consumo_material_en_obra, solo consulta
+    function verConsumo(d) {
+        formulario({
+            titulo: 'Consumo de material ' + (d.folio || d.id) + ' · ' + (d.estatus || ''), soloLectura: true,
+            campos: [
+                { id: 'ot', etiqueta: 'Orden de trabajo', valor: d.ot }, { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: dia(d.fecha) },
+                { id: 'usuario', etiqueta: 'Usuario', valor: d.usuario_creacion },
+                { id: 'descripcion', etiqueta: 'Descripción', tipo: 'textarea', valor: d.descripcion }
+            ],
+            grids: [{ id: 'articulos', titulo: 'Artículos', filas: d.articulos, columnas: [
+                { id: 'clave', etiqueta: 'Clave', ancho: '110px' }, { id: 'descripcion', etiqueta: 'Artículo' },
+                { id: 'uds_consumo', etiqueta: 'Uds consumo', ancho: '100px' }, { id: 'unimed', etiqueta: 'U.M.', ancho: '70px' }
+            ] }]
+        });
+    }
+
     // Doble clic en un renglón de cada pestaña
     var DOBLE_CLIC = {
         ordenes: function (f) { abrirDocumento('orden', f.orden_id || f.id, dialogoOrden); },
@@ -1656,6 +1694,9 @@
         },
         gastos: function (f) { abrirDocumento('gasto', f.id, dialogoGasto); },
         explosion: dialogoPartidaExplosion,
+        salidas: function (f) { if (modoSalidas === 'doctos') abrirDocumento('salida', f.id, verSalida); },
+        microsip: function (f) { abrirDocumento('salida', f.id, verSalida); },
+        consumos: function (f) { abrirDocumento('consumo', f.id, verConsumo); },
         facturacion: function (f) {
             if (f.tipo === -1) dialogoCotizacion(f);
             else if (f.tipo >= 0 && f.tipo <= 2) dialogoCobro(f);
@@ -2016,7 +2057,7 @@
     // ---------- 6-Mano de Obra › Comisiones (Dialog29): administrativos (tipo 1) u operativos (tipo 2) ----------
     // Operativos nace con los empleados que trabajaron en la obra y sus horas (retorna_empleados_asignados_por_obra_resumen)
     var PERMISO_COMIS = 'Calcular comisiones requiere el permiso «Calcular y cancelar comisiones de la obra».';
-    function dialogoComision(doc, tipoNuevo) {
+    function dialogoComision(doc, tipoNuevo, editar) {
         var tipo = doc ? parseInt(doc.tipo_id, 10) : tipoNuevo;
         var resumen = !doc && tipo === 2 ? pedir('accion=listado&tipo=mo_resumen&id=' + encodeURIComponent(obraId)) : Promise.resolve({ filas: [] });
         Promise.all([catalogosObra(), resumen]).then(function (r) {
@@ -2028,6 +2069,10 @@
             if (!filas.length) filas = [{}];
             var acciones = [];
             if (doc) acciones.push({ texto: '🖨 Imprimir', fn: function () { imprimirComision(doc); } });
+            if (doc && !editar && !cancelado && obraAbierta()) acciones.push({ texto: '✎ Modificar', fn: function () {
+                setTimeout(function () { dialogoComision(doc, null, true); }, 0);
+                return Promise.resolve();
+            } });
             if (doc && !cancelado && obraAbierta()) acciones.push({ texto: '✕ Cancelar comisión', fn: function () {
                 if (!confirm('¿Deseas archivar como cancelado este documento?')) return Promise.resolve(false);
                 var motivo = prompt('INGRESA EL MOTIVO DE CANCELACION: ', '');
@@ -2045,7 +2090,7 @@
                 aviso: cancelado ? 'Comisión cancelada: solo se puede consultar.'
                     : !doc && tipo === 2 && !horas.length ? 'La obra aún no tiene mano de obra asignada: agrega a los empleados a mano.'
                     : 'Neto de cada empleado = importe a pagar − descuentos. El total entra como mano de obra real en la analítica.',
-                soloLectura: cancelado || !obraAbierta(),
+                soloLectura: cancelado || !obraAbierta() || (!!doc && !editar),
                 campos: [
                     { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: doc ? dia(doc.fecha) : hoy() },
                     { id: 'notas', etiqueta: 'Notas', tipo: 'textarea', valor: doc ? doc.notas : '' }
@@ -2333,7 +2378,7 @@
                 ['Estatus', o.estatus], ['Fecha termino', fechaDMY(dia(o.fecha_fin))]
             ]);
             html += '<p><b>Presupuesto folio:</b> ' + escapar(o.folio || '—') + ' · <b>Orden de Trabajo (RS):</b> ' + escapar(a.ordenes.join(' ') || '—') +
-                ' · <b>% Gastos de operación (administración):</b> ' + numero(a.pct_admin) + ' %</p>';
+                ' · <b>% Gastos de operación de la obra:</b> ' + numero(a.pct_admin) + ' %</p>';
             var tot = {};
             function seccion(clave, titulo) {
                 var p = 0, r = 0;
@@ -2349,7 +2394,8 @@
             // Resumen: presupuestado (costo + utilidad del presupuesto) contra real (costo real y lo facturado sin IVA)
             var costoP = tot.mp.p + tot.mo.p + tot.go.p, costoR = tot.mp.r + tot.mo.r + tot.go.r;
             var u = num(o.utilidad_neta_por);
-            var totalP = num(o.subtotal) > 0 ? num(o.subtotal) : (u < 100 ? costoP / ((100 - u) / 100) : costoP);
+            // VB: utilidad = costo / ((100 − u) × 0.01) − costo
+            var totalP = u < 100 ? costoP / ((100 - u) * 0.01) : costoP;
             var filasRes = [
                 ['Subtotal (materia prima + mano de obra)', tot.mp.p + tot.mo.p, tot.mp.r + tot.mo.r],
                 ['+ Gastos de operación', tot.go.p, tot.go.r],
@@ -2365,7 +2411,9 @@
             html += '<h2>ESTATUS DEL PROCESO DE FACTURACION</h2><table class="t"><thead><tr><th>Folio</th><th>Tipo</th><th>Estatus</th><th>Cliente</th><th>Factura</th>' +
                 '<th class="n">Imp. Factura</th><th class="n">Cargos</th><th class="n">Créditos</th><th class="n">Saldo</th></tr></thead><tbody>' +
                 (a.facturacion.map(function (f) {
-                    if (String(f.estatus).trim() !== 'Cancelado') saldo += num(f.saldo);
+                    // VB: saldo de las cotizaciones de Microsip menos los pagos en efectivo
+                    if (f.tipo === -1) saldo += num(f.saldo);
+                    else if (f.tipo === 0) saldo -= num(f.importe);
                     return '<tr><td>' + escapar(f.folio) + '</td><td>' + escapar(f.tipo_docto) + '</td><td>' + escapar(f.estatus) + '</td><td>' + escapar(f.cliente) + '</td>' +
                         '<td>' + escapar(f.factura) + '</td><td class="n">' + dinero(f.imp_factura) + '</td><td class="n">' + dinero(f.cargos) + '</td>' +
                         '<td class="n">' + dinero(f.creditos) + '</td><td class="n">' + dinero(f.saldo) + '</td></tr>';

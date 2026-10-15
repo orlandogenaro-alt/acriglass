@@ -21,12 +21,8 @@ if (!modoConfiguracion()) {
         error_log('AcriGlass presupuesto vendedores: ' . $e->getMessage());
     }
 }
-if (!$vendedores) {
-    $r = api_http('EASYGLASS', 'GET', '/vendedores');
-    if ($r['ok']) $vendedores = array_column($r['datos']['datos'] ?? [], 'nombre');
-}
+// Form46: cmb_vendedor sale solo del catálogo de vendedores de obra (retorna_vendedores_obra)
 $vendedores = array_values(array_unique(array_filter(array_map('trim', $vendedores))));
-if (!$vendedores) $vendedores = ['ALFREDO MARTINEZ'];
 
 // Conceptos de Materia Prima / Mano de Obra / Gastos de Operacion (Administrador › Conceptos de …)
 $conceptos = ['mp' => [], 'mo' => [], 'go' => []];
@@ -100,6 +96,8 @@ if (!modoConfiguracion()) {
     }
 }
 if ($paramsPres['utilidad_pct'] !== null) $utilidadDefecto = (float) $paramsPres['utilidad_pct'];
+// Sin % configurado se usa el parámetro 101 del escritorio, que en Form46 es margen: costo / ((100 − %) × 0.01)
+else $paramsPres['utilidad_modo'] = 'margen';
 $paramsJs = [
     'utilidad_modo' => $paramsPres['utilidad_modo'], 'financiamiento_pct' => (float) $paramsPres['financiamiento_pct'],
     'indirectos' => array_keys(parametrosIndirectosActivos($paramsPres)),

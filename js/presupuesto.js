@@ -381,7 +381,7 @@
         c = c || {};
         return { uid: ++uidPU, clave: String(c.clave || '') || siguienteClave(), partida: String(c.partida || ''),
                  descripcion: String(c.descripcion || ''), unidad: String(c.unidad || ''), cantidad: num(c.cantidad),
-                 insumos: (c.insumos || []).map(limpiarInsumo) };
+                 especificacion: String(c.especificacion || ''), insumos: (c.insumos || []).map(limpiarInsumo) };
     }
 
     function ponerAnalisisPU(a) {
@@ -400,7 +400,7 @@
             fsr: analisis.fsr, hm: analisis.hm, fin: analisis.fin, util: null,
             conceptos: analisis.conceptos.map(function (c) {
                 return { clave: c.clave, partida: c.partida, descripcion: c.descripcion, unidad: c.unidad, cantidad: c.cantidad,
-                         insumos: c.insumos.map(function (i) { return limpiarInsumo(i); }) };
+                         especificacion: c.especificacion || '', insumos: c.insumos.map(function (i) { return limpiarInsumo(i); }) };
             })
         };
     }
@@ -537,6 +537,7 @@
             c.insumos = cat.insumos.map(limpiarInsumo);
             if (!txt(c.unidad)) c.unidad = cat.unidad || '';
             if (!txt(c.partida)) c.partida = cat.partida || '';
+            if (!txt(c.especificacion)) c.especificacion = cat.especificacion || '';
             return true;
         }
         var b = (BIBLIOTECA.conceptos || []).filter(function (x) { return clave(x.descripcion) === k; })[0];
@@ -546,6 +547,7 @@
         c.insumos = b.insumos.map(limpiarInsumo);
         if (!txt(c.unidad)) c.unidad = b.unidad || '';
         if (!txt(c.partida)) c.partida = b.partida || '';
+        if (!txt(c.especificacion)) c.especificacion = b.especificacion || '';
         return true;
     }
 
@@ -598,6 +600,7 @@
         });
         $('puConceptos').innerHTML = html;
         $('puAgregar').disabled = soloLectura;
+        if ($('puPlantilla')) $('puPlantilla').disabled = soloLectura;
         pintarPu(r, lista);
     }
 
@@ -694,6 +697,32 @@
     }
     $('puAgregar').addEventListener('click', agregarConceptoPU);
 
+    // Plantilla de presupuesto: agrega sus conceptos con la matriz y los precios vigentes del catálogo
+    if ($('puPlantilla')) $('puPlantilla').addEventListener('change', function () {
+        var pl = (window.ACRI_PLANTILLAS_PU || [])[this.value];
+        this.value = '';
+        if (!pl || soloLectura) return;
+        var porCodigo = {};
+        CONCEPTOS_PU.forEach(function (c) { porCodigo[clave(c.codigo)] = c; });
+        var faltan = [], sinPrecio = [];
+        pl.conceptos.forEach(function (x) {
+            var c = porCodigo[clave(x.codigo)];
+            if (!c) { faltan.push(x.codigo); return; }
+            if (c.faltan.length) sinPrecio.push(c.codigo);
+        });
+        if (!confirm('Agregar los ' + (pl.conceptos.length - faltan.length) + ' conceptos de la plantilla «' + pl.nombre + '» con los precios vigentes del catálogo?' +
+                     (faltan.length ? '\n\nNo se agregan (dados de baja o sin matriz): ' + faltan.join(', ') + '.' : '') +
+                     (sinPrecio.length ? '\n\nCon insumos sin precio: ' + sinPrecio.join(', ') + '.' : ''))) return;
+        pl.conceptos.forEach(function (x) {
+            var c = porCodigo[clave(x.codigo)];
+            if (!c) return;
+            analisis.conceptos.push(nuevoConcepto({ descripcion: c.descripcion, unidad: c.unidad, partida: x.partida || c.partida || '',
+                                                    cantidad: x.cantidad, especificacion: c.especificacion || '', insumos: c.insumos }));
+        });
+        marcarCambio();
+        renderPu();
+    });
+
     $('puConceptos').addEventListener('input', function (e) {
         var campo = e.target.dataset.pu, tr = e.target.closest('tr[data-uid]');
         if (!campo || !tr) return;
@@ -741,7 +770,8 @@
         $('puDUnidad').value = c.unidad;
         $('puDCantidad').value = c.cantidad || '';
         $('puDPartida').value = c.partida;
-        ['puDConcepto', 'puDUnidad', 'puDCantidad', 'puDPartida'].forEach(function (id) { $(id).disabled = dis; });
+        $('puDEspecificacion').value = c.especificacion || '';
+        ['puDConcepto', 'puDUnidad', 'puDCantidad', 'puDPartida', 'puDEspecificacion'].forEach(function (id) { $(id).disabled = dis; });
         $('puDialogo').querySelectorAll('[data-pu-insumo]').forEach(function (b) { b.disabled = dis; });
         renderDialogo();
         $('puDialogo').showModal();
@@ -798,14 +828,21 @@
         if (repintar) renderDialogo(); else pintarDialogo();
     }
 
-    [['puDConcepto', 'descripcion'], ['puDUnidad', 'unidad'], ['puDCantidad', 'cantidad'], ['puDPartida', 'partida']].forEach(function (p) {
+    [['puDConcepto', 'descripcion'], ['puDUnidad', 'unidad'], ['puDCantidad', 'cantidad'], ['puDPartida', 'partida'], ['puDEspecificacion', 'especificacion']].forEach(function (p) {
         $(p[0]).addEventListener('input', function () {
             editandoPU[p[1]] = p[1] === 'cantidad' ? Math.max(0, num(this.value)) : this.value;
             cambioDialogo(p[1] === 'unidad');
             if (p[1] === 'unidad') $(p[0]).focus();
         });
     });
-    $('puDConcepto').addEventListener('change', function () { if (ofrecerBiblioteca(editandoPU)) { construirSugerencias(); cambioDialogo(true); $('puDUnidad').value = editandoPU.unidad; $('puDPartida').value = editandoPU.partida; } });
+    $('puDConcepto').addEventListener('change', function () {
+        if (!ofrecerBiblioteca(editandoPU)) return;
+        construirSugerencias();
+        cambioDialogo(true);
+        $('puDUnidad').value = editandoPU.unidad;
+        $('puDPartida').value = editandoPU.partida;
+        $('puDEspecificacion').value = editandoPU.especificacion || '';
+    });
 
     $('puDialogo').querySelectorAll('[data-pu-insumo]').forEach(function (b) {
         b.addEventListener('click', function () {
@@ -864,14 +901,29 @@
     }
 
     // Formato impreso del catálogo con P.U. (y con el análisis de cada concepto en el detalle)
+    // Partidas y subpartidas: la partida se escribe «Partida / Subpartida» (dos niveles); cada una lleva número (1, 1.1)
     function documentoPU(detalle) {
         var r = calcularPU(), partidas = [], porNombre = {};
         catalogoPU(r).forEach(function (x) {
-            if (!porNombre[x.partida]) { porNombre[x.partida] = { nombre: x.partida, conceptos: [] }; partidas.push(porNombre[x.partida]); }
+            var partes = String(x.partida || '').split('/').map(function (s) { return s.trim(); }).filter(Boolean);
+            var nomP = partes[0] || 'Sin partida', nomS = partes.slice(1).join(' / ');
+            var p = porNombre[nomP.toUpperCase()];
+            if (!p) {
+                p = porNombre[nomP.toUpperCase()] = { nombre: nomP, numero: String(partidas.length + 1), conceptos: [], subpartidas: [], porNombre: {} };
+                partidas.push(p);
+            }
+            var destino = p;
+            if (nomS) {
+                destino = p.porNombre[nomS.toUpperCase()];
+                if (!destino) {
+                    destino = p.porNombre[nomS.toUpperCase()] = { nombre: nomS, numero: p.numero + '.' + (p.subpartidas.length + 1), conceptos: [] };
+                    p.subpartidas.push(destino);
+                }
+            }
             var u = x.c ? costoUnitario(x.c) : null;
-            porNombre[x.partida].conceptos.push({
+            destino.conceptos.push({
                 clave: x.clave, descripcion: x.descripcion, unidad: x.unidad, cantidad: x.cantidad, pu: x.pu, importe: x.importe,
-                cd: x.cdU,
+                cd: x.cdU, especificacion: x.c ? x.c.especificacion || '' : '',
                 insumos: !detalle ? [] : x.c ? x.c.insumos.map(function (i) {
                     var q = cantidadInsumo(i);
                     return { tipo: TIPOS_INSUMO[i.tipo], descripcion: i.descripcion, unidad: i.unidad, cantidad: q, costo: i.costo,
@@ -883,6 +935,7 @@
                 })
             });
         });
+        partidas.forEach(function (p) { delete p.porNombre; });
         return { r: r, subtotal: r.pv, catalogo: { partidas: partidas, factor: r.factor, detalle: detalle } };
     }
 
@@ -1584,13 +1637,16 @@
     }
     var impresionLista = false;
     // modo: normal · detalle · pu (catálogo con precios unitarios) · pu-detalle (con el análisis de cada concepto)
+    //       propuesta (para el cliente: especificación técnica, P.U. e importes, sin costos internos)
+    function esModoPU(modo) { return modo === 'pu' || modo === 'pu-detalle' || modo === 'propuesta'; }
     function prepararImpresion(modo) {
-        var doc = documentoImpresion(), pu = modo === 'pu' || modo === 'pu-detalle';
+        var doc = documentoImpresion(), pu = esModoPU(modo);
         if (pu) {
             var x = documentoPU(modo === 'pu-detalle');
             doc.subtotal = x.subtotal;
             doc.catalogo = x.catalogo;
-            doc.titulo = modo === 'pu' ? 'PRESUPUESTO POR PRECIOS UNITARIOS' : 'ANÁLISIS DE PRECIOS UNITARIOS';
+            doc.propuesta = modo === 'propuesta';
+            doc.titulo = { pu: 'PRESUPUESTO POR PRECIOS UNITARIOS', 'pu-detalle': 'ANÁLISIS DE PRECIOS UNITARIOS', propuesta: 'PROPUESTA ECONÓMICA' }[modo];
         }
         $('formatoImpresion').innerHTML = FormatoPresupuesto(doc, window.ACRI_MEMBRETE || {}, modo === 'detalle' || modo === 'pu-detalle');
         impresionLista = true;
@@ -1598,7 +1654,7 @@
     document.querySelectorAll('[data-imprimir]').forEach(function (b) {
         b.addEventListener('click', function () {
             var modo = b.dataset.imprimir;
-            if (modo === 'pu' || modo === 'pu-detalle') {
+            if (esModoPU(modo)) {
                 var r = calcularPU();
                 if (!r.cd) { alert('No hay conceptos para imprimir. Captura conceptos en la pestaña Análisis P.U. (o en Materia Prima / Mano de Obra).'); return; }
                 if (Math.abs(r.pv - r.subtotal) >= 0.5 && !confirm('El precio del Análisis P.U. ($' + fmt(r.pv) + ') es distinto al Subtotal del presupuesto ($' +

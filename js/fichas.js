@@ -136,6 +136,18 @@ window.Fichas = (function () {
                 { titulo: 'Matriz de insumos', render: pestanaMatriz }
             ]
         },
+        plantillas: {
+            titulo: 'Plantilla de presupuesto',
+            api: 'api/plantillas.php',
+            pestanas: [
+                { titulo: 'General', campos: [
+                    { id: 'nombre', etiqueta: 'Nombre (p. ej. Baño completo, Fachada tipo)', req: true, completo: true },
+                    { id: 'descripcion', etiqueta: 'Descripción', tipo: 'textarea', completo: true },
+                    { id: 'activo', etiqueta: 'Activa', tipo: 'check', valor: true }
+                ] },
+                { titulo: 'Conceptos', render: pestanaPlantillaConceptos }
+            ]
+        },
         clientes: {
             titulo: 'Ficha de Clientes',
             api: 'api/clientes.php',
@@ -672,6 +684,77 @@ window.Fichas = (function () {
         if (selTipo) selTipo.addEventListener('change', revisarTipo);
         calcular();
         revisarTipo();
+    }
+
+    // Conceptos de una plantilla de presupuesto: concepto del catálogo, partida («Partida / Subpartida») y cantidad.
+    // Se guardan como JSON en el campo 'conceptos'.
+    function pestanaPlantillaConceptos(sec, c) {
+        var filas = (c.st.cat.conceptos || []).map(function (f) {
+            return { concepto_pu_id: f.concepto_pu_id, codigo: f.codigo, descripcion: f.descripcion, unidad: f.unidad,
+                     familia: f.familia || '', partida: f.partida || '', cantidad: f.cantidad, baja: String(f.estatus || '').trim() === 'B' };
+        });
+        sec.innerHTML =
+            '<p class="fi-nota">Conceptos del catálogo que se agregan al Análisis P.U. al cargar la plantilla, con los precios vigentes del catálogo. ' +
+            'Sin partida se usa la familia del concepto; para una subpartida escribe «Partida / Subpartida».</p>' +
+            '<div class="fi-fila"><label class="fi-campo completo"><span>Agregar concepto (código o descripción)</span>' +
+            '<input type="text" data-c="buscar" data-editable autocomplete="off" placeholder="Escribe al menos 2 letras…"></label></div>' +
+            '<div class="fi-sugerencias" data-c="sugerencias" hidden></div>' +
+            '<div class="fi-tabla"><table><thead><tr><th>Código</th><th>Descripción</th><th>Unidad</th><th>Partida</th><th class="num">Cantidad</th><th></th></tr></thead>' +
+            '<tbody></tbody></table></div><input type="hidden" data-campo="conceptos">';
+        var tbody = sec.querySelector('tbody'), oculto = sec.querySelector('[data-campo="conceptos"]');
+        var buscar = sec.querySelector('[data-c="buscar"]'), sug = sec.querySelector('[data-c="sugerencias"]');
+        function sincronizar() {
+            oculto.value = JSON.stringify(filas.map(function (f) { return { concepto_pu_id: f.concepto_pu_id, cantidad: f.cantidad, partida: f.partida }; }));
+        }
+        function pintar() {
+            tbody.innerHTML = filas.length ? filas.map(function (f, i) {
+                return '<tr data-i="' + i + '"><td>' + c.esc(f.codigo) + (f.baja ? ' <small>(baja)</small>' : '') + '</td><td>' + c.esc(f.descripcion) + '</td><td>' + c.esc(f.unidad) + '</td>' +
+                    '<td><input type="text" data-k="partida" data-editable maxlength="100" style="width:160px;text-align:left" placeholder="' + c.esc(f.familia) + '" value="' + c.esc(f.partida) + '"></td>' +
+                    '<td class="num"><input type="number" step="any" min="0" data-k="cantidad" data-editable value="' + c.esc(f.cantidad) + '"></td>' +
+                    '<td><button type="button" class="fi-btn peligro" data-k="quitar" data-editable title="Quitar">✕</button></td></tr>';
+            }).join('') : '<tr><td colspan="6" class="fi-vacio">Sin conceptos. Búscalos arriba en el catálogo de Conceptos P.U.</td></tr>';
+            tbody.querySelectorAll('[data-editable]').forEach(function (el) { el.disabled = !c.st.editable; });
+            sincronizar();
+        }
+        tbody.addEventListener('input', function (e) {
+            var k = e.target.dataset.k, tr = e.target.closest('tr');
+            if (!k || !tr || k === 'quitar') return;
+            filas[+tr.dataset.i][k] = e.target.value;
+            c.st.cambios = true;
+            sincronizar();
+        });
+        tbody.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-k="quitar"]');
+            if (!b || b.disabled) return;
+            filas.splice(+b.closest('tr').dataset.i, 1);
+            c.st.cambios = true;
+            pintar();
+        });
+        var espera = null;
+        buscar.addEventListener('input', function () {
+            clearTimeout(espera);
+            var q = buscar.value.trim();
+            if (q.length < 2) { sug.hidden = true; return; }
+            espera = setTimeout(function () {
+                c.pedir(c.url(c.st.def.api, 'buscar', '&q=' + encodeURIComponent(q))).then(function (j) {
+                    sug.innerHTML = j.filas.length ? j.filas.map(function (f, i) {
+                        return '<button type="button" data-s="' + i + '">' + c.esc(f.codigo) + ' · ' + c.esc(f.descripcion) + ' <small>(' + c.esc(f.unidad) + ')</small></button>';
+                    }).join('') : '<p class="fi-vacio">Sin coincidencias.</p>';
+                    sug.hidden = false;
+                    sug.onclick = function (e) {
+                        var b = e.target.closest('[data-s]');
+                        if (!b) return;
+                        var f = j.filas[+b.dataset.s];
+                        filas.push({ concepto_pu_id: f.concepto_pu_id, codigo: f.codigo, descripcion: f.descripcion, unidad: f.unidad, familia: f.familia || '', partida: '', cantidad: 1 });
+                        c.st.cambios = true;
+                        buscar.value = '';
+                        sug.hidden = true;
+                        pintar();
+                    };
+                }).catch(function (err) { c.mensaje(err.message, 'error'); });
+            }, 250);
+        });
+        pintar();
     }
 
     // ================= Pestañas propias de la ficha de clientes =================

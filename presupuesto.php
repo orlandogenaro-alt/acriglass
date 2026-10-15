@@ -74,6 +74,7 @@ if (!modoConfiguracion()) {
                     if (empty($c['insumos']) || $k === '|' || isset($vistosC[$k]) || count($vistosC) >= 400) continue;
                     $vistosC[$k] = 1;
                     $bibliotecaPU['conceptos'][] = ['descripcion' => $c['descripcion'], 'unidad' => $c['unidad'] ?? '', 'partida' => $c['partida'] ?? '',
+                                                    'especificacion' => $c['especificacion'] ?? '',
                                                     'folio' => (int) $f['folio'], 'insumos' => $c['insumos']];
                     foreach ($c['insumos'] as $i) {
                         $ki = ($i['tipo'] ?? '') . '|' . mb_strtoupper(trim((string) ($i['descripcion'] ?? '')));
@@ -141,7 +142,7 @@ if (!modoConfiguracion()) {
             foreach (bd_filas('AW', 'select concepto_pu_id, insumo_id, cantidad, rendimiento, desperdicio_pct from concepto_pu_insumos order by concepto_pu_id, orden') as $r) {
                 $matricesCat[(int) $r['concepto_pu_id']][] = $r;
             }
-            foreach (bd_filas('AW', "select c.concepto_pu_id, c.codigo, c.descripcion, c.familia, u.clave as unidad
+            foreach (bd_filas('AW', "select c.concepto_pu_id, c.codigo, c.descripcion, c.descripcion_tecnica, c.familia, u.clave as unidad
                                        from conceptos_pu c join unidades u on u.unidad_id = c.unidad_id
                                       where c.estatus = 'A' order by c.codigo limit 1000") as $c) {
                 $m = $matricesCat[(int) $c['concepto_pu_id']] ?? [];
@@ -152,6 +153,7 @@ if (!modoConfiguracion()) {
                     continue;
                 }
                 $conceptosPU[] = ['codigo' => $c['codigo'], 'descripcion' => $c['descripcion'], 'unidad' => $c['unidad'], 'partida' => $c['familia'] ?? '',
+                                  'especificacion' => (string) ($c['descripcion_tecnica'] ?? ''),
                                   'faltan' => $a['faltan'],
                                   'insumos' => array_map(fn($i) => ['tipo' => $i['tipo'], 'descripcion' => $i['descripcion'], 'unidad' => $i['unidad'],
                                                                      'cantidad' => $i['cantidad'], 'rinde' => 0, 'costo' => $i['costo'] ?? 0], $a['insumos'])];
@@ -159,6 +161,28 @@ if (!modoConfiguracion()) {
         }
     } catch (Throwable $e) {
         error_log('AcriGlass presupuesto conceptos P.U.: ' . $e->getMessage());
+    }
+}
+
+// Plantillas de presupuesto activas (Catalogos › Plantillas de presupuesto): sus conceptos por código del catálogo
+$plantillasPU = [];
+if (!modoConfiguracion() && $conceptosPU) {
+    try {
+        if (bd_tiene_tabla('AW', 'plantillas_presupuesto')) {
+            $porId = [];
+            foreach (bd_filas('AW', "select p.plantilla_id, p.nombre, c.codigo, pc.cantidad, pc.partida
+                                       from plantillas_presupuesto p
+                                       join plantilla_conceptos pc on pc.plantilla_id = p.plantilla_id
+                                       join conceptos_pu c on c.concepto_pu_id = pc.concepto_pu_id
+                                      where p.estatus = 'A' order by p.nombre, pc.orden, pc.plantilla_concepto_id") as $f) {
+                $k = (int) $f['plantilla_id'];
+                if (!isset($porId[$k])) $porId[$k] = ['nombre' => $f['nombre'], 'conceptos' => []];
+                $porId[$k]['conceptos'][] = ['codigo' => $f['codigo'], 'cantidad' => (float) $f['cantidad'], 'partida' => (string) ($f['partida'] ?? '')];
+            }
+            $plantillasPU = array_values($porId);
+        }
+    } catch (Throwable $e) {
+        error_log('AcriGlass presupuesto plantillas: ' . $e->getMessage());
     }
 }
 
@@ -224,6 +248,7 @@ $secciones = [
         <div class="menu">
             <button data-imprimir="normal">Imprimir</button>
             <button data-imprimir="detalle">Imprimir Detalle</button>
+            <button data-imprimir="propuesta">Propuesta para el cliente (PDF)</button>
             <button data-imprimir="pu">Imprimir Precios Unitarios</button>
             <button data-imprimir="pu-detalle">Imprimir Análisis de P.U.</button>
             <button data-versiones>Versiones aprobadas…</button>
@@ -381,6 +406,14 @@ $secciones = [
                         <div class="extra-barra">
                             <strong>Catálogo de conceptos</strong>
                             <button type="button" class="ct-btn" id="puAgregar">+ Agregar concepto</button>
+                            <?php if ($plantillasPU): ?>
+                            <select id="puPlantilla" class="ct-btn" title="Agrega todos los conceptos de una plantilla con los precios vigentes del catálogo">
+                                <option value="">+ Desde plantilla…</option>
+                                <?php foreach ($plantillasPU as $i => $pl): ?>
+                                <option value="<?= $i ?>"><?= e($pl['nombre']) ?> (<?= count($pl['conceptos']) ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                            <?php endif; ?>
                             <span class="extra-ayuda">Si el concepto ya se hizo en otro presupuesto, elígelo de la lista al escribirlo y se copia su análisis.</span>
                         </div>
                         <div class="extra-caja">
@@ -623,7 +656,12 @@ $secciones = [
         <label class="ancho">Concepto: <input type="text" id="puDConcepto" maxlength="300" list="puSugConceptos"></label>
         <label>Unidad: <input type="text" id="puDUnidad" maxlength="20" list="puUnidades"></label>
         <label>Cantidad: <input type="number" id="puDCantidad" class="num" step="0.01" min="0"></label>
-        <label>Partida: <input type="text" id="puDPartida" maxlength="100" list="puPartidas" placeholder="ej. Cancelería"></label>
+        <label>Partida: <input type="text" id="puDPartida" maxlength="100" list="puPartidas" placeholder="ej. Cancelería / Planta baja"
+               title="Para una subpartida escribe «Partida / Subpartida»"></label>
+    </div>
+    <div class="pu-dlg-espec">
+        <label>Especificación técnica (va en la propuesta para el cliente):
+            <textarea id="puDEspecificacion" rows="2" maxlength="4000" placeholder="Materiales, acabados, medidas, herrajes, sellado…"></textarea></label>
     </div>
     <p class="pu-dlg-ayuda" id="puDAyuda"></p>
     <div class="pu-dlg-botones">
@@ -716,6 +754,7 @@ $secciones = [
     window.ACRI_BIBLIOTECA_PU = <?= json_encode($bibliotecaPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_CATALOGO_PU = <?= json_encode($catalogoPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_PARAMETROS_PRES = <?= json_encode($paramsJs, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.ACRI_PLANTILLAS_PU = <?= json_encode($plantillasPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_CONCEPTOS_PU = <?= json_encode($conceptosPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <script src="<?= recurso('js/formato-presupuesto.js') ?>"></script>

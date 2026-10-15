@@ -58,6 +58,7 @@ $menu = [
             ['Tipos de Empleados', '🪪', 'modulo', ['TIPO_EMPLEADO_ID', 'CLAVE', 'NOMBRE', 'PORCENTAJE']],
             ['Insumos',            '🧱', 'modulo', ['CLAVE', 'DESCRIPCION', 'TIPO', 'UNIDAD', 'FAMILIA', 'PRECIO', 'VIGENCIA', 'COSTO', 'ESTATUS']],
             ['Conceptos P.U.',     '🧩', 'modulo', ['CODIGO', 'DESCRIPCION', 'UNIDAD', 'FAMILIA', 'INSUMOS', 'COSTO_DIRECTO', 'ESTATUS']],
+            ['Plantillas de presupuesto', '🗂️', 'modulo', ['NOMBRE', 'DESCRIPCION', 'CONCEPTOS', 'ESTATUS']],
             ['Parámetros de costos', '⚖️', 'pagina', 'parametros-costos.php'],
             ['Importar insumos',   '📥', 'pagina', 'importar-insumos.php'],
         ],

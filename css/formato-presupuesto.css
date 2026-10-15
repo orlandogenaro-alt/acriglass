@@ -131,3 +131,8 @@
     padding-bottom: 3mm;
 }
 .fp-pie { margin-top: 4px; padding-top: 2px; border-top: 1px solid var(--fp-color); text-align: center; font-size: 8.5px; }
+
+/* Propuesta para el cliente y subpartidas */
+.fp-espec { margin-top: 2px; font-size: 0.92em; line-height: 1.35; color: #333; white-space: normal; }
+.fp-subpartida td { padding-left: 14px; font-style: italic; }
+.fp-propuesta-total { margin-top: 8px; }

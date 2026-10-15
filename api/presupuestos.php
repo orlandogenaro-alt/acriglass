@@ -121,6 +121,7 @@ function analisisPU($d): ?string
             'descripcion' => texto($c['descripcion'] ?? '', 300) ?? '',
             'unidad'      => texto($c['unidad'] ?? '', 20) ?? '',
             'cantidad'    => max(0, numero($c['cantidad'] ?? 0, 4)),
+            'especificacion' => texto($c['especificacion'] ?? '', 4000) ?? '',
             'insumos'     => $insumos,
         ];
         // Renglón totalmente vacío: no se guarda

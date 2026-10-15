@@ -42,4 +42,10 @@ En XAMPP sin `php.ini` propio, agrega `-d extension=pdo_pgsql -d extension=mbstr
 php pruebas/correr.php
 ```
 
-Prueban los cálculos del presupuesto y el freno de contraseñas. No usan ninguna base de datos.
+Prueban los cálculos del presupuesto, el motor de costos, los parámetros y el freno de contraseñas. No usan ninguna base de datos.
+
+El formato impreso (partidas, subpartidas y propuesta) se prueba con Node:
+
+```
+node pruebas/formato-presupuesto.js
+```

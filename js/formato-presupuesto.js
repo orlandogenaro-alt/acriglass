@@ -7,6 +7,8 @@
 //           titulo?, catalogo?: { partidas: [{ nombre, conceptos: [{ clave, descripcion, unidad, cantidad, pu, importe, cd,
 //                                  insumos: [{ tipo, descripcion, unidad, cantidad, costo, importe }] }] }], factor, detalle } }
 //   Con catalogo se imprime el presupuesto por precios unitarios (Análisis P.U.) en lugar de las secciones.
+//   Cada partida puede traer numero y subpartidas: [{ nombre, numero, conceptos }]; los conceptos, especificacion.
+//   doc.propuesta: formato para el cliente (sin estatus ni costos internos, con la especificación técnica y el total).
 window.FormatoPresupuesto = function (doc, m, detalle) {
     function esc(s) {
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -46,7 +48,7 @@ window.FormatoPresupuesto = function (doc, m, detalle) {
             '<div class="fp-elaboro"><b>Elaboro:</b><br><b>' + esc(doc.elaboro) + '</b></div>' +
         '</div>' +
         '<div class="fp-datos">' +
-            '<div class="fp-r1"><b>Estatus:</b><br>' + esc(doc.estatus) + '</div>' +
+            (doc.propuesta ? '<div class="fp-r1"></div>' : '<div class="fp-r1"><b>Estatus:</b><br>' + esc(doc.estatus) + '</div>') +
             '<div class="fp-r1"><b>Cliente:</b><br><b>' + esc(doc.cliente) + '</b></div>' +
             '<div class="fp-r1"><b>Fecha:</b><br>' + fecha(doc.fecha) + '</div>' +
             '<div class="fp-totales">' +
@@ -83,13 +85,14 @@ window.FormatoPresupuesto = function (doc, m, detalle) {
     // ---------- Presupuesto por precios unitarios ----------
     if (doc.catalogo) {
         var cat = doc.catalogo;
-        cuerpo = '<table class="fp-sec fp-cat"><thead><tr><th>Clave</th><th>Concepto</th><th>Unidad</th><th class="num">Cantidad</th>' +
-            '<th class="num">P.U.</th><th class="num">Importe</th></tr></thead><tbody>' +
-            cat.partidas.map(function (p) {
-                var tot = p.conceptos.reduce(function (t, c) { return t + n(c.importe); }, 0);
-                return '<tr class="fp-partida"><td colspan="5">' + esc(p.nombre) + '</td><td class="num">' + dinero(tot) + '</td></tr>' +
-                    p.conceptos.map(function (c) {
-                        var h = '<tr class="fp-concepto"><td>' + esc(c.clave) + '</td><td>' + esc(c.descripcion) + '</td><td>' + esc(c.unidad) + '</td>' +
+        var totalDe = function (lista) { return lista.reduce(function (t, c) { return t + n(c.importe); }, 0); };
+        var totalPartida = function (p) { return totalDe(p.conceptos) + (p.subpartidas || []).reduce(function (t, s) { return t + totalDe(s.conceptos); }, 0); };
+        var numero = function (p) { return p.numero ? esc(p.numero) + ' &nbsp;' : ''; };
+        var filas = function (conceptos) {
+            return conceptos.map(function (c) {
+                        var desc = esc(c.descripcion) + (doc.propuesta && c.especificacion
+                            ? '<div class="fp-espec">' + esc(c.especificacion).replace(/\n/g, '<br>') + '</div>' : '');
+                        var h = '<tr class="fp-concepto"><td>' + esc(c.clave) + '</td><td>' + desc + '</td><td>' + esc(c.unidad) + '</td>' +
                             '<td class="num">' + cant(c.cantidad) + '</td><td class="num">' + dinero(c.pu) + '</td><td class="num">' + dinero(c.importe) + '</td></tr>';
                         if (cat.detalle && c.insumos && c.insumos.length) {
                             h += '<tr class="fp-det"><td colspan="6"><table>' +
@@ -104,9 +107,23 @@ window.FormatoPresupuesto = function (doc, m, detalle) {
                                 '</tbody></table></td></tr>';
                         }
                         return h;
+            }).join('');
+        };
+        cuerpo = '<table class="fp-sec fp-cat"><thead><tr><th>Clave</th><th>Concepto</th><th>Unidad</th><th class="num">Cantidad</th>' +
+            '<th class="num">P.U.</th><th class="num">Importe</th></tr></thead><tbody>' +
+            cat.partidas.map(function (p) {
+                return '<tr class="fp-partida"><td colspan="5">' + numero(p) + esc(p.nombre) + '</td><td class="num">' + dinero(totalPartida(p)) + '</td></tr>' +
+                    filas(p.conceptos) +
+                    (p.subpartidas || []).map(function (s) {
+                        return '<tr class="fp-partida fp-subpartida"><td colspan="5">' + numero(s) + esc(s.nombre) + '</td><td class="num">' + dinero(totalDe(s.conceptos)) + '</td></tr>' +
+                            filas(s.conceptos);
                     }).join('');
             }).join('') +
-            '</tbody><tfoot><tr><td colspan="6">IMPORTE TOTAL (sin IVA): ' + dinero(subtotal) + '</td></tr></tfoot></table>';
+            '</tbody><tfoot><tr><td colspan="6">IMPORTE TOTAL (sin IVA): ' + dinero(subtotal) + '</td></tr></tfoot></table>' +
+            (doc.propuesta ? '<div class="fp-resumen fp-propuesta-total">' +
+                '<span>Subtotal:</span><b>' + dinero(subtotal) + '</b>' +
+                '<span>IVA (' + cant(doc.iva_pct) + '%):</span><b>' + dinero(iva) + '</b>' +
+                '<span>Total:</span><b>' + dinero(subtotal + iva) + '</b></div>' : '');
     }
 
     var resumen = doc.catalogo ? '' : '<div class="fp-resumen">' +

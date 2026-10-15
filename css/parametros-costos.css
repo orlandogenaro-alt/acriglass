@@ -1,0 +1,85 @@
+/* Catalogos › Parámetros de costos (mismos colores que las demás pantallas) */
+:root {
+    --fondo: #0f1623;
+    --fondo-2: #131b2b;
+    --tarjeta: #172133;
+    --borde: #26324a;
+    --borde-2: #33415c;
+    --texto: #d7deea;
+    --texto-suave: #8b97ad;
+    --azul: #3b82f6;
+    --dorado: #d9b36c;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+
+body {
+    font-family: 'Nunito', 'Segoe UI', sans-serif;
+    font-size: 13px;
+    color: var(--texto);
+    background: var(--fondo);
+    padding: 20px 22px 30px;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+
+.m-acri { color: var(--dorado); }
+.m-glass { color: #5aa0e6; }
+.cabecera h1 { font-family: 'Exo 2', sans-serif; font-size: 24px; font-weight: 800; margin-bottom: 6px; }
+.h-texto { color: #fff; margin-left: 8px; font-family: 'Nunito', sans-serif; }
+.cabecera p { max-width: 900px; line-height: 1.8; color: var(--texto-suave); }
+
+.aviso { max-width: 1100px; margin-top: 12px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--borde-2); background: var(--tarjeta); }
+.aviso.error { border-color: #f87171; color: #fecaca; }
+.aviso.ok { border-color: #22c55e; color: #dcfce7; }
+
+.bloque { max-width: 1100px; margin-top: 18px; padding: 14px 16px; border: 1px solid var(--borde); border-radius: 10px; background: var(--tarjeta); }
+.bloque h2 { font-size: 14px; font-weight: 800; color: #fff; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--borde); }
+.bloque h3 { font-size: 12.5px; font-weight: 800; color: #fff; margin: 4px 0 6px; }
+.ayuda { margin-bottom: 10px; line-height: 1.6; color: var(--texto-suave); }
+.ayuda b { color: var(--texto); }
+
+.fila { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin: 6px 0 12px; }
+.campo { display: flex; flex-direction: column; gap: 4px; width: 170px; }
+.campo.ancho { flex: 1 1 320px; width: auto; }
+.campo > span, .dato > span { font-size: 12px; font-weight: 700; color: var(--texto-suave); }
+.dato { display: flex; flex-direction: column; gap: 4px; min-width: 130px; }
+.dato b { font-size: 18px; color: #fff; }
+.check { display: flex; align-items: center; gap: 6px; padding-bottom: 8px; }
+input, select, textarea { padding: 7px 9px; border: 1px solid var(--borde-2); border-radius: 6px; background: var(--fondo); }
+input:focus, textarea:focus { outline: none; border-color: var(--azul); }
+input:disabled, textarea:disabled { color: var(--texto-suave); }
+
+.btn { padding: 7px 14px; border: 1px solid var(--borde-2); border-radius: 6px; background: var(--fondo-2); font-weight: 700; }
+.btn:hover:not(:disabled) { border-color: var(--azul); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.azul { background: var(--azul); border-color: var(--azul); color: #fff; }
+.btn.peligro { color: #fca5a5; }
+.btn.chico { padding: 3px 9px; font-size: 12px; }
+
+.tabla { border: 1px solid var(--borde); border-radius: 8px; overflow: auto; max-height: 260px; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th { position: sticky; top: 0; padding: 7px 10px; background: var(--fondo-2); color: var(--texto-suave); text-align: left; font-weight: 700; }
+td { padding: 6px 10px; border-top: 1px solid var(--borde); }
+.num { text-align: right; white-space: nowrap; }
+.vacio { color: var(--texto-suave); text-align: center; padding: 14px; }
+#fsLista tr { cursor: pointer; }
+#fsLista tr:hover { background: #1d2a44; }
+
+.editor { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--borde-2); }
+.tres { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 12px; }
+.lista { margin-bottom: 6px; border: 1px solid var(--borde); border-radius: 8px; }
+.lista td { padding: 4px 6px; }
+.lista input { width: 100%; padding: 4px 6px; }
+.lista td.num input { width: 80px; text-align: right; }
+.resultado { margin: 12px 0 4px; padding: 10px 12px; border-radius: 8px; background: var(--fondo-2); }
+.resultado b { color: #fff; }
+.resultado .fsr { font-size: 15px; font-weight: 800; color: var(--dorado); }
+.resultado .error { color: #fca5a5; }
+
+@media (max-width: 800px) {
+    body { padding: 14px 16px 24px; }
+    .tres { grid-template-columns: 1fr; }
+    .campo { width: 100%; }
+}

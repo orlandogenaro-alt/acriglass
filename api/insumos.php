@@ -43,11 +43,16 @@ function numeroValido($v, string $campo): float
     return (float) $v;
 }
 
-// Tipos de cambio para los precios en otra moneda (configuración 'tipos_cambio': { "USD": 18.25 })
+// Tipos de cambio vigentes para los precios en otra moneda (Catalogos › Parámetros de costos)
 function tiposCambio(): array
 {
-    return array_filter(array_map('floatval', configLeer('tipos_cambio')), fn($v) => $v > 0);
+    static $tc = null;
+    return $tc ?? ($tc = puTiposCambio());
 }
+
+// Migración 005: FASAR ligado a la mano de obra y costo horario del equipo
+function conFasar(): bool { return bd_tiene_columna('AW', 'insumos', 'fasar_id'); }
+function conCostoHorario(): bool { return bd_tiene_tabla('AW', 'costos_horarios'); }
 
 function costoTexto(array $r): string
 {
@@ -86,6 +91,9 @@ function ficha(int $id): array
         'fuentes' => array_map(fn($k, $v) => ['id' => $k, 'nombre' => $v], array_keys(FUENTES_PRECIO), FUENTES_PRECIO),
         'monedas' => [['id' => 'MXN', 'nombre' => 'MXN · Pesos'], ['id' => 'USD', 'nombre' => 'USD · Dólares']],
         'tipos_cambio' => tiposCambio(),
+        'fasar' => conFasar() ? bd_filas('AW', "select fasar_id as id, nombre || ' · FSR ' || fsr as nombre from fasar where estatus = 'A' order by nombre") : [],
+        'con_costo_horario' => conCostoHorario(),
+        'costo_horario' => null,
     ];
     if (!$id) return $r;
     $reg = bd_fila('AW', 'select * from insumos where insumo_id = ?', [$id]);
@@ -104,6 +112,11 @@ function ficha(int $id): array
         if ($reg['tipo'] === 'BAS') $r['componentes'] = puDesglose($id, $insumos, $componentes, tiposCambio());
     } catch (RuntimeException $e) {
         $r['faltan'] = [$e->getMessage()];
+    }
+    if ($reg['tipo'] === 'EQ' && conCostoHorario()) {
+        $ch = bd_fila('AW', 'select parametros, costo, fecha_mod, usuario_mod from costos_horarios where insumo_id = ?', [$id]);
+        if ($ch) $r['costo_horario'] = ['parametros' => json_decode((string) $ch['parametros'], true), 'costo' => (float) $ch['costo'],
+                                         'fecha' => $ch['fecha_mod'], 'usuario' => $ch['usuario_mod']];
     }
     $r['usado_en'] = bd_filas('AW', 'select i.insumo_id as id, i.clave, i.descripcion from insumo_componentes c
                                       join insumos i on i.insumo_id = c.insumo_id where c.componente_insumo_id = ? order by i.clave', [$id]);
@@ -156,6 +169,16 @@ function guardar(array $d, bool $puedeModificar, bool $puedePrecios): array
         if (!$unidad || !bd_valor('AW', 'select count(*) from unidades where unidad_id = ?', [$unidad])) error('Selecciona la unidad.');
         $fsr = trim((string) ($d['fsr'] ?? '')) === '' ? 1.0 : numeroValido($d['fsr'], 'El FSR');
         if ($fsr <= 0 || $fsr >= 10) error('El FSR debe ser mayor que 0 y menor que 10.');
+        // Mano de obra ligada a un FASAR: toma su FSR (Catalogos › Parámetros de costos)
+        $fasarId = $tipo === 'MO' && conFasar() ? (int) ($d['fasar_id'] ?? 0) : 0;
+        if ($fasarId) {
+            $f = bd_fila('AW', 'select fsr, estatus from fasar where fasar_id = ?', [$fasarId]);
+            if (!$f) error('El FASAR seleccionado ya no existe.');
+            if (trim((string) $f['estatus']) === 'B' && (int) bd_valor('AW', 'select coalesce(fasar_id, 0) from insumos where insumo_id = ?', [$id]) !== $fasarId) {
+                error('El FASAR seleccionado está dado de baja.');
+            }
+            $fsr = (float) $f['fsr'];
+        }
         $campos = [
             'clave' => $clave, 'descripcion' => $desc, 'tipo' => $tipo, 'unidad_id' => $unidad,
             'familia' => texto(mb_strtoupper((string) ($d['familia'] ?? '')), 60),
@@ -164,6 +187,7 @@ function guardar(array $d, bool $puedeModificar, bool $puedePrecios): array
             'notas' => texto($d['notas'] ?? '', 4000),
             'estatus' => !empty($d['activo']) ? 'A' : 'B',
         ];
+        if (conFasar()) $campos['fasar_id'] = $fasarId ?: null;
     } elseif ($tipo !== $actual['tipo']) {
         error('No tienes el permiso para cambiar el tipo del insumo.', 403);
     }
@@ -191,6 +215,21 @@ function guardar(array $d, bool $puedeModificar, bool $puedePrecios): array
         error('El básico tiene componentes: quítalos antes de cambiarle el tipo.');
     }
 
+    // Costo horario del equipo: se calcula aquí y su resultado entra al historial de precios
+    $costoHorario = null;
+    $datosCh = trim((string) ($d['costo_horario'] ?? ''));
+    if ($tipo === 'EQ' && $datosCh !== '' && $datosCh !== 'null' && conCostoHorario()) {
+        if (!$puedePrecios) error('No tienes el permiso para cambiar precios de insumos (PRECIOS_INSUMOS): el costo horario cambia el precio.', 403);
+        if ($hayPrecio) error('Captura el precio o el costo horario, no los dos.');
+        $p = json_decode($datosCh, true);
+        if (!is_array($p)) error('Los datos del costo horario no son válidos.');
+        try {
+            $costoHorario = puCostoHorario($p);
+        } catch (InvalidArgumentException $e) {
+            error($e->getMessage());
+        }
+    }
+
     if ($hayPrecio) {
         if ($tipo === 'BAS') error('El costo de un básico sale de sus componentes: no se le captura precio.');
         $valor = numeroValido($precio, 'El precio');
@@ -216,6 +255,22 @@ function guardar(array $d, bool $puedeModificar, bool $puedePrecios): array
             bd_ejecutar('AW', 'delete from insumo_componentes where insumo_id = ?', [$id]);
             foreach ($componentes as $cid => $c) {
                 bd_insertar('AW', 'insumo_componentes', 'componente_id', ['insumo_id' => $id, 'componente_insumo_id' => $cid] + $c);
+            }
+        }
+        if ($costoHorario !== null) {
+            $antes = bd_fila('AW', 'select parametros, costo from costos_horarios where insumo_id = ?', [$id]);
+            $param = json_encode($costoHorario['datos']);
+            if ($antes) bd_ejecutar('AW', 'update costos_horarios set parametros = cast(? as jsonb), costo = ?, fecha_mod = ?, usuario_mod = ? where insumo_id = ?',
+                [$param, $costoHorario['costo'], date('c'), mb_substr((string) ($_SESSION['usuario'] ?? ''), 0, 50), $id]);
+            else bd_ejecutar('AW', 'insert into costos_horarios (insumo_id, parametros, costo, fecha_mod, usuario_mod) values (?, cast(? as jsonb), ?, ?, ?)',
+                [$id, $param, $costoHorario['costo'], date('c'), mb_substr((string) ($_SESSION['usuario'] ?? ''), 0, 50)]);
+            // Al historial solo si cambió el costo que rige hoy
+            $vigente = bd_fila('AW', 'select precio, moneda from insumos_precio_vigente where insumo_id = ?', [$id]);
+            if (!$vigente || trim($vigente['moneda']) !== 'MXN' || abs((float) $vigente['precio'] - $costoHorario['costo']) >= 0.000001) {
+                bd_insertar('AW', 'insumo_precios', 'precio_id', [
+                    'insumo_id' => $id, 'precio' => $costoHorario['costo'], 'moneda' => 'MXN', 'vigente_desde' => date('Y-m-d'),
+                    'fuente' => 'costo_horario', 'notas' => 'Costo horario calculado', 'usuario' => mb_substr((string) ($_SESSION['usuario'] ?? ''), 0, 50),
+                ]);
             }
         }
         if ($hayPrecio) {

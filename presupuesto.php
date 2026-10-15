@@ -6,6 +6,7 @@ require __DIR__ . '/includes/conceptos.php';
 require __DIR__ . '/includes/estatus.php';
 require __DIR__ . '/includes/membrete.php';
 require __DIR__ . '/includes/conceptos-tareas.php';
+require __DIR__ . '/includes/pu.php';
 
 // Presupuesto existente a abrir (sin id = nuevo)
 $presupuestoId = max(0, (int) ($_GET['id'] ?? 0));
@@ -84,6 +85,30 @@ if (!modoConfiguracion()) {
         }
     } catch (Throwable $e) {
         error_log('AcriGlass presupuesto biblioteca P.U.: ' . $e->getMessage());
+    }
+}
+
+// Análisis P.U.: insumos del catálogo (Catalogos › Insumos) con su precio vigente en pesos, para sugerirlos primero.
+// La mano de obra va con su salario base (sin FSR): el análisis le aplica su propio FSR y así no se aplica dos veces.
+// Los básicos no se ofrecen todavía: su costo ya trae el FSR de su mano de obra.
+$catalogoPU = [];
+if (!modoConfiguracion()) {
+    try {
+        if (puDisponible()) {
+            $tc = puTiposCambio();
+            foreach (bd_filas('AW', "select i.clave, i.descripcion, i.tipo, u.clave as unidad, p.precio, p.moneda
+                                       from insumos i join unidades u on u.unidad_id = i.unidad_id
+                                       join insumos_precio_vigente p on p.insumo_id = i.insumo_id
+                                      where i.estatus = 'A' and i.tipo <> 'BAS' order by i.clave") as $f) {
+                $cambio = puTipoCambio(trim($f['moneda']), $tc);
+                if ($cambio === null) continue;
+                $catalogoPU[] = ['tipo' => ['MAT' => 'MAT', 'MO' => 'MO', 'EQ' => 'EQ', 'HER' => 'EQ'][$f['tipo']] ?? 'MAT',
+                                 'descripcion' => $f['descripcion'], 'clave' => $f['clave'], 'unidad' => $f['unidad'],
+                                 'costo' => round((float) $f['precio'] * $cambio, 6)];
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('AcriGlass presupuesto catálogo P.U.: ' . $e->getMessage());
     }
 }
 
@@ -616,6 +641,7 @@ $secciones = [
     window.ACRI_EMPLEADOS = <?= json_encode($empleados, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_TIPOS_COMISION = <?= json_encode($tiposComision, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_BIBLIOTECA_PU = <?= json_encode($bibliotecaPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.ACRI_CATALOGO_PU = <?= json_encode($catalogoPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <script src="<?= recurso('js/formato-presupuesto.js') ?>"></script>
 <script src="<?= recurso('js/conceptos-tareas.js') ?>"></script>

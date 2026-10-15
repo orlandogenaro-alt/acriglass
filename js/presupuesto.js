@@ -347,6 +347,7 @@
     var FIJOS_PU = { mp: 'MATERIALES SEGUN ANALISIS P.U.', mo: 'MANO DE OBRA SEGUN ANALISIS P.U.' };
     var TIPOS_INSUMO = { MAT: 'Material', MO: 'Mano de obra', EQ: 'Equipo / herramienta' };
     var BIBLIOTECA = window.ACRI_BIBLIOTECA_PU || { conceptos: [], insumos: [] };
+    var CATALOGO_PU = window.ACRI_CATALOGO_PU || [];   // Catalogos › Insumos (precio vigente; mano de obra sin FSR)
     var CAMPOS_PU = { fsr: 'puFsr', hm: 'puHm', fin: 'puFin' };
     var analisis = { fsr: 1, hm: 0, fin: 0, util: null, conceptos: [] };   // util null = equivalente a la Utilidad Neta
     var uidPU = 0;
@@ -479,8 +480,8 @@
     function pct(n) { return n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' %'; }
     function cant(n) { return n.toLocaleString('es-MX', { maximumFractionDigits: 4 }); }
 
-    // Sugerencias para no teclear precios: lo ya capturado en este presupuesto, los artículos importados,
-    // los empleados (sueldo diario por jornal) y lo usado en otros presupuestos. Gana lo primero.
+    // Sugerencias para no teclear precios: lo ya capturado en este presupuesto, el catálogo de insumos,
+    // los artículos importados, los empleados (sueldo diario por jornal) y lo usado en otros presupuestos. Gana lo primero.
     function construirSugerencias() {
         sugerencias = { MAT: {}, MO: {}, EQ: {} };
         function poner(tipo, descripcion, unidad, costo) {
@@ -489,6 +490,7 @@
             sugerencias[tipo][k] = { descripcion: txt(descripcion), unidad: txt(unidad), costo: num(costo) };
         }
         analisis.conceptos.forEach(function (c) { c.insumos.forEach(function (i) { poner(i.tipo, i.descripcion, i.unidad, i.costo); }); });
+        CATALOGO_PU.forEach(function (i) { poner(i.tipo, i.descripcion, i.unidad, i.costo); });
         ['mp', 'mo', 'go'].forEach(function (sec) {
             datos[sec].forEach(function (f) {
                 (f.articulos || []).forEach(function (a) { poner('MAT', txt(a.nom_articulo) || txt(a.clave_articulo), a.unid_medida, a.precio_unit); });

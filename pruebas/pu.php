@@ -97,3 +97,45 @@ prueba('desglose del básico: importe de cada componente', function () {
     igual(13.2, $d[0]['importe']);
     igual(32.0, $d[1]['importe']);
 });
+
+prueba('FASAR: 365 días, +16.5 pagados, −69 no laborados, Ps 30 % → Tp 381.5, Tl 296, Fsr 1.6755', function () {
+    $r = puFsr(365, [['concepto' => 'Aguinaldo', 'dias' => 15], ['concepto' => 'Prima vacacional', 'dias' => 1.5]],
+        [['concepto' => 'Domingos', 'dias' => 52], ['concepto' => 'Festivos', 'dias' => 7], ['concepto' => 'Vacaciones', 'dias' => 6], ['concepto' => 'Clima', 'dias' => 4]],
+        [['concepto' => 'Cuotas', 'pct' => 30]]);
+    igual(381.5, $r['tp'], 4);
+    igual(296.0, $r['tl'], 4);
+    igual(0.3, $r['ps'], 6);
+    igual(1.6755, $r['fsr'], 4);   // 1.3 × 381.5 / 296 = 1.67550676
+});
+
+prueba('FASAR: días no laborados iguales a los calendario es un error', function () {
+    try {
+        puFsr(365, [], [['concepto' => 'Todo', 'dias' => 365]], []);
+        throw new LogicException('aceptó Tl = 0');
+    } catch (InvalidArgumentException $e) {
+        verificar(true);
+    }
+});
+
+prueba('costo horario: D 45 + Im 16.50 + Sm 4.125 + Mn 36 + Co 120 + Po 112.50 = 334.125', function () {
+    $r = puCostoHorario(['vm' => 500000, 'vr' => 50000, 've' => 10000, 'hea' => 2000, 'i' => 12, 's' => 3, 'ko' => 0.8,
+                         'gh' => 5, 'pc' => 24, 'sr' => 900, 'ht' => 8]);
+    igual(45.0, $r['partes']['depreciacion'], 6);
+    igual(16.5, $r['partes']['inversion'], 6);
+    igual(4.125, $r['partes']['seguros'], 6);
+    igual(36.0, $r['partes']['mantenimiento'], 6);
+    igual(120.0, $r['partes']['combustible'], 6);
+    igual(112.5, $r['partes']['operacion'], 6);
+    igual(334.125, $r['costo'], 6);
+});
+
+prueba('costo horario: sin vida económica o con rescate mayor que el valor es un error', function () {
+    foreach ([['vm' => 1000, 've' => 0, 'hea' => 2000], ['vm' => 1000, 'vr' => 2000, 've' => 100, 'hea' => 2000]] as $p) {
+        try {
+            puCostoHorario($p);
+            throw new LogicException('aceptó ' . json_encode($p));
+        } catch (InvalidArgumentException $e) {
+            verificar(true);
+        }
+    }
+});

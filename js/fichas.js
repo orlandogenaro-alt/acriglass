@@ -110,12 +110,14 @@ window.Fichas = (function () {
                     { id: 'unidad_id', etiqueta: 'Unidad', tipo: 'select', lista: 'unidades', vacio: '— Seleccione —', req: true },
                     { id: 'familia', etiqueta: 'Familia (vidrio, aluminio, herrajes…)', mayus: true },
                     { id: 'fsr', etiqueta: 'FSR (solo mano de obra)', tipo: 'number' },
+                    { id: 'fasar_id', etiqueta: 'FASAR (si se elige, el FSR sale de ahí)', tipo: 'select', lista: 'fasar', vacio: '— FSR capturado a mano —' },
                     { id: 'clave_microsip', etiqueta: 'Clave del artículo en Microsip', mayus: true },
                     { id: 'notas', etiqueta: 'Notas', tipo: 'textarea', completo: true },
                     { id: 'activo', etiqueta: 'Activo', tipo: 'check', valor: true }
                 ] },
                 { titulo: 'Precios', render: pestanaPrecios },
-                { titulo: 'Componentes', render: pestanaComponentes }
+                { titulo: 'Componentes', render: pestanaComponentes },
+                { titulo: 'Costo horario', render: pestanaCostoHorario }
             ]
         },
         clientes: {
@@ -562,6 +564,66 @@ window.Fichas = (function () {
         var selTipo = dlg.querySelector('[data-campo="tipo"]');
         if (selTipo) selTipo.addEventListener('change', revisarTipo);
         pintar();
+        revisarTipo();
+    }
+
+    // Costo horario de una máquina (Reglamento de la LOPSRM). Misma fórmula que includes/pu.php puCostoHorario;
+    // al guardar, el servidor lo calcula y lo agrega al historial de precios. Se manda como JSON en el campo 'costo_horario'.
+    var CH_DATOS = [
+        ['vm', 'Valor de la máquina (Vm) $'], ['vr', 'Valor de rescate (Vr) $'], ['ve', 'Vida económica (Ve) horas'], ['hea', 'Horas efectivas por año (Hea)'],
+        ['i', 'Tasa de interés anual (i) %'], ['s', 'Prima anual de seguros (s) %'], ['ko', 'Factor de mantenimiento (Ko)'],
+        ['gh', 'Combustible por hora (Gh) litros'], ['pc', 'Precio del combustible (Pc) $/l'],
+        ['ah', 'Aceite por hora (Ah) litros'], ['ga', 'Aceite entre cambios por hora (Ga) litros'], ['pa', 'Precio del aceite (Pa) $/l'],
+        ['pn', 'Valor de las llantas (Pn) $'], ['vn', 'Vida de las llantas (Vn) horas'], ['pe', 'Valor de piezas especiales (Pe) $'], ['va', 'Vida de las piezas (Va) horas'],
+        ['sr', 'Salario real del operador por turno (Sr) $'], ['ht', 'Horas efectivas por turno (Ht)']
+    ];
+    function pestanaCostoHorario(sec, c) {
+        var ch = c.st.cat.costo_horario, previos = (ch && ch.parametros) || {};
+        if (!c.st.cat.con_costo_horario) { sec.innerHTML = '<p class="fi-nota">Falta aplicar la migración 005 para calcular costos horarios.</p>'; return; }
+        sec.innerHTML = '<p class="fi-nota" data-c="aviso"></p>' +
+            '<div data-c="editor">' +
+                '<div class="fi-campos tres">' + CH_DATOS.map(function (d) {
+                    return '<label class="fi-campo"><span>' + c.esc(d[1]) + '</span><input type="number" step="any" min="0" data-ch="' + d[0] + '" data-editable value="' +
+                        c.esc(previos[d[0]] != null && previos[d[0]] !== 0 ? previos[d[0]] : '') + '"></label>';
+                }).join('') + '</div>' +
+                '<div class="fi-costo" data-c="resultado"></div>' +
+                '<input type="hidden" data-campo="costo_horario">' +
+            '</div>';
+        var oculto = sec.querySelector('[data-campo="costo_horario"]'), cambiado = false;
+        function v(k) { var n = parseFloat((sec.querySelector('[data-ch="' + k + '"]') || {}).value); return isFinite(n) && n > 0 ? n : 0; }
+        function calcular() {
+            var p = {};
+            CH_DATOS.forEach(function (d) { p[d[0]] = v(d[0]); });
+            // Solo se manda si se modificó algo en esta pestaña
+            oculto.value = cambiado ? JSON.stringify(p) : '';
+            var res = sec.querySelector('[data-c="resultado"]');
+            if (!(p.vm > 0 && p.ve > 0 && p.hea > 0)) {
+                res.innerHTML = ch ? '<b>Costo horario guardado:</b> ' + c.esc(dinero6(ch.costo)) + ' <small>(' + c.esc(c.fechaDMY(ch.fecha)) + ', ' + c.esc(ch.usuario || '') + ')</small>'
+                    : 'Captura al menos Vm, Ve y Hea para calcular.';
+                return;
+            }
+            var D = (p.vm - p.vr) / p.ve;
+            var partes = [
+                ['Depreciación', D], ['Inversión', (p.vm + p.vr) * p.i / 100 / (2 * p.hea)], ['Seguros', (p.vm + p.vr) * p.s / 100 / (2 * p.hea)],
+                ['Mantenimiento', p.ko * D], ['Combustible', p.gh * p.pc], ['Lubricantes', (p.ah + p.ga) * p.pa],
+                ['Llantas', p.pn > 0 && p.vn > 0 ? p.pn / p.vn : 0], ['Piezas especiales', p.pe > 0 && p.va > 0 ? p.pe / p.va : 0],
+                ['Operación', p.sr > 0 && p.ht > 0 ? p.sr / p.ht : 0]
+            ];
+            var total = partes.reduce(function (s, x) { return s + x[1]; }, 0);
+            res.innerHTML = partes.filter(function (x) { return x[1]; }).map(function (x) { return c.esc(x[0]) + ' ' + c.esc(dinero6(x[1])); }).join(' · ') +
+                '<br><b>Costo horario: ' + c.esc(dinero6(total)) + ' por hora</b>' + (cambiado ? ' <small>(se agrega al historial de precios al guardar)</small>' : '');
+        }
+        function revisarTipo() {
+            var t = dlg.querySelector('[data-campo="tipo"]'), eq = t && t.value === 'EQ';
+            sec.querySelector('[data-c="editor"]').hidden = !eq;
+            sec.querySelector('[data-c="aviso"]').textContent = eq
+                ? 'Costo directo por hora efectiva de la máquina. Lo que no aplique déjalo vacío. Cambiarlo requiere el permiso «Capturar precios de insumos».'
+                : 'El costo horario es solo para insumos de tipo «Equipo / maquinaria».';
+        }
+        sec.addEventListener('input', function (e) { if (e.target.dataset.ch) { cambiado = true; c.st.cambios = true; calcular(); } });
+        var selTipo = dlg.querySelector('[data-campo="tipo"]');
+        if (selTipo) selTipo.addEventListener('change', revisarTipo);
+        calcular();
         revisarTipo();
     }
 

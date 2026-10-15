@@ -1982,6 +1982,26 @@
         });
     }
 
+    // Versiones congeladas del presupuesto (api/obras.php?accion=versiones)
+    var botonVersiones = document.querySelector('[data-versiones]');
+    if (botonVersiones) botonVersiones.addEventListener('click', function () {
+        if (!presupuestoId) { alert('Las versiones existen cuando el presupuesto guardado se acepta o se registra su obra.'); return; }
+        var tb = $('verLista');
+        tb.innerHTML = '<tr><td colspan="7">Consultando…</td></tr>';
+        $('verDialogo').showModal();
+        fetch('api/obras.php?accion=versiones&id=' + presupuestoId).then(function (r) { return r.json(); }).then(function (j) {
+            if (!j.ok) throw new Error(j.error);
+            var motivos = { aceptado: 'Aceptado', obra: 'Registro de obra', manual: 'Manual' };
+            tb.innerHTML = j.versiones.length ? j.versiones.map(function (v) {
+                return '<tr><td>' + v.version + '</td><td>' + escapar(motivos[v.motivo] || v.motivo) + (v.obra_id ? ' (obra ' + escapar(v.obra_id) + ')' : '') + '</td>' +
+                    '<td>' + escapar(String(v.fecha).slice(0, 16).replace('T', ' ')) + '</td><td>' + escapar(v.usuario || '') + '</td>' +
+                    '<td class="num">' + fmt(num(v.total)) + '</td><td>' + (v.integra ? '✔ Sí' : '⚠ NO') + '</td>' +
+                    '<td><a href="api/obras.php?accion=version&id=' + presupuestoId + '&v=' + v.version + '">Descargar</a></td></tr>';
+            }).join('') : '<tr><td colspan="7">' + (j.sin_tabla ? 'Falta aplicar la migración 006 en la base.' : 'Este presupuesto aún no tiene versiones.') + '</td></tr>';
+        }).catch(function (err) { tb.innerHTML = '<tr><td colspan="7">⚠ ' + escapar(err.message) + '</td></tr>'; });
+    });
+    document.querySelectorAll('[data-ver-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('verDialogo').close(); }); });
+
     var idInicial = parseInt(document.body.dataset.presupuesto, 10) || 0;
     if (!idInicial) ponerIndirectos();
     render();

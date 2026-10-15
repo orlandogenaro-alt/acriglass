@@ -226,6 +226,7 @@ $secciones = [
             <button data-imprimir="detalle">Imprimir Detalle</button>
             <button data-imprimir="pu">Imprimir Precios Unitarios</button>
             <button data-imprimir="pu-detalle">Imprimir Análisis de P.U.</button>
+            <button data-versiones>Versiones aprobadas…</button>
         </div>
     </div>
     <button class="tb" data-accion="modificar">
@@ -660,6 +661,23 @@ $secciones = [
         <span></span>
         <button type="button" class="hs-btn principal" data-pr-cerrar>Entendido</button>
     </div>
+</dialog>
+
+<!-- ============ VERSIONES CONGELADAS (al aceptar o registrar la obra) ============ -->
+<dialog class="hs-dialogo pr-dialogo" id="verDialogo">
+    <div class="hs-cabecera">
+        <strong>Versiones aprobadas del presupuesto</strong>
+        <button type="button" class="hs-cerrar" data-ver-cerrar title="Cerrar">✕</button>
+    </div>
+    <p class="pu-dlg-ayuda">Copias que se guardaron al <b>aceptar</b> el presupuesto o al <b>registrar su obra</b>. No se pueden modificar ni borrar;
+        «Íntegra» indica que la copia sigue idéntica a como se guardó.</p>
+    <div class="extra-caja pr-tabla">
+        <table class="grid mini-grid">
+            <thead><tr><th>Versión</th><th>Motivo</th><th>Fecha</th><th>Usuario</th><th class="num">Total</th><th>Íntegra</th><th></th></tr></thead>
+            <tbody id="verLista"></tbody>
+        </table>
+    </div>
+    <div class="hs-pie"><span></span><button type="button" class="hs-btn principal" data-ver-cerrar>Cerrar</button></div>
 </dialog>
 
 <!-- ============ AUTORIZACIÓN DE OTRO USUARIO (Dialog225) ============ -->

@@ -632,6 +632,29 @@ try {
                   order by r.fecha_hora_asig', [$id]);
             responder(['ok' => true, 'obra' => $o]);
 
+        // Versiones congeladas del presupuesto (migraciones/006): integra = el hash aún coincide con la copia guardada
+        case 'versiones':
+            $id = (int) ($_GET['id'] ?? 0);
+            if (!bd_tiene_tabla('AW', 'presupuesto_versiones')) responder(['ok' => true, 'versiones' => [], 'sin_tabla' => true]);
+            responder(['ok' => true, 'versiones' => bd_filas('AW',
+                "select version, motivo, obra_id, total, usuario, fecha, hash,
+                        encode(sha256(convert_to(snapshot::text, 'UTF8')), 'hex') = hash as integra
+                   from presupuesto_versiones where docto_sugerido_obra_id = ? order by version", [$id])]);
+
+        case 'version':
+            $id = (int) ($_GET['id'] ?? 0);
+            $v = (int) ($_GET['v'] ?? 0);
+            if (!bd_tiene_tabla('AW', 'presupuesto_versiones')) error('No hay versiones guardadas.', 404);
+            $f = bd_fila('AW', 'select v.snapshot, v.version, v.hash, d.folio from presupuesto_versiones v
+                                  join doctos_sugerido_obra d on d.docto_sugerido_obra_id = v.docto_sugerido_obra_id
+                                 where v.docto_sugerido_obra_id = ? and v.version = ?', [$id, $v]);
+            if (!$f) error('Esa versión no existe.', 404);
+            header('Content-Type: application/json; charset=utf-8');
+            header('Content-Disposition: attachment; filename="presupuesto-' . (int) $f['folio'] . '-v' . (int) $f['version'] . '.json"');
+            header('X-Content-Type-Options: nosniff');
+            echo $f['snapshot'];
+            exit;
+
         case 'presupuesto':
             $id = (int) ($_GET['id'] ?? 0);
             $p = bd_fila('AW',

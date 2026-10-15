@@ -184,3 +184,19 @@ prueba('la matriz aplanada con FSR 1.6 en el análisis da el mismo CD que el cat
     foreach (puAplanarMatriz(matrizPrueba(), $ins, $comp)['insumos'] as $x) $cd += $x['cantidad'] * $x['costo'] * ($x['tipo'] === 'MO' ? 1.6 : 1);
     igual(1693.3, $cd);
 });
+
+prueba('importación: tipos por código o palabra (con o sin acentos)', function () {
+    igual('MAT', puTipoTexto('Material'));
+    igual('MO', puTipoTexto('MANO DE OBRA'));
+    igual('EQ', puTipoTexto('Maquinaria'));
+    igual('HER', puTipoTexto('herramienta'));
+    igual('BAS', puTipoTexto('Básico'));
+    igual('BAS', puTipoTexto('Cuadrilla'));
+    verificar(puTipoTexto('otro') === null);
+});
+
+prueba('importación: precios con $ y comas; vacío es null; texto es inválido', function () {
+    igual(1250.5, puNumeroTexto('$1,250.50'));
+    verificar(puNumeroTexto('') === null);
+    verificar(is_nan(puNumeroTexto('abc')));
+});

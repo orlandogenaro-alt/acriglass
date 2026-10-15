@@ -59,6 +59,7 @@ $menu = [
             ['Insumos',            '🧱', 'modulo', ['CLAVE', 'DESCRIPCION', 'TIPO', 'UNIDAD', 'FAMILIA', 'PRECIO', 'VIGENCIA', 'COSTO', 'ESTATUS']],
             ['Conceptos P.U.',     '🧩', 'modulo', ['CODIGO', 'DESCRIPCION', 'UNIDAD', 'FAMILIA', 'INSUMOS', 'COSTO_DIRECTO', 'ESTATUS']],
             ['Parámetros de costos', '⚖️', 'pagina', 'parametros-costos.php'],
+            ['Importar insumos',   '📥', 'pagina', 'importar-insumos.php'],
         ],
     ],
     [

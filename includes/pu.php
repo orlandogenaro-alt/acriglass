@@ -220,6 +220,29 @@ function puCostoHorario(array $p): array
     return ['partes' => $partes, 'costo' => round(array_sum($partes), PU_DECIMALES), 'datos' => $v];
 }
 
+// ---------- Importación (Catalogos › Importar insumos) ----------
+
+// Tipo de insumo a partir de lo que trae un archivo (código o palabra); null si no se reconoce
+function puTipoTexto(string $v): ?string
+{
+    $v = mb_strtoupper(trim($v));
+    $v = strtr($v, ['Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U']);
+    if (in_array($v, ['MAT', 'MO', 'EQ', 'HER', 'BAS'], true)) return $v;
+    if (preg_match('/^MATERIAL/', $v)) return 'MAT';
+    if (preg_match('/^MANO|^M\.?O\.?$|^PERSONAL/', $v)) return 'MO';
+    if (preg_match('/^EQUIPO|^MAQUINARIA/', $v)) return 'EQ';
+    if (preg_match('/^HERRAMIENTA/', $v)) return 'HER';
+    if (preg_match('/^BASICO|^AUXILIAR|^CUADRILLA/', $v)) return 'BAS';
+    return null;
+}
+
+// Número de un archivo ("$1,250.50" → 1250.5); null si viene vacío, NAN si no es número
+function puNumeroTexto($v): ?float
+{
+    $v = trim(str_replace(['$', ',', ' '], '', (string) $v));
+    return $v === '' ? null : (is_numeric($v) ? (float) $v : NAN);
+}
+
 // ---------- Carga desde la base (Supabase) ----------
 
 // Tipo de cambio vigente de cada moneda: ['USD' => 18.25] (vacío sin la tabla o sin capturas)

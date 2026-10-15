@@ -237,14 +237,16 @@ function guardar(array $d): array
         $conceptos[] = $c;
     }
 
-    // Totales del Form46 calculados aquí con los renglones (no se confía en lo que manda el navegador):
-    // subtotal = costo / (1 − %util); el del navegador solo se acepta si cuadra (lo usa el subtotal capturado a mano)
+    // Totales del Form46 calculados aquí con los renglones (no se confía en lo que manda el navegador);
+    // el subtotal del navegador solo se acepta si cuadra (lo usa el subtotal capturado a mano)
+    // Utilidad «costo»: subtotal = costo × (1 + %) · «margen» (Form46): subtotal = costo / (1 − %)
     $util = numero($d['utilidad_por'] ?? 0, 4);
-    if ($util < 0 || $util >= 100) error('La Utilidad Neta debe ser de 0 a 99.99 %.');
+    $margen = ($d['modo_utilidad'] ?? 'margen') === 'margen';
+    if ($util < 0 || $util >= ($margen ? 100 : 1000.0001)) error($margen ? 'Con utilidad de margen, la Utilidad Neta debe ser de 0 a 99.99 %.' : 'La Utilidad Neta debe ser de 0 a 1000 %.');
     $suma = ['MP' => 0.0, 'MO' => 0.0, 'GO' => 0.0];
     foreach ($conceptos as $c) $suma[$c['tipo']] += numero($c['presupuesto'] ?? 0);
     $costo = $suma['MP'] + $suma['MO'] + $suma['GO'];
-    $esperado = $costo / (1 - $util / 100);
+    $esperado = $margen ? $costo / (1 - $util / 100) : $costo * (1 + $util / 100);
     $subtotal = numero($d['totales']['subtotal'] ?? $esperado);
     if (abs($subtotal - $esperado) > max(1, $esperado * 0.0001)) {
         error('Los totales del presupuesto no cuadran con sus conceptos (subtotal ' . number_format($subtotal, 2) . ' contra '

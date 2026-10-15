@@ -316,6 +316,14 @@ $secciones = [
                     </section>
                     <section class="extra pu-resumen">
                         <div class="extra-barra"><strong>Integración del precio</strong></div>
+                        <div class="pu-utilidad">
+                            <label>Utilidad <input type="number" id="puUtilVis" class="num" step="0.01" min="0"> %</label>
+                            <select id="puModoVis" title="Cómo se aplica el % de utilidad">
+                                <option value="costo">+ sobre el costo</option>
+                                <option value="margen">margen (Form46)</option>
+                            </select>
+                            <small>Es la misma Utilidad Neta del presupuesto.</small>
+                        </div>
                         <div class="extra-caja">
                             <table class="grid mini-grid"><tbody id="puResumen"></tbody></table>
                         </div>
@@ -327,8 +335,6 @@ $secciones = [
                                 <input type="number" id="puHm" class="num" step="0.01" min="0" value="0"></label>
                             <label title="Costo del dinero mientras se cobra la obra: % sobre costo directo + indirectos">Financiamiento %
                                 <input type="number" id="puFin" class="num" step="0.01" min="0" value="0"></label>
-                            <label title="Utilidad sobre costo directo + indirectos + financiamiento. Vacío = la equivalente a la Utilidad Neta del presupuesto">Utilidad %
-                                <input type="number" id="puUtil" class="num" step="0.01" min="0"></label>
                             <p>Indirectos = Gastos de Operacion: <b id="puInd">0.00 %</b> del costo directo · Cargos adicionales = comisiones y seguro: <b id="puCa">0.00 %</b> del precio.</p>
                         </details>
                     </section>
@@ -449,8 +455,12 @@ $secciones = [
         <div class="totales">
             <div class="t-fila"><b>+</b><span>Gastos de Operacion:</span> <output id="tGO">0</output></div>
             <div class="t-fila">
-                <b>+</b><span>Utilidad Neta:</span>
-                <input type="number" id="pctUtilidad" value="<?= e((string) $utilidadDefecto) ?>" min="0" max="99.9999" step="0.01" class="num pct" title="% de utilidad">
+                <b>+</b><span class="t-util">Utilidad Neta
+                    <select id="modoUtilidad" title="Cómo se aplica el % de utilidad">
+                        <option value="costo">+ % sobre el costo</option>
+                        <option value="margen">% de margen (Form46)</option>
+                    </select>:</span>
+                <input type="number" id="pctUtilidad" value="<?= e((string) $utilidadDefecto) ?>" min="0" max="1000" step="0.01" class="num pct" title="% de utilidad">
                 <output id="tUT">0</output>
             </div>
             <div class="t-fila">

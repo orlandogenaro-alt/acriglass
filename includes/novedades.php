@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-10-15',
+        'cambios' => [
+            ['mejora', 'Presupuesto: utilidad sumada al costo', 'Junto a «Utilidad Neta» se elige cómo se aplica: «+ % sobre el costo» (20 % de $1,000 = $1,200; es la forma por omisión en los presupuestos nuevos) o «% de margen (Form46)» (20 % de $1,000 = $1,250, la del sistema de escritorio). Los presupuestos ya guardados se abren con la forma con la que se calcularon. En Análisis P.U. la utilidad ya está a la vista y es la misma del presupuesto; el servidor valida el subtotal con la forma elegida.'],
+        ],
+    ],
+    [
         'fecha' => '2026-10-14',
         'cambios' => [
             ['correccion', 'Seguridad: permisos y token revisados en el servidor', 'Modificar un presupuesto guardado ahora exige el permiso «Modificar presupuestos» (o la autorización de otro usuario) también en el servidor, no solo en la pantalla. Subir y quitar adjuntos de Conceptos/Tareas pide el token de la página y permiso de captura (consultar ya no basta); cambiar las imágenes del sistema también pide el token.'],

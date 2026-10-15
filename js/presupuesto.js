@@ -274,11 +274,25 @@
         return ['mp', 'mo', 'go'].map(function (s) { return datos[s].map(function (r) { return num(r.presupuesto); }).join(','); }).join('|');
     }
 
-    // La utilidad es margen sobre el precio de venta, no sobre el costo (Form46):
-    // subtotal = costo / ((100 - %util) / 100)
+    // Utilidad Neta, según el selector del presupuesto:
+    //   costo  → se suma al costo:            subtotal = costo × (1 + %util / 100)   (20 % de 1,000 = 1,200)
+    //   margen → margen sobre el precio (Form46): subtotal = costo / (1 − %util / 100)   (20 % de 1,000 = 1,250)
+    // Los presupuestos nuevos usan «costo»; uno guardado conserva la forma con la que se calculó.
+    function modoUtilidad() { return $('modoUtilidad').value === 'margen' ? 'margen' : 'costo'; }
     function subtotalPorUtilidad(costo) {
         var pct = num($('pctUtilidad').value);
+        if (modoUtilidad() === 'costo') return costo * (1 + pct / 100);
         return pct < 100 ? costo / ((100 - pct) * 0.01) : costo;
+    }
+    // % de utilidad que corresponde a un subtotal capturado a mano (lápiz)
+    function utilidadPorSubtotal(costo, subtotal) {
+        if (!subtotal) return 0;
+        if (modoUtilidad() === 'costo') return costo ? (subtotal / costo - 1) * 100 : 0;
+        return 100 - costo / (subtotal * 0.01);
+    }
+    function ponerModoUtilidad(m) {
+        $('modoUtilidad').value = $('puModoVis').value = m === 'margen' ? 'margen' : 'costo';
+        $('pctUtilidad').max = m === 'margen' ? 99.9999 : 1000;
     }
 
     // calcula_totales_grid: el subtotal depende de los conceptos automáticos y de las comisiones y ellos del
@@ -304,7 +318,7 @@
         var t = recalcular();
         var subtotal = t.subtotal;
         var utilidad = subtotal - t.costo;
-        if (subtotalManual) $('pctUtilidad').value = subtotal ? (100 - t.costo / (subtotal * 0.01)).toFixed(4) : 0;
+        if (subtotalManual) $('pctUtilidad').value = utilidadPorSubtotal(t.costo, subtotal).toFixed(4);
         else $('tSUB').value = fmt(subtotal);
         var iva = subtotal * IVA;
 
@@ -333,7 +347,7 @@
     var FIJOS_PU = { mp: 'MATERIALES SEGUN ANALISIS P.U.', mo: 'MANO DE OBRA SEGUN ANALISIS P.U.' };
     var TIPOS_INSUMO = { MAT: 'Material', MO: 'Mano de obra', EQ: 'Equipo / herramienta' };
     var BIBLIOTECA = window.ACRI_BIBLIOTECA_PU || { conceptos: [], insumos: [] };
-    var CAMPOS_PU = { fsr: 'puFsr', hm: 'puHm', fin: 'puFin', util: 'puUtil' };
+    var CAMPOS_PU = { fsr: 'puFsr', hm: 'puHm', fin: 'puFin' };
     var analisis = { fsr: 1, hm: 0, fin: 0, util: null, conceptos: [] };   // util null = equivalente a la Utilidad Neta
     var uidPU = 0;
     var huboAnalisis = false;   // el presupuesto tuvo conceptos analizados: si se quitan todos, sus renglones quedan en cero
@@ -367,11 +381,11 @@
         };
         (a.conceptos || []).forEach(function (c) { analisis.conceptos.push(nuevoConcepto(c)); });
         huboAnalisis = analisis.conceptos.length > 0;
-        Object.keys(CAMPOS_PU).forEach(function (k) { $(CAMPOS_PU[k]).value = analisis[k] === null ? '' : analisis[k]; });
+        Object.keys(CAMPOS_PU).forEach(function (k) { $(CAMPOS_PU[k]).value = analisis[k]; });
     }
     function exportarAnalisis() {
         return {
-            fsr: analisis.fsr, hm: analisis.hm, fin: analisis.fin, util: analisis.util,
+            fsr: analisis.fsr, hm: analisis.hm, fin: analisis.fin, util: null,
             conceptos: analisis.conceptos.map(function (c) {
                 return { clave: c.clave, partida: c.partida, descripcion: c.descripcion, unidad: c.unidad, cantidad: c.cantidad,
                          insumos: c.insumos.map(function (i) { return limpiarInsumo(i); }) };
@@ -449,9 +463,11 @@
         r.cd = r.mp + r.mo + r.fsr + r.hm;
         r.fin = (r.cd + r.ind) * fin;
         // Utilidad equivalente: con FSR 1, sin herramienta ni financiamiento, da el mismo subtotal que el Form46
+        // Utilidad equivalente a la del presupuesto (con FSR 1, sin herramienta ni financiamiento da el mismo subtotal).
+        // Las comisiones y el seguro se cobran sobre el subtotal, por eso entran en la equivalencia.
         var m = num($('pctUtilidad').value) / 100;
-        r.utilAuto = 1 - m - ca > 0 ? m / (1 - m - ca) * 100 : 0;
-        r.utilPct = analisis.util === null ? r.utilAuto : analisis.util;
+        if (modoUtilidad() === 'costo') r.utilPct = 1 - ca * (1 + m) > 0 ? ((1 + m) * (1 - ca) / (1 - ca * (1 + m)) - 1) * 100 : 0;
+        else r.utilPct = 1 - m - ca > 0 ? m / (1 - m - ca) * 100 : 0;
         r.util = (r.cd + r.ind + r.fin) * r.utilPct / 100;
         r.pv = (r.cd + r.ind + r.fin + r.util) / (1 - ca);
         r.cargos = r.pv * ca;
@@ -564,7 +580,10 @@
     function pintarPu(r, lista) {
         r = r || calcularPU();
         lista = lista || catalogoPU(r);
-        $('puUtil').placeholder = r.utilAuto.toFixed(2) + ' (auto)';
+        if (document.activeElement !== $('puUtilVis')) $('puUtilVis').value = num($('pctUtilidad').value);
+        $('puUtilVis').disabled = soloLectura || subtotalManual;
+        $('puModoVis').disabled = soloLectura;
+        $('puModoVis').value = modoUtilidad();
         $('puInd').textContent = pct(r.cd > 0 ? r.ind / r.cd * 100 : 0);
         $('puCa').textContent = pct(r.ca * 100);
         var filas = [
@@ -806,7 +825,7 @@
     Object.keys(CAMPOS_PU).forEach(function (k) {
         $(CAMPOS_PU[k]).addEventListener('input', function () {
             var v = this.value.trim();
-            analisis[k] = k === 'util' && v === '' ? null : Math.max(0, num(v));
+            analisis[k] = Math.max(0, num(v));
             if (k === 'fsr' && analisis.fsr <= 0) analisis.fsr = 1;
             marcarCambio();
             calcularTotales();
@@ -1003,6 +1022,20 @@
     });
 
     $('pctIvaTxt').textContent = IVA * 100;
+    // Utilidad visible en Análisis P.U.: es la misma del presupuesto
+    $('puUtilVis').addEventListener('input', function () {
+        $('pctUtilidad').value = this.value;
+        $('pctUtilidad').dispatchEvent(new Event('input'));
+    });
+    $('puModoVis').addEventListener('change', function () {
+        $('modoUtilidad').value = this.value;
+        $('modoUtilidad').dispatchEvent(new Event('change'));
+    });
+    $('modoUtilidad').addEventListener('change', function () {
+        ponerModoUtilidad(this.value);
+        marcarCambio();
+        refrescarCalculados();
+    });
     $('pctUtilidad').addEventListener('input', function () {
         if (subtotalManual) return;
         marcarCambio();
@@ -1235,7 +1268,7 @@
 
     function aplicarModo() {
         document.body.classList.toggle('solo-lectura', soloLectura);
-        document.querySelectorAll('.encabezado input, .encabezado select, #descripcion, #pctUtilidad, #tSUB, #buscarHubspot, #puPanel input')
+        document.querySelectorAll('.encabezado input, .encabezado select, #descripcion, #pctUtilidad, #modoUtilidad, #tSUB, #buscarHubspot, #puPanel input')
             .forEach(function (el) { el.disabled = soloLectura; });
         $('modo').hidden = !soloLectura;
         var b = document.querySelector('.tb[data-accion="modificar"]');
@@ -1359,6 +1392,7 @@
             autoriza: presupuestoId ? autorizaModificar : null,
             analisis_pu: exportarAnalisis(),
             utilidad_por: num($('pctUtilidad').value),
+            modo_utilidad: modoUtilidad(),
             totales: {
                 cos_primo: mp + mo,
                 gas_operacion: go,
@@ -1412,9 +1446,9 @@
             $(correo.length <= 10 ? 'email' : 'proyecto').focus();
             return Promise.resolve(false);
         }
-        var util = num($('pctUtilidad').value);
-        if (util < 0 || util >= 100) {
-            alert('La Utilidad Neta debe ser de 0 a 99.99 %.');
+        var util = num($('pctUtilidad').value), maxUtil = modoUtilidad() === 'margen' ? 100 : 1000.0001;
+        if (util < 0 || util >= maxUtil) {
+            alert(modoUtilidad() === 'margen' ? 'Con utilidad de margen, la Utilidad Neta debe ser de 0 a 99.99 %.' : 'La Utilidad Neta debe ser de 0 a 1000 %.');
             $('pctUtilidad').focus();
             return Promise.resolve(false);
         }
@@ -1671,8 +1705,9 @@
             'Lo analizado pasa solo a los renglones «' + FIJOS_PU.mp + '» (Materia Prima) y «' + FIJOS_PU.mo + '» (Mano de Obra).']);
         guia.push(['Conceptos/Tareas', 'Un Concepto/Tarea por cada renglón de MP / MO / GO',
             'Se generan solos con lo capturado en Materia Prima, Mano de Obra y Gastos de Operacion; ahí se les ponen fechas, responsable y avance (Gantt).']);
-        guia.push(['Utilidad Neta', num($('pctUtilidad').value) + ' %',
-            'Parámetro de costos 101 de AW-Management (parametros_costos_sug). Es margen sobre el precio: Subtotal = Costo ÷ (1 − %).']);
+        guia.push(['Utilidad Neta', num($('pctUtilidad').value) + ' % ' + (modoUtilidad() === 'costo' ? 'sobre el costo' : 'de margen'),
+            'El % por omisión es el parámetro de costos 101 de AW-Management (parametros_costos_sug). Con «+ % sobre el costo»: Subtotal = Costo + %. ' +
+            'Con «% de margen (Form46)»: Subtotal = Costo ÷ (1 − %).']);
         guia.push(['Totales', 'Costo Primo, Gastos, Utilidad, Subtotal, IVA y Total',
             'Se calculan solos: MP + MO = Costo Primo; + Gastos de Operacion + Utilidad = Subtotal; + IVA 16 % = Total.']);
         guia.push(['Sugeridos relacionados e Id de Negocio', 'Nada',
@@ -1865,6 +1900,9 @@
                     articulos: c.articulos || []
                 });
             });
+            // Forma de la utilidad con la que se guardó: la que reproduce su subtotal (antes de esta opción todo era margen)
+            var costoG = suma(datos.mp) + suma(datos.mo) + suma(datos.go), uG = num(p.utilidad_neta_por) / 100, sG = num(p.subtotal);
+            ponerModoUtilidad(uG > 0 && uG < 1 && Math.abs(sG - costoG / (1 - uG)) < Math.abs(sG - costoG * (1 + uG)) ? 'margen' : 'costo');
             extras = {
                 empleados: (p.empleados || []).map(function (e) {
                     return { empleado_id: parseInt(e.empleado_id, 10) || 0, clave: e.clave, nombre: e.nombre || '', sueldo: num(e.sueldo), dias: num(e.dias), total: num(e.total) };

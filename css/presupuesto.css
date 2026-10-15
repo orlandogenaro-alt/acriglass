@@ -538,6 +538,13 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .pu-resumen tr.pu-ref td { color: var(--texto-3); font-size: 12px; }
 .pu-resumen tr.pu-dif td { color: var(--ambar); font-weight: 700; font-size: 12px; }
 .pu-resumen tr.pu-nota td { height: auto; padding: 6px 8px; font-size: 11.5px; color: var(--texto-3); white-space: normal; }
+.t-util select { height: 26px; margin: 0 2px; padding: 0 4px; font: inherit; font-size: 12px; background: var(--input); color: var(--texto); border: 1px solid var(--borde-2); border-radius: 4px; }
+.t-util select:disabled { opacity: .6; }
+.pu-utilidad { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px; border-bottom: 1px solid var(--borde); font-size: 12.5px; color: var(--texto-2); }
+.pu-utilidad label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--enfasis); }
+.pu-utilidad input, .pu-utilidad select { height: 28px; padding: 0 6px; background: var(--input); color: var(--texto); border: 1px solid var(--borde-2); border-radius: 4px; }
+.pu-utilidad input { width: 80px; text-align: right; }
+.pu-utilidad small { flex-basis: 100%; color: var(--texto-3); }
 .pu-avanzado { border-top: 1px solid var(--borde); font-size: 12px; color: var(--texto-2); }
 .pu-avanzado summary { padding: 8px; cursor: pointer; color: var(--azul-texto); font-weight: 600; }
 .pu-avanzado label { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 8px; }

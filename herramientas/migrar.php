@@ -47,6 +47,14 @@ $pdo->exec('CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
 )');
 $pdo->exec('ALTER TABLE migraciones_aplicadas ENABLE ROW LEVEL SECURITY');
 
+// Checksum del archivo sin importar los fines de línea (Windows / Git pueden cambiarlos de LF a CRLF)
+function checksum(string $archivo): string
+{
+    return hash('sha256', str_replace("
+", "
+", (string) file_get_contents($archivo)));
+}
+
 $aplicadas = [];
 foreach ($pdo->query('select nombre, checksum from migraciones_aplicadas') as $f) $aplicadas[$f['nombre']] = $f['checksum'];
 
@@ -55,7 +63,7 @@ sort($archivos, SORT_STRING);
 $pendientes = [];
 foreach ($archivos as $a) {
     $nombre = basename($a);
-    $suma = hash_file('sha256', $a);
+    $suma = checksum($a);
     if (!isset($aplicadas[$nombre])) {
         $pendientes[$nombre] = $a;
         echo "  pendiente  $nombre\n";
@@ -79,7 +87,7 @@ foreach ($pendientes as $nombre => $a) {
     try {
         $pdo->exec((string) file_get_contents($a));
         $pdo->prepare('insert into migraciones_aplicadas (nombre, checksum, usuario) values (?, ?, ?)')
-            ->execute([$nombre, hash_file('sha256', $a), $quien]);
+            ->execute([$nombre, checksum($a), $quien]);
         $pdo->commit();
         echo "listo";
     } catch (Throwable $e) {

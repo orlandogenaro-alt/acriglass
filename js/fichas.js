@@ -120,6 +120,22 @@ window.Fichas = (function () {
                 { titulo: 'Costo horario', render: pestanaCostoHorario }
             ]
         },
+        conceptos_pu: {
+            titulo: 'Ficha de Concepto P.U.',
+            api: 'api/conceptos-pu.php',
+            pestanas: [
+                { titulo: 'General', campos: [
+                    { id: 'codigo', etiqueta: 'Código', req: true, mayus: true },
+                    { id: 'unidad_id', etiqueta: 'Unidad', tipo: 'select', lista: 'unidades', vacio: '— Seleccione —', req: true },
+                    { id: 'descripcion', etiqueta: 'Descripción corta', req: true, completo: true },
+                    { id: 'familia', etiqueta: 'Familia / partida sugerida (cancelería, fachadas, barandales…)', mayus: true, completo: true },
+                    { id: 'descripcion_tecnica', etiqueta: 'Descripción técnica completa (la que va en la propuesta)', tipo: 'textarea', completo: true },
+                    { id: 'notas', etiqueta: 'Notas internas', tipo: 'textarea', completo: true },
+                    { id: 'activo', etiqueta: 'Activo', tipo: 'check', valor: true }
+                ] },
+                { titulo: 'Matriz de insumos', render: pestanaMatriz }
+            ]
+        },
         clientes: {
             titulo: 'Ficha de Clientes',
             api: 'api/clientes.php',
@@ -467,13 +483,15 @@ window.Fichas = (function () {
             (hist || '<tr><td colspan="6" class="fi-vacio">Sin precios capturados: el insumo queda pendiente en los análisis.</td></tr>') + '</tbody></table></div>';
     }
 
-    // Componentes de un básico o cuadrilla: insumo, cantidad y % de desperdicio. Se guardan como JSON en el campo 'componentes'.
-    function pestanaComponentes(sec, c) {
+    // Tabla de insumos de la ficha: componentes de un básico o matriz de un concepto. Cada renglón: insumo, cantidad
+    // (o rendimiento por jornada, si op.rendimiento), % de desperdicio, costo e importe. Se guarda como JSON en el campo 'componentes'.
+    //   op: { total (título del total), vacio, rendimiento, excluir (id a no ofrecer), pie, visible() y aviso(visible) }
+    function tablaInsumos(sec, c, op) {
         var filas = (c.st.cat.componentes || []).map(function (f) {
             return { insumo_id: f.insumo_id, clave: f.clave, descripcion: f.descripcion, unidad: f.unidad, cantidad: f.cantidad,
-                     desperdicio_pct: f.desperdicio_pct, costo: f.costo };
+                     rendimiento: f.rendimiento || '', desperdicio_pct: f.desperdicio_pct, costo: f.costo };
         });
-        var usadoEn = (c.st.cat.usado_en || []).map(function (u) { return c.esc(u.clave); }).join(', ');
+        var cols = op.rendimiento ? 9 : 8;
         sec.innerHTML =
             '<p class="fi-nota" data-c="aviso"></p>' +
             '<div data-c="editor">' +
@@ -481,43 +499,43 @@ window.Fichas = (function () {
                 '<input type="text" data-c="buscar" data-editable autocomplete="off" placeholder="Escribe al menos 2 letras…"></label></div>' +
                 '<div class="fi-sugerencias" data-c="sugerencias" hidden></div>' +
                 '<div class="fi-tabla"><table><thead><tr><th>Clave</th><th>Descripción</th><th>Unidad</th><th class="num">Cantidad</th>' +
+                (op.rendimiento ? '<th class="num" title="Unidades del concepto por jornada (mano de obra o cuadrilla): la cantidad es 1 / rendimiento">Rend./jor.</th>' : '') +
                 '<th class="num">% Desp.</th><th class="num">Costo</th><th class="num">Importe</th><th></th></tr></thead><tbody></tbody>' +
-                '<tfoot><tr><td colspan="6" class="num"><b>Costo del básico</b></td><td class="num" data-c="total"></td><td></td></tr></tfoot></table></div>' +
+                '<tfoot><tr><td colspan="' + (cols - 2) + '" class="num"><b>' + c.esc(op.total) + '</b></td><td class="num" data-c="total"></td><td></td></tr></tfoot></table></div>' +
                 '<input type="hidden" data-campo="componentes">' +
-            '</div>' +
-            (usadoEn ? '<p class="fi-nota">Se usa en: ' + usadoEn + '</p>' : '');
+            '</div>' + (op.pie || '');
         var tbody = sec.querySelector('tbody'), oculto = sec.querySelector('[data-campo="componentes"]');
         var buscar = sec.querySelector('[data-c="buscar"]'), sug = sec.querySelector('[data-c="sugerencias"]');
 
         function num(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
-        function importe(f) { return f.costo == null ? null : f.costo * num(f.cantidad) * (1 + num(f.desperdicio_pct) / 100); }
+        function cantidad(f) { return op.rendimiento && num(f.rendimiento) > 0 ? 1 / num(f.rendimiento) : num(f.cantidad); }
+        function importe(f) { return f.costo == null ? null : f.costo * cantidad(f) * (1 + num(f.desperdicio_pct) / 100); }
         function sincronizar() {
-            oculto.value = JSON.stringify(filas.map(function (f) { return { insumo_id: f.insumo_id, cantidad: f.cantidad, desperdicio_pct: f.desperdicio_pct }; }));
+            oculto.value = JSON.stringify(filas.map(function (f) {
+                return { insumo_id: f.insumo_id, cantidad: f.cantidad, rendimiento: op.rendimiento ? f.rendimiento : '', desperdicio_pct: f.desperdicio_pct };
+            }));
             var total = 0, pendiente = false;
             filas.forEach(function (f) { var i = importe(f); if (i === null) pendiente = true; else total += i; });
             sec.querySelector('[data-c="total"]').textContent = filas.length ? (pendiente ? 'Pendiente' : dinero6(total)) : '';
         }
         function pintar() {
             tbody.innerHTML = filas.length ? filas.map(function (f, i) {
+                var conRend = op.rendimiento && num(f.rendimiento) > 0;
                 return '<tr data-i="' + i + '"><td>' + c.esc(f.clave) + '</td><td>' + c.esc(f.descripcion) + '</td><td>' + c.esc(f.unidad) + '</td>' +
-                    '<td class="num"><input type="number" step="any" min="0" data-k="cantidad" data-editable value="' + c.esc(f.cantidad) + '"></td>' +
+                    '<td class="num"><input type="number" step="any" min="0" data-k="cantidad" data-editable value="' +
+                        c.esc(conRend ? Math.round(1 / num(f.rendimiento) * 1e6) / 1e6 : f.cantidad) + '"' + (conRend ? ' readonly title="Sale del rendimiento"' : '') + '></td>' +
+                    (op.rendimiento ? '<td class="num"><input type="number" step="any" min="0" data-k="rendimiento" data-editable value="' + c.esc(f.rendimiento) + '"></td>' : '') +
                     '<td class="num"><input type="number" step="any" min="0" max="99.99" data-k="desperdicio_pct" data-editable value="' + c.esc(f.desperdicio_pct) + '"></td>' +
                     '<td class="num">' + c.esc(dinero6(f.costo)) + '</td><td class="num">' + c.esc(dinero6(importe(f))) + '</td>' +
                     '<td><button type="button" class="fi-btn peligro" data-k="quitar" data-editable title="Quitar">✕</button></td></tr>';
-            }).join('') : '<tr><td colspan="8" class="fi-vacio">Sin componentes. Busca arriba los insumos que lleva una unidad del básico.</td></tr>';
+            }).join('') : '<tr><td colspan="' + cols + '" class="fi-vacio">' + c.esc(op.vacio) + '</td></tr>';
             tbody.querySelectorAll('[data-editable]').forEach(function (el) { el.disabled = !c.st.editable; });
             sincronizar();
         }
-        function esBasico() {
-            var t = dlg.querySelector('[data-campo="tipo"]');
-            return t && t.value === 'BAS';
-        }
-        function revisarTipo() {
-            var bas = esBasico();
-            sec.querySelector('[data-c="editor"]').hidden = !bas;
-            sec.querySelector('[data-c="aviso"]').textContent = bas
-                ? 'El costo del básico es la suma de sus componentes: costo × cantidad × (1 + % desperdicio). En una cuadrilla, la cantidad es cuántos de cada categoría trabajan en una jornada.'
-                : 'Solo los insumos de tipo «Básico / cuadrilla» llevan componentes.';
+        function revisar() {
+            var ver = op.visible ? op.visible() : true;
+            sec.querySelector('[data-c="editor"]').hidden = !ver;
+            sec.querySelector('[data-c="aviso"]').textContent = op.aviso(ver);
         }
 
         tbody.addEventListener('input', function (e) {
@@ -541,7 +559,7 @@ window.Fichas = (function () {
             var q = buscar.value.trim();
             if (q.length < 2) { sug.hidden = true; return; }
             espera = setTimeout(function () {
-                c.pedir(c.url(c.st.def.api, 'buscar', '&q=' + encodeURIComponent(q) + '&excluir=' + (c.st.id || 0))).then(function (j) {
+                c.pedir('api/insumos.php?accion=buscar&q=' + encodeURIComponent(q) + '&excluir=' + (op.excluir || 0)).then(function (j) {
                     sug.innerHTML = j.filas.length ? j.filas.map(function (f, i) {
                         return '<button type="button" data-s="' + i + '">' + c.esc(f.clave) + ' · ' + c.esc(f.descripcion) + ' <small>(' + c.esc(f.unidad) + ', ' +
                             c.esc(dinero6(f.costo)) + ')</small></button>';
@@ -551,8 +569,8 @@ window.Fichas = (function () {
                         var b = e.target.closest('[data-s]');
                         if (!b) return;
                         var f = j.filas[+b.dataset.s];
-                        if (filas.some(function (x) { return x.insumo_id === f.id; })) { c.mensaje('Ese insumo ya está en los componentes.', 'error'); return; }
-                        filas.push({ insumo_id: f.id, clave: f.clave, descripcion: f.descripcion, unidad: f.unidad, cantidad: 1, desperdicio_pct: 0, costo: f.costo });
+                        if (filas.some(function (x) { return x.insumo_id === f.id; })) { c.mensaje('Ese insumo ya está en la lista.', 'error'); return; }
+                        filas.push({ insumo_id: f.id, clave: f.clave, descripcion: f.descripcion, unidad: f.unidad, cantidad: 1, rendimiento: '', desperdicio_pct: 0, costo: f.costo });
                         c.st.cambios = true;
                         buscar.value = '';
                         sug.hidden = true;
@@ -562,9 +580,38 @@ window.Fichas = (function () {
             }, 250);
         });
         var selTipo = dlg.querySelector('[data-campo="tipo"]');
-        if (selTipo) selTipo.addEventListener('change', revisarTipo);
+        if (selTipo && op.visible) selTipo.addEventListener('change', revisar);
         pintar();
-        revisarTipo();
+        revisar();
+    }
+
+    // Componentes de un básico o cuadrilla (insumos)
+    function pestanaComponentes(sec, c) {
+        var usadoEn = (c.st.cat.usado_en || []).map(function (u) { return c.esc(u.clave); }).join(', ');
+        tablaInsumos(sec, c, {
+            total: 'Costo del básico', excluir: c.st.id,
+            vacio: 'Sin componentes. Busca arriba los insumos que lleva una unidad del básico.',
+            pie: usadoEn ? '<p class="fi-nota">Se usa en: ' + usadoEn + '</p>' : '',
+            visible: function () { var t = dlg.querySelector('[data-campo="tipo"]'); return t && t.value === 'BAS'; },
+            aviso: function (ver) {
+                return ver ? 'El costo del básico es la suma de sus componentes: costo × cantidad × (1 + % desperdicio). En una cuadrilla, la cantidad es cuántos de cada categoría trabajan en una jornada.'
+                           : 'Solo los insumos de tipo «Básico / cuadrilla» llevan componentes.';
+            }
+        });
+    }
+
+    // Matriz de un concepto del catálogo (conceptos P.U.)
+    function pestanaMatriz(sec, c) {
+        var cat = c.st.cat;
+        tablaInsumos(sec, c, {
+            total: 'Costo directo por unidad', rendimiento: true,
+            vacio: 'Sin insumos. Busca arriba lo que lleva una unidad del concepto (materiales, mano de obra o cuadrilla, equipo).',
+            pie: cat.faltan && cat.faltan.length ? '<p class="fi-nota">Falta precio de: ' + c.esc(cat.faltan.join(', ')) + '</p>' : '',
+            aviso: function () {
+                return 'Lo que lleva UNA unidad del concepto. Para mano de obra o cuadrillas puedes capturar el rendimiento (unidades por jornada) y la cantidad sale sola. ' +
+                       'El costo directo usa el costo de catálogo (mano de obra con su FSR); indirectos, financiamiento y utilidad se aplican en el presupuesto.';
+            }
+        });
     }
 
     // Costo horario de una máquina (Reglamento de la LOPSRM). Misma fórmula que includes/pu.php puCostoHorario;

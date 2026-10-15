@@ -441,6 +441,7 @@ function registrarObra(array $d): array
         $obraId = bd_insertar('AW', 'reg_obras', 'obra_id', $obra);
         // Como en el sistema de escritorio: al registrar la obra el presupuesto queda Aceptado
         bd_ejecutar('AW', "update doctos_sugerido_obra set obra_id = ?, estatus = 'Aceptado' where docto_sugerido_obra_id = ?", [$obraId, $id]);
+        presupuestoVersion($id, 'obra', $obraId);
         if ((int) $p['vendedor_obra_id']) {
             bd_insertar('AW', 'responsables_de_obra', 'res_obra_id', [
                 'obra_id' => $obraId, 'vendedor_obra_id' => (int) $p['vendedor_obra_id'], 'fecha_hora_asig' => date('Y-m-d H:i:s'),
@@ -475,6 +476,8 @@ function cambiarEstatus(array $d): array
             error("El presupuesto ya tiene una obra registrada: no se puede pasar a $nuevo. Los cambios de alcance se registran en la obra.");
         }
         bd_ejecutar('AW', 'update doctos_sugerido_obra set estatus = ? where docto_sugerido_obra_id = ?', [$nuevo, $id]);
+        // Al aceptarse queda una copia congelada del presupuesto (presupuesto_versiones)
+        if (mb_strtoupper($nuevo) === 'ACEPTADO') presupuestoVersion($id, 'aceptado', $b['obra_id'] ?: null);
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
@@ -492,6 +495,9 @@ function eliminar(array $d): void
     if (mb_strtoupper($estatus) !== 'CANCELADO') error("Solo se puede eliminar un presupuesto Cancelado (este está $estatus).");
     if (bd_valor('AW', 'select count(*) from reg_obras where sugerido_id = ?', [$id])) {
         error('No se puede eliminar: el presupuesto ya tiene una obra registrada.');
+    }
+    if (bd_tiene_tabla('AW', 'presupuesto_versiones') && bd_valor('AW', 'select count(*) from presupuesto_versiones where docto_sugerido_obra_id = ?', [$id])) {
+        error('No se puede eliminar: el presupuesto ya fue aceptado y tiene versiones guardadas para auditoría. Déjalo Cancelado.');
     }
     if (!tienePermiso('MODIFICAR_SUGERIDO_OBRA', 'ADMIN_USER')) autorizacion($d['autoriza'] ?? null, 'MODIFICAR_SUGERIDO_OBRA');
     $pdo = bd_pdo('AW');

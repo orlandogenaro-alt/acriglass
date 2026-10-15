@@ -139,3 +139,48 @@ prueba('costo horario: sin vida económica o con rescate mayor que el valor es u
         }
     }
 });
+
+// Concepto «cancel fijo de vidrio templado 9 mm» por m2: vidrio 1 m2 + 5 % desperdicio, sellado 4 m, cuadrilla que rinde 8 m2 por jornada
+function matrizPrueba(): array
+{
+    return [
+        ['insumo_id' => 1, 'cantidad' => 1, 'desperdicio_pct' => 5],
+        ['insumo_id' => 6, 'cantidad' => 4],
+        ['insumo_id' => 4, 'cantidad' => 1, 'rendimiento' => 8],
+    ];
+}
+
+prueba('concepto: vidrio 1,312.50 + sellado 180.80 + cuadrilla 1,600 / 8 = 200.00 → CD 1,693.30', function () {
+    [$ins, $comp] = catalogoPrueba();
+    $r = puCostoConcepto(matrizPrueba(), $ins, $comp);
+    igual(1312.5, $r['filas'][0]['importe']);
+    igual(180.8, $r['filas'][1]['importe']);
+    igual(200.0, $r['filas'][2]['importe']);
+    igual(1693.3, $r['cd']);
+});
+
+prueba('concepto con un insumo sin precio: CD pendiente y dice qué falta', function () {
+    [$ins, $comp] = catalogoPrueba();
+    $r = puCostoConcepto([['insumo_id' => 1, 'cantidad' => 1], ['insumo_id' => 7, 'cantidad' => 1]], $ins, $comp);
+    verificar($r['cd'] === null && $r['faltan'] === ['SINPRECIO'], json_encode($r));
+});
+
+prueba('matriz aplanada: básicos desarmados, MO con salario base y sumada por insumo', function () {
+    [$ins, $comp] = catalogoPrueba();
+    $r = puAplanarMatriz(matrizPrueba(), $ins, $comp);
+    $h = [];
+    foreach ($r['insumos'] as $x) $h[$x['clave']] = $x;
+    igual(['VT9', 'SIL', 'OFI', 'AYU'], array_keys($h));
+    igual(1.05, $h['VT9']['cantidad'], 6);
+    igual(0.44, $h['SIL']['cantidad'], 6);      // 4 m × 0.1 cartucho × 1.10
+    igual(0.205, $h['OFI']['cantidad'], 6);     // 4 × 0.02 (sellado) + 1/8 (cuadrilla)
+    igual(600.0, $h['OFI']['costo']);           // salario base, sin FSR
+    igual('MO', $h['AYU']['tipo']);
+});
+
+prueba('la matriz aplanada con FSR 1.6 en el análisis da el mismo CD que el catálogo (1,693.30)', function () {
+    [$ins, $comp] = catalogoPrueba();
+    $cd = 0;
+    foreach (puAplanarMatriz(matrizPrueba(), $ins, $comp)['insumos'] as $x) $cd += $x['cantidad'] * $x['costo'] * ($x['tipo'] === 'MO' ? 1.6 : 1);
+    igual(1693.3, $cd);
+});

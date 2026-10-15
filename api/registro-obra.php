@@ -149,6 +149,8 @@ function guardar(array $d): array
         // actualiza_estatus_sugerido_obra(sugerido_id_rel, "Aceptado")
         if ($sugerido) {
             bd_ejecutar('AW', "update doctos_sugerido_obra set estatus = 'Aceptado', obra_id = ? where docto_sugerido_obra_id = ?", [$id, $sugerido]);
+            // Obra nueva ligada al presupuesto: copia congelada de lo que se aprobó
+            if (!(int) ($d['id'] ?? 0)) presupuestoVersion($sugerido, 'obra', $id);
         }
         $pdo->commit();
     } catch (Throwable $e) {

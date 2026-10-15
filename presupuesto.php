@@ -112,6 +112,39 @@ if (!modoConfiguracion()) {
     }
 }
 
+// Análisis P.U.: conceptos del catálogo (Catalogos › Conceptos P.U.) con su matriz ya desarmada en insumos simples
+// (MO con salario base), para copiarlos al escribir su descripción. Los que tienen insumos sin precio se marcan.
+$conceptosPU = [];
+if (!modoConfiguracion()) {
+    try {
+        if (puDisponible() && bd_tiene_tabla('AW', 'conceptos_pu')) {
+            [$insumosCat, $componentesCat] = puCargarCatalogo();
+            $tcCat = puTiposCambio();
+            $matricesCat = [];
+            foreach (bd_filas('AW', 'select concepto_pu_id, insumo_id, cantidad, rendimiento, desperdicio_pct from concepto_pu_insumos order by concepto_pu_id, orden') as $r) {
+                $matricesCat[(int) $r['concepto_pu_id']][] = $r;
+            }
+            foreach (bd_filas('AW', "select c.concepto_pu_id, c.codigo, c.descripcion, c.familia, u.clave as unidad
+                                       from conceptos_pu c join unidades u on u.unidad_id = c.unidad_id
+                                      where c.estatus = 'A' order by c.codigo limit 1000") as $c) {
+                $m = $matricesCat[(int) $c['concepto_pu_id']] ?? [];
+                if (!$m) continue;
+                try {
+                    $a = puAplanarMatriz($m, $insumosCat, $componentesCat, $tcCat);
+                } catch (Throwable $e) {
+                    continue;
+                }
+                $conceptosPU[] = ['codigo' => $c['codigo'], 'descripcion' => $c['descripcion'], 'unidad' => $c['unidad'], 'partida' => $c['familia'] ?? '',
+                                  'faltan' => $a['faltan'],
+                                  'insumos' => array_map(fn($i) => ['tipo' => $i['tipo'], 'descripcion' => $i['descripcion'], 'unidad' => $i['unidad'],
+                                                                     'cantidad' => $i['cantidad'], 'rinde' => 0, 'costo' => $i['costo'] ?? 0], $a['insumos'])];
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('AcriGlass presupuesto conceptos P.U.: ' . $e->getMessage());
+    }
+}
+
 // Estatus del menú «Actualizar Estatus» (Administrador › Estatus de Presupuestos)
 try {
     $estatus = estatusPresupuesto();
@@ -642,6 +675,7 @@ $secciones = [
     window.ACRI_TIPOS_COMISION = <?= json_encode($tiposComision, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_BIBLIOTECA_PU = <?= json_encode($bibliotecaPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_CATALOGO_PU = <?= json_encode($catalogoPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.ACRI_CONCEPTOS_PU = <?= json_encode($conceptosPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <script src="<?= recurso('js/formato-presupuesto.js') ?>"></script>
 <script src="<?= recurso('js/conceptos-tareas.js') ?>"></script>

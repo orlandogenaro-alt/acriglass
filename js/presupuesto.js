@@ -348,6 +348,7 @@
     var TIPOS_INSUMO = { MAT: 'Material', MO: 'Mano de obra', EQ: 'Equipo / herramienta' };
     var BIBLIOTECA = window.ACRI_BIBLIOTECA_PU || { conceptos: [], insumos: [] };
     var CATALOGO_PU = window.ACRI_CATALOGO_PU || [];   // Catalogos › Insumos (precio vigente; mano de obra sin FSR)
+    var CONCEPTOS_PU = window.ACRI_CONCEPTOS_PU || [];  // Catalogos › Conceptos P.U. con su matriz desarmada (mano de obra sin FSR)
     var CAMPOS_PU = { fsr: 'puFsr', hm: 'puHm', fin: 'puFin' };
     var analisis = { fsr: 1, hm: 0, fin: 0, util: null, conceptos: [] };   // util null = equivalente a la Utilidad Neta
     var uidPU = 0;
@@ -507,7 +508,9 @@
         var partidas = {};
         analisis.conceptos.forEach(function (c) { if (txt(c.partida)) partidas[txt(c.partida)] = 1; });
         $('puPartidas').innerHTML = Object.keys(partidas).map(function (p) { return '<option value="' + escapar(p) + '">'; }).join('');
-        $('puSugConceptos').innerHTML = (BIBLIOTECA.conceptos || []).map(function (c) {
+        $('puSugConceptos').innerHTML = CONCEPTOS_PU.map(function (c) {
+            return '<option value="' + escapar(c.descripcion) + '">' + escapar(c.unidad) + ' · catálogo ' + escapar(c.codigo) + '</option>';
+        }).join('') + (BIBLIOTECA.conceptos || []).map(function (c) {
             return '<option value="' + escapar(c.descripcion) + '">' + escapar(c.unidad) + ' · folio ' + c.folio + '</option>';
         }).join('');
     }
@@ -516,6 +519,16 @@
     function ofrecerBiblioteca(c) {
         if (c.insumos.length || soloLectura) return false;
         var k = clave(c.descripcion);
+        // Primero el catálogo de conceptos (precios vigentes del catálogo de insumos)
+        var cat = CONCEPTOS_PU.filter(function (x) { return clave(x.descripcion) === k; })[0];
+        if (cat && confirm('«' + cat.descripcion + '» está en el catálogo de conceptos (' + cat.codigo + ', ' + cat.insumos.length + ' insumos por ' +
+                           (cat.unidad || 'unidad') + ').' + (cat.faltan.length ? '\n\nOjo: sin precio en el catálogo: ' + cat.faltan.join(', ') + '.' : '') +
+                           '\n\n¿Copiar su análisis con los precios vigentes del catálogo? Después puedes ajustarlo.')) {
+            c.insumos = cat.insumos.map(limpiarInsumo);
+            if (!txt(c.unidad)) c.unidad = cat.unidad || '';
+            if (!txt(c.partida)) c.partida = cat.partida || '';
+            return true;
+        }
         var b = (BIBLIOTECA.conceptos || []).filter(function (x) { return clave(x.descripcion) === k; })[0];
         if (!b) return false;
         if (!confirm('«' + b.descripcion + '» ya se analizó en el presupuesto folio ' + b.folio + ' (' + b.insumos.length +

@@ -79,6 +79,78 @@ function puDesglose(int $id, array $insumos, array $componentes, array $tiposCam
     return $filas;
 }
 
+// ---------- Conceptos (matriz de insumos por unidad del concepto) ----------
+// Renglón de la matriz: ['insumo_id', 'cantidad', 'rendimiento' (opcional), 'desperdicio_pct']
+// Con rendimiento (unidades del concepto por jornada), la cantidad es 1 / rendimiento.
+
+function puCantidadMatriz(array $r): float
+{
+    $base = (float) ($r['rendimiento'] ?? 0) > 0 ? 1 / (float) $r['rendimiento'] : (float) $r['cantidad'];
+    return $base * (1 + (float) ($r['desperdicio_pct'] ?? 0) / 100);
+}
+
+// Costo directo por unidad del concepto con el costo de catálogo de cada insumo (la mano de obra con su FSR)
+function puCostoConcepto(array $matriz, array $insumos, array $componentes, array $tiposCambio = []): array
+{
+    $memo = [];
+    $cd = 0.0;
+    $faltan = [];
+    $filas = [];
+    foreach ($matriz as $r) {
+        $id = (int) $r['insumo_id'];
+        $c = puCostoInsumo($id, $insumos, $componentes, $tiposCambio, $memo);
+        $cant = puCantidadMatriz($r);
+        $imp = $c['costo'] === null ? null : round($c['costo'] * $cant, PU_DECIMALES);
+        if ($imp === null) $faltan = array_merge($faltan, $c['faltan']); else $cd += $imp;
+        $filas[] = ['insumo_id' => $id, 'clave' => $insumos[$id]['clave'], 'descripcion' => $insumos[$id]['descripcion'], 'tipo' => $insumos[$id]['tipo'],
+                    'unidad' => $insumos[$id]['unidad'] ?? '', 'cantidad' => (float) $r['cantidad'], 'rendimiento' => (float) ($r['rendimiento'] ?? 0) ?: null,
+                    'desperdicio_pct' => (float) ($r['desperdicio_pct'] ?? 0), 'cantidad_efectiva' => round($cant, PU_DECIMALES),
+                    'costo' => $c['costo'], 'importe' => $imp];
+    }
+    $faltan = array_values(array_unique($faltan));
+    return ['cd' => $faltan ? null : round($cd, PU_DECIMALES), 'faltan' => $faltan, 'filas' => $filas];
+}
+
+// Matriz del concepto como la usa el Análisis P.U. del presupuesto: solo insumos simples (los básicos se
+// desarman en sus componentes), tipos MAT / MO / EQ (la herramienta va como EQ), la cantidad ya con
+// desperdicio, y la mano de obra con su SALARIO BASE (el análisis le aplica su FSR; así no se aplica dos veces).
+// El mismo insumo que aparece por varios caminos se junta en un renglón.
+function puAplanarMatriz(array $matriz, array $insumos, array $componentes, array $tiposCambio = []): array
+{
+    $hojas = [];
+    $faltan = [];
+    $memo = [];
+    $agregar = function (int $id, float $cant, array $camino) use (&$agregar, &$hojas, &$faltan, &$memo, $insumos, $componentes, $tiposCambio) {
+        if (!isset($insumos[$id])) throw new InvalidArgumentException("El insumo $id no existe en el catálogo.");
+        if (in_array($id, $camino, true)) throw new RuntimeException('Referencia circular en los básicos: ' . $insumos[$id]['clave']);
+        $ins = $insumos[$id];
+        if ($ins['tipo'] === 'BAS') {
+            if (empty($componentes[$id])) { $faltan[] = $ins['clave'] . ' (básico sin componentes)'; return; }
+            foreach ($componentes[$id] as $c) {
+                $agregar((int) $c['insumo_id'], $cant * (float) $c['cantidad'] * (1 + (float) ($c['desperdicio_pct'] ?? 0) / 100), array_merge($camino, [$id]));
+            }
+            return;
+        }
+        if ($ins['tipo'] === 'MO') {
+            $tc = $ins['precio'] === null ? null : puTipoCambio($ins['moneda'] ?? 'MXN', $tiposCambio);
+            $costo = $tc === null ? null : round((float) $ins['precio'] * $tc, PU_DECIMALES);
+            if ($costo === null) $faltan[] = $ins['clave'];
+        } else {
+            $r = puCostoInsumo($id, $insumos, $componentes, $tiposCambio, $memo);
+            $costo = $r['costo'];
+            $faltan = array_merge($faltan, $r['faltan']);
+        }
+        if (!isset($hojas[$id])) {
+            $hojas[$id] = ['insumo_id' => $id, 'clave' => $ins['clave'], 'tipo' => $ins['tipo'] === 'MO' ? 'MO' : ($ins['tipo'] === 'MAT' ? 'MAT' : 'EQ'),
+                           'descripcion' => $ins['descripcion'], 'unidad' => $ins['unidad'] ?? '', 'cantidad' => 0.0, 'costo' => $costo];
+        }
+        $hojas[$id]['cantidad'] += $cant;
+    };
+    foreach ($matriz as $r) $agregar((int) $r['insumo_id'], puCantidadMatriz($r), []);
+    foreach ($hojas as &$h) $h['cantidad'] = round($h['cantidad'], PU_DECIMALES);
+    return ['insumos' => array_values($hojas), 'faltan' => array_values(array_unique($faltan))];
+}
+
 // ---------- FASAR (Factor de Salario Real) ----------
 // Reglamento de la LOPSRM:  Fsr = Ps × (Tp / Tl) + Tp / Tl
 //   Tp = días calendario + días pagados adicionales (aguinaldo, prima vacacional…)

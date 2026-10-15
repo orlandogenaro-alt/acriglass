@@ -690,6 +690,7 @@ function iconoPestana() {
 </dialog>
 
 <script>window.ACRI_MEMBRETE = <?= json_encode($membrete, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
+<script src="<?= recurso('js/ruta-critica.js') ?>"></script>
 <script src="<?= recurso('js/conceptos-tareas.js') ?>"></script>
 <script src="<?= recurso('js/obra.js') ?>"></script>
 </body>

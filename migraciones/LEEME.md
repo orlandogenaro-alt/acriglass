@@ -44,8 +44,9 @@ php pruebas/correr.php
 
 Prueban los cálculos del presupuesto, el motor de costos, los parámetros y el freno de contraseñas. No usan ninguna base de datos.
 
-El formato impreso (partidas, subpartidas y propuesta) se prueba con Node:
+El formato impreso (partidas, subpartidas y propuesta) y la ruta crítica del programa se prueban con Node:
 
 ```
 node pruebas/formato-presupuesto.js
+node pruebas/ruta-critica.js
 ```

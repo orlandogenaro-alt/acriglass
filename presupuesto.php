@@ -758,6 +758,7 @@ $secciones = [
     window.ACRI_CONCEPTOS_PU = <?= json_encode($conceptosPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <script src="<?= recurso('js/formato-presupuesto.js') ?>"></script>
+<script src="<?= recurso('js/ruta-critica.js') ?>"></script>
 <script src="<?= recurso('js/conceptos-tareas.js') ?>"></script>
 <script src="<?= recurso('js/presupuesto.js') ?>"></script>
 </body>

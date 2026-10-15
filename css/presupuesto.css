@@ -880,3 +880,9 @@ output, #tSUB, .pct {
 .pu-dlg-espec { padding: 8px 16px 0; font-size: 12.5px; color: var(--texto-2); }
 .pu-dlg-espec label { display: flex; flex-direction: column; gap: 3px; }
 .pu-dlg-espec textarea { padding: 6px 8px; background: var(--input); color: var(--texto); border: 1px solid var(--borde-2); border-radius: 4px; resize: vertical; font: inherit; }
+
+/* Programa: ruta crítica y conflictos de predecesoras (js/ruta-critica.js) */
+.ct-g-critica { outline: 2px solid #ef4444; outline-offset: 1px; }
+.ct-g-nom-critica { color: #fca5a5; font-weight: 700; }
+.ct-g-conflicto { color: #fbbf24; cursor: help; }
+.ct-g-aviso { margin: 6px 0; color: #fbbf24; font-size: 12.5px; }

@@ -101,9 +101,12 @@ function guardarTareas(int $presupuesto, array $filas): array
             'avance'      => round(min(100, max(0, (float) ($f['avance'] ?? 0))), 2),
             'estatus'     => tareaTexto($f['estatus'] ?? '', 20),
             'manual'      => tareaTexto($f['manual'] ?? '', 100),
+            'predecesoras' => tareaTexto(mb_strtoupper(preg_replace('/\s+/', '', (string) ($f['predecesoras'] ?? ''))), 500),
             'fecha_mod'   => date('Y-m-d H:i:s'),
             'usuario_mod' => mb_substr((string) ($_SESSION['usuario'] ?? ''), 0, 50),
         ];
+        // Sin la columna (migraciones/010) las predecesoras no se guardan; lo demás sí
+        if (!bd_tiene_columna('AW', 'conceptos_tareas', 'predecesoras')) unset($r['predecesoras']);
         bd_insertar('AW', 'conceptos_tareas', 'tarea_id', $r);
         $limpias[] = $r;
     }

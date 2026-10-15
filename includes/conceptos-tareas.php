@@ -77,6 +77,8 @@ function ctDialogos(array $usuarios): void
                         </select>
                     </label>
                     <label>Costo: <input id="ctMonto" class="num" inputmode="decimal" autocomplete="off"></label>
+                    <label class="ancho">Predecesoras (claves que deben terminar antes, separadas por coma):
+                        <input id="ctPredecesoras" placeholder="p. ej. MP-10-001, TA-10-002" autocomplete="off"></label>
                     <label class="ancho">Empleados: <input id="ctEmpleados" placeholder="Elije uno o más empleados (separados por coma)" autocomplete="off"></label>
                 </div>
                 <p class="ct-nota">ⓘ La duración laboral, horas laborables, horas-hombre y días-hombre se calcularán al guardar el proyecto (dependen de la jornada resuelta, las fechas y los empleados asignados).</p>

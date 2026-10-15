@@ -27,7 +27,8 @@ window.AcriTareas = function (op) {
         tipo: 'ctTipo', nombre: 'ctNombre', agrupador: 'ctAgrupador', responsable: 'ctResponsable',
         iniReal: 'ctIniReal', finReal: 'ctFinReal', iniCli: 'ctIniCli', finCli: 'ctFinCli',
         jornada: 'ctJornada', empleados: 'ctEmpleados', color: 'ctColor',
-        cantidad: 'ctCantidad', unidad: 'ctUnidad', descripcion: 'ctDescripcion', avance: 'ctAvance'
+        cantidad: 'ctCantidad', unidad: 'ctUnidad', descripcion: 'ctDescripcion', avance: 'ctAvance',
+        predecesoras: 'ctPredecesoras'
     };
     // Campos que se generan en automático; si el usuario los cambia ya no se sobrescriben
     var AUTOMATICOS = ['nombre', 'cantidad', 'unidad', 'descripcion'];
@@ -54,7 +55,7 @@ window.AcriTareas = function (op) {
         var t = {
             uid: ++uidTarea, origen: null, tipo: 'Tarea', nombre: '', clave: '', agrupador: '',
             responsable: '', iniReal: '', finReal: '', iniCli: '', finCli: '', jornada: '', empleados: '',
-            cantidad: '', unidad: '', descripcion: '', manual: {},
+            cantidad: '', unidad: '', descripcion: '', manual: {}, predecesoras: '',
             color: COLOR_BASE, padre: null, monto: 0, avance: 0
         };
         Object.keys(campos || {}).forEach(function (k) { t[k] = campos[k]; });
@@ -310,9 +311,60 @@ window.AcriTareas = function (op) {
         }).join('');
     }
 
+    // Ruta crítica con las predecesoras (js/ruta-critica.js): solo tareas con fechas; las predecesoras van por clave
+    function clavesPred(t) { return String(t.predecesoras || '').toUpperCase().split(/[,;\s]+/).filter(Boolean); }
+    function rutaCritica(filas) {
+        if (!window.RutaCritica) return null;
+        var con = filas.filter(function (f) { return f.t.iniReal && f.t.finReal; }).map(function (f) { return f.t; });
+        var hay = con.some(function (t) { return clavesPred(t).length; });
+        if (!hay) return null;
+        var r = window.RutaCritica.calcular(con.map(function (t) {
+            return { id: String(t.clave).toUpperCase(), inicio: +new Date(t.iniReal), fin: +new Date(t.finReal), preds: clavesPred(t) };
+        }));
+        r.hay = true;
+        return r;
+    }
+    // Mueve el inicio y fin de las tareas con predecesoras para que empiecen al terminar la última (conserva la duración)
+    function programarPorPredecesoras() {
+        if (bloqueado()) return;
+        var r = rutaCritica(arbol(null, '', 0, []));
+        if (!r) { alert('Captura predecesoras (y fechas) en los conceptos/tareas para programarlos.'); return; }
+        if (r.ciclo) { alert('Hay una referencia circular en las predecesoras: ' + r.ciclo.join(', ') + '. Corrígela primero.'); return; }
+        var movidas = [];
+        tareas.forEach(function (t) {
+            var id = String(t.clave).toUpperCase();
+            if (!clavesPred(t).length || r.es[id] == null || !t.iniReal) return;
+            var antes = +new Date(t.iniReal);
+            if (Math.abs(r.es[id] - antes) < 6e4) return;
+            movidas.push(t.clave + ': ' + fechaTxt(t.iniReal) + ' → ' + fechaTxt(fechaLocal(r.es[id])));
+            t._nuevo = { ini: fechaLocal(r.es[id]), fin: fechaLocal(r.ef[id]) };
+        });
+        if (!movidas.length) { alert('Las fechas ya respetan las predecesoras.'); return; }
+        if (!confirm('Se moverán ' + movidas.length + ' tarea(s) para que empiecen al terminar sus predecesoras (conservan su duración):\n\n' +
+                     movidas.slice(0, 15).join('\n') + (movidas.length > 15 ? '\n…' : '') + '\n\n¿Continuar?')) {
+            tareas.forEach(function (t) { delete t._nuevo; });
+            return;
+        }
+        tareas.forEach(function (t) {
+            if (!t._nuevo) return;
+            t.iniReal = t._nuevo.ini;
+            t.finReal = t._nuevo.fin;
+            delete t._nuevo;
+        });
+        cambio();
+        render();
+    }
+    function fechaLocal(ms) {
+        var d = new Date(ms), p = function (n) { return ('0' + n).slice(-2); };
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+
     function renderGantt() {
         var filas = arbol(null, '', 0, []);
         var con = filas.filter(function (f) { return f.t.iniReal && f.t.finReal; });
+        var rc = rutaCritica(filas);
+        var conflictos = {};
+        if (rc && !rc.ciclo) rc.conflictos.forEach(function (c) { (conflictos[c.id] = conflictos[c.id] || []).push(c.pred); });
         if (!con.length) {
             $('ctGantt').innerHTML = '<p class="ct-vacio">' + (filas.length
                 ? 'Captura las fechas de Inicio y Fin (Real) de los conceptos/tareas para ver el diagrama de Gantt.'
@@ -338,13 +390,15 @@ window.AcriTareas = function (op) {
         $('ctGantt').innerHTML = '<div class="ct-g">' +
             '<div class="ct-g-nom ct-g-cab">Concepto/Tarea</div><div class="ct-g-pista ct-g-cab">' + marcas + '</div>' +
             filas.map(function (f) {
-                var t = f.t, barra = '';
+                var t = f.t, barra = '', id = String(t.clave).toUpperCase();
+                var critica = rc && !rc.ciclo && rc.criticas[id], holgura = rc && !rc.ciclo && rc.holgura[id] != null ? rc.holgura[id] : null;
                 if (t.iniReal && t.finReal) {
                     var izq = pos(t.iniReal), ancho = Math.max(pos(t.finReal) - izq, 0.4);
                     var info = escapar(t.nombre) + ': ' + fechaTxt(t.iniReal) + ' → ' + fechaTxt(t.finReal) + ' (' + duracion(t.iniReal, t.finReal) + ') · avance ' + Math.round(num(t.avance)) + ' %';
                     barra = t.tipo === 'Hito'
                         ? '<i class="ct-g-hito" style="left:' + izq + '%;background:' + escapar(t.color) + '" title="' + info + '"></i>'
-                        : '<i class="ct-g-barra" style="left:' + izq + '%;width:' + ancho + '%;background:' + escapar(t.color) + '" title="' + info + '">' +
+                        : '<i class="ct-g-barra' + (critica ? ' ct-g-critica' : '') + '" style="left:' + izq + '%;width:' + ancho + '%;background:' + escapar(t.color) + '" title="' + info +
+                          (critica ? ' · RUTA CRÍTICA' : holgura != null ? ' · holgura ' + holgura + ' días' : '') + '">' +
                           '<i class="ct-g-avance" style="width:' + Math.min(100, num(t.avance)) + '%"></i></i>';
                     if (t.iniCli && t.finCli) {
                         var ic = pos(t.iniCli);
@@ -354,10 +408,18 @@ window.AcriTareas = function (op) {
                 } else {
                     barra = '<em class="ct-g-sin">Sin fechas</em>';
                 }
-                return '<div class="ct-g-nom" style="padding-left:' + (6 + f.nivel * 16) + 'px" title="' + escapar(t.nombre) + '"><b>' + f.n + '</b> ' + escapar(t.nombre) + '</div>' +
+                var marca = conflictos[id] ? ' <span class="ct-g-conflicto" title="Empieza antes de que termine ' + escapar(conflictos[id].join(', ')) + '">⚠</span>' : '';
+                return '<div class="ct-g-nom' + (critica ? ' ct-g-nom-critica' : '') + '" style="padding-left:' + (6 + f.nivel * 16) + 'px" title="' + escapar(t.nombre) + '"><b>' + f.n + '</b> ' + escapar(t.nombre) + marca + '</div>' +
                     '<div class="ct-g-pista" style="' + rejilla + '">' + barra + '</div>';
             }).join('') + '</div>' +
-            '<p class="ct-g-ley"><i class="ct-g-barra"></i> Real &nbsp; <i class="ct-g-cli"></i> Cliente &nbsp; <i class="ct-g-barra"><i class="ct-g-avance" style="width:100%"></i></i> Avance</p>';
+            '<p class="ct-g-ley"><i class="ct-g-barra"></i> Real &nbsp; <i class="ct-g-cli"></i> Cliente &nbsp; <i class="ct-g-barra"><i class="ct-g-avance" style="width:100%"></i></i> Avance' +
+            (rc ? ' &nbsp; <i class="ct-g-barra ct-g-critica"></i> Ruta crítica &nbsp; ⚠ Empieza antes que su predecesora' : '') + '</p>' +
+            (rc && rc.ciclo ? '<p class="ct-g-aviso">⚠ Referencia circular en las predecesoras: ' + escapar(rc.ciclo.join(', ')) + '. No se calcula la ruta crítica.</p>' : '') +
+            (rc && rc.faltan.length ? '<p class="ct-g-aviso">Predecesoras que no existen o sin fechas: ' + escapar(rc.faltan.map(function (x) { return x.id + ' ← ' + x.pred; }).join(', ')) + '</p>' : '') +
+            (rc && !rc.ciclo ? '<p class="ct-g-ley">Terminación con las dependencias: <b>' + fechaTxt(fechaLocal(rc.fin)) + '</b> &nbsp; ' +
+                '<button type="button" class="ct-btn" id="ctProgramar">Programar según predecesoras</button></p>' : '');
+        var bp = document.getElementById('ctProgramar');
+        if (bp) bp.addEventListener('click', programarPorPredecesoras);
     }
 
     function mover(t, d) {
@@ -550,6 +612,14 @@ window.AcriTareas = function (op) {
         var v = {};
         Object.keys(CAMPOS).forEach(function (k) { v[k] = String($(CAMPOS[k]).value).trim(); });
         if (v.finReal < v.iniReal || v.finCli < v.iniCli) { alert('La fecha de Fin no puede ser anterior a la de Inicio.'); return; }
+        // Predecesoras: claves que existen, sin la propia (la referencia circular entre varias la avisa el Gantt)
+        var predes = v.predecesoras.toUpperCase().split(/[,;\s]+/).filter(Boolean);
+        var propia = editando ? String(editando.clave).toUpperCase() : '';
+        var claves = tareas.map(function (x) { return String(x.clave).toUpperCase(); });
+        if (propia && predes.indexOf(propia) >= 0) { alert('Una tarea no puede ser predecesora de sí misma.'); return; }
+        var noExisten = predes.filter(function (p) { return claves.indexOf(p) < 0; });
+        if (noExisten.length) { alert('Estas predecesoras no existen: ' + noExisten.join(', ') + '. Usa la clave de la tarea (columna Clave).'); return; }
+        v.predecesoras = predes.join(', ');
         v.avance = Math.max(0, Math.min(100, Math.round(num(v.avance))));
         var t = editando;
         if (!t) {
@@ -655,7 +725,8 @@ window.AcriTareas = function (op) {
                 agrupador: t.agrupador, descripcion: t.descripcion, cantidad: num(t.cantidad), unidad: t.unidad, monto: num(t.monto),
                 ini_real: t.iniReal, fin_real: t.finReal, ini_cli: t.iniCli, fin_cli: t.finCli, jornada: t.jornada,
                 responsable: t.responsable, empleados: t.empleados, color: t.color, avance: num(t.avance), estatus: estatusTarea({ avance: avanceTarea(t), finReal: t.finReal }),
-                manual: Object.keys(t.manual).filter(function (k) { return t.manual[k]; }).join(',')
+                manual: Object.keys(t.manual).filter(function (k) { return t.manual[k]; }).join(','),
+                predecesoras: t.predecesoras || ''
             };
         });
         Object.keys(excluidos).forEach(function (o) {
@@ -686,7 +757,7 @@ window.AcriTareas = function (op) {
                 jornada: r.jornada || '', empleados: r.empleados || '',
                 cantidad: r.cantidad == null ? '' : cantTxt(r.cantidad), unidad: r.unidad || '', descripcion: r.descripcion || '',
                 manual: manual, color: r.color || COLOR_BASE, padre: parseInt(r.padre_uid, 10) || null,
-                monto: num(r.monto), avance: num(r.avance)
+                monto: num(r.monto), avance: num(r.avance), predecesoras: r.predecesoras || ''
             });
         });
     }

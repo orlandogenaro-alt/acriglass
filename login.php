@@ -76,7 +76,9 @@ if (ACRI_NUBE) {
         foreach (bd_filas('AW', $sql, array_fill(0, substr_count($sql, '?'), $u['usuario_id'])) as $p) {
             $permisos[strtoupper($p['permiso'])] = true;
         }
-        bd_pdo('AW')->prepare('update usuarios set ultimo_acceso = now() where usuario_id = ?')->execute([$u['usuario_id']]);
+        // Con el usuario ya puesto, la bitácora anota quién entró (bd_ejecutar abre la transacción con acri.usuario)
+        $_SESSION['usuario'] = $u['login'];
+        bd_ejecutar('AW', 'update usuarios set ultimo_acceso = now() where usuario_id = ?', [$u['usuario_id']]);
     } catch (Throwable $e) {
         error_log('AcriGlass login: ' . $e->getMessage());
         volver('bd');

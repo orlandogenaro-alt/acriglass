@@ -151,6 +151,52 @@ function puAplanarMatriz(array $matriz, array $insumos, array $componentes, arra
     return ['insumos' => array_values($hojas), 'faltan' => array_values(array_unique($faltan))];
 }
 
+// ---------- Explosión de insumos de un presupuesto ----------
+// A partir del Análisis P.U. guardado (JSON de doctos_sugerido_obra.analisis_pu): cantidad total de cada insumo =
+// Σ cantidad del concepto × cantidad del insumo por unidad (mano de obra con rendimiento: 1 / rendimiento).
+// Se agrupa por tipo + descripción + unidad. Importe = cantidad × costo, y en mano de obra × FSR del análisis
+// (el mismo costo real con el que se calculó el precio). La herramienta menor (% de la mano de obra) va aparte.
+// Regresa ['insumos' => [{tipo, descripcion, unidad, cantidad, costo, importe}], 'totales' => [MAT, MO, EQ, hm, total]]
+function puExplosion(array $analisis): array
+{
+    $fsr = (float) ($analisis['fsr'] ?? 1) > 0 ? (float) $analisis['fsr'] : 1.0;
+    $hmPct = (float) ($analisis['hm'] ?? 0);
+    $grupos = [];
+    $tot = ['MAT' => 0.0, 'MO' => 0.0, 'EQ' => 0.0, 'hm' => 0.0];
+    foreach ($analisis['conceptos'] ?? [] as $c) {
+        $cantConcepto = (float) ($c['cantidad'] ?? 0);
+        if ($cantConcepto <= 0) continue;
+        foreach ($c['insumos'] ?? [] as $i) {
+            $tipo = in_array($i['tipo'] ?? '', ['MAT', 'MO', 'EQ'], true) ? $i['tipo'] : 'MAT';
+            $porUnidad = $tipo === 'MO' && (float) ($i['rinde'] ?? 0) > 0 ? 1 / (float) $i['rinde'] : (float) ($i['cantidad'] ?? 0);
+            $cant = $cantConcepto * $porUnidad;
+            if ($cant <= 0) continue;
+            $costo = (float) ($i['costo'] ?? 0);
+            $imp = $cant * $costo * ($tipo === 'MO' ? $fsr : 1);
+            $k = $tipo . '|' . mb_strtoupper(trim((string) ($i['descripcion'] ?? ''))) . '|' . mb_strtoupper(trim((string) ($i['unidad'] ?? '')));
+            if (!isset($grupos[$k])) {
+                $grupos[$k] = ['tipo' => $tipo, 'descripcion' => trim((string) ($i['descripcion'] ?? '')), 'unidad' => trim((string) ($i['unidad'] ?? '')),
+                               'cantidad' => 0.0, 'importe' => 0.0];
+            }
+            $grupos[$k]['cantidad'] += $cant;
+            $grupos[$k]['importe'] += $imp;
+            $tot[$tipo] += $imp;
+            if ($tipo === 'MO') $tot['hm'] += $imp * $hmPct / 100;
+        }
+    }
+    $lista = array_values(array_map(function ($g) {
+        $g['cantidad'] = round($g['cantidad'], 4);
+        $g['importe'] = round($g['importe'], 2);
+        // Costo unitario promedio (el mismo insumo puede venir con costos distintos en varios conceptos)
+        $g['costo'] = $g['cantidad'] > 0 ? round($g['importe'] / $g['cantidad'], 6) : 0.0;
+        return $g;
+    }, $grupos));
+    usort($lista, fn($a, $b) => [array_search($a['tipo'], ['MAT', 'MO', 'EQ']), $a['descripcion']] <=> [array_search($b['tipo'], ['MAT', 'MO', 'EQ']), $b['descripcion']]);
+    $tot = array_map(fn($v) => round($v, 2), $tot);
+    $tot['total'] = round($tot['MAT'] + $tot['MO'] + $tot['EQ'] + $tot['hm'], 2);
+    return ['insumos' => $lista, 'totales' => $tot];
+}
+
 // ---------- FASAR (Factor de Salario Real) ----------
 // Reglamento de la LOPSRM:  Fsr = Ps × (Tp / Tl) + Tp / Tl
 //   Tp = días calendario + días pagados adicionales (aguinaldo, prima vacacional…)

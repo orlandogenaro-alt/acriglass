@@ -24,6 +24,7 @@ require __DIR__ . '/../includes/servicios.php';
 require __DIR__ . '/../includes/autenticacion.php';
 require __DIR__ . '/../includes/permisos.php';
 require __DIR__ . '/../includes/presupuesto-obra.php';
+require __DIR__ . '/../includes/pu.php';
 require __DIR__ . '/../includes/respuesta.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') error('Método no permitido.', 405);
@@ -470,6 +471,50 @@ function agregarExplosion(array $d): array
     return ['agregadas' => $n];
 }
 
+// Explosión automática: los insumos del Análisis P.U. del presupuesto aprobado de la obra.
+// {id, aplicar?}: sin aplicar regresa la vista previa (materiales, mano de obra y equipo); con aplicar agrega los
+// MATERIALES a la explosión de la obra marcados como «Análisis P.U.» y reemplaza solo los que se generaron así antes
+// (lo capturado a mano no se toca).
+const EXPLOSION_ORIGEN = 'ANALISIS PU';
+function explosionPresupuesto(array $d): array
+{
+    $obra = (int) ($d['id'] ?? 0);
+    $sugerido = (int) bd_valor('AW', 'select sugerido_id from reg_obras where obra_id = ?', [$obra]);
+    $fuente = presupuestoAnalisisAprobado($sugerido);
+    if (!$fuente || empty($fuente['analisis']['conceptos'])) {
+        error('El presupuesto de la obra no tiene conceptos en su Análisis P.U.: la explosión automática sale de ahí.');
+    }
+    $exp = puExplosion($fuente['analisis']);
+    $r = ['origen' => $fuente['origen'], 'folio' => $fuente['folio']] + $exp;
+    if (empty($d['aplicar'])) {
+        $r['anteriores'] = (int) bd_valor('AW', 'select count(*) from explocion_material_de_obra where obra_id = ? and tipo_docto = ?', [$obra, EXPLOSION_ORIGEN]);
+        return $r;
+    }
+    validaEstatusObra($obra);
+    exigirOAutorizar($d, 'MODIFICAR_OBRA');
+    if (!bd_tiene_columna('AW', 'explocion_material_de_obra', 'tipo_docto')) error('La tabla de explosión no tiene la columna TIPO_DOCTO para marcar el origen.');
+    $pdo = bd_pdo('AW');
+    $pdo->beginTransaction();
+    try {
+        $quitadas = bd_ejecutar('AW', 'delete from explocion_material_de_obra where obra_id = ? and tipo_docto = ?', [$obra, EXPLOSION_ORIGEN]);
+        $n = 0;
+        foreach ($exp['insumos'] as $i) {
+            if ($i['tipo'] !== 'MAT') continue;
+            $campos = ['obra_id' => $obra, 'nombre' => mb_substr($i['descripcion'] ?: '(sin descripción)', 0, 200), 'um' => mb_substr($i['unidad'], 0, 15),
+                       'uds' => round($i['cantidad'], 3), 'costo_unit' => round($i['costo'], 2), 'costo_tot' => round($i['importe'], 2), 'tipo_docto' => EXPLOSION_ORIGEN];
+            if (bd_tiene_columna('AW', 'explocion_material_de_obra', 'folio')) $campos['folio'] = mb_substr((string) $fuente['folio'], 0, 20);
+            bd_insertar('AW', 'explocion_material_de_obra', 'explocion_mat_obra_id', $campos);
+            $n++;
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+    bitacora($obra, "Explosión automática desde el Análisis P.U. ({$fuente['origen']}): $n materiales" . ($quitadas ? ", reemplaza $quitadas anteriores" : ''));
+    return $r + ['agregadas' => $n, 'reemplazadas' => $quitadas];
+}
+
 // guarda_explocion_materiales_obra: unidades y costo capturados en la tabla
 function actualizarExplosion(array $d): array
 {
@@ -816,6 +861,8 @@ try {
         case 'eliminar_adjunto':
             eliminarAdjunto(entrada());
             responder(['ok' => true]);
+        case 'explosion_presupuesto':
+            responder(['ok' => true] + explosionPresupuesto(entrada()));
         case 'eliminar_explosion':
             responder(['ok' => true] + eliminarExplosion(entrada()));
         case 'asignar_cot':

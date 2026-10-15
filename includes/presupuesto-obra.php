@@ -52,6 +52,24 @@ function presupuestoVersion(int $id, string $motivo, ?int $obraId = null): int
     return $version;
 }
 
+// Análisis P.U. del presupuesto de una obra: el de su última versión aprobada (congelada) o, si aún no
+// tiene versiones, el del presupuesto actual. ['analisis' => array, 'origen' => texto, 'folio' => int] o null
+function presupuestoAnalisisAprobado(int $sugeridoId): ?array
+{
+    if (!$sugeridoId) return null;
+    $folio = (int) bd_valor('AW', 'select folio from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$sugeridoId]);
+    if (bd_motor('AW') === 'pgsql' && bd_tiene_tabla('AW', 'presupuesto_versiones')) {
+        $v = bd_fila('AW', "select version, snapshot->'encabezado'->'analisis_pu' as analisis from presupuesto_versiones
+                             where docto_sugerido_obra_id = ? order by version desc limit 1", [$sugeridoId]);
+        $a = $v ? json_decode((string) $v['analisis'], true) : null;
+        if (is_string($a)) $a = json_decode($a, true);   // guardado como texto dentro del snapshot
+        if (is_array($a)) return ['analisis' => $a, 'origen' => 'versión aprobada ' . $v['version'], 'folio' => $folio];
+    }
+    if (!bd_tiene_columna('AW', 'doctos_sugerido_obra', 'analisis_pu')) return null;
+    $a = json_decode((string) bd_valor('AW', 'select analisis_pu from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$sugeridoId]), true);
+    return is_array($a) ? ['analisis' => $a, 'origen' => 'presupuesto actual (sin versión aprobada)', 'folio' => $folio] : null;
+}
+
 // Obra ligada al presupuesto: la de su obra_id si existe; si no, la primera obra que apunte a él
 function presupuestoObra(int $id, int $obraId = 0): int
 {

@@ -29,7 +29,8 @@ $listados = [
     ],
     'explosion' => [
         'titulo'   => '4-Explosion Material',
-        'botones'  => [['nueva-explosion', 'Nuevo', '＋'], ['consultar', 'Consultar', '🔎'], ['eliminar-explosion', 'Eliminar seleccionados', '✕']],
+        'botones'  => [['nueva-explosion', 'Nuevo', '＋'], ['explosion-presupuesto', 'Desde el presupuesto', '🧮'], ['consultar', 'Consultar', '🔎'],
+                       ['eliminar-explosion', 'Eliminar seleccionados', '✕']],
         'columnas' => [['Clave', 'clave', 'txt'], ['Nombre', 'nombre', 'txt'], ['U.M.', 'um', 'txt'], ['Uds', 'uds', 'num'], ['Costo Unit.', 'costo_unit', 'dinero'],
                        ['Costo Total', 'costo_tot', 'dinero'], ['U.M. ML/M2', 'um_ml_m2', 'txt'], ['Tipo Docto', 'tipo_docto', 'txt'], ['Folio', 'folio', 'txt']],
         'totales'  => [['totExplosion', 'Importe', 'costo_tot']],
@@ -156,6 +157,10 @@ function iconoPestana() {
         <span>Guardar y Cerrar</span>
     </button>
     <span class="sep"></span>
+    <button class="tb" data-accion="contrato" title="Contrato con el cliente, convenios, aditivas y órdenes de cambio">
+        <svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z" fill="#fff" stroke="#666"/><path d="M15 2v5h5" fill="none" stroke="#666"/><path d="M9 12h8M9 15h8M9 18h5" stroke="#3b82f6" stroke-width="1.5"/></svg>
+        <span>Contrato</span>
+    </button>
     <button class="tb" data-accion="imprimir">
         <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="7" fill="#fff" stroke="#666"/><rect x="2" y="9" width="20" height="9" rx="2" fill="#8a8a8a"/><rect x="6" y="14" width="12" height="8" fill="#fff" stroke="#666"/></svg>
         <span>Imprimir</span>

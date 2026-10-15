@@ -1187,6 +1187,30 @@
             });
         }).catch(avisarError);
     }
+    // Explosión automática: insumos del Análisis P.U. del presupuesto aprobado. Primero se ve el resumen y se confirma;
+    // se agregan los materiales y se reemplazan solo los que antes se generaron así (lo capturado a mano no se toca).
+    function explosionDesdePresupuesto() {
+        enviar('explosion_presupuesto', { id: obraId }).then(function (j) {
+            var cuenta = { MAT: 0, MO: 0, EQ: 0 };
+            j.insumos.forEach(function (i) { cuenta[i.tipo]++; });
+            var t = j.totales;
+            var msg = 'Explosión del presupuesto folio ' + j.folio + ' (' + j.origen + '):\n\n' +
+                '• Materiales: ' + cuenta.MAT + ' insumos · ' + dinero(t.MAT) + '\n' +
+                '• Mano de obra: ' + cuenta.MO + ' categorías · ' + dinero(t.MO) + ' (con FSR)\n' +
+                '• Equipo y herramienta: ' + cuenta.EQ + ' · ' + dinero(t.EQ) + (t.hm ? ' + herramienta menor ' + dinero(t.hm) : '') + '\n' +
+                '• Total costo directo: ' + dinero(t.total) + '\n\n' +
+                'Se agregan los ' + cuenta.MAT + ' materiales a la explosión de la obra' +
+                (j.anteriores ? ' y se reemplazan los ' + j.anteriores + ' que se generaron antes desde el presupuesto' : '') +
+                '. Lo capturado a mano no se toca.\n\n¿Continuar?';
+            if (!cuenta.MAT) { alert(msg.split('\n\nSe agregan')[0] + '\n\nNo hay materiales que agregar.'); return; }
+            if (!confirm(msg)) return;
+            return guardarCon('explosion_presupuesto', { aplicar: true }).then(function (r) {
+                notificar('Explosión generada: ' + r.agregadas + ' materiales' + (r.reemplazadas ? ' (reemplazó ' + r.reemplazadas + ')' : '') + '.', 'ok');
+                cargarListado('explosion', 'explosion', 'No existen datos para mostrar');
+            });
+        }).catch(avisarError);
+    }
+
     // Doble clic en una partida: corregir unidades y costo (guarda_explocion_materiales_obra)
     function dialogoPartidaExplosion(f) {
         formulario({
@@ -1649,6 +1673,7 @@
             if (puedeCapturar('Es necesario guardar la obra para registrar una orden de trabajo.')) dialogoOrden(null);
         },
         'nueva-explosion': function () { if (puedeCapturar()) dialogoExplosion(); },
+        'explosion-presupuesto': function () { if (puedeCapturar('Es necesario guardar la obra.')) explosionDesdePresupuesto(); },
         'eliminar-explosion': eliminarExplosion,
         'nueva-mo': function () { if (puedeCapturar()) dialogoManoObra(null); },
         'nuevo-gasto': function () { if (puedeCapturar()) dialogoGasto(null); },
@@ -1994,6 +2019,13 @@
         'guardar': function () { guardaObra().then(function (ok) { if (ok) habilitaControles(false); }); },
         'guardar-cerrar': function () { guardaObra().then(function (ok) { if (ok) cerrarVentana(); }); },
         'imprimir': function () { window.print(); },
+        // Contrato de obra y convenios (contrato-obra.php) en su propia pestaña
+        'contrato': function () {
+            if (!requiereObra('Es necesario guardar la obra para registrar su contrato.')) return;
+            var titulo = 'Contrato · ' + ($('nombreObra').value || obraId);
+            if (window.parent !== window) window.parent.postMessage({ tipo: 'abrir', modulo: 'Contrato de Obra', id: obraId, titulo: titulo }, location.origin);
+            else window.open('contrato-obra.php?id=' + encodeURIComponent(obraId), '_blank');
+        },
         'ejecucion': function () {
             if (estatus !== 'Planificacion') {
                 alert('Para actualizar el estatus de la obra, es necesario que su estatus sea Planificacion. Actualice el estatus para poder continuar.');

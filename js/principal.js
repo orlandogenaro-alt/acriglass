@@ -8,7 +8,8 @@
     // Módulos que ya tienen formulario de captura
     var formularios = {
         'Presupuestos de Obra': { url: 'presupuesto.php', titulo: 'Presupuesto de Obra' },
-        'Obras':                { url: 'obra.php',        titulo: 'Registro de Obra' }
+        'Obras':                { url: 'obra.php',        titulo: 'Registro de Obra' },
+        'Contrato de Obra':     { url: 'contrato-obra.php', titulo: 'Contrato de Obra' }
     };
 
     // Módulos que ya leen datos reales

@@ -200,3 +200,31 @@ prueba('importación: precios con $ y comas; vacío es null; texto es inválido'
     verificar(puNumeroTexto('') === null);
     verificar(is_nan(puNumeroTexto('abc')));
 });
+
+prueba('explosión: 10 m2 de cancel (1.05 m2 vidrio, 0.44 cart. silicón, MO que rinde 8 m2/jor) y 2 piezas con el mismo silicón', function () {
+    $a = ['fsr' => 1.6, 'hm' => 3, 'conceptos' => [
+        ['cantidad' => 10, 'insumos' => [
+            ['tipo' => 'MAT', 'descripcion' => 'Vidrio templado 9 mm', 'unidad' => 'm2', 'cantidad' => 1.05, 'costo' => 1250],
+            ['tipo' => 'MAT', 'descripcion' => 'Silicón', 'unidad' => 'cart', 'cantidad' => 0.44, 'costo' => 120],
+            ['tipo' => 'MO', 'descripcion' => 'Oficial vidriero', 'unidad' => 'jor', 'rinde' => 8, 'cantidad' => 0, 'costo' => 600],
+        ]],
+        ['cantidad' => 2, 'insumos' => [
+            ['tipo' => 'MAT', 'descripcion' => 'silicón ', 'unidad' => 'CART', 'cantidad' => 1, 'costo' => 130],
+            ['tipo' => 'EQ', 'descripcion' => 'Ventosa', 'unidad' => 'hr', 'cantidad' => 0.5, 'costo' => 40],
+        ]],
+        ['cantidad' => 0, 'insumos' => [['tipo' => 'MAT', 'descripcion' => 'No cuenta', 'unidad' => 'pza', 'cantidad' => 5, 'costo' => 1]]],
+    ]];
+    $r = puExplosion($a);
+    $h = [];
+    foreach ($r['insumos'] as $x) $h[$x['descripcion']] = $x;
+    igual(['Silicón', 'Vidrio templado 9 mm', 'Oficial vidriero', 'Ventosa'], array_keys($h));   // orden: MAT, MO, EQ
+    igual(10.5, $h['Vidrio templado 9 mm']['cantidad'], 4);
+    igual(13125.0, $h['Vidrio templado 9 mm']['importe']);
+    igual(6.4, $h['Silicón']['cantidad'], 4);                 // 10 × 0.44 + 2 × 1 (mismo insumo, se juntan)
+    igual(788.0, $h['Silicón']['importe']);                   // 4.4 × 120 + 2 × 130
+    igual(123.125, $h['Silicón']['costo'], 6);                // costo promedio
+    igual(1.25, $h['Oficial vidriero']['cantidad'], 4);       // 10 / 8 jornadas
+    igual(1200.0, $h['Oficial vidriero']['importe']);         // 1.25 × 600 × FSR 1.6
+    igual(36.0, $r['totales']['hm']);                         // 3 % de 1,200
+    igual(15189.0, $r['totales']['total']);                   // 13,125 + 788 + 1,200 + 40 + 36
+});

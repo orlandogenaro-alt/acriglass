@@ -19,6 +19,7 @@ const ACRI_PERMISOS = [
     'NUEVO_TIPO_EMPLEADO'     => 'Alta y cambios de tipos de empleado',
     'CATALOGO_INSUMOS'        => 'Alta y cambios del catálogo de insumos y básicos',
     'PRECIOS_INSUMOS'         => 'Capturar precios de insumos',
+    'AUTORIZAR_CONVENIOS'     => 'Autorizar convenios, aditivas y órdenes de cambio de obra',
 ];
 
 // Solo los permisos conocidos, en mayúsculas y sin repetir

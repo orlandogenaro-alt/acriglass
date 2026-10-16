@@ -73,6 +73,7 @@ window.Fichas = (function () {
             api: 'api/catalogos.php?tipo=vendedores',
             pestanas: [{ titulo: 'General', campos: [
                 { id: 'nombre', etiqueta: 'Nombre', req: true, completo: true, mayus: true },
+                { id: 'id_hubspot', etiqueta: 'Id de HubSpot (propietario)' },
                 { id: 'activo', etiqueta: 'Activo', tipo: 'check', valor: true }
             ] }]
         },

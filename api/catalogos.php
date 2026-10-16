@@ -94,6 +94,12 @@ function guardar(string $tipo, string $tabla, string $colId, string $generador, 
         case 'vendedores':
             if (repetido($tabla, $colId, 'nombre', $nombre, $id)) error("Ya existe el vendedor «{$nombre}».");
             $campos = ['nombre' => $nombre, 'estatus' => !empty($d['activo']) ? 'A' : 'B'];
+            // Propietario de HubSpot del vendedor (migración 013): sus presupuestos quedan a su nombre en HubSpot
+            if (bd_tiene_columna('AW', 'vendedores_obras', 'id_hubspot')) {
+                $hs = trim((string) ($d['id_hubspot'] ?? ''));
+                if ($hs !== '' && !ctype_digit($hs)) error('El Id de HubSpot del vendedor es un número (el Id de propietario / owner).');
+                $campos['id_hubspot'] = $hs === '' ? null : $hs;
+            }
             break;
 
         case 'empleados':

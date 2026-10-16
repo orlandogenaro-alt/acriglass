@@ -4,6 +4,13 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-10-16',
+        'cambios' => [
+            ['nuevo', 'Presupuesto: negocio en HubSpot al guardar', 'Como en el escritorio, al guardar un presupuesto se revisa que el correo del contacto exista en HubSpot; si no existe, no se guarda. Ya guardado, se crea su negocio en HubSpot (o se actualiza si ya tiene Id de Negocio) con el nombre «folio proyecto», el total, la nota «PRESUPUESTO DE OBRA Ubicado en: …», el vendedor como propietario y el contacto y su empresa asociados. El formato de Imprimir queda adjunto en una nota del negocio (como página HTML; el escritorio adjuntaba un PDF). Si HubSpot falla después de guardar, el presupuesto queda guardado y se avisa.'],
+            ['nuevo', 'Vendedores de Obra: Id de HubSpot', 'La ficha del vendedor tiene su Id de HubSpot (propietario): con él sus presupuestos quedan a su nombre en HubSpot. Sin él se usa el del usuario del sistema con el mismo nombre; si no hay ninguno, el presupuesto se guarda y se avisa que el vendedor no tiene relación con HubSpot. Requiere la migración 013.'],
+        ],
+    ],
+    [
         'fecha' => '2026-10-15',
         'cambios' => [
             ['correccion', 'Obra: cada botón pide su permiso, como en el escritorio', 'Ya no basta «Modificar obras» para todo. Nueva orden de trabajo pide «Registrar órdenes de trabajo»; nueva cotización, asignar cotización y documentos de cobro, «Registrar o asignar cotizaciones»; explosión e importar, «Agregar explosión de material» (también para agregar pedidos relacionados); eliminar partidas de la explosión, «Eliminar partidas de la explosión»; nueva mano de obra, «Asignar mano de obra»; nuevo gasto, «Registrar gastos adicionales»; eliminar adjuntos, «Eliminar archivos adjuntos»; y la pestaña Consumos, «Consultar consumos de material». Si falta el permiso, otro usuario que lo tenga lo puede autorizar, y el aviso dice cuál es. Un administrador debe asignar estos permisos en Administrador › Usuarios o Roles.'],

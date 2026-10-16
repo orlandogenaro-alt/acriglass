@@ -4,6 +4,7 @@
 // POST ?accion=estatus     { id, estatus, autoriza? }  cambia el estatus con las reglas del Form46
 // POST ?accion=registrar_obra { id, nom_obra }  crea la obra del presupuesto; regresa { obra_id, nom_obra, nueva }
 // POST ?accion=eliminar    { id, autoriza? }  solo un presupuesto Cancelado
+// POST ?accion=hubspot     { id, email, formato_html? }  crea o actualiza su negocio en HubSpot (después de guardar)
 // Los ids nuevos salen de GEN_ID(ID_CATALOGOS) en Firebird (igual que los triggers de AW)
 // y de las columnas identity en Supabase. El folio lo asigna la base (trigger / secuencia).
 define('ACRI_API', true);
@@ -16,6 +17,7 @@ require __DIR__ . '/../includes/tareas.php';
 require __DIR__ . '/../includes/presupuesto-obra.php';
 require __DIR__ . '/../includes/calculo.php';
 require __DIR__ . '/../includes/parametros-presupuesto.php';
+require __DIR__ . '/../includes/hubspot-presupuesto.php';
 require __DIR__ . '/../includes/respuesta.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') error('Método no permitido.', 405);
@@ -314,6 +316,20 @@ function guardar(array $d): array
             . 'o Consultas/supabase_presupuesto_analisis_pu.sql (Supabase), o quita los conceptos de la pestaña Análisis P.U.');
     }
 
+    // actualiza_relacion_contacto_hubspot: sin el contacto en HubSpot no se guarda (Form46)
+    $hsContactos = null;
+    $hsAvisos = [];
+    if (hsActivo()) {
+        try {
+            $hsContactos = hsContactos($email);
+        } catch (Throwable $e) {
+            error('No se pudo consultar el contacto en HubSpot, el presupuesto no se guardó: ' . $e->getMessage(), 502);
+        }
+        if (!$hsContactos) error("No existe un contacto con los datos seleccionados: el correo $email no está en HubSpot.");
+    } else {
+        $hsAvisos[] = 'HubSpot no está configurado (servicio HUBSPOT_API): el presupuesto se guardó sin actualizar su negocio.';
+    }
+
     $pdo = bd_pdo('AW');
     $pdo->beginTransaction();
     try {
@@ -381,7 +397,40 @@ function guardar(array $d): array
         throw $e;
     }
 
-    return ['id' => $id, 'folio' => (int) bd_valor('AW', 'select folio from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id])];
+    $folio = (int) bd_valor('AW', 'select folio from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]);
+
+    // El negocio de HubSpot lo crea o actualiza ?accion=hubspot, que la pantalla llama enseguida con el formato
+    // impreso del presupuesto ya con su folio (guarda_o_actualiza_sugerido_hs)
+    return ['id' => $id, 'folio' => $folio, 'hubspot' => (bool) $hsContactos, 'avisos' => $hsAvisos];
+}
+
+// guarda_o_actualiza_sugerido_hs, después de guardar: { id, email, formato_html? } → { id_hs, avisos }
+function sincronizarHubSpot(array $d): array
+{
+    $id = (int) ($d['id'] ?? 0);
+    if (!hsActivo()) return ['id_hs' => null, 'avisos' => ['HubSpot no está configurado (servicio HUBSPOT_API).']];
+    $conHs = bd_tiene_columna('AW', 'doctos_sugerido_obra', 'id_hs');
+    $p = bd_fila('AW', 'select folio, proyecto, ubicacion, total, vendedor_obra_id' . ($conHs ? ', id_hs' : '') .
+        (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'correo_electronico') ? ', correo_electronico' : '') .
+        ' from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]);
+    if (!$p) error('El presupuesto no existe.', 404);
+    $correo = trim((string) (($p['correo_electronico'] ?? '') ?: ($d['email'] ?? '')));
+    try {
+        $contactos = hsContactos($correo);
+        if (!$contactos) return ['id_hs' => $p['id_hs'] ?? null, 'avisos' => ["HubSpot: No existe un contacto con el correo $correo."]];
+        $hs = hsGuardarPresupuesto([
+            'folio' => $p['folio'], 'proyecto' => (string) $p['proyecto'], 'ubicacion' => (string) $p['ubicacion'], 'total' => $p['total'],
+            'id_hs' => $p['id_hs'] ?? '', 'vendedor_obra_id' => (int) $p['vendedor_obra_id'], 'usuario' => (string) ($_SESSION['usuario'] ?? ''),
+        ], $contactos, isset($d['formato_html']) && is_string($d['formato_html']) ? mb_substr($d['formato_html'], 0, 3000000) : null);
+    } catch (Throwable $e) {
+        error_log('AcriGlass HubSpot presupuesto ' . $id . ': ' . $e->getMessage());
+        return ['id_hs' => $p['id_hs'] ?? null, 'avisos' => ['El presupuesto se guardó, pero no se pudo actualizar el negocio en HubSpot: ' . $e->getMessage()]];
+    }
+    // actualiza_id_negosio_obra_saca_hs
+    if ($conHs && $hs['id_hs'] && $hs['id_hs'] !== trim((string) ($p['id_hs'] ?? ''))) {
+        bd_ejecutar('AW', 'update doctos_sugerido_obra set id_hs = ? where docto_sugerido_obra_id = ?', [$hs['id_hs'], $id]);
+    }
+    return $hs;
 }
 
 // Registra la obra del presupuesto (reg_obras) y la liga al presupuesto (doctos_sugerido_obra.obra_id).
@@ -540,6 +589,8 @@ try {
     switch ($_GET['accion'] ?? '') {
         case 'guardar':
             responder(['ok' => true] + guardar(entrada()));
+        case 'hubspot':
+            responder(['ok' => true] + sincronizarHubSpot(entrada()));
         case 'registrar_obra':
             responder(['ok' => true] + registrarObra(entrada()));
         case 'estatus':

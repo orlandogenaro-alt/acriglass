@@ -1551,6 +1551,8 @@
             aplicarModo();
             if (nuevo && !enPestana && history.replaceState) history.replaceState(null, '', 'presupuesto.php?id=' + j.id);
             if (enPestana) window.parent.postMessage({ tipo: 'guardado', id: j.id, folio: j.folio }, location.origin);
+            if (j.avisos && j.avisos.length) alert(j.avisos.join('\n'));
+            if (j.hubspot) sincronizarHubSpot();
             return true;
         }).catch(function (err) {
             alert('No se pudo guardar el presupuesto: ' + err.message);
@@ -1560,6 +1562,42 @@
             document.body.classList.remove('guardando');
             return ok;
         });
+    }
+
+    // guarda_o_actualiza_sugerido_hs (Form46): ya guardado, crea o actualiza el negocio en HubSpot con el formato impreso
+    // adjunto (en el escritorio era un PDF; aquí el mismo formato de «Imprimir» como página HTML)
+    var cssFormato = null;
+    function formatoParaHubSpot() {
+        var css = cssFormato ? Promise.resolve(cssFormato) : fetch('css/formato-presupuesto.css').then(function (r) { return r.ok ? r.text() : ''; })
+            .catch(function () { return ''; }).then(function (t) { cssFormato = t; return t; });
+        return css.then(function (t) {
+            prepararImpresion('normal');
+            impresionLista = false;
+            var cont = $('formatoImpresion').cloneNode(true);
+            cont.querySelectorAll('img').forEach(function (img) { img.setAttribute('src', img.src); });   // rutas completas
+            return '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Presupuesto de Obra ' + escapar($('folio').value) +
+                '</title><style>' + t + '</style></head><body>' + cont.innerHTML + '</body></html>';
+        });
+    }
+    function sincronizarHubSpot() {
+        return formatoParaHubSpot().then(function (html) {
+            return pedirPresupuestos('hubspot', { id: presupuestoId, email: $('email').value.trim(), formato_html: html });
+        }).then(function (j) {
+            if (j.id_hs) ponerNegocio(String(j.id_hs), hs.urlNegocio);
+            if (j.avisos && j.avisos.length) alert(j.avisos.join('\n'));
+            else notificarHubSpot('Negocio ' + j.id_hs + ' actualizado en HubSpot.');
+        }).catch(function (err) {
+            alert('El presupuesto se guardó, pero no se pudo actualizar HubSpot: ' + err.message);
+        });
+    }
+    function notificarHubSpot(texto) {
+        var t = document.createElement('div');
+        t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:9999;padding:8px 16px;' +
+            'border-radius:6px;background:#1f7a3a;color:#fff;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.25)';
+        t.setAttribute('role', 'status');
+        t.textContent = texto;
+        document.body.appendChild(t);
+        setTimeout(function () { t.remove(); }, 3000);
     }
 
     // Menús desplegables: al abrirse pasan al <body> (la barra de herramientas tiene overflow y los

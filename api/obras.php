@@ -678,6 +678,40 @@ function filaMicrosip(array $m, array $base): array
     ]);
 }
 
+// Renglón de una factura de Microsip sin folio de Easy-Glass asignada a la obra (estatus F en DOCTOS_MICROSIP_OBRA).
+// Cargos = total de la factura con IVA, Creditos = lo pagado según Microsip (monto_pago).
+function filaFacturaMicrosip(array $c, array &$avisos): array
+{
+    $base = ['id' => $c['id'], 'tipo' => -1, 'tipo_docto' => 'Factura Microsip', 'folio' => $c['folio'], 'estatus' => 'Normal',
+             'cliente' => $c['nom_cliente'], 'fecha' => $c['fecha'], 'importe' => (float) $c['importe_neto'], 'factura' => $c['folio']];
+    try {
+        $f = microsip_factura((string) $c['folio'], substr((string) $c['fecha'], 0, 10) ?: null);
+    } catch (Throwable $e) {
+        $f = null;
+        $avisos[] = "Microsip factura {$c['folio']}: " . $e->getMessage();
+    }
+    if (!$f) {
+        $imp = (float) $c['importe_neto'];
+        return $base + ['imp_factura' => $imp, 'cargos' => $imp, 'creditos' => 0, 'saldo' => $imp, 'detalle' => []];
+    }
+    $total = (float) $f['total_docto'];
+    $pagado = (float) ($f['monto_pago'] ?? 0);
+    return array_merge($base, [
+        'estatus'     => $f['estatus'] ?? 'Normal',
+        'moneda'      => $f['moneda'] ?? '',
+        'importe'     => $total,
+        'imp_factura' => $total,
+        'cargos'      => $total,
+        'creditos'    => $pagado,
+        'saldo'       => round($total - $pagado, 2),
+        'cobranza'    => $pagado >= $total - 0.01 ? 'LIQUIDADO' : ($pagado > 0 ? 'PARCIAL' : 'PENDIENTE'),
+        'detalle'     => array_values(array_filter([
+            ['tipo' => 'Factura', 'folio' => $f['folio'], 'fecha' => $f['fecha'], 'estatus' => $f['estatus'] ?? '', 'importe' => $total, 'moneda' => $f['moneda'] ?? ''],
+            $pagado > 0 ? ['tipo' => 'Pago', 'folio' => '', 'fecha' => $f['fecha_pago'] ?? '', 'estatus' => '', 'importe' => $pagado, 'moneda' => $f['moneda'] ?? ''] : null,
+        ])),
+    ]);
+}
+
 // Documentos de Microsip de un folio para el detalle del renglón
 function detalleMicrosip(array $m): array
 {
@@ -746,6 +780,7 @@ function facturacion(int $obraId): array
     try {
         foreach ($cotizaciones as $c) {
             $folioEasy = $folioDe($c);
+            if (!$folioEasy && trim((string) $c['estatus']) === 'F') { $filas[] = filaFacturaMicrosip($c, $avisos); continue; }
             $cruzar(['id' => $c['id'], 'tipo' => -1, 'tipo_docto' => 'Cotizacion Microsip', 'folio' => $c['folio'], 'estatus' => estatusLetra($c['estatus']),
                      'cliente' => $c['nom_cliente'], 'fecha' => $c['fecha'], 'importe' => (float) $c['importe_neto']], $folioEasy);
         }

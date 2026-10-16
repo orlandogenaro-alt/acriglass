@@ -785,6 +785,25 @@ function asignarCotizacion(array $d): array
     $docs = $r['datos']['datos'] ?? [];
     if ($docs) {
         $p = $docs[0];
+    } elseif (!preg_match('/^(EG)?\d+$/', $folio)) {
+        // Folio de factura (serie A): se busca en las facturas de Microsip de los últimos 24 meses
+        try {
+            $f = microsip_factura($folio);
+        } catch (Throwable $e) {
+            error($e->getMessage(), 502);
+        }
+        if (!$f) error("No existe en Microsip un pedido ni una factura (últimos 24 meses) con el folio $folio.", 404);
+        $num = (int) ($f['folio_easy'] ?? 0);
+        $p = [
+            // Factura de un presupuesto de Easy-Glass: se liga su folio EG para que facturación cruce pedido y cobranza
+            'folio'         => $num ? 'EG' . str_pad((string) $num, 7, '0', STR_PAD_LEFT) : $f['folio'],
+            'cliente_no'    => $f['cliente_no'] ?? null,
+            'cliente'       => $f['nombre_cliente'] ?? '',
+            'fecha'         => $f['fecha'] ?? '',
+            'estatus_clave' => 'F',
+            'descripcion'   => 'Factura ' . $f['folio'] . ($num ? " · Easy-Glass $num" : '') . (!empty($f['descripcion']) ? ' · ' . preg_replace('/\s+/', ' ', $f['descripcion']) : ''),
+            'importe_neto'  => $f['importe_total'] ?? 0,
+        ];
     } else {
         // Presupuesto de Easy-Glass que aún no pasa a Microsip: se liga como EG0009783 y la
         // pestaña de facturación lo cruza con Microsip cuando ya exista el pedido

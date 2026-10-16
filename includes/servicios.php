@@ -190,6 +190,36 @@ function api_http_varios(string $clave, array $rutas, int $simultaneas = 8): arr
     return $res;
 }
 
+// Factura de Microsip (DOCTOS_VE tipo F) por su folio (A00002080 o A2080). /microsip-facturas de Easy-Glass no
+// filtra por folio: se pide el periodo (500 por página, las demás páginas en paralelo) y se busca ahí. Con $fecha
+// solo se pide ese día. Devuelve el renglón del listado con total_docto y total_impuestos del detalle, o null.
+function microsip_factura(string $folio, ?string $fecha = null, int $meses = 24): ?array
+{
+    $norm = fn($f) => preg_replace('/^([A-Z]*)0*/', '$1', strtoupper(trim((string) $f)));
+    $buscado = $norm($folio);
+    $q = $fecha ? "desde=$fecha&hasta=$fecha" : 'desde=' . date('Y-m-d', strtotime("-$meses months")) . '&hasta=' . date('Y-m-d');
+    $ruta = "/microsip-facturas?$q&limite=500";
+    $r = api_http('EASYGLASS', 'GET', $ruta);
+    if (!$r['ok']) throw new RuntimeException('No se pudo consultar las facturas de Microsip en la API de Easy-Glass: ' . ($r['error'] ?: 'sin respuesta'));
+    $paginas = [$r];
+    $rutas = [];
+    for ($p = 2; $p <= (int) ($r['datos']['paginas'] ?? 1); $p++) $rutas[$p] = "$ruta&pagina=$p";
+    if ($rutas) $paginas = array_merge($paginas, array_values(api_http_varios('EASYGLASS', $rutas)));
+    foreach ($paginas as $pg) {
+        foreach ($pg['datos']['datos'] ?? [] as $f) {
+            if ($norm($f['folio'] ?? '') !== $buscado) continue;
+            // El listado trae el importe sin impuestos; el total con IVA viene en el detalle
+            $d = api_http('EASYGLASS', 'GET', '/microsip-facturas/' . (int) $f['docto_ve_id']);
+            $det = $d['ok'] ? ($d['datos']['datos'] ?? []) : [];
+            return $f + [
+                'total_impuestos' => (float) ($det['total_impuestos'] ?? 0),
+                'total_docto'     => (float) ($det['total_docto'] ?? $f['importe_total'] ?? 0),
+            ];
+        }
+    }
+    return null;
+}
+
 // Estado de la credencial para mostrar en la lista (nunca devuelve el valor)
 function api_estado_credencial(array $s): array
 {

@@ -563,7 +563,7 @@
         if (r.otros.length) ct.exportar().tareas.forEach(function (x) { if (x.origen) tareas[x.origen] = x; });
         r.otros.forEach(function (o) {
             var tr = tareas[o.sec + ':' + o.fila.id] || {}, cantidad = num(tr.cantidad) || 1;
-            lista.push({ otro: true, clave: tr.clave || SIGLAS[o.sec] + '-' + o.fila.id, partida: txt(tr.agrupador) || NOMBRES[o.sec],
+            lista.push({ otro: true, sec: o.sec, fila: o.fila, clave: tr.clave || SIGLAS[o.sec] + '-' + o.fila.id, partida: txt(tr.agrupador) || NOMBRES[o.sec],
                          descripcion: o.fila.concepto, unidad: tr.unidad || 'Lote', cantidad: cantidad, cdU: o.cd / cantidad,
                          pu: o.cd * r.factor / cantidad, importe: o.cd * r.factor, articulos: o.fila.articulos || [] });
         });
@@ -584,7 +584,9 @@
                 html += '<tr class="pu-otro"><td class="id">' + escapar(x.clave) + '</td><td class="ro izq">' + escapar(x.partida) + '</td>' +
                     '<td class="ro izq">' + escapar(x.descripcion) + '</td><td class="ro izq">' + escapar(x.unidad) + '</td>' +
                     '<td class="ro">' + cant(x.cantidad) + '</td><td class="ro">' + fmt(x.pu) + '</td><td class="ro">' + fmt(x.importe) + '</td>' +
-                    '<td class="ro izq pu-rev">Por importe</td><td></td></tr>';
+                    '<td class="ro izq pu-rev">Por importe</td><td class="pu-acciones">' + (x.fila.calc ? '' :
+                    '<button type="button" class="ct-btn" data-pu-accion="analizar-importe" data-sec="' + x.sec + '" data-id="' + x.fila.id + '"' +
+                    ' title="Pasarlo al análisis con lo que ya tiene capturado"' + dis + '>Analizar</button>') + '</td></tr>';
                 return;
             }
             var c = x.c, falta = revisionConcepto(c);
@@ -748,6 +750,7 @@
     $('puConceptos').addEventListener('click', function (e) {
         var b = e.target.closest('[data-pu-accion]');
         if (!b) return;
+        if (b.dataset.puAccion === 'analizar-importe') { analizarImporte(b.dataset.sec, b.dataset.id); return; }
         var c = conceptoPU(b.closest('tr').dataset.uid), acc = b.dataset.puAccion;
         if (acc === 'analizar') { abrirAnalisis(c); return; }
         if (soloLectura) { avisoSoloLectura(); return; }
@@ -762,6 +765,36 @@
         calcularTotales();
         renderPu();
     });
+
+    // Un renglón capturado por importe en MP / MO pasa a concepto analizado con lo que ya tiene: sus artículos
+    // importados (si cuadran con el importe) o un solo insumo por el importe. Sale de su sección y su costo
+    // entra por el renglón fijo del análisis, así no se cuenta dos veces.
+    function analizarImporte(sec, id) {
+        if (soloLectura) { avisoSoloLectura(); return; }
+        var x = catalogoPU(calcularPU()).filter(function (o) { return o.otro && o.sec === sec && String(o.fila.id) === String(id); })[0];
+        if (!x || x.fila.calc) return;
+        var f = x.fila, base = num(f.presupuesto), cantidad = x.cantidad > 0 ? x.cantidad : 1, tipo = sec === 'mo' ? 'MO' : 'MAT';
+        if (!confirm('«' + f.concepto + '» pasará al Análisis de Precios Unitarios con lo que ya tiene capturado y saldrá de ' + NOMBRES[sec] +
+                     '; su importe quedará en el renglón «' + FIJOS_PU[sec] + '».' +
+                     (tipo === 'MO' && factorFsr() !== 1 ? '\n\nOjo: como mano de obra analizada se le aplica el FSR (× ' + cant(factorFsr()) + ').' : '') +
+                     '\n\n¿Continuar?')) return;
+        var arts = f.articulos || [], sumaArt = 0;
+        arts.forEach(function (a) { sumaArt += num(a.precio_total); });
+        var insumos = arts.length && Math.abs(sumaArt - base) < 0.5 && arts.every(function (a) { return num(a.unidades) > 0; })
+            ? arts.map(function (a) {
+                return limpiarInsumo({ tipo: tipo, descripcion: txt(a.nom_articulo) || txt(a.clave_articulo), unidad: txt(a.unid_medida),
+                                       cantidad: num(a.unidades) / cantidad, costo: num(a.precio_total) / num(a.unidades) });
+            })
+            : [limpiarInsumo({ tipo: tipo, descripcion: f.concepto, unidad: x.unidad, cantidad: 1, costo: base / cantidad })];
+        var c = nuevoConcepto({ descripcion: f.concepto, unidad: x.unidad, cantidad: cantidad, partida: x.partida, insumos: insumos });
+        analisis.conceptos.push(c);
+        datos[sec].splice(datos[sec].indexOf(f), 1);
+        huboAnalisis = true;
+        marcarCambio();
+        calcularTotales();
+        renderPu();
+        abrirAnalisis(c);
+    }
 
     // ----- Ventana de análisis de un concepto -----
     function abrirAnalisis(c) {

@@ -671,14 +671,14 @@
         doctos: {
             tipo: 'salidas',
             columnas: [['Folio', 'folio_microsip', 'txt'], ['OT', 'ot', 'txt'], ['Fecha', 'fecha', 'fecha'], ['Estatus', 'estatus', 'txt'],
-                       ['Concepto', 'nom_concepto', 'txt'], ['Almacen', 'nom_almacen', 'txt'], ['Costo Total', 'cos_tot', 'dinero']],
-            totales: [['totSalidas', 'Total salidas', 'cos_tot']]
+                       ['Concepto', 'nom_concepto', 'txt'], ['Almacen', 'nom_almacen', 'txt'], ['Costo_Total', 'cos_tot', 'dinero']],
+            totales: [['totSalidas', 'Total', 'cos_tot']]
         },
         detalle: {
             tipo: 'salidas_det',
             columnas: [['Estatus', 'estatus', 'txt'], ['Clave', 'clave_art', 'txt'], ['Nombre', 'nom_art', 'txt'], ['Uds', 'uds', 'num'],
                        ['Uni.Med', 'unid_med', 'txt'], ['Almacen', 'nom_almacen', 'txt'], ['Costo Total', 'costo_total', 'dinero']],
-            totales: [['totSalidas', 'Total salidas', 'costo_total']]
+            totales: [['totSalidas', 'Total', 'costo_total']]
         }
     };
     var modoSalidas = 'doctos';
@@ -817,7 +817,7 @@
     function cotPonerEstatus(e) {
         cot.estatus = e;
         $('cotEstatus').textContent = e === 'C' ? 'Cancelado'
-            : esOt() ? ({ P: 'En Produccion', F: 'Fin de Produccion' }[e] || (cot.id ? 'Orden Creada' : 'Orden Nueva'))
+            : esOt() ? ({ P: 'Produccion', F: 'Fin Produccion' }[e] || (cot.id ? 'Orden Creada' : 'Orden Nueva'))
             : (cot.id ? 'Documento Creado' : 'Documento Nuevo');
         $('cotEstatus').classList.toggle('cancelado', e === 'C');
     }
@@ -1705,17 +1705,16 @@
     // Form21.abre_salida_materiales / Dialog59: la salida de material con sus artículos, solo consulta
     function verSalida(d) {
         formulario({
-            titulo: 'Salida de material ' + (d.folio_microsip || d.id) + ' · ' + d.estatus, soloLectura: true,
+            titulo: 'Movimiento de Inventario · ' + (d.estatus || ''), soloLectura: true,
             campos: [
-                { id: 'ot', etiqueta: 'Orden de trabajo', valor: d.ot }, { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: dia(d.fecha) },
-                { id: 'concepto', etiqueta: 'Concepto', valor: d.nom_concepto }, { id: 'almacen', etiqueta: 'Almacén', valor: d.nom_almacen },
-                { id: 'docto', etiqueta: 'Docto_In_Id (Microsip)', valor: d.docto_in_id }, { id: 'usuario', etiqueta: 'Usuario', valor: d.usuario_creador },
-                { id: 'descripcion', etiqueta: 'Descripción', tipo: 'textarea', valor: d.descripcion }
+                { id: 'concepto', etiqueta: 'Concepto', valor: d.nom_concepto }, { id: 'almacen', etiqueta: 'Almacen', valor: d.nom_almacen },
+                { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: dia(d.fecha) }, { id: 'folio', etiqueta: 'Folio', valor: d.folio_microsip },
+                { id: 'ot', etiqueta: 'Orden de Trabajo', valor: d.ot }, { id: 'docto', etiqueta: 'Docto_In_Id (Microsip)', valor: d.docto_in_id },
+                { id: 'descripcion', etiqueta: 'Descripcion', tipo: 'textarea', valor: d.descripcion }
             ],
-            grids: [{ id: 'articulos', titulo: 'Artículos', filas: d.articulos, columnas: [
-                { id: 'clave_art', etiqueta: 'Clave', ancho: '110px' }, { id: 'nom_art', etiqueta: 'Artículo' },
-                { id: 'unidades', etiqueta: 'Uds', ancho: '80px' }, { id: 'unid_med', etiqueta: 'U.M.', ancho: '70px' },
-                { id: 'costo_unitario', etiqueta: 'Costo Unit.', ancho: '100px' },
+            grids: [{ id: 'articulos', titulo: 'Documento', filas: d.articulos, columnas: [
+                { id: 'id', etiqueta: 'ID', ancho: '90px' }, { id: 'clave_art', etiqueta: 'Clave', ancho: '110px' }, { id: 'nom_art', etiqueta: 'Descripcion' },
+                { id: 'unidades', etiqueta: 'Unidades', ancho: '80px' }, { id: 'costo_unitario', etiqueta: 'Costo', ancho: '100px' },
                 { id: 'costo_total', etiqueta: 'Costo Total', ancho: '110px', total: true, calc: function (f) { return num(f.costo_total); } }
             ] }]
         });
@@ -1723,15 +1722,16 @@
     // Form21.abre_consumo_material_en_obra, solo consulta
     function verConsumo(d) {
         formulario({
-            titulo: 'Consumo de material ' + (d.folio || d.id) + ' · ' + (d.estatus || ''), soloLectura: true,
+            titulo: 'Consumo de Material en Obra · ' + (d.estatus || ''), soloLectura: true,
             campos: [
-                { id: 'ot', etiqueta: 'Orden de trabajo', valor: d.ot }, { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: dia(d.fecha) },
+                { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: dia(d.fecha) }, { id: 'folio', etiqueta: 'Folio', valor: d.folio },
+                { id: 'ot', etiqueta: 'Orden de Trabajo', valor: d.ot }, { id: 'unidad', etiqueta: 'Unidad', valor: d.nom_unidad },
                 { id: 'usuario', etiqueta: 'Usuario', valor: d.usuario_creacion },
-                { id: 'descripcion', etiqueta: 'Descripción', tipo: 'textarea', valor: d.descripcion }
+                { id: 'descripcion', etiqueta: 'Descripcion', tipo: 'textarea', valor: d.descripcion }
             ],
-            grids: [{ id: 'articulos', titulo: 'Artículos', filas: d.articulos, columnas: [
-                { id: 'clave', etiqueta: 'Clave', ancho: '110px' }, { id: 'descripcion', etiqueta: 'Artículo' },
-                { id: 'uds_consumo', etiqueta: 'Uds consumo', ancho: '100px' }, { id: 'unimed', etiqueta: 'U.M.', ancho: '70px' }
+            grids: [{ id: 'articulos', titulo: 'Documento', filas: d.articulos, columnas: [
+                { id: 'clave', etiqueta: 'Clave', ancho: '110px' }, { id: 'descripcion', etiqueta: 'Descripcion' },
+                { id: 'uds_consumo', etiqueta: 'Uds.Consumo', ancho: '100px' }, { id: 'unimed', etiqueta: 'U.Med.', ancho: '70px' }
             ] }]
         });
     }
@@ -2053,9 +2053,9 @@
         ordenes: {
             ordenes: {
                 tipo: 'ordenes', vacio: 'No existen ordenes de trabajo asignadas a esta obra',
-                columnas: [['Folio', 'folio', 'txt'], ['Estatus', 'estatus', 'txt'], ['Fecha', 'fecha', 'fecha'], ['Fecha Entrega', 'fecha_entrega', 'fecha'],
-                           ['Importe', 'importe_neto', 'dinero'], ['Descripcion', 'descripcion', 'txt']],
-                totales: [['totOrdenes', 'Importe', 'importe_neto']]
+                columnas: [['Folio', 'folio', 'txt'], ['Estatus', 'estatus', 'txt'], ['Fecha Inicio', 'fecha', 'fecha'], ['Fecha Cierre', 'fecha_entrega', 'fecha'],
+                           ['Importe', 'importe_neto', 'dinero']],
+                totales: [['totOrdenes', 'Sub Total', 'importe_neto']]
             },
             // retorna_material_a_producir_por_obra (ToolStripButton8)
             produccion: {
@@ -2068,9 +2068,9 @@
         mano: {
             mano: {
                 tipo: 'mano',
-                columnas: [['Fecha', 'fecha', 'fecha'], ['Estatus', 'estatus', 'txt'], ['Folio OT', 'folio', 'txt'], ['Unidad', 'nom_unidad', 'txt'],
-                           ['Importe MO', 'importe_mo', 'dinero'], ['Importe MO Real', 'importe_mo_real', 'dinero'], ['Notas', 'notas', 'txt']],
-                totales: [['totMoPres', 'MO presupuestada', 'importe_mo'], ['totMoReal', 'MO real', 'importe_mo_real']]
+                columnas: [['Fecha', 'fecha', 'fecha'], ['Estatus', 'estatus', 'txt'], ['Folio_RS', 'folio', 'txt'], ['Unidad transporte', 'nom_unidad', 'txt'],
+                           ['Importe', 'importe_mo', 'dinero'], ['Imp.Real', 'importe_mo_real', 'dinero'], ['Notas', 'notas', 'txt']],
+                totales: [['totMoPres', 'Total', 'importe_mo'], ['totMoReal', 'Total Real', 'importe_mo_real']]
             },
             // retorna_empleados_para_pago_comisiones_por_obra (ToolStripButton29)
             comisiones: {

@@ -307,7 +307,8 @@ function guardarOrden(array $d): array
         'fecha'         => fecha($d['fecha'] ?? '') ?? date('Y-m-d'),
         'fecha_entrega' => fecha($d['fecha_entrega'] ?? ''),
         'descripcion'   => texto($d['descripcion'] ?? '', 200),
-        'importe_neto'  => numero(array_sum(array_column($partidas, 'precio_total'))),
+        // Importe de la orden: Total con IVA (Sub Total + 16 %), como lo guarda el escritorio
+        'importe_neto'  => numero(round(array_sum(array_column($partidas, 'precio_total')) * 1.16, 2)),
     ];
     if ($enc['descripcion'] === null) error('Captura la descripción de la orden de trabajo.');
     if (bd_tiene_columna('AW', 'doctos_orden_obra', 'urgencia')) $enc['urgencia'] = texto($d['urgencia'] ?? '', 30);

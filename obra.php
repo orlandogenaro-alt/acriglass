@@ -16,64 +16,64 @@ $obraId = max(0, (int) ($_GET['id'] ?? 0));
 $listados = [
     'facturacion' => [
         'titulo'   => '2-Facturacion',
-        'botones'  => [['nueva-cot', 'Nueva Cotizacion', '＋'], ['asignar-cot', 'Asignar Cotizacion Microsip', '🔗'], ['nuevo-cobro', 'Nuevo Documento de Cobro', '💵'], ['consultar', 'Consultar', '🔎']],
-        'columnas' => [['Folio', 'folio', 'txt'], ['Tipo Docto', 'tipo_docto', 'txt'], ['Estatus', 'estatus', 'txt'], ['Cliente', 'cliente', 'txt'],
-                       ['Fecha', 'fecha', 'fecha'], ['Importe', 'importe', 'dinero'], ['Factura', 'factura', 'txt'], ['Imp.Factura', 'imp_factura', 'dinero'],
+        'botones'  => [['nueva-cot', 'Nueva Cotizacion', '＋'], ['asignar-cot', 'Agregar Cotizacion', '🔗'], ['nuevo-cobro', 'Agregar Pago en Efectivo', '💵'], ['consultar', 'Mostrar', '🔎']],
+        'columnas' => [['Folio', 'folio', 'txt'], ['Tipo', 'tipo_docto', 'txt'], ['Estatus', 'estatus', 'txt'], ['Cliente', 'cliente', 'txt'],
+                       ['Fecha', 'fecha', 'fecha'], ['Importe', 'importe', 'dinero'], ['Folio.Fact', 'factura', 'txt'], ['Imp.Factura', 'imp_factura', 'dinero'],
                        ['Cargos', 'cargos', 'dinero'], ['Creditos', 'creditos', 'dinero'], ['Saldo', 'saldo', 'dinero']],
         'totales'  => [['totImpCot', 'Importe', 'importe'], ['totCargos', 'Total Cargos', 'cargos'], ['totCred', 'Total Creditos', 'creditos'], ['totSaldo', 'Saldo', 'saldo']],
     ],
     'ordenes' => [
         'titulo'   => '3-Orden Trabajo',
         'modos'    => ['ordenes' => 'Ordenes de Trabajo', 'produccion' => 'Produccion'],
-        'botones'  => [['nueva-ot', 'Nueva Orden de Trabajo', '＋', 'ordenes'], ['consultar', 'Consultar', '🔎']],
-        'columnas' => [['Folio', 'folio', 'txt'], ['Estatus', 'estatus', 'txt'], ['Fecha', 'fecha', 'fecha'], ['Fecha Entrega', 'fecha_entrega', 'fecha'],
-                       ['Importe', 'importe_neto', 'dinero'], ['Descripcion', 'descripcion', 'txt']],
-        'totales'  => [['totOrdenes', 'Importe', 'importe_neto', 'ordenes']],
+        'botones'  => [['nueva-ot', 'Nueva Orden', '＋', 'ordenes'], ['consultar', 'Mostrar', '🔎']],
+        'columnas' => [['Folio', 'folio', 'txt'], ['Estatus', 'estatus', 'txt'], ['Fecha Inicio', 'fecha', 'fecha'], ['Fecha Cierre', 'fecha_entrega', 'fecha'],
+                       ['Importe', 'importe_neto', 'dinero']],
+        'totales'  => [['totOrdenes', 'Sub Total', 'importe_neto', 'ordenes']],
     ],
     'explosion' => [
         'titulo'   => '4-Explosion Material',
         'botones'  => [['nueva-explosion', 'Nuevo', '＋'], ['explosion-presupuesto', 'Desde el presupuesto', '🧮'], ['importar-explosion', 'Importar', '📥'],
-                       ['consultar', 'Consultar', '🔎'], ['eliminar-explosion', 'Eliminar seleccionados', '✕']],
-        'columnas' => [['Clave', 'clave', 'txt'], ['Nombre', 'nombre', 'txt'], ['U.M.', 'um', 'txt'], ['Uds', 'uds', 'num'], ['Costo Unit.', 'costo_unit', 'dinero'],
-                       ['Costo Total', 'costo_tot', 'dinero'], ['U.M. ML/M2', 'um_ml_m2', 'txt'], ['Tipo Docto', 'tipo_docto', 'txt'], ['Folio', 'folio', 'txt']],
-        'totales'  => [['totExplosion', 'Importe', 'costo_tot']],
+                       ['consultar', 'Mostrar', '🔎'], ['eliminar-explosion', 'Eliminar', '✕']],
+        'columnas' => [['id', 'id', 'txt'], ['Clave', 'clave', 'txt'], ['Nombre', 'nombre', 'txt'], ['UM', 'um', 'txt'], ['Uds', 'uds', 'num'], ['Cost.Unit', 'costo_unit', 'dinero'],
+                       ['Costo_Total', 'costo_tot', 'dinero'], ['MQ_ML', 'um_ml_m2', 'txt'], ['Tipo', 'tipo_docto', 'txt'], ['Folio', 'folio', 'txt']],
+        'totales'  => [['totExplosion', 'Totales', 'costo_tot']],
     ],
     'salidas' => [
         'titulo'   => '5-Salidas Material',
-        'botones'  => [['salidas-doctos', 'Documentos', '📄'], ['salidas-detalle', 'Detalle de articulos', '📦'], ['imprimir-salidas', 'Imprimir', '🖨'],
+        'botones'  => [['salidas-doctos', 'Listar Salidas', '📄'], ['salidas-detalle', 'Listar Materiales', '📦'], ['imprimir-salidas', 'Imprimir', '🖨'],
                        ['exportar', 'Exportar a Excel', '📗']],
         'columnas' => [['Folio', 'folio_microsip', 'txt'], ['OT', 'ot', 'txt'], ['Fecha', 'fecha', 'fecha'], ['Estatus', 'estatus', 'txt'],
-                       ['Concepto', 'nom_concepto', 'txt'], ['Almacen', 'nom_almacen', 'txt'], ['Costo Total', 'cos_tot', 'dinero']],
-        'totales'  => [['totSalidas', 'Total salidas', 'cos_tot']],
+                       ['Concepto', 'nom_concepto', 'txt'], ['Almacen', 'nom_almacen', 'txt'], ['Costo_Total', 'cos_tot', 'dinero']],
+        'totales'  => [['totSalidas', 'Total', 'cos_tot']],
     ],
     'mano' => [
         'titulo'   => '6-Mano de Obra',
         'modos'    => ['mano' => 'Mano de Obra', 'comisiones' => 'Comisiones'],
-        'botones'  => [['nueva-mo', 'Asignar Mano de Obra', '＋', 'mano'], ['nueva-comis-admin', 'Comisión Administrativos', '＋', 'comisiones'],
-                       ['nueva-comis-oper', 'Comisión Operativos', '＋', 'comisiones'], ['consultar', 'Consultar', '🔎']],
-        'columnas' => [['Fecha', 'fecha', 'fecha'], ['Estatus', 'estatus', 'txt'], ['Folio OT', 'folio', 'txt'], ['Unidad', 'nom_unidad', 'txt'],
-                       ['Importe MO', 'importe_mo', 'dinero'], ['Importe MO Real', 'importe_mo_real', 'dinero'], ['Notas', 'notas', 'txt']],
-        'totales'  => [['totMoPres', 'MO presupuestada', 'importe_mo', 'mano'], ['totMoReal', 'MO real', 'importe_mo_real', 'mano'],
+        'botones'  => [['nueva-mo', 'Nuevo', '＋', 'mano'], ['nueva-comis-admin', 'Comisión Administrativos', '＋', 'comisiones'],
+                       ['nueva-comis-oper', 'Comisión Operativos', '＋', 'comisiones'], ['consultar', 'Mostrar', '🔎']],
+        'columnas' => [['Fecha', 'fecha', 'fecha'], ['Estatus', 'estatus', 'txt'], ['Folio_RS', 'folio', 'txt'], ['Unidad transporte', 'nom_unidad', 'txt'],
+                       ['Importe', 'importe_mo', 'dinero'], ['Imp.Real', 'importe_mo_real', 'dinero'], ['Notas', 'notas', 'txt']],
+        'totales'  => [['totMoPres', 'Total', 'importe_mo', 'mano'], ['totMoReal', 'Total Real', 'importe_mo_real', 'mano'],
                        ['totComis', 'Total comisiones', 'importe_neto', 'comisiones']],
     ],
     'consumos' => [
         'titulo'   => '7-Consumos',
-        'botones'  => [['consultar', 'Consultar', '🔎']],
+        'botones'  => [['consultar', 'Mostrar', '🔎']],
         'columnas' => [['Folio Orden', 'folio_orden', 'txt'], ['Folio', 'folio', 'txt'], ['Estatus', 'estatus', 'txt'], ['Fecha', 'fecha', 'fecha'], ['Uds Salida', 'uds_salida', 'num']],
     ],
     'gastos' => [
         'titulo'   => '8-Gastos Adicion.',
-        'botones'  => [['nuevo-gasto', 'Nuevo Gasto', '＋'], ['consultar', 'Consultar', '🔎']],
-        'columnas' => [['Nombre', 'nombre', 'txt'], ['Estatus', 'estatus', 'txt'], ['Folio OT', 'folio', 'txt'], ['Fecha', 'fecha_creacion', 'fecha'],
-                       ['Unidad', 'nom_unidad', 'txt'], ['Importe', 'importe', 'dinero'], ['Importe Real', 'importe_real', 'dinero'], ['Notas', 'notas', 'txt']],
-        'totales'  => [['totGastos', 'Total gastos', 'importe'], ['totGastosReal', 'Total real', 'importe_real']],
+        'botones'  => [['nuevo-gasto', 'Nuevo', '＋'], ['consultar', 'Mostrar', '🔎']],
+        'columnas' => [['Concepto', 'nombre', 'txt'], ['Estatus', 'estatus', 'txt'], ['Folio_RS', 'folio', 'txt'], ['Fecha', 'fecha_creacion', 'fecha'],
+                       ['Unidad transporte', 'nom_unidad', 'txt'], ['Importe', 'importe', 'dinero'], ['Imp.Real', 'importe_real', 'dinero'], ['Notas', 'notas', 'txt']],
+        'totales'  => [['totGastos', 'Total', 'importe'], ['totGastosReal', 'Total Real', 'importe_real']],
     ],
     'microsip' => [
         'titulo'   => '10-Mov.Microsip',
         'aparte'   => true,
         'botones'  => [['consultar', 'Mostrar', '🔎'], ['exportar', 'Exportar a Excel', '📗']],
-        'columnas' => [['Docto_In_Id', 'docto_in_id', 'txt'], ['Folio', 'folio', 'txt'], ['Concepto', 'concepto', 'txt'], ['Fecha', 'fecha', 'fecha'],
-                       ['Almacen', 'almacen', 'txt'], ['Naturaleza', 'naturaleza', 'txt'], ['OT', 'ot', 'txt'], ['Estatus', 'estatus', 'txt']],
+        'columnas' => [['DOCTO_IN_ID', 'docto_in_id', 'txt'], ['FOLIO', 'folio', 'txt'], ['CONCEPTO', 'concepto', 'txt'], ['FECHA', 'fecha', 'fecha'],
+                       ['ALMACEN', 'almacen', 'txt'], ['NATURALEZA_CONCEPTO', 'naturaleza', 'txt']],
     ],
 ];
 // Pista bajo los botones de cada pestaña para quien apenas usa el sistema
@@ -367,7 +367,7 @@ function iconoPestana() {
         <label>Archivo: <input type="text" id="adjNombre" readonly></label>
         <label>Descripcion corta: <input type="text" id="adjDesc" maxlength="49" placeholder="Máximo 50 caracteres"></label>
         <button type="button" class="ob-btn" id="adjuntar">📎 Adjuntar</button>
-        <button type="button" class="ob-btn" data-sub="consultar">🔎 Consultar</button>
+        <button type="button" class="ob-btn" data-sub="consultar">🔎 Mostrar</button>
         <span class="ob-estado" data-estado></span>
     </div>
     <div class="grid-caja">

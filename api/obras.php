@@ -570,15 +570,16 @@ function documento(string $tipo, int $obra, int $id): array
                                   join doctos_orden_obra o on o.docto_orden_obra_id = s.docto_orden_obra_id
                                  where s.docto_solicitud_id = ? and o.obra_id = ?', [$id, $obra]);
             if (!$s) break;
-            $s['articulos'] = bd_filas('AW', 'select clave_art, nom_art, unidades, unid_med, costo_unitario, costo_total
+            $s['articulos'] = bd_filas('AW', 'select docto_solicitud_id_det as id, clave_art, nom_art, unidades, unid_med, costo_unitario, costo_total
                                                 from doctos_solicitudes_det where docto_solicitud_id = ? order by docto_solicitud_id_det', [$id]);
             return $s;
 
         case 'consumo':   // Form21.abre_consumo_material_en_obra (solo consulta)
             if (!tienePermiso('LISTAR_CONSUMOS_MAT_OBRA', 'ADMIN_USER')) error('No tiene el permiso para ' . ACRI_PERMISOS['LISTAR_CONSUMOS_MAT_OBRA'] . ' (LISTAR_CONSUMOS_MAT_OBRA).', 403);
-            $c = bd_fila('AW', 'select c.consumo_material_obra_id as id, c.folio, c.fecha, c.estatus, c.descripcion, c.usuario_creacion, o.folio as ot
+            $c = bd_fila('AW', 'select c.consumo_material_obra_id as id, c.folio, c.fecha, c.estatus, c.descripcion, c.usuario_creacion, o.folio as ot, u.nombre as nom_unidad
                                   from consumos_metrial_en_obra c
                                   left join doctos_orden_obra o on o.docto_orden_obra_id = c.docto_orden_obra_id
+                                  left join unidades_transporte u on u.unidad_trans_id = c.equipo_trans_id
                                  where c.consumo_material_obra_id = ? and c.obra_id = ?', [$id, $obra]);
             if (!$c) break;
             $c['articulos'] = bd_filas('AW', 'select clave, descripcion, uds_consumo, unimed from consumos_material_en_obra_det

@@ -280,6 +280,8 @@
 .cot-tabs button.activo { background: var(--tarjeta); border-color: var(--borde); color: var(--texto); font-weight: 700; margin-bottom: -1px; }
 .cot-panel { display: none; flex-direction: column; gap: 8px; }
 .cot-panel.visible { display: flex; }
+/* El mismo diálogo es Cotizacion (2-Facturacion) u Orden de Trabajo (3-Orden Trabajo, clase es-ot) */
+.cot-dialogo.es-ot .solo-cot, .cot-dialogo:not(.es-ot) .solo-ot { display: none !important; }
 .cot-acciones { display: flex; gap: 8px; }
 .cot-acciones .ob-btn { font-size: 12px; min-height: 26px; }
 .cot-grid { min-height: 220px; max-height: 300px; }

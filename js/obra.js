@@ -789,86 +789,43 @@
     // Antes de una captura nueva: obra guardada y con estatus abierto (valida_estatus_obra)
     function puedeCapturar(msg) { return validaEstatusObra() && requiereObra(msg); }
 
-    // 3-Orden de trabajo (nuevo_orden_trabajo / Dialog242)
+    // 3-Orden de trabajo (nuevo_orden_trabajo / Dialog242): la misma ventana de la Cotizacion, en modo Orden de Trabajo
     function dialogoOrden(orden) {
         catalogosObra().then(function (cat) {
-            var e2 = orden ? orden.estatus_2 : 'O';
-            var acciones = [];
-            function cambio(est, pregunta) {
-                return { texto: { P: '▶ Liberar a Producción', F: '✔ Fin de Producción', C: '✕ Cancelar orden' }[est], fn: function () {
-                    if (!confirm(pregunta)) return Promise.resolve(false);
-                    return guardarCon('estatus_orden', { orden_id: orden.id, estatus: est }).then(function () {
-                        catObra = null;
-                        cargarListado('ordenes', 'ordenes', 'No existen ordenes de trabajo asignadas a esta obra');
-                    });
-                } };
-            }
-            if (orden && obraAbierta()) {
-                if (e2 === 'O') acciones.push(cambio('P', '¿Liberar la orden ' + orden.folio + ' a producción?'));
-                if (e2 === 'P') acciones.push(cambio('F', '¿Enviar la orden ' + orden.folio + ' a Fin de Producción?'));
-                if (e2 === 'O' || e2 === 'P') acciones.push(cambio('C', '¿Cancelar la orden ' + orden.folio + '?'));
-            }
-            formulario({
-                titulo: orden ? 'Orden de Trabajo ' + orden.folio + ' · ' + orden.estatus : 'Nueva Orden de Trabajo · ' + $('nombreObra').value.split('\n')[0],
-                aviso: orden && e2 !== 'O' ? 'La orden ya se liberó a producción: solo se puede consultar.' : '',
-                soloLectura: e2 !== 'O' || !obraAbierta(),
-                campos: [
-                    { id: 'nom_cliente', etiqueta: 'Cliente', valor: orden ? orden.nom_cliente : cat.cliente },
-                    { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: orden ? dia(orden.fecha) : hoy() },
-                    { id: 'fecha_entrega', etiqueta: 'Fecha de entrega', tipo: 'date', valor: orden ? dia(orden.fecha_entrega) : '' },
-                    { id: 'descripcion', etiqueta: 'Descripción', tipo: 'textarea', valor: orden ? orden.descripcion : '' }
-                ],
-                grids: [{
-                    id: 'partidas', titulo: 'Partidas', filas: orden ? orden.partidas : [{}],
-                    columnas: [
-                        { id: 'clave_articulo', etiqueta: 'Clave', ancho: '110px' },
-                        { id: 'descripcion', etiqueta: 'Descripción' },
-                        { id: 'unidades', etiqueta: 'Uds', tipo: 'number', ancho: '80px' },
-                        { id: 'um', etiqueta: 'U.M.', ancho: '80px' },
-                        { id: 'precio_unitario', etiqueta: 'Precio Unit.', tipo: 'number', ancho: '110px' },
-                        { id: 'importe', etiqueta: 'Importe', ancho: '110px', total: true, calc: function (f) { return num(f.unidades) * num(f.precio_unitario); } },
-                        { id: 'notas_adic', etiqueta: 'Notas' }
-                    ],
-                    importar: { texto: '⇩ Artículos del presupuesto', fn: function () {
-                        return cat.articulos.map(function (a) {
-                            return { articulo_id: a.articulo_id, clave_articulo: a.clave, descripcion: a.nombre, unidades: a.uds, um: a.um, precio_unitario: a.costo_unit };
-                        });
-                    } }
-                }],
-                acciones: acciones,
-                guardar: function (d) {
-                    return guardarCon('guardar_orden', {
-                        orden_id: orden ? orden.id : 0, nom_cliente: d.nom_cliente, fecha: d.fecha, fecha_entrega: d.fecha_entrega,
-                        descripcion: d.descripcion, partidas: d.partidas
-                    }).then(function (j) {
-                        if (!orden) alert('Se registró la orden de trabajo folio ' + j.folio + '.');
-                        catObra = null;
-                        cargarListado('ordenes', 'ordenes', 'No existen ordenes de trabajo asignadas a esta obra');
-                    });
-                }
-            });
+            cot.cat = cat;
+            cotAbrir(orden, 'ot');
         }).catch(avisarError);
+    }
+    function recargarOrdenes() {
+        catObra = null;
+        cargarListado('ordenes', 'ordenes', 'No existen ordenes de trabajo asignadas a esta obra');
     }
 
     // 2-Facturacion: Cotizacion Microsip (encabezado, General, Quejas de Cliente y Otros Datos)
+    // tipo 'ot': Orden de Trabajo (3-Orden Trabajo) con Salidas y Consumos de Material; estatus O, P, F o C
     var IVA = 0.16;
-    var cot = { id: 0, partidas: [], estatus: 'P', editable: true, cliente_id: null };
+    var cot = { id: 0, tipo: 'cot', partidas: [], estatus: 'P', editable: true, cliente_id: null };
+    function esOt() { return cot.tipo === 'ot'; }
 
     function cotHabilita(val) {
         cot.editable = val;
         $('cotDialogo').querySelectorAll('.cot-edit').forEach(function (el) { el.disabled = !val; });
+        if (esOt()) $('cotFolio').disabled = true;   // el folio de la orden lo asigna el sistema
         estadoDocumento($('cotDialogo'), { guardado: !!cot.id, editable: val, cancelado: cot.estatus === 'C' });
         cotPintar();
     }
     function cotPonerEstatus(e) {
         cot.estatus = e;
-        $('cotEstatus').textContent = e === 'C' ? 'Cancelado' : (cot.id ? 'Documento Creado' : 'Documento Nuevo');
+        $('cotEstatus').textContent = e === 'C' ? 'Cancelado'
+            : esOt() ? ({ P: 'En Produccion', F: 'Fin de Produccion' }[e] || (cot.id ? 'Orden Creada' : 'Orden Nueva'))
+            : (cot.id ? 'Documento Creado' : 'Documento Nuevo');
         $('cotEstatus').classList.toggle('cancelado', e === 'C');
     }
     function cotPestana(t) {
         $('cotDialogo').querySelectorAll('[data-cot-tab]').forEach(function (b) { b.classList.toggle('activo', b.dataset.cotTab === t); });
         $('cotDialogo').querySelectorAll('[data-cot-panel]').forEach(function (p) { p.classList.toggle('visible', p.dataset.cotPanel === t); });
         if (t === 'quejas') cotQuejas();
+        if (t === 'salidas' || t === 'consumos') cotMaterial(t);
     }
     // Pestaña General: Clave, Descripcion, Uds., U.Med., Precio.Unit., Total y Costo.Unita
     function cotPintar() {
@@ -879,9 +836,9 @@
         $('cotPartidas').innerHTML = cot.partidas.length ? cot.partidas.map(function (f, i) {
             return '<tr data-i="' + i + '"><td>' + campo(f, 'clave_articulo') + '</td><td>' + campo(f, 'descripcion') + '</td>' +
                 '<td>' + campo(f, 'unidades', true) + '</td><td>' + campo(f, 'um') + '</td><td>' + campo(f, 'precio_unitario', true) + '</td>' +
-                '<td class="num">' + (dinero(num(f.unidades) * num(f.precio_unitario)) || '$0.00') + '</td><td>' + campo(f, 'costo_unit', true) + '</td>' +
+                '<td class="num">' + (dinero(num(f.unidades) * num(f.precio_unitario)) || '$0.00') + '</td>' + (esOt() ? '' : '<td>' + campo(f, 'costo_unit', true) + '</td>') +
                 '<td>' + (cot.editable ? '<button type="button" class="quitar" title="Quitar">🗑</button>' : '') + '</td></tr>';
-        }).join('') : '<tr class="vacio"><td colspan="8">Sin partidas. Agregue un renglón o importe la materia prima del presupuesto.</td></tr>';
+        }).join('') : '<tr class="vacio"><td colspan="8">Sin partidas. Agregue un renglón o importe ' + (esOt() ? 'los artículos' : 'la materia prima') + ' del presupuesto.</td></tr>';
         cotTotales();
     }
     function cotTotales() {
@@ -900,12 +857,18 @@
     function dialogoCotizacion(f) {
         catalogosObra().then(function (cat) {
             cot.cat = cat;
-            if (!f) return cotAbrir(null);
+            if (!f) return cotAbrir(null, 'cot');
             return pedir('accion=documento&tipo=cot&id=' + encodeURIComponent(obraId) + '&doc=' + encodeURIComponent(f.id))
-                .then(function (j) { cotAbrir(j.documento); });
+                .then(function (j) { cotAbrir(j.documento, 'cot'); });
         }).catch(avisarError);
     }
-    function cotAbrir(doc) {
+    function cotAbrir(doc, tipo) {
+        cot.tipo = tipo;
+        var ot = esOt();
+        $('cotDialogo').classList.toggle('es-ot', ot);
+        $('cotCaption').textContent = ot ? 'Orden de Trabajo' : 'Cotizacion Microsip';
+        $('cotTituloDoc').textContent = ot ? 'Orden de Trabajo' : 'Cotizacion';
+        $('cotImportarTxt').textContent = ot ? 'Artículos del presupuesto' : 'Materia prima del presupuesto';
         cot.id = doc ? doc.id : 0;
         cot.cliente_id = doc ? doc.cliente_id : null;
         cot.partidas = doc ? doc.partidas.map(function (p) { return Object.assign({}, p); }) : [{}];
@@ -922,7 +885,7 @@
         $('cotCreoFecha').value = doc ? String(doc.fecha_creacion || '').substr(0, 16) : '';
         $('cotModifico').value = doc ? (doc.usuario_modificacion || '') : '';
         $('cotModificoFecha').value = doc ? String(doc.fecha_mod || '').substr(0, 16) : '';
-        cotPonerEstatus(doc ? String(doc.estatus || '').trim().toUpperCase() : 'P');
+        cotPonerEstatus(doc ? String((ot ? doc.estatus_2 : doc.estatus) || '').trim().toUpperCase() : (ot ? 'O' : 'P'));
         $('cotQuejas').innerHTML = '';
         $('cotQuejasAviso').hidden = true;
         cotPestana('general');
@@ -935,7 +898,8 @@
     $('cotAgregar').addEventListener('click', function () { cot.partidas.push({}); cotPintar(); });
     $('cotImportar').addEventListener('click', function () {
         var nuevas = (cot.cat.articulos || []).map(function (a) {
-            return { articulo_id: a.articulo_id, clave_articulo: a.clave, descripcion: a.nombre, unidades: a.uds, um: a.um, precio_unitario: 0, costo_unit: a.costo_unit };
+            return { articulo_id: a.articulo_id, clave_articulo: a.clave, descripcion: a.nombre, unidades: a.uds, um: a.um,
+                     precio_unitario: esOt() ? a.costo_unit : 0, costo_unit: a.costo_unit };
         });
         if (!nuevas.length) { alert('El presupuesto no tiene materia prima para importar.'); return; }
         cot.partidas = cot.partidas.filter(function (f) { return String(f.clave_articulo || f.descripcion || '').trim(); }).concat(nuevas);
@@ -970,6 +934,23 @@
                 $('cotQuejas').innerHTML = '<tr class="vacio"><td colspan="6">' + escapar(err.message) + '</td></tr>';
             });
     }
+    // Orden de Trabajo: salidas de material (retorna_doctos_salidas_por_obra) y consumos en obra registrados con esta OT
+    function cotMaterial(t) {
+        var tb = $(t === 'salidas' ? 'cotSalidas' : 'cotConsumos'), cols = t === 'salidas' ? 6 : 4;
+        var fila = function (txt) { return '<tr class="vacio"><td colspan="' + cols + '">' + escapar(txt) + '</td></tr>'; };
+        if (!cot.id) { tb.innerHTML = fila('Guarda la orden de trabajo para ver su material.'); return; }
+        tb.innerHTML = fila('Consultando…');
+        var folio = String($('cotFolio').value).trim();
+        pedir('accion=listado&tipo=' + t + '&id=' + encodeURIComponent(obraId)).then(function (j) {
+            var filas = j.filas.filter(function (f) { return String(t === 'salidas' ? f.ot : f.folio_orden).trim() === folio; });
+            tb.innerHTML = filas.length ? filas.map(function (f) {
+                return t === 'salidas'
+                    ? '<tr><td>' + escapar(f.folio_microsip) + '</td><td>' + escapar(fechaDMY(dia(f.fecha))) + '</td><td>' + escapar(f.estatus) + '</td><td>' + escapar(f.nom_concepto) +
+                      '</td><td>' + escapar(f.nom_almacen) + '</td><td class="num">' + (dinero(num(f.cos_tot)) || '$0.00') + '</td></tr>'
+                    : '<tr><td>' + escapar(f.folio) + '</td><td>' + escapar(fechaDMY(dia(f.fecha))) + '</td><td>' + escapar(f.estatus) + '</td><td class="num">' + escapar(f.uds_salida) + '</td></tr>';
+            }).join('') : fila(t === 'salidas' ? 'La orden de trabajo no tiene salidas de material.' : 'La orden de trabajo no tiene consumos de material en obra.');
+        }).catch(function (err) { tb.innerHTML = fila(err.message); });
+    }
     $('cotDialogo').addEventListener('click', function (e) {
         var t = e.target.closest('[data-cot-tab]');
         if (t) { cotPestana(t.dataset.cotTab); return; }
@@ -981,6 +962,7 @@
 
     // Guardar / Guardar y Cerrar
     function cotGuardar(cerrar) {
+        if (esOt()) { otGuardar(cerrar); return; }
         if (!$('cotNombre').value.trim()) {
             alert('Falta el cliente. Búscalo con el botón del embudo junto a «Nombre».');
             $('cotNombre').focus();
@@ -1013,15 +995,80 @@
             notificar('Se guardó correctamente.');
         }).catch(avisarError);
     }
+    function otGuardar(cerrar) {
+        var partidas = cot.partidas.filter(function (f) { return String(f.clave_articulo || '').trim() || String(f.descripcion || '').trim(); });
+        if (!partidas.length) {
+            alert('Agrega al menos una partida en la pestaña General (botón «Agregar renglón»).');
+            cotPestana('general');
+            return;
+        }
+        if (hayNegativos(partidas, ['unidades', 'precio_unitario'])) {
+            alert('Hay cantidades negativas en las partidas. Corrígelas para poder guardar.');
+            cotPestana('general');
+            return;
+        }
+        if (!$('cotDescripcion').value.trim()) {
+            alert('Captura la descripción de la orden de trabajo en la pestaña Otros Datos.');
+            cotPestana('otros');
+            $('cotDescripcion').focus();
+            return;
+        }
+        var nueva = !cot.id;
+        guardarCon('guardar_orden', {
+            orden_id: cot.id, fecha: $('cotFecha').value, fecha_entrega: $('cotEntrega').value,
+            cliente_id: cot.cliente_id, clave_cliente: $('cotClave').value, nom_cliente: $('cotNombre').value,
+            urgencia: $('cotUrgencia').value, descripcion: $('cotDescripcion').value, partidas: partidas
+        }).then(function (j) {
+            cot.id = j.orden_id;
+            $('cotDocId').value = cot.id;
+            $('cotFolio').value = j.folio || '';
+            cotPonerEstatus('O');
+            recargarOrdenes();
+            $('cotDialogo')._sucio = false;
+            if (cerrar) $('cotDialogo').close();
+            else cotHabilita(false);
+            if (nueva) alert('Se registró la orden de trabajo folio ' + j.folio + '.');
+            else notificar('Se guardó correctamente.');
+        }).catch(avisarError);
+    }
+    // Enviar a Produccion (O→P), Fin de Produccion (P→F) o Cancelar (O/P→C)
+    function otEstatus(est, pregunta, aviso) {
+        if (!confirm(pregunta)) return;
+        guardarCon('estatus_orden', { orden_id: cot.id, estatus: est }).then(function () {
+            cotPonerEstatus(est);
+            cotHabilita(false);
+            recargarOrdenes();
+            notificar(aviso);
+        }).catch(avisarError);
+    }
+    function otProduccion() {
+        if (!validaEstatusObra()) return;
+        if (!cot.id) { alert('Guarda la orden de trabajo antes de enviarla a producción.'); return; }
+        if (cot.editable) { alert('Guarda los cambios de la orden antes de enviarla a producción.'); return; }
+        if (cot.estatus !== 'O') { alert('La orden ya se envió a producción o está cancelada.'); return; }
+        otEstatus('P', '¿Liberar la orden ' + $('cotFolio').value + ' a producción?', 'La orden se envió a producción.');
+    }
+    function otModificarEstatus() {
+        if (!validaEstatusObra()) return;
+        if (cot.estatus !== 'P') { alert('Solo una orden en producción se puede pasar a Fin de Producción.'); return; }
+        otEstatus('F', '¿Enviar la orden ' + $('cotFolio').value + ' a Fin de Producción?', 'La orden quedó en Fin de Producción.');
+    }
+
     function cotModificar() {
         if (!validaEstatusObra()) return;
         if (cot.estatus === 'C') { alert('No es posible modificar un documento cancelado'); return; }
+        if (esOt() && cot.estatus !== 'O') { alert('Solo se puede modificar una orden que no se ha liberado a producción.'); return; }
         cotHabilita(true);
     }
     function cotCancelar() {
         if (!validaEstatusObra()) return;
         if (!cot.id) { alert('El documento aún no se ha guardado.'); return; }
         if (cot.estatus === 'C') { alert('El documento ya está cancelado.'); return; }
+        if (esOt()) {
+            if (cot.estatus === 'F') { alert('La orden ya terminó su producción: no se puede cancelar.'); return; }
+            otEstatus('C', '¿Cancelar la orden ' + $('cotFolio').value + '?', 'La orden de trabajo quedó cancelada.');
+            return;
+        }
         if (!confirm('¿Deseas archivar como cancelado este documento?')) return;
         var motivo = prompt('INGRESA EL MOTIVO DE CANCELACION: ', '');
         if (motivo === null) return;
@@ -1037,7 +1084,7 @@
         var sub = cotTotales(), iva = Math.round(sub * IVA * 100) / 100;
         var filas = cot.partidas.filter(function (f) { return String(f.clave_articulo || f.descripcion || '').trim(); });
         imprimirFormato({
-            titulo: 'COTIZACION', id: cot.id, folioOt: 'RS ' + ($('cotFolio').value || '0'), fecha: fechaDMY($('cotFecha').value),
+            titulo: esOt() ? 'ORDEN DE TRABAJO' : 'COTIZACION', id: cot.id, folioOt: 'RS ' + ($('cotFolio').value || '0'), fecha: fechaDMY($('cotFecha').value),
             concepto: 'Entrega ' + fechaDMY($('cotEntrega').value) + ' · ' + $('cotUrgencia').value, estatus: $('cotEstatus').textContent,
             unidad: '—', descripcion: $('cotDescripcion').value,
             cuerpo: '<b>CLIENTE: </b>' + escapar(($('cotClave').value ? $('cotClave').value + ' · ' : '') + $('cotNombre').value) +
@@ -1058,12 +1105,16 @@
         'imprimir': cotImprimir,
         'modificar': cotModificar,
         'cancelar': cotCancelar,
-        'bitacora': function () { verBitacora('cot', cot.id); },
+        'bitacora': function () { verBitacora(esOt() ? 'orden' : 'cot', cot.id); },
+        'produccion': otProduccion,
         'cerrar': function () { cerrarDoc($('cotDialogo')); },
         // Escriben en Microsip: la web solo puede hacerlo por la API de Easy-Glass, que aún no tiene esos recursos
         'entrada-pt': function () { alert('Entrada PT da de alta la entrada de producto terminado en Microsip. La API de Easy-Glass aún no tiene ese recurso, así que se sigue haciendo en el sistema de escritorio.'); },
         'enviar': function () { alert('Enviar a Microsip de una cotización capturada aquí necesita un recurso nuevo en la API de Easy-Glass (hoy solo envía presupuestos de Easy-Glass con folio EG). Mientras tanto se envía desde el sistema de escritorio.'); },
-        'estatus': function () { alert('Modificar Estatus aún no está disponible en la web.'); }
+        'estatus': function () {
+            if (esOt()) otModificarEstatus();
+            else alert('Modificar Estatus aún no está disponible en la web.');
+        }
     };
     $('cotDialogo').querySelector('.mo-toolbar').addEventListener('click', function (e) {
         var b = e.target.closest('[data-cot]');

@@ -519,13 +519,15 @@ function documento(string $tipo, int $obra, int $id): array
 {
     switch ($tipo) {
         case 'orden':
-            $o = bd_fila('AW', 'select docto_orden_obra_id as id, folio, estatus, nom_cliente, fecha, fecha_entrega, descripcion, importe_neto
-                                  from doctos_orden_obra where docto_orden_obra_id = ? and obra_id = ?', [$id, $obra]);
+            // Se abre en la ventana Orden de Trabajo (Dialog242): encabezado, cliente, Otros Datos y bitácora
+            $o = bd_fila('AW', 'select * from doctos_orden_obra where docto_orden_obra_id = ? and obra_id = ?', [$id, $obra]);
             if (!$o) break;
+            $o['id'] = $o['docto_orden_obra_id'];
             $o['estatus_2'] = trim((string) $o['estatus']);
             $o['estatus'] = estatusLetra($o['estatus'], true);
             $o['partidas'] = bd_filas('AW', 'select articulo_id, clave_articulo, descripcion, unidades, um, precio_unitario, precio_total, notas_adic
                                                from doctos_orden_obra_det where docto_orden_obra_id = ? order by pos, docto_orden_obra_det_id', [$id]);
+            $o['bitacora'] = bitacoraDocumento($id);
             return $o;
 
         case 'mo':

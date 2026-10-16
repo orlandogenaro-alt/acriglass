@@ -301,6 +301,8 @@ function guardarOrden(array $d): array
     }
     if (!$partidas) error('Agrega al menos una partida a la orden de trabajo.');
     $enc = [
+        'cliente_id'    => (int) ($d['cliente_id'] ?? 0) ?: null,
+        'clave_cliente' => texto($d['clave_cliente'] ?? '', 30),
         'nom_cliente'   => texto($d['nom_cliente'] ?? '', 200),
         'fecha'         => fecha($d['fecha'] ?? '') ?? date('Y-m-d'),
         'fecha_entrega' => fecha($d['fecha_entrega'] ?? ''),
@@ -308,6 +310,7 @@ function guardarOrden(array $d): array
         'importe_neto'  => numero(array_sum(array_column($partidas, 'precio_total'))),
     ];
     if ($enc['descripcion'] === null) error('Captura la descripción de la orden de trabajo.');
+    if (bd_tiene_columna('AW', 'doctos_orden_obra', 'urgencia')) $enc['urgencia'] = texto($d['urgencia'] ?? '', 30);
 
     $pdo = bd_pdo('AW');
     $pdo->beginTransaction();

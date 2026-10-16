@@ -518,10 +518,11 @@ function iconoPestana() {
     </div>
 </dialog>
 
-<!-- ============ COTIZACION MICROSIP (2-Facturacion) ============ -->
+<!-- ============ COTIZACION MICROSIP (2-Facturacion) Y ORDEN DE TRABAJO (3-Orden Trabajo) · Dialog242 ============ -->
+<!-- solo-cot / solo-ot: lo que solo se ve en un modo (js/obra.js pone la clase es-ot en la Orden de Trabajo) -->
 <dialog class="hs-dialogo cot-dialogo" id="cotDialogo">
     <div class="hs-cabecera">
-        <strong>Cotizacion Microsip</strong>
+        <strong id="cotCaption">Cotizacion Microsip</strong>
         <button type="button" class="hs-cerrar" data-cot="cerrar" title="Cerrar">✕</button>
     </div>
     <div class="toolbar mo-toolbar">
@@ -537,11 +538,15 @@ function iconoPestana() {
             <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="7" fill="#fff" stroke="#666"/><rect x="2" y="9" width="20" height="9" rx="2" fill="#8a8a8a"/><rect x="6" y="14" width="12" height="8" fill="#fff" stroke="#666"/></svg>
             <span>Imprimir</span>
         </button>
-        <button type="button" class="tb" data-cot="entrada-pt">
+        <button type="button" class="tb solo-cot" data-cot="entrada-pt">
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="16" height="18" fill="#dfeefc" stroke="#3b7dc4"/><path d="M7 8h8M7 12h8M7 16h5" stroke="#3b7dc4"/><path d="M15 15l3 3 4-6" stroke="#2e7d32" stroke-width="2" fill="none"/></svg>
             <span>Entrada PT</span>
         </button>
-        <button type="button" class="tb" data-cot="enviar">
+        <button type="button" class="tb solo-ot" data-cot="produccion">
+            <svg viewBox="0 0 24 24"><rect x="2" y="4" width="14" height="16" fill="#dfeefc" stroke="#3b7dc4"/><path d="M7 9h5M7 13h5" stroke="#3b7dc4"/><path d="M12 16h9M18 13l3 3-3 3" stroke="#2e7d32" stroke-width="2" fill="none"/></svg>
+            <span>Enviar a Produccion</span>
+        </button>
+        <button type="button" class="tb solo-cot" data-cot="enviar">
             <svg viewBox="0 0 24 24"><rect x="2" y="4" width="14" height="16" fill="#dfeefc" stroke="#3b7dc4"/><path d="M10 12h11M17 8l4 4-4 4" stroke="#2e7d32" stroke-width="2" fill="none"/></svg>
             <span>Enviar a Microsip</span>
         </button>
@@ -571,7 +576,7 @@ function iconoPestana() {
         <p class="doc-ayuda" role="status"></p>
         <div class="cot-enc">
             <div>
-                <h2 class="cot-titulo">Cotizacion</h2>
+                <h2 class="cot-titulo" id="cotTituloDoc">Cotizacion</h2>
                 <div class="cot-obra"><span>OBRA:</span> <b id="cotObra"></b></div>
             </div>
             <div class="cot-fecfol">
@@ -598,6 +603,8 @@ function iconoPestana() {
 
         <nav class="cot-tabs">
             <button type="button" class="activo" data-cot-tab="general">General</button>
+            <button type="button" class="solo-ot" data-cot-tab="salidas">Salidas de Material</button>
+            <button type="button" class="solo-ot" data-cot-tab="consumos">Consumos de Material en Obra</button>
             <button type="button" data-cot-tab="quejas">Quejas de Cliente</button>
             <button type="button" data-cot-tab="otros">Otros Datos</button>
         </nav>
@@ -605,19 +612,38 @@ function iconoPestana() {
         <section class="cot-panel visible" data-cot-panel="general">
             <div class="cot-acciones">
                 <button type="button" class="ob-btn cot-edit" id="cotAgregar">＋ Agregar renglón</button>
-                <button type="button" class="ob-btn cot-edit" id="cotImportar">⇩ Materia prima del presupuesto</button>
+                <button type="button" class="ob-btn cot-edit" id="cotImportar">⇩ <span id="cotImportarTxt">Materia prima del presupuesto</span></button>
             </div>
             <div class="mo-grid cot-grid">
                 <table>
                     <thead><tr><th style="width:110px">Clave</th><th>Descripcion</th><th style="width:70px">Uds.</th><th style="width:70px">U.Med.</th>
-                        <th style="width:95px">Precio.Unit.</th><th style="width:100px">Total</th><th style="width:95px">Costo.Unita</th><th style="width:26px"></th></tr></thead>
+                        <th style="width:95px">Precio.Unit.</th><th style="width:100px">Total</th><th style="width:95px" class="solo-cot">Costo.Unita</th><th style="width:26px"></th></tr></thead>
                     <tbody id="cotPartidas"></tbody>
                 </table>
             </div>
             <div class="cot-totales">
-                <label>Sub Total: <input id="cotSubtotal" readonly></label><input id="cotCosto" readonly title="Costo total">
+                <label>Sub Total: <input id="cotSubtotal" readonly></label><input id="cotCosto" class="solo-cot" readonly title="Costo total">
                 <label>IVA: <input id="cotIva" readonly></label><span></span>
                 <label>Total: <input id="cotTotal" readonly></label><span></span>
+            </div>
+        </section>
+
+        <!-- Solo en la Orden de Trabajo: salidas y consumos de material registrados con esta OT -->
+        <section class="cot-panel" data-cot-panel="salidas">
+            <div class="mo-grid cot-grid">
+                <table>
+                    <thead><tr><th style="width:90px">Folio</th><th style="width:95px">Fecha</th><th style="width:100px">Estatus</th><th>Concepto</th><th>Almacen</th><th style="width:110px">Costo Total</th></tr></thead>
+                    <tbody id="cotSalidas"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="cot-panel" data-cot-panel="consumos">
+            <div class="mo-grid cot-grid">
+                <table>
+                    <thead><tr><th style="width:90px">Folio</th><th style="width:95px">Fecha</th><th style="width:100px">Estatus</th><th style="width:110px">Uds Salida</th></tr></thead>
+                    <tbody id="cotConsumos"></tbody>
+                </table>
             </div>
         </section>
 

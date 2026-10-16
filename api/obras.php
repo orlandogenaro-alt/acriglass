@@ -811,7 +811,32 @@ function facturacion(int $obraId): array
                  'estatus' => $f['estatus'], 'cliente' => $f['nom_cliente'], 'fecha' => $f['fecha'], 'importe' => (float) $f['importe_con_iva']], $f['folio']);
     }
     if (!$filas) $avisos[] = 'No existen Cotizaciones asignadas a esta obra.';
-    return ['filas' => $filas, 'avisos' => $avisos];
+    return ['filas' => $filas, 'avisos' => $avisos, 'resumen' => resumenFacturado($obraId, $filas)];
+}
+
+// Facturado contra el presupuesto que se le dio al cliente (total con IVA del presupuesto de obra).
+// Facturado = facturas de Microsip de las cotizaciones y folios de Easy-Glass + notas de cargo de AW.
+// Por facturar = cotizaciones y folios que aún no tienen factura (su pedido o presupuesto).
+function resumenFacturado(int $obraId, array $filas): array
+{
+    $p = bd_fila('AW', 'select b.folio, b.subtotal, b.total from reg_obras a join doctos_sugerido_obra b on b.docto_sugerido_obra_id = a.sugerido_id where a.obra_id = ?', [$obraId]);
+    $facturado = $porFacturar = 0.0;
+    foreach ($filas as $f) {
+        if ($f['tipo'] === 1) $facturado += (float) $f['cargos'];   // nota de cargo (0 si está cancelada)
+        if ($f['tipo'] !== -1 && $f['tipo'] !== 9) continue;
+        if ((float) $f['imp_factura'] > 0) $facturado += (float) $f['imp_factura'];
+        elseif (stripos((string) $f['estatus'], 'cancel') === false) $porFacturar += (float) $f['cargos'];
+    }
+    $pres = $p ? (float) $p['total'] : 0.0;
+    return [
+        'presupuesto_folio' => $p['folio'] ?? null,
+        'presupuesto'       => round($pres, 2),
+        'facturado'         => round($facturado, 2),
+        'por_facturar'      => round($porFacturar, 2),
+        'diferencia'        => round($facturado - $pres, 2),              // > 0: se facturó más de lo presupuestado
+        'pct'               => $pres > 0 ? round($facturado / $pres * 100, 1) : null,
+        'proyectado'        => round($facturado + $porFacturar - $pres, 2), // si se factura todo lo pendiente
+    ];
 }
 
 // Tablero de los proyectos en Bienvenido: obras del año (sin las canceladas) o una sola obra.

@@ -332,6 +332,7 @@ function iconoPestana() {
     <?php endif; ?>
     <?php if ($clave === 'facturacion'): ?>
     <ul class="ob-rel-avisos" id="facAvisos"></ul>
+    <div class="ob-fac-resumen" id="facResumen" hidden></div>
     <?php endif; ?>
     <div class="grid-caja">
         <table class="grid ob-grid" data-columnas="<?= e(json_encode($l['columnas'], JSON_UNESCAPED_UNICODE)) ?>"

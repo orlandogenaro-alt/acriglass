@@ -726,10 +726,30 @@
             datosListado.facturacion = j.filas;
             pintarListado(vista, j.filas, 'No existen Cotizaciones asignadas a esta obra.');
             $('facAvisos').innerHTML = j.avisos.map(function (a) { return '<li>' + escapar(a) + '</li>'; }).join('');
+            pintarResumenFacturado(j.resumen);
         }).catch(function (err) {
             cargado.facturacion = false;
             estado(vista, '⚠ ' + err.message);
         });
+    }
+
+    // Facturado contra el presupuesto que se le dio al cliente (con IVA)
+    function pintarResumenFacturado(r) {
+        var caja = $('facResumen');
+        if (!r || !r.presupuesto) { caja.hidden = true; return; }
+        var dif = r.diferencia, proy = r.proyectado;
+        var dato = function (etiqueta, valor, clase, nota) {
+            return '<div class="' + (clase || '') + '"><span>' + etiqueta + '</span><strong>' + valor + '</strong>' + (nota ? '<small>' + nota + '</small>' : '') + '</div>';
+        };
+        caja.innerHTML =
+            dato('Presupuesto al cliente', dinero(r.presupuesto), '', r.presupuesto_folio ? 'Folio ' + escapar(r.presupuesto_folio) + ' · con IVA' : 'con IVA') +
+            dato('Facturado', dinero(r.facturado), '', r.pct === null ? '' : r.pct.toFixed(1) + ' % del presupuesto') +
+            dato(dif > 0 ? 'Excedido' : 'Falta por facturar', dinero(Math.abs(dif)), dif > 0 ? 'mal' : 'bien',
+                 dif > 0 ? 'Se facturó más de lo presupuestado' : 'Dentro del presupuesto') +
+            dato('Pendiente de facturar', dinero(r.por_facturar), '', 'Pedidos y folios sin factura') +
+            dato('Proyectado al terminar', (proy > 0 ? '+' : proy < 0 ? '−' : '') + dinero(Math.abs(proy)), proy > 0 ? 'mal' : 'bien',
+                 proy > 0 ? 'Se pasaría del presupuesto' : 'Quedaría dentro del presupuesto');
+        caja.hidden = false;
     }
 
     function verDetalleFactura(f) {

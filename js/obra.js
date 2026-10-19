@@ -727,6 +727,7 @@
             pintarListado(vista, j.filas, 'No existen Cotizaciones asignadas a esta obra.');
             $('facAvisos').innerHTML = j.avisos.map(function (a) { return '<li>' + escapar(a) + '</li>'; }).join('');
             pintarResumenFacturado(j.resumen);
+            explicarTotalesFacturacion(j.filas);
         }).catch(function (err) {
             cargado.facturacion = false;
             estado(vista, '⚠ ' + err.message);
@@ -734,26 +735,116 @@
     }
 
     // Facturado contra el presupuesto que se le dio al cliente (con IVA)
+    // Cada tarjeta y total explica al pasar el mouse de dónde sale su número
     function pintarResumenFacturado(r) {
         var caja = $('facResumen');
         if (!r || !r.presupuesto) { caja.hidden = true; return; }
         var dif = r.diferencia, proy = r.proyectado;
-        var dato = function (etiqueta, valor, clase, nota) {
-            return '<div class="' + (clase || '') + '"><span>' + etiqueta + '</span><strong>' + valor + '</strong>' + (nota ? '<small>' + nota + '</small>' : '') + '</div>';
+        var conSigno = function (v) { return (v < 0 ? '−' : '') + dinero(Math.abs(v)); };
+        var tarjetas = [];
+        var dato = function (etiqueta, valor, clase, nota, explica) {
+            tarjetas.push(explica);
+            return '<div class="' + (clase || '') + '" tabindex="0"><span>' + etiqueta + ' <i class="ob-tip-ico">ⓘ</i></span><strong>' + valor + '</strong>' + (nota ? '<small>' + nota + '</small>' : '') + '</div>';
         };
+        var gastos = tipGrupo('Compras de material · 5-Salidas Material', r.compras_det, r.compras) +
+                     tipGrupo('Gastos indirectos · 8-Gastos Adicion. (Imp.Real)', r.indirectos_det, r.indirectos) +
+                     tipGrupo('Mano de obra · 6-Mano de Obra (Total Real)', r.mano_obra_det, r.mano_obra);
         caja.innerHTML =
-            dato('Presupuesto al cliente', dinero(r.presupuesto), '', r.presupuesto_folio ? 'Folio ' + escapar(r.presupuesto_folio) + ' · con IVA' : 'con IVA') +
-            dato('Facturado', dinero(r.facturado), '', r.pct === null ? '' : r.pct.toFixed(1) + ' % del presupuesto') +
+            dato('Presupuesto al cliente', dinero(r.presupuesto), '', r.presupuesto_folio ? 'Folio ' + escapar(r.presupuesto_folio) + ' · con IVA' : 'con IVA',
+                 tipTexto('Total con IVA del presupuesto de obra' + (r.presupuesto_folio ? ' folio ' + r.presupuesto_folio : '') + ' ligado a la obra en 1-Datos.') +
+                 tipCuenta([['Subtotal', r.presupuesto_sub], ['IVA', r.presupuesto - r.presupuesto_sub], ['Total con IVA', r.presupuesto, true]])) +
+            dato('Facturado', dinero(r.facturado), '', r.pct === null ? '' : r.pct.toFixed(1) + ' % del presupuesto',
+                 tipTexto('Suma con IVA de las facturas de Microsip (columna IMP.FACTURA) de las cotizaciones y folios de Easy-Glass de la obra, más las notas de cargo.') +
+                 tipGrupo('Facturas', r.facturas, r.facturado) +
+                 (r.pct === null ? '' : tipTexto(dinero(r.facturado) + ' ÷ ' + dinero(r.presupuesto) + ' = ' + r.pct.toFixed(1) + ' % del presupuesto'))) +
             dato(dif > 0 ? 'Excedido' : 'Falta por facturar', dinero(Math.abs(dif)), dif > 0 ? 'mal' : 'bien',
-                 dif > 0 ? 'Se facturó más de lo presupuestado' : 'Dentro del presupuesto') +
+                 dif > 0 ? 'Se facturó más de lo presupuestado' : 'Dentro del presupuesto',
+                 tipCuenta([['Presupuesto al cliente', r.presupuesto], ['− Facturado', r.facturado], [dif > 0 ? 'Excedido' : 'Falta por facturar', Math.abs(dif), true]])) +
             dato('Gastado', dinero(r.gastado), '',
-                 'Compras ' + dinero(r.compras) + ' · Indirectos ' + dinero(r.indirectos) + ' · M.O. ' + dinero(r.mano_obra)) +
-            dato('Utilidad al momento', (r.utilidad < 0 ? '−' : '') + dinero(Math.abs(r.utilidad)), r.utilidad < 0 ? 'mal' : 'bien',
-                 'Facturado sin IVA ' + dinero(r.facturado_sin_iva) + ' − gastado' + (r.margen === null ? '' : ' · ' + r.margen.toFixed(1) + ' %')) +
+                 'Compras ' + dinero(r.compras) + ' · Indirectos ' + dinero(r.indirectos) + ' · M.O. ' + dinero(r.mano_obra),
+                 tipTexto('Lo real registrado en la obra, sin IVA y sin los documentos cancelados. Es la suma de los totales de las pestañas 5, 8 y 6.') +
+                 gastos + tipCuenta([['Gastado', r.gastado, true]]) +
+                 (r.sin_real > 0 ? tipTexto('Hay ' + dinero(r.sin_real) + ' capturados en mano de obra o gastos que todavía no tienen importe real: no cuentan hasta que se registre lo real.', 'aviso') : '')) +
+            dato('Utilidad al momento', conSigno(r.utilidad), r.utilidad < 0 ? 'mal' : 'bien',
+                 'Facturado sin IVA − gastado' + (r.margen === null ? '' : ' · margen ' + r.margen.toFixed(1) + ' %'),
+                 tipTexto('Lo facturado sin IVA menos lo gastado (los costos van sin IVA).') +
+                 tipCuenta([['Facturado con IVA', r.facturado], ['÷ ' + (1 + r.iva_pct / 100).toFixed(2) + ' (IVA ' + r.iva_pct + ' %)', r.facturado_sin_iva], ['− Gastado', r.gastado],
+                            ['Utilidad', r.utilidad, true]]) +
+                 (r.margen === null ? '' : tipTexto('Margen: ' + conSigno(r.utilidad) + ' ÷ ' + dinero(r.facturado_sin_iva) + ' = ' + r.margen.toFixed(1) + ' %'))) +
             dato('Proyectado al terminar', (proy > 0 ? '+' : proy < 0 ? '−' : '') + dinero(Math.abs(proy)), proy > 0 ? 'mal' : 'bien',
-                 proy > 0 ? 'Se pasaría del presupuesto' : 'Quedaría dentro del presupuesto');
+                 proy > 0 ? 'Se pasaría del presupuesto' : 'Quedaría dentro del presupuesto',
+                 tipTexto('Cómo quedaría contra el presupuesto si se facturan todos los pedidos y folios que aún no tienen factura.') +
+                 tipGrupo('Pendiente de facturar', r.pendientes, r.por_facturar) +
+                 tipCuenta([['Facturado', r.facturado], ['+ Pendiente de facturar', r.por_facturar], ['− Presupuesto', r.presupuesto], ['Proyectado', proy, true]]));
+        Array.prototype.forEach.call(caja.children, function (d, i) { d._tip = tarjetas[i]; });
         caja.hidden = false;
     }
+
+    // Totales de abajo de 2-Facturacion: qué suma cada uno, renglón por renglón
+    function explicarTotalesFacturacion(filas) {
+        var lineas = function (campo) {
+            return filas.filter(function (f) { return +f[campo]; }).map(function (f) {
+                return { doc: f.tipo_docto + ' ' + f.folio + (f.factura && f.factura !== f.folio && f.factura !== 'NO FACTUR' ? ' · Fact. ' + f.factura : ''), fecha: f.fecha, importe: +f[campo] };
+            });
+        };
+        var suma = function (campo) { return filas.reduce(function (s, f) { return s + (+f[campo] || 0); }, 0); };
+        [['totImpCot', 'importe', 'Importe con IVA de cada renglón: el total de la cotización, pedido o factura de Microsip, o el folio de Easy-Glass; en AW, el pago en efectivo, nota de cargo o anticipo.'],
+         ['totCargos', 'cargos', 'Lo que se le cobra al cliente: el total de la factura si ya está facturado; si no, el importe del pedido o folio. Más las notas de cargo.'],
+         ['totCred', 'creditos', 'Lo que el cliente ya pagó: cobros, anticipos y notas de crédito aplicados en Microsip, más los pagos en efectivo y anticipos capturados en AW.'],
+         ['totSaldo', 'saldo', 'Lo que falta por cobrar: Total Cargos − Total Creditos.']].forEach(function (t) {
+            var o = $(t[0]);
+            if (!o) return;
+            var etiqueta = o.parentNode;
+            etiqueta._tip = tipTexto(t[2]) + (t[1] === 'saldo'
+                ? tipCuenta([['Total Cargos', suma('cargos')], ['− Total Creditos', suma('creditos')], ['Saldo', suma('saldo'), true]])
+                : tipGrupo('', lineas(t[1]), suma(t[1])));
+            etiqueta.classList.add('ob-tip-ancla');
+        });
+    }
+
+    function tipTexto(texto, clase) { return '<p' + (clase ? ' class="' + clase + '"' : '') + '>' + escapar(texto) + '</p>'; }
+    function tipCuenta(renglones) {
+        return '<table>' + renglones.map(function (x) {
+            return '<tr' + (x[2] ? ' class="tot"' : '') + '><td>' + escapar(x[0]) + '</td><td class="num">' + (x[1] < 0 ? '−' : '') + dinero(Math.abs(x[1])) + '</td></tr>';
+        }).join('') + '</table>';
+    }
+    function tipGrupo(titulo, lineas, total) {
+        lineas = lineas || [];
+        var max = 12, resto = lineas.slice(max);
+        return (titulo ? '<h4>' + escapar(titulo) + '</h4>' : '') + '<table>' +
+            (lineas.length ? lineas.slice(0, max).map(function (l) {
+                return '<tr><td>' + escapar(l.doc) + (l.fecha ? ' <small>' + fechaDMY(l.fecha) + '</small>' : '') +
+                    (l.capturado && l.capturado !== l.importe ? ' <small>(capturado ' + dinero(l.capturado) + ')</small>' : '') +
+                    '</td><td class="num">' + dinero(l.importe) + '</td></tr>';
+            }).join('') : '<tr><td colspan="2"><small>Sin documentos</small></td></tr>') +
+            (resto.length ? '<tr><td><small>y ' + resto.length + ' más</small></td><td class="num">' +
+                dinero(resto.reduce(function (s, l) { return s + l.importe; }, 0)) + '</td></tr>' : '') +
+            '<tr class="tot"><td>Total</td><td class="num">' + dinero(total) + '</td></tr></table>';
+    }
+
+    // Un solo recuadro flotante para todas las explicaciones (fixed: no lo recorta ningún contenedor)
+    (function () {
+        var tip = document.createElement('div');
+        tip.className = 'ob-tip';
+        tip.hidden = true;
+        document.body.appendChild(tip);
+        var actual = null;
+        function mostrar(el) {
+            actual = el;
+            tip.innerHTML = el._tip;
+            tip.hidden = false;
+            var r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+            var x = Math.max(8, Math.min(r.left, innerWidth - w - 8));
+            var y = r.bottom + 6 + h > innerHeight ? r.top - h - 6 : r.bottom + 6;
+            tip.style.left = x + 'px';
+            tip.style.top = Math.max(8, y) + 'px';
+        }
+        function ocultar() { actual = null; tip.hidden = true; }
+        var anclaDe = function (t) { while (t && t !== document) { if (t._tip) return t; t = t.parentNode; } return null; };
+        document.addEventListener('mouseover', function (e) { var el = anclaDe(e.target); if (el && el !== actual) mostrar(el); else if (!el && actual) ocultar(); });
+        document.addEventListener('focusin', function (e) { var el = anclaDe(e.target); if (el) mostrar(el); else if (actual) ocultar(); });
+        document.addEventListener('scroll', ocultar, true);
+    })();
 
     function verDetalleFactura(f) {
         $('facDetalleTitulo').textContent = 'Documentos en Microsip · ' + f.folio + (f.cobranza ? ' · Cobranza: ' + f.cobranza : '');

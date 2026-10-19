@@ -6,6 +6,7 @@ return [
     [
         'fecha' => '2026-10-19',
         'cambios' => [
+            ['mejora', 'Obra: cada número de 2-Facturación explica de dónde sale', 'Al pasar el mouse (o con Tab) sobre las tarjetas de arriba y los totales de abajo de 2-Facturación aparece cómo se calcula y de qué documentos viene: las facturas que forman lo facturado, la cuenta de falta por facturar, utilidad y proyectado, y en Gastado cada salida de material, gasto adicional y mano de obra con su importe. Gastado ahora cuadra con los totales reales de las pestañas 5, 8 y 6 (sin cancelados) y avisa cuánto hay capturado sin importe real. Lo facturado sin IVA usa el IVA del presupuesto, como la analítica de Imprimir.'],
             ['mejora', 'Obra: gastado y utilidad al momento en 2-Facturación', 'En lugar de «Pendiente de facturar», arriba de 2-Facturación se ve lo Gastado en la obra (compras de material + gastos indirectos, como comidas + mano de obra, solo lo real) con su desglose, y la Utilidad al momento: lo facturado sin IVA menos lo gastado, con su % de margen. En rojo si va en pérdida.'],
             ['mejora', 'Obra: Gastos de Obra acomodado como en el escritorio', 'En la ventana Gastos de Obra la Fecha queda arriba a la derecha junto al Folio de la OT (ahora más ancho), y el Estatus grande debajo de la Fecha, a la altura de la Unidad, igual que en el sistema de escritorio.'],
         ],

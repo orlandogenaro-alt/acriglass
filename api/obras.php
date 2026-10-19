@@ -817,39 +817,104 @@ function facturacion(int $obraId): array
 // Facturado contra el presupuesto que se le dio al cliente (total con IVA del presupuesto de obra).
 // Facturado = facturas de Microsip de las cotizaciones y folios de Easy-Glass + notas de cargo de AW.
 // Por facturar = cotizaciones y folios que aún no tienen factura (su pedido o presupuesto).
+// Gastado = lo real de las pestañas 5-Salidas Material (compras), 8-Gastos Adicion. (indirectos) y
+// 6-Mano de Obra, sin los cancelados. Utilidad = facturado sin IVA − gastado (los costos van sin IVA).
+// Cada parte trae sus documentos para explicar el número al pasar el mouse.
 function resumenFacturado(int $obraId, array $filas): array
 {
-    $p = bd_fila('AW', 'select b.folio, b.subtotal, b.total from reg_obras a join doctos_sugerido_obra b on b.docto_sugerido_obra_id = a.sugerido_id where a.obra_id = ?', [$obraId]);
+    $p = bd_fila('AW', 'select b.docto_sugerido_obra_id as id, b.folio, b.subtotal, b.total from reg_obras a join doctos_sugerido_obra b on b.docto_sugerido_obra_id = a.sugerido_id where a.obra_id = ?', [$obraId]);
     $facturado = $porFacturar = 0.0;
+    $facturas = $pendientes = [];
     foreach ($filas as $f) {
-        if ($f['tipo'] === 1) $facturado += (float) $f['cargos'];   // nota de cargo (0 si está cancelada)
+        if ($f['tipo'] === 1 && (float) $f['cargos'] > 0) {   // nota de cargo (0 si está cancelada)
+            $facturado += (float) $f['cargos'];
+            $facturas[] = ['doc' => 'Nota de cargo ' . $f['folio'], 'fecha' => $f['fecha'], 'importe' => (float) $f['cargos']];
+        }
         if ($f['tipo'] !== -1 && $f['tipo'] !== 9) continue;
-        if ((float) $f['imp_factura'] > 0) $facturado += (float) $f['imp_factura'];
-        elseif (stripos((string) $f['estatus'], 'cancel') === false) $porFacturar += (float) $f['cargos'];
+        if ((float) $f['imp_factura'] > 0) {
+            $facturado += (float) $f['imp_factura'];
+            $facturas[] = ['doc' => 'Factura ' . $f['factura'] . ($f['factura'] !== $f['folio'] ? ' (de ' . $f['folio'] . ')' : ''), 'fecha' => $f['fecha'], 'importe' => (float) $f['imp_factura']];
+        } elseif (stripos((string) $f['estatus'], 'cancel') === false) {
+            $porFacturar += (float) $f['cargos'];
+            $pendientes[] = ['doc' => $f['tipo_docto'] . ' ' . $f['folio'], 'fecha' => $f['fecha'], 'importe' => (float) $f['cargos']];
+        }
     }
     $pres = $p ? (float) $p['total'] : 0.0;
-    // Gastado a la fecha (lo real, igual que el tablero): compras de material, gastos indirectos y mano de obra.
-    // Los costos van sin IVA: la utilidad se saca contra lo facturado sin IVA (proporción subtotal/total del presupuesto).
-    $t = tablero((int) date('Y'), $obraId);
-    $gastado = $t['materiales'] + $t['gastos'] + $t['mano_obra'];
-    $sinIva = $p && (float) $p['total'] > 0 && (float) $p['subtotal'] > 0 ? (float) $p['subtotal'] / (float) $p['total'] : 1 / 1.16;
-    $facturadoSinIva = $facturado * $sinIva;
+
+    $avisos = [];
+    $leer = function (string $sql) use ($obraId, &$avisos) {
+        try {
+            return bd_filas('AW', $sql, [$obraId]);
+        } catch (Throwable $e) {
+            $avisos[] = bd_mensaje_error($e);
+            return [];
+        }
+    };
+    $compras = array_map(function ($s) {
+        $folio = trim((string) $s['folio_microsip']);
+        return ['doc' => 'Salida ' . ($folio !== '' && $folio !== '0' ? $folio : 'sin folio') . ' · OT ' . $s['ot'], 'fecha' => $s['fecha'], 'importe' => (float) $s['importe']];
+    }, $leer(
+        "select s.folio_microsip, o.folio as ot, s.fecha,
+                (select coalesce(sum(d.costo_total), 0) from doctos_solicitudes_det d where d.docto_solicitud_id = s.docto_solicitud_id) as importe
+           from dvd_solicitudes_material s
+           join doctos_orden_obra o on o.docto_orden_obra_id = s.docto_orden_obra_id
+          where o.obra_id = ? and trim(coalesce(s.estatus, '')) not in ('C', 'Cancelado')
+          order by s.fecha, s.docto_solicitud_id"));
+    $sinReal = 0.0;   // capturado que aún no tiene importe real: no cuenta en lo gastado
+    $indirectos = array_map(function ($g) use (&$sinReal) {
+        $sinReal += max(0, (float) $g['importe'] - (float) $g['imp_real']);
+        return ['doc' => ($g['concepto'] ?: 'Gasto') . ($g['ot'] ? ' · OT ' . $g['ot'] : ''), 'fecha' => $g['fecha'], 'importe' => (float) $g['imp_real'], 'capturado' => (float) $g['importe']];
+    }, $leer(
+        "select cg.nombre as concepto, o.folio as ot, g.fecha_creacion as fecha, g.importe,
+                (select coalesce(sum(d.imp_real), 0) from gastos_adicionales_obra_det d where d.gasto_adicional_id = g.gasto_adicional_id) as imp_real
+           from gastos_adicionales_obra g
+           left join conceptos_gastos_obra cg on cg.concepto_gasto_id = g.concepto_gasto_id
+           left join doctos_orden_obra o on o.docto_orden_obra_id = g.docto_orden_obra_id
+          where g.obra_id = ? and trim(coalesce(g.estatus, '')) <> 'C'
+          order by g.fecha_creacion, g.gasto_adicional_id"));
+    $mano = array_map(function ($e) use (&$sinReal) {
+        $sinReal += max(0, (float) $e['importe'] - (float) $e['imp_real']);
+        return ['doc' => 'Mano de obra' . ($e['ot'] ? ' · OT ' . $e['ot'] : '') . ($e['nom_unidad'] ? ' · ' . $e['nom_unidad'] : ''), 'fecha' => $e['fecha'], 'importe' => (float) $e['imp_real'], 'capturado' => (float) $e['importe']];
+    }, $leer(
+        "select e.fecha, o.folio as ot, e.nom_unidad, e.importe_mo as importe, coalesce(e.imp_mo_real, 0) as imp_real
+           from empleados_asignados_a_obra e
+           left join doctos_orden_obra o on o.docto_orden_obra_id = e.docto_orden_obra_id
+          where e.obra_id = ? and trim(coalesce(e.estatus, '')) <> 'C'
+          order by e.fecha, e.empleado_asignado_obra_id"));
+    $suma = fn($l) => round(array_sum(array_column($l, 'importe')), 2);
+    $gastado = $suma($compras) + $suma($indirectos) + $suma($mano);
+
+    // IVA del presupuesto (como la analítica de Imprimir); 16 % si no lo trae
+    $iva = 16.0;
+    if ($p && bd_tiene_columna('AW', 'doctos_sugerido_obra', 'iva_pct')) {
+        $iva = (float) bd_valor('AW', 'select iva_pct from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$p['id']]) ?: 16.0;
+    }
+    $facturadoSinIva = round($facturado / (1 + $iva / 100), 2);
     $utilidad = $facturadoSinIva - $gastado;
     return [
         'presupuesto_folio' => $p['folio'] ?? null,
         'presupuesto'       => round($pres, 2),
+        'presupuesto_sub'   => $p ? round((float) $p['subtotal'], 2) : 0,
         'facturado'         => round($facturado, 2),
+        'facturas'          => $facturas,
         'por_facturar'      => round($porFacturar, 2),
+        'pendientes'        => $pendientes,
         'diferencia'        => round($facturado - $pres, 2),              // > 0: se facturó más de lo presupuestado
         'pct'               => $pres > 0 ? round($facturado / $pres * 100, 1) : null,
         'proyectado'        => round($facturado + $porFacturar - $pres, 2), // si se factura todo lo pendiente
-        'compras'           => round($t['materiales'], 2),
-        'indirectos'        => round($t['gastos'], 2),
-        'mano_obra'         => round($t['mano_obra'], 2),
+        'compras'           => $suma($compras),
+        'compras_det'       => $compras,
+        'indirectos'        => $suma($indirectos),
+        'indirectos_det'    => $indirectos,
+        'mano_obra'         => $suma($mano),
+        'mano_obra_det'     => $mano,
+        'sin_real'          => round($sinReal, 2),
         'gastado'           => round($gastado, 2),
-        'facturado_sin_iva' => round($facturadoSinIva, 2),
+        'iva_pct'           => $iva,
+        'facturado_sin_iva' => $facturadoSinIva,
         'utilidad'          => round($utilidad, 2),
         'margen'            => $facturadoSinIva > 0 ? round($utilidad / $facturadoSinIva * 100, 1) : null,
+        'avisos'            => $avisos,
     ];
 }
 

@@ -148,6 +148,22 @@
 .ob-fac-resumen .mal { background: var(--rojo-suave); border-color: var(--rojo); }
 .ob-fac-resumen .mal strong { color: var(--rojo); }
 .ob-fac-resumen .bien strong { color: var(--verde); }
+.ob-fac-resumen > div, .ob-tip-ancla { cursor: help; }
+.ob-tip-ico { font-style: normal; opacity: .6; }
+/* Explicación de cada número al pasar el mouse */
+.ob-tip {
+    position: fixed; z-index: 1000; width: max-content; max-width: min(480px, calc(100vw - 16px)); max-height: 70vh; overflow: auto;
+    padding: 8px 10px; border: 1px solid var(--borde-2); border-radius: var(--radio); background: var(--tarjeta); color: var(--texto);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .3); font-size: 12px; font-weight: 400; pointer-events: none;
+}
+.ob-tip p { margin: 0 0 6px; color: var(--texto-2); }
+.ob-tip p.aviso { color: var(--rojo); }
+.ob-tip h4 { margin: 6px 0 2px; font-size: 12px; }
+.ob-tip table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+.ob-tip td { padding: 1px 4px; vertical-align: top; }
+.ob-tip td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ob-tip small { color: var(--texto-2); }
+.ob-tip tr.tot td { border-top: 1px solid var(--borde); font-weight: 700; }
 .ob-listado .ob-grid td.num { text-align: right; padding: 0 6px; }
 .ob-listado .ob-grid td.txt { padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
 

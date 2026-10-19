@@ -746,7 +746,10 @@
             dato('Facturado', dinero(r.facturado), '', r.pct === null ? '' : r.pct.toFixed(1) + ' % del presupuesto') +
             dato(dif > 0 ? 'Excedido' : 'Falta por facturar', dinero(Math.abs(dif)), dif > 0 ? 'mal' : 'bien',
                  dif > 0 ? 'Se facturó más de lo presupuestado' : 'Dentro del presupuesto') +
-            dato('Pendiente de facturar', dinero(r.por_facturar), '', 'Pedidos y folios sin factura') +
+            dato('Gastado', dinero(r.gastado), '',
+                 'Compras ' + dinero(r.compras) + ' · Indirectos ' + dinero(r.indirectos) + ' · M.O. ' + dinero(r.mano_obra)) +
+            dato('Utilidad al momento', (r.utilidad < 0 ? '−' : '') + dinero(Math.abs(r.utilidad)), r.utilidad < 0 ? 'mal' : 'bien',
+                 'Facturado sin IVA ' + dinero(r.facturado_sin_iva) + ' − gastado' + (r.margen === null ? '' : ' · ' + r.margen.toFixed(1) + ' %')) +
             dato('Proyectado al terminar', (proy > 0 ? '+' : proy < 0 ? '−' : '') + dinero(Math.abs(proy)), proy > 0 ? 'mal' : 'bien',
                  proy > 0 ? 'Se pasaría del presupuesto' : 'Quedaría dentro del presupuesto');
         caja.hidden = false;

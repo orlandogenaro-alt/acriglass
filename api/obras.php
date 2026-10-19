@@ -828,6 +828,13 @@ function resumenFacturado(int $obraId, array $filas): array
         elseif (stripos((string) $f['estatus'], 'cancel') === false) $porFacturar += (float) $f['cargos'];
     }
     $pres = $p ? (float) $p['total'] : 0.0;
+    // Gastado a la fecha (lo real, igual que el tablero): compras de material, gastos indirectos y mano de obra.
+    // Los costos van sin IVA: la utilidad se saca contra lo facturado sin IVA (proporción subtotal/total del presupuesto).
+    $t = tablero((int) date('Y'), $obraId);
+    $gastado = $t['materiales'] + $t['gastos'] + $t['mano_obra'];
+    $sinIva = $p && (float) $p['total'] > 0 && (float) $p['subtotal'] > 0 ? (float) $p['subtotal'] / (float) $p['total'] : 1 / 1.16;
+    $facturadoSinIva = $facturado * $sinIva;
+    $utilidad = $facturadoSinIva - $gastado;
     return [
         'presupuesto_folio' => $p['folio'] ?? null,
         'presupuesto'       => round($pres, 2),
@@ -836,6 +843,13 @@ function resumenFacturado(int $obraId, array $filas): array
         'diferencia'        => round($facturado - $pres, 2),              // > 0: se facturó más de lo presupuestado
         'pct'               => $pres > 0 ? round($facturado / $pres * 100, 1) : null,
         'proyectado'        => round($facturado + $porFacturar - $pres, 2), // si se factura todo lo pendiente
+        'compras'           => round($t['materiales'], 2),
+        'indirectos'        => round($t['gastos'], 2),
+        'mano_obra'         => round($t['mano_obra'], 2),
+        'gastado'           => round($gastado, 2),
+        'facturado_sin_iva' => round($facturadoSinIva, 2),
+        'utilidad'          => round($utilidad, 2),
+        'margen'            => $facturadoSinIva > 0 ? round($utilidad / $facturadoSinIva * 100, 1) : null,
     ];
 }
 

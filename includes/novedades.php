@@ -6,6 +6,7 @@ return [
     [
         'fecha' => '2026-10-19',
         'cambios' => [
+            ['mejora', 'Obra: gastado y utilidad al momento en 2-Facturación', 'En lugar de «Pendiente de facturar», arriba de 2-Facturación se ve lo Gastado en la obra (compras de material + gastos indirectos, como comidas + mano de obra, solo lo real) con su desglose, y la Utilidad al momento: lo facturado sin IVA menos lo gastado, con su % de margen. En rojo si va en pérdida.'],
             ['mejora', 'Obra: Gastos de Obra acomodado como en el escritorio', 'En la ventana Gastos de Obra la Fecha queda arriba a la derecha junto al Folio de la OT (ahora más ancho), y el Estatus grande debajo de la Fecha, a la altura de la Unidad, igual que en el sistema de escritorio.'],
         ],
     ],

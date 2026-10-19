@@ -221,7 +221,7 @@
 .mo-fila { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .mo-fila label { display: flex; align-items: center; gap: 8px; color: var(--texto-2); }
 .mo-fila select, .mo-fila input { height: 28px; padding: 0 6px; }
-#moOrden { width: 140px; }
+#moOrden, #gaOrden { width: 140px; }
 .mo-largo { flex: 1; min-width: 240px; }
 .mo-largo select { flex: 1; min-width: 0; }
 .mo-der { margin-left: auto; }
@@ -246,10 +246,6 @@
 .mo-bitacora textarea { display: block; width: calc(100% - 32px); height: 260px; margin: 14px 16px 0; padding: 6px 8px; font-family: Consolas, monospace; font-size: 12px; resize: vertical; }
 
 /* Gastos de Obra (Dialog274): mismas piezas que Costo de Mano de Obra */
-.ga-der { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-.ga-estatus { display: flex; align-items: baseline; gap: 10px; color: var(--texto-2); }
-.ga-estatus b { font-size: 20px; color: var(--texto); }
-.ga-estatus b.cancelado { color: var(--rojo); }
 .mo-grid-chico { min-height: 90px; max-height: 150px; }
 .mo-grid td input.txt { text-align: left; }
 .mo-etq { color: var(--texto-2); }

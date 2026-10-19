@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-10-19',
+        'cambios' => [
+            ['mejora', 'Obra: Gastos de Obra acomodado como en el escritorio', 'En la ventana Gastos de Obra la Fecha queda arriba a la derecha junto al Folio de la OT (ahora más ancho), y el Estatus grande debajo de la Fecha, a la altura de la Unidad, igual que en el sistema de escritorio.'],
+        ],
+    ],
+    [
         'fecha' => '2026-10-16',
         'cambios' => [
             ['nuevo', 'Obra: facturado contra presupuesto', 'Arriba de 2-Facturación se ve el presupuesto que se le dio al cliente (con IVA) contra lo facturado (facturas de Microsip de las cotizaciones y folios de Easy-Glass, más notas de cargo): % facturado, cuánto falta por facturar o cuánto se excedió, lo pendiente de facturar (pedidos y folios sin factura) y cómo quedaría al facturar todo. En rojo cuando se pasa del presupuesto.'],

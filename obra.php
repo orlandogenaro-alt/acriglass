@@ -715,13 +715,11 @@ function iconoPestana() {
         <p class="doc-ayuda" role="status"></p>
         <div class="mo-fila">
             <label>Folio de la OT <select id="gaOrden" class="mo-edit"></select></label>
-            <div class="mo-der ga-der">
-                <div class="ga-estatus"><span>Estatus:</span> <b id="gaEstatus">Normal</b></div>
-                <label>Fecha: <input type="datetime-local" id="gaFecha" class="mo-edit"></label>
-            </div>
+            <label class="mo-der">Fecha: <input type="datetime-local" id="gaFecha" class="mo-edit"></label>
         </div>
         <div class="mo-fila">
             <label class="mo-largo">Unidad: <select id="gaUnidad" class="mo-edit"></select></label>
+            <div class="mo-der mo-estatus"><span>Estatus:</span><b id="gaEstatus">Normal</b></div>
         </div>
         <div class="mo-fila">
             <label class="mo-largo">Personal de Obra: <select id="gaPersonal" class="mo-edit"></select></label>

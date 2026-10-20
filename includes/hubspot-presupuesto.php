@@ -1,7 +1,7 @@
 <?php
 // HubSpot al guardar un presupuesto de obra, como el Form46 del escritorio (ToolStripButton1/2):
 //   antes de guardar   actualiza_relacion_contacto_hubspot: el contacto del correo debe existir en HubSpot;
-//                      si no existe, no se guarda ("No existe un contacto con los datos seleccionados").
+//                      si no existe, se guarda igual con un aviso y sin negocio en HubSpot.
 //   después de guardar guarda_o_actualiza_sugerido_hs: crea el negocio (o lo actualiza si ya tiene Id) con
 //                      nombre «folio proyecto», monto total, nota «PRESUPUESTO DE OBRA  Ubicado en: …», el
 //                      propietario del vendedor, los contactos y la empresa; sube el formato impreso y lo deja

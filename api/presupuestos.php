@@ -318,7 +318,7 @@ function guardar(array $d): array
             . 'o Consultas/supabase_presupuesto_analisis_pu.sql (Supabase), o quita los conceptos de la pestaña Análisis P.U.');
     }
 
-    // actualiza_relacion_contacto_hubspot: sin el contacto en HubSpot no se guarda (Form46)
+    // actualiza_relacion_contacto_hubspot: sin el contacto en HubSpot se guarda igual, solo sin negocio
     $hsContactos = null;
     $hsAvisos = [];
     if (hsActivo()) {
@@ -327,7 +327,7 @@ function guardar(array $d): array
         } catch (Throwable $e) {
             error('No se pudo consultar el contacto en HubSpot, el presupuesto no se guardó: ' . $e->getMessage(), 502);
         }
-        if (!$hsContactos) error("No existe un contacto con los datos seleccionados: el correo $email no está en HubSpot.");
+        if (!$hsContactos) $hsAvisos[] = "El correo $email no está en HubSpot: el presupuesto se guardó sin crear ni actualizar su negocio.";
     } else {
         $hsAvisos[] = 'HubSpot no está configurado (servicio HUBSPOT_API): el presupuesto se guardó sin actualizar su negocio.';
     }

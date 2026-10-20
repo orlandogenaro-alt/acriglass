@@ -312,6 +312,15 @@ function guardarOrden(array $d): array
     ];
     if ($enc['descripcion'] === null) error('Captura la descripción de la orden de trabajo.');
     if (bd_tiene_columna('AW', 'doctos_orden_obra', 'urgencia')) $enc['urgencia'] = texto($d['urgencia'] ?? '', 30);
+    // Datos de entrega (migración 014): dónde está la empresa, contacto, a nombre de quién se factura y lugar de entrega
+    if (bd_tiene_columna('AW', 'doctos_orden_obra', 'lugar_entrega')) {
+        $enc += [
+            'ubicacion_empresa' => texto($d['ubicacion_empresa'] ?? '', 300),
+            'contacto'          => texto($d['contacto'] ?? '', 150),
+            'facturar_a'        => texto($d['facturar_a'] ?? '', 200),
+            'lugar_entrega'     => texto($d['lugar_entrega'] ?? '', 300),
+        ];
+    }
 
     $pdo = bd_pdo('AW');
     $pdo->beginTransaction();

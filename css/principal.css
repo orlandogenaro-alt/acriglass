@@ -168,6 +168,12 @@ body.sb-oculto .sidebar { margin-left: calc(-1 * var(--sb-ancho)); }
 
 .tb-iconos { margin-left: auto; display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 8px; background: #111a29; border: 1px solid var(--borde-2); }
 .tb-iconos .tb-btn { border: none; background: none; min-width: 32px; height: 30px; }
+/* Tema: un solo ícono según la elección (Automático, Claro u Oscuro) */
+.tb-tema { color: #f5c542; }
+.tb-tema svg { width: 18px; height: 18px; }
+.tb-tema .i-sol, .tb-tema .i-luna { display: none; }
+.tb-tema[data-tema="claro"] .i-auto, .tb-tema[data-tema="oscuro"] .i-auto { display: none; }
+.tb-tema[data-tema="claro"] .i-sol, .tb-tema[data-tema="oscuro"] .i-luna { display: block; }
 .tb-avatar { width: 32px; height: 32px; font-size: 13px; }
 
 /* Panel de usuario */

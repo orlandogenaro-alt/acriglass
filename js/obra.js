@@ -994,6 +994,11 @@
         $('cotEntrega').value = doc ? dia(doc.fecha_entrega) : hoy();
         $('cotUrgencia').value = doc && doc.urgencia ? doc.urgencia : 'Nesesaria (Normal)';
         $('cotDescripcion').value = doc ? (doc.descripcion || '') : '';
+        // Datos de entrega de la orden; una nueva toma el contacto y la dirección de la obra (1-Datos)
+        $('otUbicacion').value = doc ? (doc.ubicacion_empresa || '') : '';
+        $('otLugarEntrega').value = doc ? (doc.lugar_entrega || '') : $('direccion').value;
+        $('otContacto').value = doc ? (doc.contacto || '') : $('contacto').value;
+        $('otFacturarA').value = doc ? (doc.facturar_a || '') : $('cotNombre').value;
         $('cotDocId').value = cot.id || '';
         $('cotCreo').value = doc ? (doc.usuario_creacion || '') : '';
         $('cotCreoFecha').value = doc ? String(doc.fecha_creacion || '').substr(0, 16) : '';
@@ -1131,7 +1136,9 @@
         guardarCon('guardar_orden', {
             orden_id: cot.id, fecha: $('cotFecha').value, fecha_entrega: $('cotEntrega').value,
             cliente_id: cot.cliente_id, clave_cliente: $('cotClave').value, nom_cliente: $('cotNombre').value,
-            urgencia: $('cotUrgencia').value, descripcion: $('cotDescripcion').value, partidas: partidas
+            urgencia: $('cotUrgencia').value, descripcion: $('cotDescripcion').value, partidas: partidas,
+            ubicacion_empresa: $('otUbicacion').value, contacto: $('otContacto').value,
+            facturar_a: $('otFacturarA').value, lugar_entrega: $('otLugarEntrega').value
         }).then(function (j) {
             cot.id = j.orden_id;
             $('cotDocId').value = cot.id;
@@ -1197,11 +1204,15 @@
         if (!cot.id) { alert('Guarda el documento para poder imprimirlo.'); return; }
         var sub = cotTotales(), iva = Math.round(sub * IVA * 100) / 100;
         var filas = cot.partidas.filter(function (f) { return String(f.clave_articulo || f.descripcion || '').trim(); });
+        // Orden de Trabajo: datos de entrega capturados (solo los que tienen algo)
+        var entrega = !esOt() ? '' : [['UBICACIÓN DE LA EMPRESA', 'otUbicacion'], ['CONTACTO', 'otContacto'], ['FACTURAR A NOMBRE DE', 'otFacturarA'], ['LUGAR DE ENTREGA', 'otLugarEntrega']]
+            .filter(function (c) { return $(c[1]).value.trim(); })
+            .map(function (c) { return '<br><b>' + c[0] + ': </b>' + escapar($(c[1]).value.trim()); }).join('');
         imprimirFormato({
             titulo: esOt() ? 'ORDEN DE TRABAJO' : 'COTIZACION', id: cot.id, folioOt: 'RS ' + ($('cotFolio').value || '0'), fecha: fechaDMY($('cotFecha').value),
             concepto: 'Entrega ' + fechaDMY($('cotEntrega').value) + ' · ' + $('cotUrgencia').value, estatus: $('cotEstatus').textContent,
             unidad: '—', descripcion: $('cotDescripcion').value,
-            cuerpo: '<b>CLIENTE: </b>' + escapar(($('cotClave').value ? $('cotClave').value + ' · ' : '') + $('cotNombre').value) +
+            cuerpo: '<b>CLIENTE: </b>' + escapar(($('cotClave').value ? $('cotClave').value + ' · ' : '') + $('cotNombre').value) + entrega +
                 '<table style="width:100%;margin-top:8px;border-collapse:collapse"><tr style="font-weight:bold"><td>Clave</td><td>Descripcion</td><td style="text-align:right">Uds.</td><td>U.Med.</td><td style="text-align:right">Precio.Unit.</td><td style="text-align:right">Total</td></tr>' +
                 filas.map(function (f) {
                     return '<tr><td>' + escapar(f.clave_articulo || '') + '</td><td>' + escapar(f.descripcion || '') + '</td><td style="text-align:right">' + escapar(f.unidades || 0) +

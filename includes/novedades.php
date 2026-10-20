@@ -4,6 +4,13 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-10-20',
+        'cambios' => [
+            ['nuevo', 'Obra: datos de entrega en la Orden de Trabajo', 'La ventana Orden de Trabajo (3-Orden Trabajo) tiene el recuadro Datos de entrega: Ubicación de la empresa, Lugar de entrega, Contacto y Facturar a nombre de. Una orden nueva toma el contacto y la dirección de la obra (1-Datos) y el nombre del cliente; se pueden cambiar. También salen al imprimir la orden. Requiere la migración 014.'],
+            ['mejora', 'Tema claro / oscuro en la barra superior', 'El botón de tema (Automático, Claro u Oscuro) pasó de la barra del Presupuesto a la barra superior, junto a Favoritos. Cambia todas las pestañas abiertas a la vez.'],
+        ],
+    ],
+    [
         'fecha' => '2026-10-19',
         'cambios' => [
             ['mejora', 'Obra: cada número de 2-Facturación explica de dónde sale', 'Al pasar el mouse (o con Tab) sobre las tarjetas de arriba y los totales de abajo de 2-Facturación aparece cómo se calcula y de qué documentos viene: las facturas que forman lo facturado, la cuenta de falta por facturar, utilidad y proyectado, y en Gastado cada salida de material, gasto adicional y mano de obra con su importe. Gastado ahora cuadra con los totales reales de las pestañas 5, 8 y 6 (sin cancelados) y avisa cuánto hay capturado sin importe real. Lo facturado sin IVA usa el IVA del presupuesto, como la analítica de Imprimir.'],

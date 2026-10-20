@@ -114,6 +114,7 @@ function idItem(string $nombre): string
     <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= recurso('css/principal.css') ?>">
     <link rel="stylesheet" href="<?= recurso('css/fichas.css') ?>">
+    <script src="<?= recurso('js/tema.js') ?>"></script>
 </head>
 <body>
 
@@ -174,6 +175,12 @@ function idItem(string $nombre): string
         <div class="marca"><span class="m-acri">ACRI</span><span class="m-glass">GLASS</span></div>
 
         <div class="tb-iconos">
+            <!-- Tema claro / oscuro de las pantallas (js/tema.js); se comparte con todas las pestañas -->
+            <button class="tb-btn tb-tema" data-tema="auto" title="Tema">
+                <svg class="i-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>
+                <svg class="i-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                <svg class="i-luna" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+            </button>
             <button class="tb-btn" id="btnFavoritos" title="Favoritos">⭐</button>
             <button class="tb-btn" id="btnPantalla" title="Pantalla completa">⛶</button>
             <button class="tb-btn" id="btnAvisos" title="Notificaciones">🔔</button>

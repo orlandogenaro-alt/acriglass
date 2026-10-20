@@ -602,6 +602,15 @@ function iconoPestana() {
             </div>
         </div>
 
+        <!-- Solo en la Orden de Trabajo: a dónde y a quién va la orden -->
+        <fieldset class="cot-entrega solo-ot">
+            <legend>Datos de entrega</legend>
+            <label>Ubicación de la empresa: <textarea id="otUbicacion" rows="2" maxlength="300" class="cot-edit" placeholder="Dirección de la empresa del cliente"></textarea></label>
+            <label>Lugar de entrega: <textarea id="otLugarEntrega" rows="2" maxlength="300" class="cot-edit" placeholder="Dónde se entrega (de inicio, la dirección de la obra)"></textarea></label>
+            <label>Contacto: <input id="otContacto" maxlength="150" class="cot-edit" placeholder="Nombre y teléfono de quien recibe"></label>
+            <label>Facturar a nombre de: <input id="otFacturarA" maxlength="200" class="cot-edit" placeholder="Razón social a la que se factura"></label>
+        </fieldset>
+
         <nav class="cot-tabs">
             <button type="button" class="activo" data-cot-tab="general">General</button>
             <button type="button" class="solo-ot" data-cot-tab="salidas">Salidas de Material</button>

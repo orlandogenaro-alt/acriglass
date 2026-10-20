@@ -347,6 +347,29 @@
 .bc-grid tbody tr:not(.vacio):hover { background: var(--azul-suave); }
 .bc-estado { color: var(--texto-2); }
 
+/* Asignar Cotización: folios sugeridos mientras se escribe */
+.ac-dialogo { width: min(820px, calc(100vw - 24px)); }
+.ac-dialogo .hs-pie .bc-estado { flex: 1; }
+.ac-campo { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px 10px; }
+.ac-campo label { font-weight: 700; }
+.ac-campo small { font-weight: 400; color: var(--texto-2); }
+.ac-campo input { height: 36px; padding: 0 10px; font-size: 15px; text-transform: uppercase; }
+.ac-campo input::placeholder { text-transform: none; }
+.ac-grid { margin: 0 16px; min-height: 240px; max-height: 340px; }
+.ac-grid td { padding: 5px 6px; vertical-align: top; }
+.ac-grid tbody tr[data-i] { cursor: pointer; }
+.ac-grid tbody tr[data-i]:hover { background: var(--azul-suave); }
+.ac-grid tbody tr.sel { background: var(--azul-suave); box-shadow: inset 3px 0 0 var(--azul); }
+.ac-grid tbody tr.asignado { opacity: .55; cursor: default; }
+.ac-grid mark { background: #fde68a; color: #1f2937; padding: 0; border-radius: 2px; }
+.ac-grid .ac-det { display: block; color: var(--texto-2); font-size: 12px; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-origen { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 11.5px; font-weight: 700; background: var(--sub); border: 1px solid var(--borde); }
+.ac-origen.ms { color: #0f766e; }
+.ac-origen.eg { color: var(--azul); }
+@media (max-width: 700px) {
+    .ac-grid th:nth-child(4), .ac-grid td:nth-child(4), .ac-grid th:nth-child(6), .ac-grid td:nth-child(6) { display: none; }
+}
+
 /* Línea de ayuda de los documentos y aviso flotante («Se guardó correctamente») */
 .doc-ayuda { margin: 0; padding: 6px 10px; border-radius: 4px; font-size: 12.5px; border: 1px solid var(--borde); background: var(--sub); color: var(--texto-2); }
 .doc-ayuda.azul { background: var(--azul-suave); border-color: var(--azul-borde); color: var(--azul-texto); }

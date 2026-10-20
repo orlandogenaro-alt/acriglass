@@ -855,18 +855,108 @@
         $('facDetalle').hidden = false;
     }
 
-    // asigna_cot_de_obra
+    // asigna_cot_de_obra: ventana flotante que sugiere folios de Microsip y de Easy-Glass mientras se escribe.
+    // También acepta un folio que no aparezca en la lista (p. ej. una factura A00002080) escribiéndolo completo.
+    var ac = { filas: [], sel: -1, espera: null, pedido: 0 };
     function asignarCotizacion() {
         if (!validaEstatusObra() || !requiereObra('Es necesario guardar la obra para asignar una Cotizacion.')) return;
-        var fol = prompt('Ingresa el Folio de la Cotizacion (folio de Microsip o de Easy-Glass)', '');
-        if (!fol || !fol.trim()) return;
+        $('acFolio').value = '';
+        ac.filas = []; ac.sel = -1;
+        acPintar('Escribe al menos 2 caracteres del folio, del cliente o del proyecto.');
+        $('acDialogo').showModal();
+        $('acFolio').focus();
+    }
+    function acResaltar(texto, q) {
+        var t = String(texto == null ? '' : texto), i = q ? t.toUpperCase().indexOf(q) : -1;
+        return i < 0 ? escapar(t) : escapar(t.substr(0, i)) + '<mark>' + escapar(t.substr(i, q.length)) + '</mark>' + escapar(t.substr(i + q.length));
+    }
+    function acPintar(estado) {
+        var q = $('acFolio').value.trim().toUpperCase();
+        $('acFilas').innerHTML = ac.filas.length ? ac.filas.map(function (f, i) {
+            return '<tr data-i="' + i + '" role="option" aria-selected="' + (i === ac.sel) + '" class="' + (i === ac.sel ? 'sel ' : '') + (f.asignado ? 'asignado' : '') + '"' +
+                (f.asignado ? ' title="Ya está asignado a esta obra"' : '') + '>' +
+                '<td><b>' + acResaltar(f.folio, q) + '</b></td>' +
+                '<td><span class="ac-origen ' + (f.origen === 'Easy-Glass' ? 'eg' : 'ms') + '">' + escapar(f.origen) + '</span></td>' +
+                '<td>' + acResaltar(f.cliente, q) + '<span class="ac-det">' + acResaltar(f.detalle, q) + '</span></td>' +
+                '<td>' + fechaDMY(f.fecha) + '</td>' +
+                '<td class="num">' + dinero(f.total) + ' ' + escapar(f.moneda) + '</td>' +
+                '<td>' + (f.asignado ? 'Asignado' : escapar(f.estatus)) + '</td></tr>';
+        }).join('') : '<tr class="vacio"><td colspan="6">' + escapar(estado || '') + '</td></tr>';
+        $('acEstado').textContent = ac.filas.length ? ac.filas.length + ' folio(s) · ↑ ↓ para elegir, Enter para asignar' : '';
+        $('acFolio').setAttribute('aria-expanded', ac.filas.length ? 'true' : 'false');
+        $('acAsignar').disabled = !q;
+        var tr = $('acFilas').querySelector('tr.sel');
+        if (tr) tr.scrollIntoView({ block: 'nearest' });
+    }
+    function acBuscar() {
+        var q = $('acFolio').value.trim();
+        var n = ++ac.pedido;
+        if (q.length < 2) { ac.filas = []; ac.sel = -1; acPintar('Escribe al menos 2 caracteres del folio, del cliente o del proyecto.'); return; }
+        $('acEstado').textContent = 'Buscando…';
+        pedir('accion=folios_eg&id=' + encodeURIComponent(obraId) + '&q=' + encodeURIComponent(q)).then(function (j) {
+            if (n !== ac.pedido) return;   // ya se escribió otra cosa
+            ac.filas = j.filas;
+            ac.sel = -1;
+            // Se preselecciona solo el que empieza con lo escrito; si no, Enter asigna el texto tal cual
+            var qU = q.toUpperCase();
+            for (var i = 0; i < ac.filas.length; i++) {
+                var f = ac.filas[i];
+                if (!f.asignado && (f.folio.indexOf(qU) === 0 || f.valor.indexOf(qU) === 0)) { ac.sel = i; break; }
+            }
+            acPintar('No hay folios que coincidan. Si es una factura de Microsip, escribe el folio completo y presiona Asignar.');
+        }).catch(function (err) {
+            if (n !== ac.pedido) return;
+            ac.filas = []; ac.sel = -1;
+            acPintar(err.message);
+        });
+    }
+    function acMover(paso) {
+        if (!ac.filas.length) return;
+        var i = ac.sel;
+        for (var k = 0; k < ac.filas.length; k++) {
+            i = (i + paso + ac.filas.length) % ac.filas.length;
+            if (!ac.filas[i].asignado) { ac.sel = i; break; }
+        }
+        acPintar();
+    }
+    function acAsignar(folio) {
+        folio = String(folio || '').trim();
+        if (!folio) return;
+        $('acDialogo').close();
         conAutorizacion(function (a) {
-            return enviar('asignar_cot', { id: obraId, folio: fol.trim(), autoriza: a });
+            return enviar('asignar_cot', { id: obraId, folio: folio, autoriza: a });
         }, 'Asignar cotizaciones requiere el permiso «Modificar obras».').then(function (j) {
             alert('Se asignó el folio ' + j.folio + (j.cliente ? ' (' + j.cliente + ')' : '') + ' a la obra.');
             cargarFacturacion();
         }).catch(avisarError);
     }
+    $('acFolio').addEventListener('input', function () {
+        clearTimeout(ac.espera);
+        $('acAsignar').disabled = !this.value.trim();
+        ac.espera = setTimeout(acBuscar, 300);
+    });
+    $('acFolio').addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); acMover(1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); acMover(-1); }
+    });
+    $('acForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var f = ac.filas[ac.sel];
+        acAsignar(f && !f.asignado ? f.valor : $('acFolio').value);
+    });
+    $('acFilas').addEventListener('click', function (e) {
+        var tr = e.target.closest('tr[data-i]');
+        if (!tr || ac.filas[tr.dataset.i].asignado) return;
+        ac.sel = +tr.dataset.i;
+        $('acFolio').value = ac.filas[ac.sel].folio;
+        acPintar();
+        $('acFolio').focus();
+    });
+    $('acFilas').addEventListener('dblclick', function (e) {
+        var tr = e.target.closest('tr[data-i]');
+        if (tr && !ac.filas[tr.dataset.i].asignado) acAsignar(ac.filas[tr.dataset.i].valor);
+    });
+    document.querySelectorAll('[data-ac-cerrar]').forEach(function (b) { b.addEventListener('click', function () { clearTimeout(ac.espera); $('acDialogo').close(); }); });
 
     // ---------- 4-Explosion de material: eliminar partidas (ToolStripButton16) ----------
     function eliminarExplosion(vista) {

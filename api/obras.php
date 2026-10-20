@@ -18,6 +18,7 @@
 // GET ?accion=adjunto&id=N           descarga un archivo adjunto de la obra
 // GET ?accion=documento&tipo=orden|mo|gasto|cot|comision&id=obra&doc=N   documento con su detalle
 // GET ?accion=clientes_eg&q=T        Busca Cliente (API de Easy-Glass)
+// GET ?accion=folios_eg&q=T&id=N     sugerencias al asignar una cotización: pedidos de Microsip y presupuestos de Easy-Glass
 // GET ?accion=quejas&folio=F&cliente=N   Quejas de Cliente de una cotización
 // GET ?accion=catalogos_obra&id=N    empleados, conceptos de gasto, unidades, órdenes y artículos del presupuesto
 define('ACRI_API', true);
@@ -1218,6 +1219,43 @@ try {
                 'cliente_id' => $c['cliente_id'] ?? null, 'clave' => (string) ($c['clave_cliente'] ?? ''), 'nombre' => $c['nombre'] ?? '',
                 'contacto' => $c['contacto'] ?? '', 'telefono' => $c['telefono'] ?? '', 'vendedor' => $c['vendedor'] ?? '',
             ], (array) ($r['datos']['datos'] ?? []))]);
+
+        case 'folios_eg':   // Asignar Cotización: folios que coinciden con lo que se va escribiendo (últimos 24 meses)
+            $q = strtoupper(trim((string) ($_GET['q'] ?? '')));
+            if (mb_strlen($q) < 2) responder(['ok' => true, 'filas' => []]);
+            // «EG0009815» o «9815»: a Easy-Glass se le pregunta por el número
+            $num = preg_match('/^(EG)?0*(\d+)$/', $q, $mm) ? $mm[2] : $q;
+            $desde = date('Y-m-d', strtotime('-24 months'));
+            $r = api_http_varios('EASYGLASS', [
+                'pedidos'      => '/microsip-pedidos?limite=10&desde=' . $desde . '&q=' . rawurlencode($q),
+                'presupuestos' => '/presupuestos?limite=10&desde=' . $desde . '&q=' . rawurlencode($num),
+            ]);
+            if (!$r['pedidos']['ok'] && !$r['presupuestos']['ok']) {
+                error('No se pudo consultar la API de Easy-Glass: ' . ($r['pedidos']['error'] ?: 'sin respuesta'), 502);
+            }
+            $filas = [];
+            foreach ((array) ($r['pedidos']['datos']['datos'] ?? []) as $p) {
+                $filas[$p['folio']] = [
+                    'folio' => (string) $p['folio'], 'valor' => (string) $p['folio'], 'origen' => 'Pedido Microsip',
+                    'cliente' => $p['cliente'] ?? '', 'detalle' => trim(preg_replace('/\s+/', ' ', (string) ($p['descripcion'] ?? ''))),
+                    'fecha' => $p['fecha'] ?? '', 'total' => (float) ($p['total_docto'] ?? 0), 'moneda' => $p['moneda'] ?? '', 'estatus' => $p['estatus'] ?? '',
+                ];
+            }
+            foreach ((array) ($r['presupuestos']['datos']['datos'] ?? []) as $p) {
+                $folio = 'EG' . str_pad((string) $p['folio'], 7, '0', STR_PAD_LEFT);
+                if (isset($filas[$folio])) continue;   // ya pasó a pedido de Microsip
+                $filas[$folio] = [
+                    'folio' => $folio, 'valor' => (string) $p['folio'], 'origen' => 'Easy-Glass',
+                    'cliente' => $p['cliente'] ?? '', 'detalle' => (string) ($p['proyecto'] ?? ''),
+                    'fecha' => $p['fecha'] ?? '', 'total' => (float) ($p['total'] ?? 0), 'moneda' => $p['moneda'] ?? '', 'estatus' => $p['estatus'] ?? '',
+                ];
+            }
+            $asignados = array_column(bd_filas('AW', 'select folio from doctos_microsip_obra where obra_id = ?', [(int) ($_GET['id'] ?? 0)]), 'folio');
+            $filas = array_map(fn($f) => $f + ['asignado' => in_array($f['folio'], $asignados, true)], array_values($filas));
+            // Primero los que empiezan con lo escrito, luego los más recientes
+            $empieza = fn($f) => strpos($f['folio'], $q) === 0 || strpos(ltrim(substr($f['folio'], 2), '0'), $num) === 0 ? 0 : 1;
+            usort($filas, fn($a, $b) => [$empieza($a), $b['fecha']] <=> [$empieza($b), $a['fecha']]);
+            responder(['ok' => true, 'filas' => array_slice($filas, 0, 15)]);
 
         case 'quejas':   // Quejas de Cliente de la cotización: por su folio (FOLIO_PEDIDO_AW) o por el nombre del cliente
             $folio = trim((string) ($_GET['folio'] ?? ''));

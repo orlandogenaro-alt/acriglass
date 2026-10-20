@@ -719,6 +719,33 @@ function iconoPestana() {
     </form>
 </dialog>
 
+<!-- Asignar Cotización: sugiere folios de Microsip y de Easy-Glass mientras se escribe -->
+<dialog class="hs-dialogo ac-dialogo" id="acDialogo">
+    <form id="acForm" autocomplete="off">
+        <div class="hs-cabecera">
+            <strong>Asignar Cotización</strong>
+            <button type="button" class="hs-cerrar" data-ac-cerrar title="Cerrar">✕</button>
+        </div>
+        <div class="ac-campo">
+            <label for="acFolio">Folio de la Cotización <small>(folio de Microsip o de Easy-Glass)</small></label>
+            <input id="acFolio" placeholder="Ej. 9815, EG0009815 o A00002080" spellcheck="false"
+                   role="combobox" aria-autocomplete="list" aria-controls="acFilas" aria-expanded="false">
+        </div>
+        <div class="mo-grid ac-grid">
+            <table>
+                <thead><tr><th style="width:96px">Folio</th><th style="width:110px">Origen</th><th>Cliente / Proyecto</th>
+                    <th style="width:84px">Fecha</th><th style="width:120px" class="num">Total</th><th style="width:90px">Estatus</th></tr></thead>
+                <tbody id="acFilas" role="listbox"></tbody>
+            </table>
+        </div>
+        <div class="hs-pie">
+            <span class="bc-estado" id="acEstado"></span>
+            <button type="submit" class="hs-btn principal" id="acAsignar" disabled>Asignar</button>
+            <button type="button" class="hs-btn" data-ac-cerrar>Cancelar</button>
+        </div>
+    </form>
+</dialog>
+
 <!-- ============ GASTOS DE OBRA (Dialog274) ============ -->
 <dialog class="hs-dialogo mo-dialogo" id="gaDialogo">
     <div class="hs-cabecera">

@@ -1966,6 +1966,7 @@
             // ponerEstatus pide la confirmación y valida que el estatus actual lo permita
             ponerEstatus('Cancelado');
         },
+        'bitacora': verBitacora,
         'eliminar': function () {
             if (!presupuestoId) {
                 if (confirm('Este presupuesto no se ha guardado. ¿Descartarlo?')) { cambios = false; cerrarVentana(); }
@@ -2131,6 +2132,27 @@
         }).catch(function (err) { tb.innerHTML = '<tr><td colspan="7">⚠ ' + escapar(err.message) + '</td></tr>'; });
     });
     document.querySelectorAll('[data-ver-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('verDialogo').close(); }); });
+
+    // Bitácora de cambios (api/obras.php?accion=bitacora_presupuesto): solo consulta, nadie la puede cambiar
+    function verBitacora() {
+        if (!presupuestoId) { alert('La bitácora existe cuando el presupuesto ya está guardado.'); return; }
+        var tb = $('bitLista');
+        tb.innerHTML = '<tr><td colspan="4">Consultando…</td></tr>';
+        $('bitTotal').textContent = '';
+        $('bitDialogo').showModal();
+        fetch('api/obras.php?accion=bitacora_presupuesto&id=' + presupuestoId).then(function (r) { return r.json(); }).then(function (j) {
+            if (!j.ok) throw new Error(j.error);
+            $('bitTotal').textContent = '$' + fmt(num(j.total));
+            var dondes = { web: '🌐 Sistema web', base: '🗄 Directo en la base' };
+            tb.innerHTML = j.movimientos.length ? j.movimientos.map(function (m) {
+                var f = String(m.fecha);   // AAAA-MM-DD HH:MM:SS → DD/MM/AAAA HH:MM
+                return '<tr><td>' + escapar(f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(0, 4) + ' ' + f.slice(11, 16)) + '</td>' +
+                    '<td>' + escapar(m.usuario || '—') + '</td><td>' + escapar(dondes[m.donde] || '—') + '</td>' +
+                    '<td>' + escapar(m.movimiento) + '</td></tr>';
+            }).join('') : '<tr><td colspan="4">' + (j.sin_tabla ? 'Falta aplicar la migración 001 (auditoría) en la base.' : 'Este presupuesto aún no tiene movimientos.') + '</td></tr>';
+        }).catch(function (err) { tb.innerHTML = '<tr><td colspan="4">⚠ ' + escapar(err.message) + '</td></tr>'; });
+    }
+    document.querySelectorAll('[data-bit-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('bitDialogo').close(); }); });
 
     var idInicial = parseInt(document.body.dataset.presupuesto, 10) || 0;
     if (!idInicial) ponerIndirectos();

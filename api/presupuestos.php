@@ -307,6 +307,8 @@ function guardar(array $d): array
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'correo_electronico')) $enc['correo_electronico'] = texto($d['email'] ?? '', 150);
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'utilidad_modo')) $enc['utilidad_modo'] = $margen ? 'margen' : 'costo';
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'iva_pct')) $enc['iva_pct'] = $ivaPct;
+    // Cada Guardar deja su renglón en la bitácora de cambios aunque no cambie el encabezado (migraciones/015)
+    if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'modificado_en')) $enc['modificado_en'] = date('c');
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'datos_obra')) $enc['datos_obra'] = datosObra($d['obra_datos'] ?? []);
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'analisis_pu')) {
         $enc['analisis_pu'] = analisisPU($d['analisis_pu'] ?? []);

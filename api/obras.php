@@ -7,6 +7,7 @@
 // GET ?accion=obra&id=N              registro de obra con responsables
 // GET ?accion=presupuesto&id=N       presupuesto de obra con sus conceptos (MP / MO / GO)
 // GET ?accion=presupuesto_folio&folio=N  presupuesto por folio (para relacionarlo con otro)
+// GET ?accion=bitacora_presupuesto&id=N  bitácora de cambios del presupuesto (quién lo movió y cuándo)
 // GET ?accion=imagen&id=N            imagen de la obra
 // GET ?accion=catalogos              responsables y conceptos de gastos de operación
 // GET ?accion=relacionados&id=N      negocio de HubSpot y folios de Easy-Glass ligados a la obra
@@ -513,6 +514,51 @@ function bitacoraDocumento(int $id): array
     } catch (Throwable $e) {
         return [];
     }
+}
+
+// Bitácora de cambios del presupuesto: los renglones de auditoria (migraciones/001) del encabezado, del más
+// reciente al más antiguo. Es solo consulta (la 015 impide cambiar o borrar auditoria). Sin usuario = cambio hecho
+// directo en la base, fuera del sistema.
+const BITACORA_CAMPOS = [
+    'fecha' => 'fecha', 'cliente' => 'cliente', 'proyecto' => 'proyecto', 'ubicacion' => 'ubicación',
+    'vendedor_obra_id' => 'vendedor', 'utilidad_neta_por' => '% de utilidad', 'utilidad_modo' => 'forma de la utilidad',
+    'iva_pct' => '% de IVA', 'notas' => 'descripción', 'correo_electronico' => 'correo', 'id_hs' => 'negocio de HubSpot',
+    'datos_obra' => 'datos de la obra', 'analisis_pu' => 'Análisis P.U.',
+];
+
+function bitacoraPresupuesto(int $id): array
+{
+    $total = bd_valor('AW', 'select total from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]);
+    if ($total === null || $total === false) error('El presupuesto ya no existe (¿lo eliminaron?).', 404);
+    if (!bd_auditoria('AW')) return ['total' => (float) $total, 'movimientos' => [], 'sin_tabla' => true];
+    $dinero = fn($v) => '$' . number_format((float) $v, 2);
+    $movs = [];
+    foreach (bd_filas('AW', "select to_char(fecha at time zone ?, 'YYYY-MM-DD HH24:MI:SS') as fecha, usuario, operacion, antes, despues
+                                from auditoria where tabla = 'doctos_sugerido_obra' and llave = ?
+                               order by auditoria.fecha desc, auditoria_id desc", [date_default_timezone_get(), (string) $id]) as $a) {
+        $antes = json_decode((string) $a['antes'], true) ?: [];
+        $despues = json_decode((string) $a['despues'], true) ?: [];
+        $partes = [];
+        if ($a['operacion'] === 'I') {
+            $partes[] = 'Se crea el presupuesto · Estatus: ' . trim((string) ($despues['estatus'] ?? '')) . ' · Importe: ' . $dinero($despues['total'] ?? 0);
+        } elseif ($a['operacion'] === 'D') {
+            $partes[] = 'Se elimina el presupuesto';
+        } else {
+            if (array_key_exists('estatus', $despues)) $partes[] = 'Se realizan cambio de estatus: ' . trim((string) $despues['estatus'])
+                . (isset($antes['estatus']) ? ' (antes ' . trim((string) $antes['estatus']) . ')' : '');
+            if (array_key_exists('obra_id', $despues)) $partes[] = $despues['obra_id'] ? 'Se registra la obra ' . $despues['obra_id'] : 'Se quita la obra registrada';
+            if (array_key_exists('total', $despues)) {
+                $partes[] = 'Se realizan modificaciones sobre el presupuesto importe anterior: ' . $dinero($antes['total'] ?? 0) . ' · nuevo: ' . $dinero($despues['total']);
+            }
+            $campos = array_values(array_filter(array_map(fn($k) => BITACORA_CAMPOS[$k] ?? null, array_keys($despues))));
+            if ($campos) $partes[] = ($partes ? 'Cambia: ' : 'Se realizan modificaciones sobre el presupuesto: ') . implode(', ', $campos);
+            if (!$partes && array_key_exists('modificado_en', $despues)) $partes[] = 'Se guarda el presupuesto sin cambios en el importe';
+            if (!$partes) $partes[] = 'Se realizan modificaciones sobre el presupuesto';
+        }
+        $movs[] = ['fecha' => (string) $a['fecha'], 'usuario' => (string) $a['usuario'],
+                   'donde' => $a['usuario'] !== null && $a['usuario'] !== '' ? 'web' : 'base', 'movimiento' => implode(' · ', $partes)];
+    }
+    return ['total' => (float) $total, 'movimientos' => $movs];
 }
 
 function documento(string $tipo, int $obra, int $id): array
@@ -1038,6 +1084,9 @@ try {
                   where r.obra_id = ?
                   order by r.fecha_hora_asig', [$id]);
             responder(['ok' => true, 'obra' => $o]);
+
+        case 'bitacora_presupuesto':
+            responder(['ok' => true] + bitacoraPresupuesto((int) ($_GET['id'] ?? 0)));
 
         // Versiones congeladas del presupuesto (migraciones/006): integra = el hash aún coincide con la copia guardada
         case 'versiones':

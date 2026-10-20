@@ -575,6 +575,16 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .pu-dlg-totales .pu-pu b { color: var(--azul-texto); }
 .pu-dlg-totales .pu-falta { color: var(--ambar); font-weight: 600; }
 .pr-dialogo { width: min(1000px, calc(100vw - 24px)); }
+/* Bitácora de cambios */
+.bit-dialogo { width: min(980px, calc(100vw - 24px)); }
+.bit-total { margin: 12px 16px 0; padding: 9px 12px; background: var(--ambar-suave); border: 1px solid var(--ambar-borde); border-radius: 6px 6px 0 0; font-size: 13px; color: var(--texto-2); }
+.bit-total b { color: var(--enfasis); margin-right: 4px; }
+.bit-total output { color: var(--enfasis); font-variant-numeric: tabular-nums; }
+.bit-signo { color: var(--verde); font-weight: 700; }
+.bit-tabla { margin: 0 16px; max-height: 55vh; overflow: auto; border: 1px solid var(--borde); border-top: none; border-radius: 0 0 6px 6px; }
+.bit-tabla th { text-transform: uppercase; font-size: 11.5px; letter-spacing: .03em; text-align: left; }
+.bit-tabla td { height: auto !important; padding: 7px 10px !important; white-space: normal; vertical-align: top; font-size: 12.5px; }
+.bit-tabla td:first-child, .bit-tabla td:nth-child(2), .bit-tabla td:nth-child(3) { white-space: nowrap; }
 .pr-tabla { margin: 10px 16px 0; max-height: 52vh; border: 1px solid var(--borde); border-radius: 4px; }
 .pr-tabla td { height: auto !important; padding: 6px 8px !important; white-space: normal; vertical-align: top; font-size: 12.5px; }
 .pr-tabla td:first-child { font-weight: 700; color: var(--enfasis); white-space: nowrap; }

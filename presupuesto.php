@@ -288,6 +288,10 @@ $secciones = [
         <span>Cancelar</span>
     </button>
     <button class="tb peligro" data-accion="eliminar">
+    <button class="tb" data-accion="bitacora" title="Bitácora de cambios: quién movió el presupuesto y cuándo (solo consulta)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M5 4a1 1 0 0 1 1-1h12v18H6a1 1 0 0 1-1-1z"/><path d="M5 17.5A1.5 1.5 0 0 1 6.5 16H18"/><path d="M9 7h6M9 10.5h6"/></svg>
+        <span>Bitácora</span>
+    </button>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
         <span>Eliminar</span>
     </button>
@@ -715,6 +719,22 @@ $secciones = [
         <div class="hs-cabecera">
             <strong>Autorización</strong>
             <button type="button" class="hs-cerrar" data-au-cerrar title="Cerrar">✕</button>
+<!-- ============ BITÁCORA DE CAMBIOS (solo consulta) ============ -->
+<dialog class="hs-dialogo bit-dialogo" id="bitDialogo">
+    <div class="hs-cabecera">
+        <strong>Bitácora de cambios</strong>
+        <button type="button" class="hs-cerrar" data-bit-cerrar title="Cerrar">✕</button>
+    </div>
+    <div class="bit-total"><span class="bit-signo">$</span> <b>Total del Presupuesto</b> <output id="bitTotal"></output> <small>· como está hoy el documento</small></div>
+    <div class="bit-tabla">
+        <table class="grid mini-grid">
+            <thead><tr><th>Fecha</th><th>Usuario</th><th>Dónde</th><th>Movimiento</th></tr></thead>
+            <tbody id="bitLista"></tbody>
+        </table>
+    </div>
+    <div class="hs-pie"><span></span><button type="button" class="hs-btn" data-bit-cerrar>Cerrar</button></div>
+</dialog>
+
         </div>
         <div class="au-campos">
             <p id="auMensaje"></p>

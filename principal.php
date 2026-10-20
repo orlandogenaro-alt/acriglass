@@ -114,12 +114,13 @@ function idItem(string $nombre): string
     <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= recurso('css/principal.css') ?>">
     <link rel="stylesheet" href="<?= recurso('css/fichas.css') ?>">
+    <link rel="stylesheet" href="<?= recurso('css/recorrido.css') ?>">
     <script src="<?= recurso('js/tema.js') ?>"></script>
 </head>
 <body>
 
 <!-- ================= MENÚ LATERAL ================= -->
-<aside class="sidebar" id="sidebar">
+<aside class="sidebar" id="sidebar" data-recorrido="menu">
     <div class="sb-cabecera">
         <div class="sb-logo"><img id="logoSistema" src="<?= e(imagenSistema('logo', $cfg)) ?>" alt="AcriGlass"></div>
         <div class="avatar sb-avatar"><?= e($inicial) ?></div>
@@ -161,6 +162,11 @@ function idItem(string $nombre): string
             <span class="i-icono">📖</span><span class="i-texto">Manual de uso</span>
         </div>
     </nav>
+
+    <!-- Recorrido guiado (js/recorrido.js) -->
+    <div class="sb-pie">
+        <button class="sb-tour" id="btnTour" title="Iniciar el recorrido guiado" data-recorrido="tour">▶ Tour</button>
+    </div>
 </aside>
 <div class="velo" id="velo"></div>
 
@@ -168,7 +174,7 @@ function idItem(string $nombre): string
 <div class="principal">
     <header class="topbar">
         <button class="tb-btn" id="btnMenu" title="Mostrar / ocultar menú">☰</button>
-        <div class="buscador" id="buscador">
+        <div class="buscador" id="buscador" data-recorrido="buscador">
             <button class="tb-btn" id="btnBuscar" title="Buscar en el menú">🔍</button>
             <input type="search" id="txtBuscar" placeholder="Buscar módulo…" autocomplete="off">
         </div>
@@ -184,7 +190,17 @@ function idItem(string $nombre): string
             <button class="tb-btn" id="btnFavoritos" title="Favoritos">⭐</button>
             <button class="tb-btn" id="btnPantalla" title="Pantalla completa">⛶</button>
             <button class="tb-btn" id="btnAvisos" title="Notificaciones">🔔</button>
-            <button class="avatar tb-avatar" id="btnUsuario" title="Panel de usuario"><?= e($inicial) ?></button>
+            <!-- Ayuda: recorrido guiado (js/recorrido.js) -->
+            <div class="ayuda">
+                <button class="tb-btn tb-ayuda" id="btnAyuda" title="Ayuda" aria-haspopup="true" aria-expanded="false" data-recorrido="ayuda">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.8"/><circle cx="12" cy="17.2" r=".6" fill="currentColor"/></svg>
+                </button>
+                <div class="ayuda-menu" id="menuAyuda" hidden>
+                    <div class="am-titulo">Ayuda</div>
+                    <button class="am-op" data-ayuda="recorrido">🧭 Iniciar recorrido<small></small></button>
+                </div>
+            </div>
+            <button class="avatar tb-avatar" id="btnUsuario" title="Panel de usuario" data-recorrido="usuario"><?= e($inicial) ?></button>
         </div>
 
         <!-- Panel de usuario -->
@@ -223,7 +239,7 @@ function idItem(string $nombre): string
     </header>
 
     <!-- Pestañas internas -->
-    <div class="pestanas" id="pestanas"></div>
+    <div class="pestanas" id="pestanas" data-recorrido="pestanas"></div>
 
     <div class="paneles" id="paneles">
         <!-- Bienvenido -->
@@ -233,7 +249,7 @@ function idItem(string $nombre): string
                     <h1 class="bv-titulo">General</h1>
                     <span class="bv-periodo" id="txtPeriodo"></span>
                 </div>
-                <div class="tarjetas">
+                <div class="tarjetas" data-recorrido="resumen">
                     <?php foreach ([
                         ['PRESUPUESTOS PENDIENTES', 'Presupuestos de Obra', 'presupuestos_pendientes'],
                         ['PRESUPUESTOS APROBADOS',  'Presupuestos de Obra', 'presupuestos_aceptados'],
@@ -304,5 +320,7 @@ function idItem(string $nombre): string
 <script src="<?= recurso('js/fichas.js') ?>"></script>
 <script src="<?= recurso('js/principal.js') ?>"></script>
 <script src="<?= recurso('js/tablero.js') ?>"></script>
+<script src="<?= recurso('js/recorrido-pasos.js') ?>"></script>
+<script src="<?= recurso('js/recorrido.js') ?>"></script>
 </body>
 </html>

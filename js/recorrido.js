@@ -1,11 +1,22 @@
-// Recorrido guiado de la pantalla principal: bienvenida, fondo atenuado, elemento resaltado
-// y una tarjeta por paso. Los pasos están en js/recorrido-pasos.js.
-// Se ofrece la primera vez; si se omite o se completa ya no se vuelve a ofrecer y se abre desde
-// Ayuda › Iniciar recorrido. El estado se guarda en este navegador por usuario, como los favoritos.
+// Recorrido guiado: bienvenida, fondo atenuado, elemento resaltado y una tarjeta por paso.
+// Pantalla principal: pasos en js/recorrido-pasos.js. Presupuesto de Obra y Obra: js/recorrido-presupuesto.js
+// y js/recorrido-obra.js, que además ponen window.RECORRIDO_OPCIONES (id, usuario y textos de la bienvenida).
+// Se ofrece la primera vez; si se omite o se completa ya no se vuelve a ofrecer y se abre con el botón Tour
+// (en la principal también desde Ayuda › Iniciar recorrido). El estado se guarda en este navegador por usuario
+// y por pantalla, como los favoritos.
 (function () {
     var PASOS = window.RECORRIDO_PASOS || [];
-    var VERSION = 1;   // súbela cuando cambien mucho los pasos para volver a ofrecer la bienvenida
-    var clave = 'acri_recorrido_' + ((window.ACRI && window.ACRI.usuario) || '');
+    var OPC = window.RECORRIDO_OPCIONES || {};
+    var VERSION = OPC.version || 1;   // súbela cuando cambien mucho los pasos para volver a ofrecer la bienvenida
+    var usuario = OPC.usuario || (window.ACRI && window.ACRI.usuario) || '';
+    var clave = 'acri_recorrido_' + (OPC.id ? OPC.id + '_' : '') + usuario;
+    var TEXTOS = {
+        titulo: OPC.titulo || '¡Bienvenido al recorrido de AcriGlass!',
+        intro: OPC.intro || 'Te mostraremos las funciones principales del sistema para que puedas empezar a trabajar con mayor facilidad.',
+        volver: OPC.volver || 'Podrás abrirlo nuevamente con el botón Tour, al pie del menú, o desde Ayuda.',
+        listo: OPC.listo || '¡Listo! Puedes volver a consultar este recorrido con el botón Tour o desde Ayuda.'
+    };
+    function esc(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
     var movil = window.matchMedia('(max-width: 800px)');
     var ESPERA_MAX = 2500;   // ms que se espera a que aparezca un elemento antes de omitir su paso
 
@@ -72,12 +83,12 @@
             '<div class="rc-fondo">' +
             '<div class="rc-modal" role="dialog" aria-modal="true" aria-labelledby="rcTitulo" aria-describedby="rcTexto">' +
             '<button class="rc-x" data-rc="cerrar" aria-label="Cerrar" title="Cerrar">×</button>' +
-            '<h2 id="rcTitulo">¡Bienvenido al recorrido de AcriGlass!</h2>' +
+            '<h2 id="rcTitulo">' + esc(TEXTOS.titulo) + '</h2>' +
             '<div id="rcTexto">' +
-            '<p>Te mostraremos las funciones principales del sistema para que puedas empezar a trabajar con mayor facilidad.</p>' +
+            '<p>' + esc(TEXTOS.intro) + '</p>' +
             '<p>Avanza a tu ritmo, regresa al paso anterior o cierra el recorrido cuando quieras. También puedes usar las teclas:<br>' +
             '<b>← para ir al paso anterior</b><br><b>→ para ir al siguiente</b><br><b>Esc para salir</b></p>' +
-            '<p>Podrás abrirlo nuevamente con el botón Tour, al pie del menú, o desde Ayuda.</p>' +
+            '<p>' + esc(TEXTOS.volver) + '</p>' +
             '</div>' +
             '<div class="rc-pie">' +
             '<button class="rc-btn-sec" data-rc="no">Ahora no</button>' +
@@ -109,7 +120,7 @@
     var activo = false;
     var lista = [];       // pasos que se mostrarán (ya filtrados por su condición)
     var i = 0;            // paso actual
-    var objetivo = null;  // elemento resaltado
+    var objetivo = null;  // elementos resaltados (arreglo)
     var ultimo = '';      // última posición dibujada del elemento
     var espera = 0, bucle = 0, focoPrevio = null;
     var raiz, foco, tarjeta, flecha, txtPaso, txtTitulo, txtTexto, btnAnt, btnSig;
@@ -171,6 +182,21 @@
         var r = el.getBoundingClientRect();
         return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';
     }
+    // Un paso puede resaltar varios elementos juntos (p. ej. tres botones seguidos): la función regresa
+    // un arreglo y se resaltan los que se ven, como un solo rectángulo.
+    function visibles(el) {
+        if (!el) return null;
+        var v = (Array.isArray(el) ? el : [el]).filter(function (x) { return x && visible(x); });
+        return v.length ? v : null;
+    }
+    function rect(els) {
+        var l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+        els.forEach(function (el) {
+            var x = el.getBoundingClientRect();
+            l = Math.min(l, x.left); t = Math.min(t, x.top); r = Math.max(r, x.right); b = Math.max(b, x.bottom);
+        });
+        return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
+    }
 
     // dir: 1 = avanzando, -1 = regresando (para saber a dónde ir si se omite el paso)
     function mostrar(n, dir) {
@@ -193,8 +219,8 @@
         var inicio = Date.now();
         (function buscar() {
             if (!activo || i !== n) return;
-            var el = resolver(paso);
-            if (el && visible(el)) { enfocar(el); return; }
+            var el = visibles(resolver(paso));
+            if (el) { enfocar(el); return; }
             if (Date.now() - inicio < ESPERA_MAX) { espera = setTimeout(buscar, 100); return; }
             // No apareció o no está disponible: se omite y se recalcula el total
             lista.splice(n, 1);
@@ -206,9 +232,11 @@
     function enfocar(el) {
         var paso = lista[i];
         objetivo = el;
-        var r = el.getBoundingClientRect();
-        if (r.top < 0 || r.bottom > window.innerHeight) {
-            el.scrollIntoView({ block: r.height > window.innerHeight * 0.7 ? 'start' : 'center', inline: 'nearest', behavior: 'smooth' });
+        var r = rect(el);
+        if (r.top < 0 || r.bottom > window.innerHeight || r.left < 0 || r.right > document.documentElement.clientWidth) {
+            // Varios elementos: primero se trae el último y luego el primero, para que se vean todos si caben
+            if (el.length > 1) el[el.length - 1].scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            el[0].scrollIntoView({ block: r.height > window.innerHeight * 0.7 ? 'start' : 'center', inline: 'nearest', behavior: 'smooth' });
         }
         txtPaso.textContent = 'Paso ' + (i + 1) + ' de ' + lista.length;
         txtTitulo.textContent = paso.titulo;
@@ -225,7 +253,7 @@
     function seguir() {
         if (!activo) return;
         if (objetivo) {
-            var r = objetivo.getBoundingClientRect();
+            var r = rect(objetivo);
             var k = [r.left, r.top, r.width, r.height, window.innerWidth, window.innerHeight].map(Math.round).join();
             if (k !== ultimo) { ultimo = k; colocar(); }
         }
@@ -241,7 +269,7 @@
 
     function colocar() {
         if (!objetivo) return;
-        var r = objetivo.getBoundingClientRect();
+        var r = rect(objetivo);
         var vw = document.documentElement.clientWidth, vh = window.innerHeight;
         var m = 10, sep = 14, pad = 5;
 
@@ -318,7 +346,7 @@
         raiz.remove();
         raiz = objetivo = null;
         guardarEstado(completo ? 'completado' : 'omitido');
-        if (completo) aviso('¡Listo! Puedes volver a consultar este recorrido con el botón Tour o desde Ayuda.');
+        if (completo) aviso(TEXTOS.listo);
         if (focoPrevio && focoPrevio.focus && document.contains(focoPrevio)) focoPrevio.focus({ preventScroll: true });
         focoPrevio = null;
     }

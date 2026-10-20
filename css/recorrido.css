@@ -113,3 +113,8 @@
 @media (max-width: 480px) {
     .rc-pie button { flex: 1; }
 }
+
+/* Al imprimir (Presupuesto / Obra) no sale el recorrido */
+@media print {
+    .rc, .rc-fondo, .rc-aviso { display: none !important; }
+}

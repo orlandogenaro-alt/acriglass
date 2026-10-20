@@ -223,6 +223,7 @@ $secciones = [
     <link rel="icon" href="<?= e(imagenSistema('favicon')) ?>">
     <link rel="stylesheet" href="<?= recurso('css/presupuesto.css') ?>">
     <link rel="stylesheet" href="<?= recurso('css/formato-presupuesto.css') ?>">
+    <link rel="stylesheet" href="<?= recurso('css/recorrido.css') ?>">
     <script src="<?= recurso('js/tema.js') ?>"></script>
 </head>
 <body data-presupuesto="<?= $presupuestoId ?>">
@@ -287,11 +288,11 @@ $secciones = [
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>
         <span>Cancelar</span>
     </button>
-    <button class="tb peligro" data-accion="eliminar">
     <button class="tb" data-accion="bitacora" title="Bitácora de cambios: quién movió el presupuesto y cuándo (solo consulta)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M5 4a1 1 0 0 1 1-1h12v18H6a1 1 0 0 1-1-1z"/><path d="M5 17.5A1.5 1.5 0 0 1 6.5 16H18"/><path d="M9 7h6M9 10.5h6"/></svg>
         <span>Bitácora</span>
     </button>
+    <button class="tb peligro" data-accion="eliminar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
         <span>Eliminar</span>
     </button>
@@ -299,6 +300,11 @@ $secciones = [
     <button class="tb" data-accion="cerrar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
         <span>Cerrar</span>
+    </button>
+    <span class="sep"></span>
+    <button class="tb" id="btnTour" title="Recorrido guiado del presupuesto">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8.5l5 3.5-5 3.5z"/></svg>
+        <span>Tour</span>
     </button>
 
     <span class="modo" id="modo" hidden title="Presiona «Modificar» para cambiar el presupuesto">🔒 Solo lectura</span>
@@ -713,12 +719,6 @@ $secciones = [
     <div class="hs-pie"><span></span><button type="button" class="hs-btn principal" data-ver-cerrar>Cerrar</button></div>
 </dialog>
 
-<!-- ============ AUTORIZACIÓN DE OTRO USUARIO (Dialog225) ============ -->
-<dialog class="hs-dialogo au-dialogo" id="auDialogo">
-    <form id="auForm">
-        <div class="hs-cabecera">
-            <strong>Autorización</strong>
-            <button type="button" class="hs-cerrar" data-au-cerrar title="Cerrar">✕</button>
 <!-- ============ BITÁCORA DE CAMBIOS (solo consulta) ============ -->
 <dialog class="hs-dialogo bit-dialogo" id="bitDialogo">
     <div class="hs-cabecera">
@@ -735,6 +735,12 @@ $secciones = [
     <div class="hs-pie"><span></span><button type="button" class="hs-btn" data-bit-cerrar>Cerrar</button></div>
 </dialog>
 
+<!-- ============ AUTORIZACIÓN DE OTRO USUARIO (Dialog225) ============ -->
+<dialog class="hs-dialogo au-dialogo" id="auDialogo">
+    <form id="auForm">
+        <div class="hs-cabecera">
+            <strong>Autorización</strong>
+            <button type="button" class="hs-cerrar" data-au-cerrar title="Cerrar">✕</button>
         </div>
         <div class="au-campos">
             <p id="auMensaje"></p>
@@ -772,5 +778,7 @@ $secciones = [
 <script src="<?= recurso('js/ruta-critica.js') ?>"></script>
 <script src="<?= recurso('js/conceptos-tareas.js') ?>"></script>
 <script src="<?= recurso('js/presupuesto.js') ?>"></script>
+<script src="<?= recurso('js/recorrido-presupuesto.js') ?>"></script>
+<script src="<?= recurso('js/recorrido.js') ?>"></script>
 </body>
 </html>

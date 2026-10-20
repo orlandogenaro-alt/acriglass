@@ -157,9 +157,10 @@ function iconoPestana() {
     <link rel="icon" href="<?= e(imagenSistema('favicon')) ?>">
     <link rel="stylesheet" href="<?= recurso('css/presupuesto.css') ?>">
     <link rel="stylesheet" href="<?= recurso('css/obra.css') ?>">
+    <link rel="stylesheet" href="<?= recurso('css/recorrido.css') ?>">
     <script src="<?= recurso('js/tema.js') ?>"></script>
 </head>
-<body data-obra="<?= $obraId ?>" data-permisos="<?= e(implode(',', $permisos)) ?>">
+<body data-obra="<?= $obraId ?>" data-usuario="<?= e($usuarioSesion) ?>" data-permisos="<?= e(implode(',', $permisos)) ?>">
 
 <!-- Barra de herramientas -->
 <header class="toolbar">
@@ -226,6 +227,11 @@ function iconoPestana() {
     <button class="tb" data-accion="cerrar">
         <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="#e53935" stroke-width="2.5" stroke-linecap="round"/></svg>
         <span>Cerrar</span>
+    </button>
+    <span class="sep"></span>
+    <button class="tb" id="btnTour" title="Recorrido guiado de la obra">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#fff" stroke="#3b7dc4" stroke-width="1.5"/><path d="M10 8l6 4-6 4z" fill="#3b7dc4"/></svg>
+        <span>Tour</span>
     </button>
 </header>
 
@@ -788,5 +794,7 @@ function iconoPestana() {
 <script src="<?= recurso('js/ruta-critica.js') ?>"></script>
 <script src="<?= recurso('js/conceptos-tareas.js') ?>"></script>
 <script src="<?= recurso('js/obra.js') ?>"></script>
+<script src="<?= recurso('js/recorrido-obra.js') ?>"></script>
+<script src="<?= recurso('js/recorrido.js') ?>"></script>
 </body>
 </html>

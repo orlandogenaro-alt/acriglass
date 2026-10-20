@@ -903,7 +903,7 @@
             var qU = q.toUpperCase();
             for (var i = 0; i < ac.filas.length; i++) {
                 var f = ac.filas[i];
-                if (!f.asignado && (f.folio.indexOf(qU) === 0 || f.valor.indexOf(qU) === 0)) { ac.sel = i; break; }
+                if (!f.asignado && (f.exacto || f.folio.indexOf(qU) === 0 || f.valor.indexOf(qU) === 0)) { ac.sel = i; break; }
             }
             acPintar('No hay pedidos, facturas ni presupuestos de los últimos 24 meses que coincidan. Si conoces el folio exacto, escríbelo completo y presiona Asignar.');
         }).catch(function (err) {

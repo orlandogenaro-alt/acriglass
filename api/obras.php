@@ -68,7 +68,8 @@ require __DIR__ . '/../includes/respuesta.php';
 
 // Facturas de Microsip de los últimos 24 meses para sugerirlas en Asignar Cotización. /microsip-facturas de
 // Easy-Glass no filtra por folio y traerlas tarda unos segundos: se guarda un índice compacto 10 minutos en la
-// carpeta temporal del servidor (la ventana lo precarga al abrirse).
+// carpeta temporal del servidor y en configuracion (en Vercel cada petición puede caer en otro servidor).
+// La ventana lo precarga al abrirse. Si Easy-Glass no responde se usa el último índice guardado.
 function facturasMicrosipIndice(): array
 {
     $archivo = sys_get_temp_dir() . '/acri-facturas-' . md5(__DIR__) . '.json';
@@ -76,6 +77,25 @@ function facturasMicrosipIndice(): array
         $d = json_decode((string) @file_get_contents($archivo), true);
         if (is_array($d)) return $d;
     }
+    $guardado = [];
+    try { $guardado = configLeer('cache-facturas-microsip'); } catch (Throwable $e) {}
+    if (is_array($guardado['facturas'] ?? null) && (int) ($guardado['generado'] ?? 0) > time() - 600) {
+        @file_put_contents($archivo, json_encode($guardado['facturas'], JSON_UNESCAPED_UNICODE), LOCK_EX);
+        return $guardado['facturas'];
+    }
+    try {
+        $indice = facturasMicrosipDescargar();
+    } catch (Throwable $e) {
+        if (is_array($guardado['facturas'] ?? null)) return $guardado['facturas'];
+        throw $e;
+    }
+    @file_put_contents($archivo, json_encode($indice, JSON_UNESCAPED_UNICODE), LOCK_EX);
+    try { configGuardar('cache-facturas-microsip', ['generado' => time(), 'facturas' => $indice]); } catch (Throwable $e) {}
+    return $indice;
+}
+
+function facturasMicrosipDescargar(): array
+{
     $ruta = '/microsip-facturas?desde=' . date('Y-m-d', strtotime('-24 months')) . '&limite=500';
     $r = api_http('EASYGLASS', 'GET', $ruta);
     if (!$r['ok']) throw new RuntimeException('No se pudo consultar las facturas de Microsip: ' . ($r['error'] ?: 'sin respuesta'));
@@ -92,7 +112,6 @@ function facturasMicrosipIndice(): array
             ];
         }
     }
-    @file_put_contents($archivo, json_encode($indice, JSON_UNESCAPED_UNICODE), LOCK_EX);
     return $indice;
 }
 
@@ -1260,13 +1279,34 @@ try {
             // A00002080 = A2080: se comparan los folios sin los ceros después de la serie
             $norm = fn($f) => preg_replace('/^([A-Z]*)0*/', '$1', mb_strtoupper(trim((string) $f)));
             $qNorm = $norm($q) ?: $q;
-            // «EG0009815» o «9815»: a Easy-Glass se le pregunta por el número
-            $num = preg_match('/^(EG)?0*(\d+)$/', $q, $mm) ? $mm[2] : $q;
+            // «EG0009815», «000009815», «A00009815» o «9815»: a Easy-Glass se le pregunta por el número, por texto y
+            // por folio exacto (la búsqueda por texto trae otros folios que contienen esos dígitos, como 9820 para 820).
+            // Microsip responde error con ceros a la izquierda en «q»: se manda sin ellos.
+            $num = preg_match('/^[A-Z]*0*(\d+)$/', $q, $mm) ? $mm[1] : '';
             $desde = date('Y-m-d', strtotime('-24 months'));
-            $r = api_http_varios('EASYGLASS', [
-                'pedidos'      => '/microsip-pedidos?limite=10&desde=' . $desde . '&q=' . rawurlencode($q),
-                'presupuestos' => '/presupuestos?limite=10&desde=' . $desde . '&q=' . rawurlencode($num),
-            ]);
+            $rutas = [
+                'pedidos'      => '/microsip-pedidos?limite=10&desde=' . $desde . '&q=' . rawurlencode(ctype_digit($q) ? $num : $q),
+                'presupuestos' => '/presupuestos?limite=10&desde=' . $desde . '&q=' . rawurlencode($num !== '' ? $num : $q),
+            ];
+            if ($num !== '') {
+                $rutas['pedido_folio']      = '/microsip-pedidos?folio=' . $num;
+                $rutas['presupuesto_folio'] = '/presupuestos?folio=' . $num;
+            }
+            $r = api_http_varios('EASYGLASS', $rutas);
+            // Los de folio exacto van primero en cada lista
+            $exacto = $r['presupuesto_folio']['datos']['datos'] ?? null;
+            if (is_array($exacto) && !empty($exacto['folio'])) {
+                $r['presupuestos']['datos']['datos'] = array_merge([[
+                    'folio' => $exacto['folio'], 'cliente' => $exacto['nom_cliente'] ?? '', 'proyecto' => $exacto['proyecto'] ?? '',
+                    'total' => $exacto['total_proyecto'] ?? $exacto['importe_con_iva'] ?? 0, 'moneda' => $exacto['moneda'] ?? '',
+                    'fecha' => $exacto['fecha'] ?? '', 'estatus' => $exacto['estatus'] ?? '',
+                ]], (array) ($r['presupuestos']['datos']['datos'] ?? []));
+                $r['presupuestos']['ok'] = true;
+            }
+            if (!empty($r['pedido_folio']['datos']['datos'])) {
+                $r['pedidos']['datos']['datos'] = array_merge($r['pedido_folio']['datos']['datos'], (array) ($r['pedidos']['datos']['datos'] ?? []));
+                $r['pedidos']['ok'] = true;
+            }
             try {
                 $facturas = facturasMicrosipIndice();
             } catch (Throwable $e) {
@@ -1309,11 +1349,17 @@ try {
             }
             $asignados = array_column(bd_filas('AW', 'select folio from doctos_microsip_obra where obra_id = ?', [(int) ($_GET['id'] ?? 0)]), 'folio');
             $filas = array_map(fn($f) => $f + ['asignado' => in_array($f['clave'] ?? $f['folio'], $asignados, true)], array_values($filas));
-            // Primero los que empiezan con lo escrito (A2080 = A00002080, 9815 = EG0009815), luego los más recientes
-            $empieza = fn($f) => strpos($f['folio'], $q) === 0 || strpos($norm($f['folio']), $qNorm) === 0
-                || strpos(ltrim(substr($f['folio'], 2), '0'), $num) === 0 ? 0 : 1;
+            // Primero el folio exacto (A2080 = A00002080, 820 = EG0000820), luego los que empiezan con lo escrito
+            // y al final los demás; en cada grupo, los más recientes
+            $empieza = function ($f) use ($q, $qNorm, $num, $norm) {
+                $sinSerie = preg_replace('/^[A-Z]*0*/', '', $f['folio']);
+                if ($f['folio'] === $q || $norm($f['folio']) === $qNorm || ($num !== '' && $sinSerie === $num)) return 0;
+                if (strpos($f['folio'], $q) === 0 || strpos($norm($f['folio']), $qNorm) === 0 || ($num !== '' && strpos($sinSerie, $num) === 0)) return 1;
+                return 2;
+            };
             usort($filas, fn($a, $b) => [$empieza($a), $b['fecha']] <=> [$empieza($b), $a['fecha']]);
-            responder(['ok' => true, 'filas' => array_slice($filas, 0, 20)]);
+            $filas = array_map(fn($f) => $f + ['exacto' => $empieza($f) === 0], array_slice($filas, 0, 20));
+            responder(['ok' => true, 'filas' => $filas]);
 
         case 'quejas':   // Quejas de Cliente de la cotización: por su folio (FOLIO_PEDIDO_AW) o por el nombre del cliente
             $folio = trim((string) ($_GET['folio'] ?? ''));

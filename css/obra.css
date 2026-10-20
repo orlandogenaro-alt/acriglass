@@ -366,6 +366,7 @@
 .ac-origen { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 11.5px; font-weight: 700; background: var(--sub); border: 1px solid var(--borde); }
 .ac-origen.ms { color: #0f766e; }
 .ac-origen.eg { color: var(--azul); }
+.ac-origen.fa { color: #b45309; }
 @media (max-width: 700px) {
     .ac-grid th:nth-child(4), .ac-grid td:nth-child(4), .ac-grid th:nth-child(6), .ac-grid td:nth-child(6) { display: none; }
 }

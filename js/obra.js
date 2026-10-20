@@ -865,6 +865,8 @@
         acPintar('Escribe al menos 2 caracteres del folio, del cliente o del proyecto.');
         $('acDialogo').showModal();
         $('acFolio').focus();
+        // Deja listas en el servidor las facturas de Microsip (tardan unos segundos la primera vez)
+        pedir('accion=folios_eg&precargar=1').catch(function () {});
     }
     function acResaltar(texto, q) {
         var t = String(texto == null ? '' : texto), i = q ? t.toUpperCase().indexOf(q) : -1;
@@ -876,7 +878,7 @@
             return '<tr data-i="' + i + '" role="option" aria-selected="' + (i === ac.sel) + '" class="' + (i === ac.sel ? 'sel ' : '') + (f.asignado ? 'asignado' : '') + '"' +
                 (f.asignado ? ' title="Ya está asignado a esta obra"' : '') + '>' +
                 '<td><b>' + acResaltar(f.folio, q) + '</b></td>' +
-                '<td><span class="ac-origen ' + (f.origen === 'Easy-Glass' ? 'eg' : 'ms') + '">' + escapar(f.origen) + '</span></td>' +
+                '<td><span class="ac-origen ' + (f.origen === 'Easy-Glass' ? 'eg' : f.origen === 'Factura Microsip' ? 'fa' : 'ms') + '">' + escapar(f.origen) + '</span></td>' +
                 '<td>' + acResaltar(f.cliente, q) + '<span class="ac-det">' + acResaltar(f.detalle, q) + '</span></td>' +
                 '<td>' + fechaDMY(f.fecha) + '</td>' +
                 '<td class="num">' + dinero(f.total) + ' ' + escapar(f.moneda) + '</td>' +
@@ -903,7 +905,7 @@
                 var f = ac.filas[i];
                 if (!f.asignado && (f.folio.indexOf(qU) === 0 || f.valor.indexOf(qU) === 0)) { ac.sel = i; break; }
             }
-            acPintar('No hay folios que coincidan. Si es una factura de Microsip, escribe el folio completo y presiona Asignar.');
+            acPintar('No hay pedidos, facturas ni presupuestos de los últimos 24 meses que coincidan. Si conoces el folio exacto, escríbelo completo y presiona Asignar.');
         }).catch(function (err) {
             if (n !== ac.pedido) return;
             ac.filas = []; ac.sel = -1;

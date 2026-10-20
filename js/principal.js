@@ -19,7 +19,7 @@
     var fuentes = {
         'Presupuestos de Obra': { api: 'api/obras.php?accion=presupuestos', fecha: true, origen: 'AW-Management' },
         'Obras':                { api: 'api/obras.php?accion=obras',        fecha: true, origen: 'AW-Management' },
-        'Clientes':             { api: 'api/clientes.php?accion=listar', ficha: 'clientes', filtros: ['CIUDAD', 'VENDEDOR'], origen: 'Easy-Glass' },
+        'Clientes':             { api: 'api/clientes.php?accion=listar', ficha: 'clientes', filtros: ['CIUDAD', 'VENDEDOR'], origen: 'Supabase' },
         'Vendedores de Obra':   { api: 'api/catalogos.php?tipo=vendedores&accion=listar', ficha: 'vendedores', filtros: ['ESTATUS'], origen: 'AW-Management' },
         'Empleados':            { api: 'api/catalogos.php?tipo=empleados&accion=listar', ficha: 'empleados', filtros: ['TIPO_EMPLEADO', 'ESTATUS'], origen: 'AW-Management' },
         'Tipos de Empleados':   { api: 'api/catalogos.php?tipo=tipos&accion=listar', ficha: 'tipos', filtros: [], origen: 'AW-Management' },

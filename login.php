@@ -23,13 +23,15 @@ function fallo(string $usuario): void
     volver('datos');
 }
 
-function iniciarSesion(string $usuario, array $permisos, bool $modoConfig = false): void
+function iniciarSesion(string $usuario, array $permisos, bool $modoConfig = false, bool $primerIngreso = false): void
 {
     intentosRegistrar($usuario, true);
     session_regenerate_id(true);
     $_SESSION['usuario']     = $usuario;
     $_SESSION['permisos']    = $permisos;
     $_SESSION['modo_config'] = $modoConfig;
+    // Primera vez que entra desde que le crearon la cuenta: el recorrido guiado se ofrece solo en esta sesión
+    $_SESSION['primer_ingreso'] = $primerIngreso;
     $_SESSION['inicio']      = time();
     $_SESSION['expira']      = time() + ACRI_DURACION_SESION;
     header('Location: principal.php');
@@ -65,7 +67,7 @@ if (!$aw || ($aw['contrasena'] ?? '') === '') {
 // Permisos = los de su rol (permisos_roles) más los sueltos del usuario (permisos_usuarios).
 if (ACRI_NUBE) {
     try {
-        $u = bd_fila('AW', 'select usuario_id, login, contrasena_hash, estatus from usuarios where upper(trim(login)) = ?', [mb_strtoupper($usuario)]);
+        $u = bd_fila('AW', 'select usuario_id, login, contrasena_hash, estatus, ultimo_acceso from usuarios where upper(trim(login)) = ?', [mb_strtoupper($usuario)]);
         if (!$u || !password_verify($contrasena, (string) $u['contrasena_hash'])) fallo($usuario);
         if (strtoupper((string) $u['estatus']) === 'B') volver('baja');
         $sql = 'select permiso from permisos_usuarios where usuario_id = ?';
@@ -83,7 +85,7 @@ if (ACRI_NUBE) {
         error_log('AcriGlass login: ' . $e->getMessage());
         volver('bd');
     }
-    iniciarSesion($u['login'], $permisos);
+    iniciarSesion($u['login'], $permisos, false, $u['ultimo_acceso'] === null);
 }
 
 try {

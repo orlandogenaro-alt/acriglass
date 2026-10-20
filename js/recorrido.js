@@ -1,13 +1,14 @@
 // Recorrido guiado: bienvenida, fondo atenuado, elemento resaltado y una tarjeta por paso.
 // Pantalla principal: pasos en js/recorrido-pasos.js. Presupuesto de Obra y Obra: js/recorrido-presupuesto.js
 // y js/recorrido-obra.js, que además ponen window.RECORRIDO_OPCIONES (id, usuario y textos de la bienvenida).
-// Se ofrece la primera vez; si se omite o se completa ya no se vuelve a ofrecer y se abre con el botón Tour
-// (en la principal también desde Ayuda › Iniciar recorrido). El estado se guarda en este navegador por usuario
-// y por pantalla, como los favoritos.
+// Se ofrece solo en la primera sesión del usuario después de que le crearon la cuenta (login.php pone
+// primer_ingreso cuando aún no tenía ultimo_acceso); si se omite o se completa ya no se vuelve a ofrecer.
+// Después se abre con el botón Tour (en la principal también desde Ayuda › Iniciar recorrido). El estado
+// (omitido / completado) se guarda en este navegador por usuario y por pantalla, como los favoritos.
 (function () {
     var PASOS = window.RECORRIDO_PASOS || [];
     var OPC = window.RECORRIDO_OPCIONES || {};
-    var VERSION = OPC.version || 1;   // súbela cuando cambien mucho los pasos para volver a ofrecer la bienvenida
+    var VERSION = OPC.version || 1;   // se guarda con el estado (omitido / completado)
     var usuario = OPC.usuario || (window.ACRI && window.ACRI.usuario) || '';
     var clave = 'acri_recorrido_' + (OPC.id ? OPC.id + '_' : '') + usuario;
     var TEXTOS = {
@@ -401,9 +402,9 @@
     var btnTour = document.getElementById('btnTour');
     if (btnTour) btnTour.addEventListener('click', function () { iniciar(btnTour); });
 
-    // Primera vez de este usuario en este navegador: se ofrece la bienvenida
-    var est = leerEstado();
-    if (!est || est.version !== VERSION) setTimeout(bienvenida, 700);
+    // Solo en la primera sesión del usuario (la primera vez que entra desde que le crearon la cuenta) se ofrece
+    // la bienvenida, una vez por pantalla; después el recorrido se abre únicamente con el botón Tour
+    if (window.ACRI_PRIMER_INGRESO && !leerEstado()) setTimeout(bienvenida, 700);
 
     window.Recorrido = { iniciar: iniciar, bienvenida: bienvenida };
 })();

@@ -320,6 +320,7 @@ function idItem(string $nombre): string
 <script src="<?= recurso('js/fichas.js') ?>"></script>
 <script src="<?= recurso('js/principal.js') ?>"></script>
 <script src="<?= recurso('js/tablero.js') ?>"></script>
+<script>window.ACRI_PRIMER_INGRESO = <?= !empty($_SESSION['primer_ingreso']) ? 'true' : 'false' ?>;</script>
 <script src="<?= recurso('js/recorrido-pasos.js') ?>"></script>
 <script src="<?= recurso('js/recorrido.js') ?>"></script>
 </body>

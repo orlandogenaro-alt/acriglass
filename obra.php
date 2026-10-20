@@ -794,6 +794,7 @@ function iconoPestana() {
 <script src="<?= recurso('js/ruta-critica.js') ?>"></script>
 <script src="<?= recurso('js/conceptos-tareas.js') ?>"></script>
 <script src="<?= recurso('js/obra.js') ?>"></script>
+<script>window.ACRI_PRIMER_INGRESO = <?= !empty($_SESSION['primer_ingreso']) ? 'true' : 'false' ?>;</script>
 <script src="<?= recurso('js/recorrido-obra.js') ?>"></script>
 <script src="<?= recurso('js/recorrido.js') ?>"></script>
 </body>

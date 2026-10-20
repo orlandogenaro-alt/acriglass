@@ -2,10 +2,10 @@
     // Tasa de IVA del presupuesto (select ivaTasa; las tasas salen de Administrador › Parámetros de presupuesto)
     var PARAMETROS = window.ACRI_PARAMETROS_PRES || { iva_defecto: 16, iva_tasas: [], indirectos: [], financiamiento_pct: 0 };
     var IVA = (PARAMETROS.iva_defecto != null ? Number(PARAMETROS.iva_defecto) : 16) / 100;
-    var NOMBRES = { mp: 'Materia Prima', mo: 'Mano de Obra', go: 'Gastos de Operacion', ct: 'Conceptos/Tareas y Previsualización', pu: 'Análisis de Precios Unitarios' };
+    var NOMBRES = { mp: 'Materia Prima', mo: 'Mano de Obra', go: 'Gastos de Operacion', cc: 'Catálogo de Conceptos', pu: 'Análisis de Precios Unitarios' };
     var AYUDAS = {
         grid: 'Ctrl + I para agregar un nuevo Concepto',
-        ct: 'Se generan en automático con los conceptos de Materia Prima, Mano de Obra y Gastos de Operacion',
+        cc: 'Como Neodata: partidas, subpartidas y conceptos con su P.U. (el análisis de cada uno está en Análisis P.U.)',
         pu: 'Como Neodata, con lo capturado en el presupuesto: no cambia el Subtotal ni el Total'
     };
 
@@ -36,7 +36,7 @@
     // ---------- Rejilla ----------
     function render() {
         renderExtras();
-        if (seccion === 'ct') { renderCt(); return; }
+        if (seccion === 'cc') { renderCc(); return; }
         if (seccion === 'pu') { renderPu(); return; }
         var filas = datos[seccion];
         if (!filas.length) {
@@ -87,7 +87,7 @@
 
     function refrescarCalculados() {
         var subtotal = calcularTotales();
-        if (seccion === 'ct') return;
+        if (seccion === 'cc') { pintarCc(); return; }
         if (seccion === 'pu') { renderPu(); return; }
         var filas = datos[seccion];
         // Los cálculos agregaron un renglón fijo (mano de obra, comisiones, seguro): se vuelve a pintar
@@ -112,8 +112,8 @@
 
     function agregarConcepto() {
         if (seccion === 'pu') { agregarConceptoPU(); return; }
+        if (seccion === 'cc') { agregarConceptoCc(); return; }
         if (soloLectura) { avisoSoloLectura(); return; }
-        if (seccion === 'ct') { ct.abrirNuevo(); return; }
         datos[seccion].push({ id: ++consecutivo, concepto: '', presupuesto: 0, importar: false, folio: '' });
         marcarCambio();
         render();
@@ -157,17 +157,19 @@
             document.querySelectorAll('.sec-tab').forEach(function (x) { x.classList.remove('activo'); });
             t.classList.add('activo');
             seccion = t.dataset.sec;
-            var ct = seccion === 'ct', pu = seccion === 'pu';
+            var cc = seccion === 'cc', pu = seccion === 'pu';
             $('secNombre').textContent = NOMBRES[seccion] + ':';
-            $('secAyuda').textContent = AYUDAS[ct ? 'ct' : pu ? 'pu' : 'grid'];
-            document.querySelector('.grid-caja').hidden = ct || pu;
-            $('ctPanel').hidden = !ct;
+            $('secAyuda').textContent = AYUDAS[cc ? 'cc' : pu ? 'pu' : 'grid'];
+            document.querySelector('.grid-caja').hidden = cc || pu;
+            $('ccPanel').hidden = !cc;
             $('puPanel').hidden = !pu;
             render();
         });
     });
 
     // ---------- Conceptos/Tareas (js/conceptos-tareas.js, se guardan con el presupuesto) ----------
+    // Ya no tienen pestaña en el presupuesto (la ocupa el Catálogo de Conceptos): se siguen generando y guardando
+    // para el programa de la Obra, y dan la unidad y cantidad de lo capturado por importe
     // Los adjuntos se guardan por presupuesto (P<id>); si aún no se guarda, en una carpeta temporal
     var adjCarpeta = (function () {
         var id = parseInt(document.body.dataset.presupuesto, 10) || 0;
@@ -181,11 +183,10 @@
         contexto: function () { return { proyecto: $('proyecto').value, ubicacion: $('ubicacion').value, fecha: $('fecha').value }; },
         soloLectura: function () { return soloLectura; },
         avisoSoloLectura: function () { avisoSoloLectura(); },
-        visible: function () { return seccion === 'ct'; },
+        visible: function () { return false; },
         carpeta: function () { return adjCarpeta; },
         alCambiar: marcarCambio
     });
-    function renderCt() { ct.render(); }
     ct.contarAdjuntos();
 
     // ---------- Cálculos del Form46 ----------
@@ -701,9 +702,9 @@
     $('puAgregar').addEventListener('click', agregarConceptoPU);
 
     // Plantilla de presupuesto: agrega sus conceptos con la matriz y los precios vigentes del catálogo
-    if ($('puPlantilla')) $('puPlantilla').addEventListener('change', function () {
-        var pl = (window.ACRI_PLANTILLAS_PU || [])[this.value];
-        this.value = '';
+    function agregarPlantilla(sel, partida) {
+        var pl = (window.ACRI_PLANTILLAS_PU || [])[sel.value];
+        sel.value = '';
         if (!pl || soloLectura) return;
         var porCodigo = {};
         CONCEPTOS_PU.forEach(function (c) { porCodigo[clave(c.codigo)] = c; });
@@ -719,12 +720,14 @@
         pl.conceptos.forEach(function (x) {
             var c = porCodigo[clave(x.codigo)];
             if (!c) return;
-            analisis.conceptos.push(nuevoConcepto({ descripcion: c.descripcion, unidad: c.unidad, partida: x.partida || c.partida || '',
+            analisis.conceptos.push(nuevoConcepto({ descripcion: c.descripcion, unidad: c.unidad, partida: x.partida || partida || c.partida || '',
                                                     cantidad: x.cantidad, especificacion: c.especificacion || '', insumos: c.insumos }));
         });
         marcarCambio();
-        renderPu();
-    });
+        calcularTotales();
+        render();
+    }
+    if ($('puPlantilla')) $('puPlantilla').addEventListener('change', function () { agregarPlantilla(this, ''); });
 
     $('puConceptos').addEventListener('input', function (e) {
         var campo = e.target.dataset.pu, tr = e.target.closest('tr[data-uid]');
@@ -916,6 +919,7 @@
     $('puDialogo').addEventListener('close', function () {
         editandoPU = null;
         if (seccion === 'pu') renderPu();
+        if (seccion === 'cc') renderCc();
     });
 
     Object.keys(CAMPOS_PU).forEach(function (k) {
@@ -972,6 +976,339 @@
         partidas.forEach(function (p) { delete p.porNombre; });
         return { r: r, subtotal: r.pv, catalogo: { partidas: partidas, factor: r.factor, detalle: detalle } };
     }
+
+    // ---------- Catálogo de Conceptos (como Neodata) ----------
+    // Los mismos conceptos del Análisis P.U., acomodados en partidas y subpartidas (la partida se escribe
+    // «Partida / Subpartida», igual que en la impresión) con clave, unidad, cantidad, P.U., importe y % del total.
+    // Lo capturado por importe en Materia Prima / Mano de Obra aparece en su partida, sin editar.
+    var ccPartidaSel = null;   // partida del renglón seleccionado: ahí se agregan conceptos y subpartidas
+
+    function partesPartida(p) {
+        var x = String(p || '').split('/').map(function (s) { return txt(s); }).filter(Boolean);
+        return { p: x[0] || '', s: x.slice(1).join(' / ') };
+    }
+    function unirPartida(p, s) { return p && s ? p + ' / ' + s : p || s || ''; }
+    function clavePartida(p) { var x = partesPartida(p); return clave(unirPartida(x.p, x.s)); }
+
+    // Partidas con sus conceptos directos y sus subpartidas, en el orden en que aparecen
+    function arbolCc(r) {
+        var lista = catalogoPU(r), partidas = [], porNombre = {}, total = 0;
+        lista.forEach(function (x) {
+            var pp = partesPartida(x.c ? x.c.partida : x.partida), kp = clave(pp.p);
+            var p = porNombre[kp];
+            if (!p) {
+                p = porNombre[kp] = { nombre: pp.p, numero: partidas.length + 1, conceptos: [], subs: [], porNombre: {}, importe: 0 };
+                partidas.push(p);
+            }
+            var destino = p;
+            if (pp.s) {
+                destino = p.porNombre[clave(pp.s)];
+                if (!destino) {
+                    destino = p.porNombre[clave(pp.s)] = { nombre: pp.s, padre: p, numero: p.numero + '.' + (p.subs.length + 1), conceptos: [], importe: 0 };
+                    p.subs.push(destino);
+                }
+                destino.importe += x.importe;
+            }
+            p.importe += x.importe;
+            destino.conceptos.push(x);
+            total += x.importe;
+        });
+        return { partidas: partidas, total: total };
+    }
+
+    function renderCc() {
+        construirSugerencias();
+        var r = calcularPU(), a = arbolCc(r), dis = soloLectura ? ' disabled' : '', html = '';
+        function filaGrupo(g, sub) {
+            var partida = sub ? unirPartida(g.padre.nombre, g.nombre) : g.nombre;
+            // Solo los grupos con conceptos analizados se editan; los de lo capturado por importe se ven nada más
+            var analizado = function (x) { return !x.otro; };
+            var editable = g.conceptos.some(analizado) || (!sub && g.subs.some(function (s) { return s.conceptos.some(analizado); }));
+            return '<tr class="' + (sub ? 'cc-sub' : 'cc-partida') + '" data-partida="' + escapar(partida) + '">' +
+                '<td class="id">' + (sub ? g.numero : g.numero + '.') + '</td>' +
+                '<td colspan="4">' + (editable
+                    ? '<input type="text" data-cc-grupo="' + (sub ? 's' : 'p') + '" maxlength="100" value="' + escapar(g.nombre) + '" placeholder="' + (sub ? 'Subpartida' : 'Sin partida') + '"' + dis + '>'
+                    : '<span class="cc-nombre">' + escapar(g.nombre || 'Sin partida') + '</span>') + '</td>' +
+                '<td class="ro" data-cc-calc="importe">' + fmt(g.importe) + '</td>' +
+                '<td class="ro" data-cc-calc="pct">' + (a.total ? pct(g.importe / a.total * 100) : '') + '</td>' +
+                '<td class="pu-acciones">' + (editable ?
+                    '<button type="button" class="pu-mini" data-cc-accion="agregar" title="Agregar un concepto a esta ' + (sub ? 'subpartida' : 'partida') + '"' + dis + '>+</button>' +
+                    (sub ? '' : '<button type="button" class="pu-mini" data-cc-accion="subir-partida" title="Subir la partida"' + dis + '>↑</button>' +
+                                '<button type="button" class="pu-mini" data-cc-accion="bajar-partida" title="Bajar la partida"' + dis + '>↓</button>') +
+                    '<button type="button" class="pu-mini borrar" data-cc-accion="quitar-grupo" title="Quitar la ' + (sub ? 'subpartida' : 'partida') + ' con sus conceptos"' + dis + '>✕</button>' : '') +
+                '</td></tr>';
+        }
+        function filaConcepto(x) {
+            var p = a.total ? pct(x.importe / a.total * 100) : '';
+            if (x.otro) {
+                return '<tr class="cc-otro" data-buscar="' + escapar(clave(x.clave + ' ' + x.descripcion)) + '"><td class="id">' + escapar(x.clave) + '</td>' +
+                    '<td class="ro izq">' + escapar(x.descripcion) + '</td><td class="ro izq">' + escapar(x.unidad) + '</td>' +
+                    '<td class="ro">' + cant(x.cantidad) + '</td><td class="ro">' + fmt(x.pu) + '</td><td class="ro">' + fmt(x.importe) + '</td>' +
+                    '<td class="ro">' + p + '</td><td class="pu-acciones">' + (x.fila.calc ? '<span class="cc-nota">Automático</span>' :
+                    '<button type="button" class="ct-btn" data-cc-accion="analizar-importe" data-sec="' + x.sec + '" data-id="' + x.fila.id + '"' +
+                    ' title="Capturado por importe en ' + escapar(NOMBRES[x.sec]) + ': pasarlo al análisis con lo que ya tiene"' + dis + '>Analizar</button>') + '</td></tr>';
+            }
+            var c = x.c, falta = revisionConcepto(c);
+            return '<tr data-uid="' + c.uid + '" data-buscar="' + escapar(clave(c.clave + ' ' + c.descripcion)) + '">' +
+                '<td><input type="text" data-cc="clave" maxlength="20" value="' + escapar(c.clave) + '"' + dis + '></td>' +
+                '<td><input type="text" data-cc="descripcion" list="puSugConceptos" maxlength="300" value="' + escapar(c.descripcion) + '" placeholder="¿Qué trabajo es?"' + dis + '></td>' +
+                '<td><input type="text" data-cc="unidad" list="puUnidades" maxlength="20" value="' + escapar(c.unidad) + '" placeholder="m², pza…"' + dis + '></td>' +
+                '<td><input type="number" class="num" data-cc="cantidad" step="0.01" min="0" value="' + (c.cantidad || '') + '"' + dis + '></td>' +
+                '<td class="ro" data-cc-calc="pu">' + fmt(x.pu) + '</td><td class="ro" data-cc-calc="importe">' + fmt(x.importe) + '</td>' +
+                '<td class="ro" data-cc-calc="pct">' + p + '</td>' +
+                '<td class="pu-acciones"><button type="button" class="ct-btn' + (falta ? ' cc-falta' : '') + '" data-cc-accion="analizar" title="' +
+                    (falta ? '⚠ ' + falta : 'Ver o cambiar el análisis de una unidad') + '">' + (falta ? '⚠ ' : '') + 'Análisis</button>' +
+                '<button type="button" class="pu-mini" data-cc-accion="subir" title="Subir"' + dis + '>↑</button>' +
+                '<button type="button" class="pu-mini" data-cc-accion="bajar" title="Bajar"' + dis + '>↓</button>' +
+                '<button type="button" class="pu-mini" data-cc-accion="duplicar" title="Duplicar el concepto con su análisis"' + dis + '>⧉</button>' +
+                '<button type="button" class="pu-mini borrar" data-cc-accion="quitar" title="Quitar el concepto"' + dis + '>✕</button></td></tr>';
+        }
+        a.partidas.forEach(function (p) {
+            html += filaGrupo(p, false);
+            p.conceptos.forEach(function (x) { html += filaConcepto(x); });
+            p.subs.forEach(function (s) {
+                html += filaGrupo(s, true);
+                s.conceptos.forEach(function (x) { html += filaConcepto(x); });
+            });
+        });
+        $('ccCuerpo').innerHTML = html ||
+            '<tr class="vacio-fila"><td colspan="8">El catálogo está vacío. Empieza con «+ Partida» (ej. Cancelería) y agrega sus conceptos con su unidad y cantidad.</td></tr>';
+        ['ccPartida', 'ccSubpartida', 'ccConcepto', 'ccRenumerar', 'ccPlantilla'].forEach(function (id) { if ($(id)) $(id).disabled = soloLectura; });
+        filtrarCc();
+        pintarCc(r, a);
+    }
+
+    // Cifras sin volver a pintar los campos (para no perder el cursor mientras se escribe)
+    function pintarCc(r, a) {
+        r = r || calcularPU();
+        a = a || arbolCc(r);
+        var porPartida = {}, porUid = {};
+        a.partidas.forEach(function (p) {
+            porPartida[clave(p.nombre)] = p;
+            p.conceptos.forEach(function (x) { if (x.c) porUid[x.c.uid] = x; });
+            p.subs.forEach(function (s) {
+                porPartida[clave(unirPartida(p.nombre, s.nombre))] = s;
+                s.conceptos.forEach(function (x) { if (x.c) porUid[x.c.uid] = x; });
+            });
+        });
+        var porc = function (n) { return a.total ? pct(n / a.total * 100) : ''; };
+        $('ccCuerpo').querySelectorAll('tr[data-partida]').forEach(function (tr) {
+            var g = porPartida[clave(tr.dataset.partida)];
+            if (!g) return;
+            tr.querySelector('[data-cc-calc="importe"]').textContent = fmt(g.importe);
+            tr.querySelector('[data-cc-calc="pct"]').textContent = porc(g.importe);
+        });
+        $('ccCuerpo').querySelectorAll('tr[data-uid]').forEach(function (tr) {
+            var x = porUid[tr.dataset.uid];
+            if (!x) return;
+            tr.querySelector('[data-cc-calc="pu"]').textContent = fmt(x.pu);
+            tr.querySelector('[data-cc-calc="importe"]').textContent = fmt(x.importe);
+            tr.querySelector('[data-cc-calc="pct"]').textContent = porc(x.importe);
+        });
+        var dif = Math.abs(a.total - r.subtotal) >= 0.5;
+        $('ccPie').innerHTML =
+            '<tr><td colspan="5" class="ro">Total del catálogo (sin IVA)</td><td class="ro">' + fmt(a.total) + '</td><td colspan="2"></td></tr>' +
+            '<tr><td colspan="5" class="ro">IVA ' + pct(IVA * 100) + '</td><td class="ro">' + fmt(a.total * IVA) + '</td><td colspan="2"></td></tr>' +
+            '<tr class="cc-total"><td colspan="5" class="ro">Total</td><td class="ro">' + fmt(a.total * (1 + IVA)) + '</td><td colspan="2"></td></tr>' +
+            '<tr class="cc-letra"><td colspan="8">' + escapar(importeConLetra(a.total * (1 + IVA))) +
+                (dif ? '<br><small>El Subtotal del presupuesto es ' + fmt(r.subtotal) + ': la diferencia viene de los ajustes avanzados del Análisis P.U. o de los conceptos con cálculo automático.</small>' : '') +
+            '</td></tr>';
+    }
+
+    // Importe con letra, como en los presupuestos: «(MIL DOSCIENTOS PESOS 50/100 M.N.)»
+    function numeroConLetra(n) {
+        var U = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE', 'DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE',
+                 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE', 'VEINTE', 'VEINTIUN', 'VEINTIDOS', 'VEINTITRES', 'VEINTICUATRO', 'VEINTICINCO',
+                 'VEINTISEIS', 'VEINTISIETE', 'VEINTIOCHO', 'VEINTINUEVE'];
+        var D = ['', '', '', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+        var C = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+        function menorMil(x) {
+            if (x === 100) return 'CIEN';
+            var c = Math.floor(x / 100), r = x % 100, t = C[c];
+            if (r) t += (t ? ' ' : '') + (r < 30 ? U[r] : D[Math.floor(r / 10)] + (r % 10 ? ' Y ' + U[r % 10] : ''));
+            return t;
+        }
+        if (n === 0) return 'CERO';
+        var partes = [], mill = Math.floor(n / 1e6), miles = Math.floor(n / 1000) % 1000, resto = n % 1000;
+        if (mill) partes.push(mill === 1 ? 'UN MILLON' : numeroConLetra(mill) + ' MILLONES');
+        if (miles) partes.push(miles === 1 ? 'MIL' : menorMil(miles) + ' MIL');
+        if (resto) partes.push(menorMil(resto));
+        return partes.join(' ');
+    }
+    function importeConLetra(n) {
+        var centavos = Math.round(Math.max(0, n) * 100), entero = Math.floor(centavos / 100);
+        var letra = numeroConLetra(entero);
+        return '(' + letra + (entero && entero % 1e6 === 0 ? ' DE' : '') + (entero === 1 ? ' PESO ' : ' PESOS ') + ('0' + centavos % 100).slice(-2) + '/100 M.N.)';
+    }
+
+    function filtrarCc() {
+        var q = clave($('ccBuscar').value);
+        $('ccCuerpo').querySelectorAll('tr[data-buscar]').forEach(function (tr) { tr.hidden = !!q && tr.dataset.buscar.indexOf(q) < 0; });
+    }
+    $('ccBuscar').addEventListener('input', filtrarCc);
+
+    function agregarConceptoCc(partida) {
+        if (soloLectura) { avisoSoloLectura(); return; }
+        if (partida === undefined) {
+            var ultimo = analisis.conceptos[analisis.conceptos.length - 1];
+            partida = ccPartidaSel !== null ? ccPartidaSel : ultimo ? ultimo.partida : '';
+        }
+        // Va después del último concepto de la misma partida, para que quede junto a ellos
+        var k = clavePartida(partida), pos = analisis.conceptos.length;
+        analisis.conceptos.forEach(function (c, i) { if (clavePartida(c.partida) === k) pos = i + 1; });
+        var c = nuevoConcepto({ partida: partida });
+        analisis.conceptos.splice(pos, 0, c);
+        ccPartidaSel = partida;
+        marcarCambio();
+        renderCc();
+        var f = $('ccCuerpo').querySelector('tr[data-uid="' + c.uid + '"] [data-cc="descripcion"]');
+        if (f) f.focus();
+    }
+
+    $('ccPartida').addEventListener('click', function () {
+        if (soloLectura) { avisoSoloLectura(); return; }
+        var nombre = txt(prompt('Nombre de la nueva partida (ej. Cancelería, Barandales, Fachada):') || '').replace(/\//g, '-');
+        if (!nombre) return;
+        var existe = analisis.conceptos.some(function (c) { return clave(partesPartida(c.partida).p) === clave(nombre); });
+        if (existe) { alert('La partida «' + nombre + '» ya está en el catálogo.'); return; }
+        agregarConceptoCc(nombre);
+    });
+    $('ccSubpartida').addEventListener('click', function () {
+        if (soloLectura) { avisoSoloLectura(); return; }
+        var p = partesPartida(ccPartidaSel !== null ? ccPartidaSel : (analisis.conceptos[analisis.conceptos.length - 1] || {}).partida).p;
+        if (!p) { alert('Primero selecciona (o crea) la partida donde va la subpartida.'); return; }
+        var nombre = txt(prompt('Nombre de la subpartida dentro de «' + p + '»:') || '').replace(/\//g, '-');
+        if (nombre) agregarConceptoCc(unirPartida(p, nombre));
+    });
+    $('ccConcepto').addEventListener('click', function () { agregarConceptoCc(); });
+    if ($('ccPlantilla')) $('ccPlantilla').addEventListener('change', function () { agregarPlantilla(this, ccPartidaSel || ''); });
+
+    // Claves en orden, como Neodata: partida 01 → 01-001, 01-002; subpartida 01.02 → 01.02-001
+    $('ccRenumerar').addEventListener('click', function () {
+        if (soloLectura) { avisoSoloLectura(); return; }
+        if (!analisis.conceptos.length) return;
+        if (!confirm('¿Cambiar las claves de todos los conceptos por su número de partida (01-001, 01.01-001…)?')) return;
+        var dos = function (n) { return ('0' + n).slice(-2); };
+        arbolCc(calcularPU()).partidas.forEach(function (p) {
+            var poner = function (lista, prefijo) {
+                var n = 0;
+                lista.forEach(function (x) { if (x.c) x.c.clave = prefijo + '-' + pad3(++n); });
+            };
+            poner(p.conceptos, dos(p.numero));
+            p.subs.forEach(function (s, i) { poner(s.conceptos, dos(p.numero) + '.' + dos(i + 1)); });
+        });
+        marcarCambio();
+        renderCc();
+    });
+
+    // Cambia el nombre de una partida (o subpartida) en todos sus conceptos
+    function renombrarGrupo(anterior, nivel, nombre) {
+        var a = partesPartida(anterior);
+        nombre = txt(nombre).replace(/\//g, '-');
+        analisis.conceptos.forEach(function (c) {
+            var x = partesPartida(c.partida);
+            if (clave(x.p) !== clave(a.p)) return;
+            if (nivel === 'p') c.partida = unirPartida(nombre, x.s);
+            else if (clave(x.s) === clave(a.s)) c.partida = unirPartida(x.p, nombre);
+        });
+        ccPartidaSel = nivel === 'p' ? nombre : unirPartida(a.p, nombre);
+    }
+
+    // Mueve una partida completa (con sus subpartidas) antes o después de la vecina
+    function moverPartida(nombre, d) {
+        var orden = [], grupos = {};
+        analisis.conceptos.forEach(function (c) {
+            var k = clave(partesPartida(c.partida).p);
+            if (!grupos[k]) { grupos[k] = []; orden.push(k); }
+            grupos[k].push(c);
+        });
+        var i = orden.indexOf(clave(nombre)), j = i + d;
+        if (i < 0 || j < 0 || j >= orden.length) return false;
+        orden[i] = orden[j];
+        orden[j] = clave(nombre);
+        analisis.conceptos = [].concat.apply([], orden.map(function (k) { return grupos[k]; }));
+        return true;
+    }
+    // Mueve un concepto dentro de su partida
+    function moverConcepto(c, d) {
+        var l = analisis.conceptos, k = clavePartida(c.partida), i = l.indexOf(c), j = i + d;
+        while (j >= 0 && j < l.length && clavePartida(l[j].partida) !== k) j += d;
+        if (j < 0 || j >= l.length) return false;
+        l[i] = l[j];
+        l[j] = c;
+        return true;
+    }
+
+    $('ccCuerpo').addEventListener('focusin', function (e) {
+        var tr = e.target.closest('tr');
+        if (!tr) return;
+        $('ccCuerpo').querySelectorAll('tr.actual').forEach(function (t) { t.classList.remove('actual'); });
+        tr.classList.add('actual');
+        if (tr.dataset.partida !== undefined) ccPartidaSel = tr.dataset.partida;
+        else if (tr.dataset.uid) ccPartidaSel = conceptoPU(tr.dataset.uid).partida;
+    });
+    $('ccCuerpo').addEventListener('input', function (e) {
+        var campo = e.target.dataset.cc, tr = e.target.closest('tr[data-uid]');
+        if (!campo || !tr) return;
+        var c = conceptoPU(tr.dataset.uid);
+        c[campo] = campo === 'cantidad' ? Math.max(0, num(e.target.value)) : e.target.value;
+        marcarCambio();
+        if (campo === 'cantidad') { calcularTotales(); pintarCc(); }
+    });
+    $('ccCuerpo').addEventListener('change', function (e) {
+        var tr = e.target.closest('tr');
+        if (!tr) return;
+        if (e.target.dataset.ccGrupo) {
+            renombrarGrupo(tr.dataset.partida, e.target.dataset.ccGrupo, e.target.value);
+            marcarCambio();
+            renderCc();
+            return;
+        }
+        if (!tr.dataset.uid) return;
+        if (e.target.dataset.cc === 'cantidad' && num(e.target.value) < 0) e.target.value = 0;
+        var c = conceptoPU(tr.dataset.uid);
+        if (e.target.dataset.cc === 'descripcion' && ofrecerBiblioteca(c)) {
+            marcarCambio();
+            calcularTotales();
+            renderCc();
+        }
+    });
+    $('ccCuerpo').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-cc-accion]');
+        if (!b) return;
+        var acc = b.dataset.ccAccion, tr = b.closest('tr');
+        if (acc === 'analizar-importe') { analizarImporte(b.dataset.sec, b.dataset.id); return; }
+        if (acc === 'analizar') { abrirAnalisis(conceptoPU(tr.dataset.uid)); return; }
+        if (soloLectura) { avisoSoloLectura(); return; }
+        if (acc === 'agregar') { agregarConceptoCc(tr.dataset.partida); return; }
+        if (acc === 'subir-partida' || acc === 'bajar-partida') {
+            if (!moverPartida(tr.dataset.partida, acc === 'subir-partida' ? -1 : 1)) return;
+        } else if (acc === 'quitar-grupo') {
+            var g = partesPartida(tr.dataset.partida), sub = tr.classList.contains('cc-sub');
+            var quitar = analisis.conceptos.filter(function (c) {
+                var x = partesPartida(c.partida);
+                return clave(x.p) === clave(g.p) && (!sub || clave(x.s) === clave(g.s));
+            });
+            if (!confirm('¿Quitar la ' + (sub ? 'subpartida' : 'partida') + ' «' + (tr.dataset.partida || 'Sin partida') + '» con sus ' +
+                         quitar.length + ' conceptos y su análisis?')) return;
+            analisis.conceptos = analisis.conceptos.filter(function (c) { return quitar.indexOf(c) < 0; });
+            ccPartidaSel = null;
+        } else {
+            var c = conceptoPU(tr.dataset.uid);
+            if (acc === 'subir' || acc === 'bajar') {
+                if (!moverConcepto(c, acc === 'subir' ? -1 : 1)) return;
+            } else if (acc === 'duplicar') {
+                analisis.conceptos.splice(analisis.conceptos.indexOf(c) + 1, 0, nuevoConcepto({ partida: c.partida, descripcion: c.descripcion + ' (copia)',
+                    unidad: c.unidad, cantidad: c.cantidad, especificacion: c.especificacion, insumos: c.insumos }));
+            } else if (acc === 'quitar') {
+                if (!confirm('¿Quitar el concepto «' + (c.descripcion || c.clave) + '» con su análisis?')) return;
+                analisis.conceptos.splice(analisis.conceptos.indexOf(c), 1);
+            }
+        }
+        marcarCambio();
+        calcularTotales();
+        renderCc();
+    });
 
     // ---------- Empleados, comisiones y anexo de seguro (debajo de Mano de Obra / Gastos de Operacion) ----------
     var EMPLEADOS = window.ACRI_EMPLEADOS || [];
@@ -1858,8 +2195,9 @@
         guia.push(['Análisis P.U.', '«PRUEBA - Cancel de baño» 10 m² y «PRUEBA - Muro de tablaroca» 20 m², con sus insumos',
             'Se capturan en la pestaña Análisis P.U. con «Analizar». Los precios se sugieren de los empleados, de los artículos importados y de otros presupuestos. ' +
             'Lo analizado pasa solo a los renglones «' + FIJOS_PU.mp + '» (Materia Prima) y «' + FIJOS_PU.mo + '» (Mano de Obra).']);
-        guia.push(['Conceptos/Tareas', 'Un Concepto/Tarea por cada renglón de MP / MO / GO',
-            'Se generan solos con lo capturado en Materia Prima, Mano de Obra y Gastos de Operacion; ahí se les ponen fechas, responsable y avance (Gantt).']);
+        guia.push(['Catálogo de Conceptos', 'Las partidas «PRUEBA Cancelería» y «PRUEBA Acabados» con sus conceptos',
+            'Son los mismos conceptos del Análisis P.U., acomodados por partida como Neodata: clave, unidad, cantidad, P.U., importe, % de cada partida y el total con letra. ' +
+            'Los Conceptos/Tareas (fechas, responsable, avance) se siguen generando con MP / MO / GO y se manejan en la Obra.']);
         guia.push(['Utilidad Neta', num($('pctUtilidad').value) + ' % ' + (modoUtilidad() === 'costo' ? 'sobre el costo' : 'de margen'),
             'El % por omisión es el parámetro de costos 101 de AW-Management (parametros_costos_sug). Con «+ % sobre el costo»: Subtotal = Costo + %. ' +
             'Con «% de margen (Form46)»: Subtotal = Costo ÷ (1 − %).']);

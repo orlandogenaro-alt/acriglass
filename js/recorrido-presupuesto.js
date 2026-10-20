@@ -111,7 +111,7 @@
             id: 'secciones',
             elemento: '.sec-tabs',
             titulo: 'Secciones del presupuesto',
-            texto: 'Materia Prima, Mano de Obra, Gastos de Operación, Conceptos/Tareas y Análisis P.U. Haz clic en una para ver y capturar sus conceptos.',
+            texto: 'Materia Prima, Mano de Obra, Gastos de Operación, Catálogo de Conceptos (por partidas, como Neodata) y Análisis P.U. Haz clic en una para ver y capturar sus conceptos.',
             posicion: 'derecha',
             preparar: verDocumento
         },

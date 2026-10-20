@@ -517,6 +517,29 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .sug-panel .extra-barra .ct-btn { margin-left: auto; }
 .sug-panel .extra-caja { flex: 1; max-height: none; }
 
+/* Catálogo de Conceptos (Neodata): partidas, subpartidas y conceptos */
+.cc-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.cc-catalogo { flex: 1; min-height: 0; }
+.cc-catalogo .extra-caja { flex: 1; max-height: none; }
+.cc-buscar { margin-left: auto; height: 28px; width: 220px; max-width: 100%; padding: 0 8px; background: var(--input); color: var(--texto); border: 1px solid var(--borde-2); border-radius: 4px; }
+.cc-grid th.cc-clave { width: 120px; }
+.cc-grid th.cc-unidad { width: 90px; }
+.cc-grid th.cc-acc { width: 210px; }
+.cc-grid thead th { position: sticky; top: 0; z-index: 1; }
+.cc-grid tr.cc-partida td { background: var(--sub) !important; font-weight: 700; color: var(--enfasis); border-top: 1px solid var(--borde-2); }
+.cc-grid tr.cc-sub td { background: var(--fila-alt) !important; font-weight: 600; color: var(--enfasis); }
+.cc-grid tr.cc-sub td.id { padding-left: 20px; }
+.cc-grid tr.cc-partida input, .cc-grid tr.cc-sub input { font-weight: inherit; color: inherit; }
+.cc-grid .cc-nombre { padding: 0 8px; }
+.cc-grid tr.cc-otro td { color: var(--texto-3); }
+.cc-grid .cc-nota { padding: 0 6px; font-size: 12px; color: var(--texto-3); }
+.cc-grid .ct-btn.cc-falta { color: var(--ambar); }
+.cc-grid tfoot td { height: 30px; font-weight: 700; color: var(--enfasis); background: var(--sub); }
+.cc-grid tfoot tr:first-child td { border-top: 1px solid var(--borde-2); }
+.cc-grid tfoot tr.cc-total td { font-size: 14px; }
+.cc-grid tfoot tr.cc-letra td { height: auto; padding: 6px 8px; font-weight: 600; color: var(--texto-2); white-space: normal; }
+.cc-grid tfoot tr.cc-letra small { font-weight: 400; color: var(--texto-3); }
+
 /* Análisis de Precios Unitarios (Neodata) */
 .pu-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: auto; }
 .pu-pasos { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 8px 12px; list-style: none; background: var(--azul-suave); border: 1px solid var(--azul-borde); border-radius: 4px; font-size: 12.5px; color: var(--texto); }

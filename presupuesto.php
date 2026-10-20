@@ -209,7 +209,7 @@ $secciones = [
     'mp' => 'Materia Prima',
     'mo' => 'Mano de Obra',
     'go' => 'Gastos de Operacion',
-    'ct' => 'Conceptos/Tareas',
+    'cc' => 'Catálogo de Conceptos',
     'pu' => 'Análisis P.U.',
 ];
 ?>
@@ -391,8 +391,38 @@ $secciones = [
                 <span id="secAyuda">Ctrl + I para agregar un nuevo Concepto</span>
             </div>
 
-            <!-- Conceptos/Tareas: se generan solos con lo capturado en MP / MO / GO -->
+            <!-- Conceptos/Tareas: se generan solos con lo capturado en MP / MO / GO; ya no tienen pestaña en el presupuesto,
+                 pero se siguen guardando con él para el programa de la Obra (13-Conceptos/Tareas) -->
             <?php ctPanel(true); ?>
+
+            <!-- Catálogo de Conceptos (como Neodata): los conceptos del Análisis P.U. por partida y subpartida,
+                 con clave, unidad, cantidad, P.U., importe y % de cada partida; el total con letra -->
+            <div class="cc-panel" id="ccPanel" hidden>
+                <section class="extra cc-catalogo">
+                    <div class="extra-barra">
+                        <button type="button" class="ct-btn" id="ccPartida" title="Nueva partida (agrupa conceptos, ej. «Cancelería»)">+ Partida</button>
+                        <button type="button" class="ct-btn" id="ccSubpartida" title="Nueva subpartida dentro de la partida seleccionada">+ Subpartida</button>
+                        <button type="button" class="ct-btn" id="ccConcepto" title="Nuevo concepto en la partida seleccionada (Ctrl + I)">+ Concepto</button>
+                        <?php if ($plantillasPU): ?>
+                        <select id="ccPlantilla" class="ct-btn" title="Agrega todos los conceptos de una plantilla con los precios vigentes del catálogo">
+                            <option value="">+ Desde plantilla…</option>
+                            <?php foreach ($plantillasPU as $i => $pl): ?>
+                            <option value="<?= $i ?>"><?= e($pl['nombre']) ?> (<?= count($pl['conceptos']) ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php endif; ?>
+                        <button type="button" class="ct-btn" id="ccRenumerar" title="Vuelve a poner las claves en orden por partida: 01-001, 01.01-001…">Renumerar claves</button>
+                        <input type="search" id="ccBuscar" class="cc-buscar" placeholder="Buscar clave o descripción" autocomplete="off">
+                    </div>
+                    <div class="extra-caja">
+                        <table class="grid mini-grid cc-grid">
+                            <thead><tr><th class="c-id cc-clave">Clave</th><th>Descripción</th><th class="cc-unidad">Unidad</th><th class="c-num">Cantidad</th><th class="c-num">P.U.</th><th class="c-num">Importe</th><th class="c-pct">%</th><th class="cc-acc"></th></tr></thead>
+                            <tbody id="ccCuerpo"></tbody>
+                            <tfoot id="ccPie"></tfoot>
+                        </table>
+                    </div>
+                </section>
+            </div>
 
             <!-- Análisis de Precios Unitarios (como Neodata): conceptos con cantidad × P.U. y su análisis de insumos.
                  Lo que se captura aquí pasa solo a Materia Prima y Mano de Obra; lo capturado por importe se respeta. -->
@@ -689,7 +719,7 @@ $secciones = [
         <strong>Prueba cargada: de dónde sale cada dato</strong>
         <button type="button" class="hs-cerrar" data-pr-cerrar title="Cerrar">✕</button>
     </div>
-    <p class="pu-dlg-ayuda">Se llenaron todos los apartados con datos de <b>PRUEBA</b>. Recorre las pestañas de la izquierda (Materia Prima, Mano de Obra, Gastos de Operacion, Conceptos/Tareas y Análisis P.U.) para verlos. <b>No se guardó nada</b>: si presionas Guardar se crea un presupuesto PRUEBA normal, que después puedes Cancelar y Eliminar.</p>
+    <p class="pu-dlg-ayuda">Se llenaron todos los apartados con datos de <b>PRUEBA</b>. Recorre las pestañas de la izquierda (Materia Prima, Mano de Obra, Gastos de Operacion, Catálogo de Conceptos y Análisis P.U.) para verlos. <b>No se guardó nada</b>: si presionas Guardar se crea un presupuesto PRUEBA normal, que después puedes Cancelar y Eliminar.</p>
     <div class="extra-caja pr-tabla">
         <table class="grid mini-grid">
             <thead><tr><th>Apartado</th><th>Qué se cargó</th><th>De dónde sale la información</th></tr></thead>

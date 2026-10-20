@@ -21,7 +21,7 @@ $menu = [
             ['Gastos de Obra',               '💵', 'modulo', ['GASTO_OBRA_ID', 'FOLIO', 'FECHA', 'OBRA', 'CONCEPTO', 'IMPORTE']],
             ['Salidas de Personal a Obra',   '👷', 'modulo', ['SALIDA_PERSONAL_ID', 'FOLIO', 'FECHA', 'OBRA', 'EMPLEADO', 'ESTATUS']],
             ['Salidas de Materiales',        '📦', 'modulo', ['SALIDA_MATERIAL_ID', 'FOLIO', 'FECHA', 'OBRA', 'ESTATUS']],
-            ['Consumos de Material en Obra', '🧰', 'modulo', ['CONSUMO_MATERIAL_ID', 'FOLIO', 'FECHA', 'OBRA', 'ESTATUS']],
+            ['Consumibles de Material en Obra', '🧰', 'modulo', ['CONSUMO_MATERIAL_ID', 'FOLIO', 'FECHA', 'OBRA', 'ESTATUS']],
         ],
     ],
     [

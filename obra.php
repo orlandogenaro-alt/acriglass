@@ -57,7 +57,7 @@ $listados = [
                        ['totComis', 'Total comisiones', 'importe_neto', 'comisiones']],
     ],
     'consumos' => [
-        'titulo'   => '7-Consumos',
+        'titulo'   => '7-Consumibles',
         'botones'  => [['consultar', 'Mostrar', '🔎']],
         'columnas' => [['Folio Orden', 'folio_orden', 'txt'], ['Folio', 'folio', 'txt'], ['Estatus', 'estatus', 'txt'], ['Fecha', 'fecha', 'fecha'], ['Uds Salida', 'uds_salida', 'num']],
     ],
@@ -614,7 +614,7 @@ function iconoPestana() {
         <nav class="cot-tabs">
             <button type="button" class="activo" data-cot-tab="general">General</button>
             <button type="button" class="solo-ot" data-cot-tab="salidas">Salidas de Material</button>
-            <button type="button" class="solo-ot" data-cot-tab="consumos">Consumos de Material en Obra</button>
+            <button type="button" class="solo-ot" data-cot-tab="consumos">Consumibles de Material en Obra</button>
             <button type="button" data-cot-tab="quejas">Quejas de Cliente</button>
             <button type="button" data-cot-tab="otros">Otros Datos</button>
         </nav>

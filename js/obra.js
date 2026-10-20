@@ -1847,7 +1847,7 @@
     // Form21.abre_consumo_material_en_obra, solo consulta
     function verConsumo(d) {
         formulario({
-            titulo: 'Consumo de Material en Obra · ' + (d.estatus || ''), soloLectura: true,
+            titulo: 'Consumible de Material en Obra · ' + (d.estatus || ''), soloLectura: true,
             campos: [
                 { id: 'fecha', etiqueta: 'Fecha', tipo: 'date', valor: dia(d.fecha) }, { id: 'folio', etiqueta: 'Folio', valor: d.folio },
                 { id: 'ot', etiqueta: 'Orden de Trabajo', valor: d.ot }, { id: 'unidad', etiqueta: 'Unidad', valor: d.nom_unidad },

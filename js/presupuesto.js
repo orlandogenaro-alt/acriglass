@@ -1037,17 +1037,18 @@
         b.addEventListener('click', function () { ponerVistaCc(b.dataset.ccVista); renderCc(); });
     });
 
-    function renderResumenCc() {
+    // Renglones del resumen: los usa la pestaña y el formato impreso Análisis de Cancelería (js/formato-analisis.js).
+    // Cada renglón: { clase, anexo, nombre, extra, pres, sub, tot, p, ir, como } con importes en número (null = vacío);
+    // como: 'pct' (tot es un %), 'usd' (tot en dólares) o 'fijo' (se muestra aunque sea 0).
+    function filasResumenCc() {
         var subtotal = calcularTotales();
         var t = { mp: suma(datos.mp), mo: suma(datos.mo), go: suma(datos.go) };
         var primo = t.mp + t.mo, bruta = subtotal - primo, neta = bruta - t.go, iva = subtotal * IVA;
-        var dinero = function (n) { return Math.abs(n) < 0.005 ? '-' : fmt(n); };
-        var porc = function (n) { return subtotal > 0 ? pct(n / subtotal * 100) : ''; };
-        var html = '', n = 0;
-        function fila(clase, anexo, nombre, pres, sub, tot, p, ir) {
-            return '<tr class="' + clase + '"' + (ir ? ' data-ccr-ir="' + ir + '" title="Ir a ' + escapar(NOMBRES[ir]) + '"' : '') + '>' +
-                '<td class="ccr-anexo">' + anexo + '</td><td class="izq">' + nombre + '</td>' +
-                '<td class="ro">' + pres + '</td><td class="ro">' + sub + '</td><td class="ro">' + tot + '</td><td class="ro">' + p + '</td></tr>';
+        var porc = function (n) { return subtotal > 0 ? n / subtotal * 100 : null; };
+        var filas = [], n = 0;
+        function fila(clase, anexo, nombre, pres, sub, tot, p, ir, extra) {
+            filas.push({ clase: clase, anexo: anexo, nombre: nombre, pres: pres, sub: sub, tot: tot, p: p, ir: ir || '', extra: extra || '' });
+            return filas[filas.length - 1];
         }
         // Analizados: lo que cada concepto del Análisis P.U. pone en Materia Prima (materiales, equipo, herramienta) o en Mano de Obra
         function desglosePU(sec) {
@@ -1057,34 +1058,47 @@
             }).filter(function (x) { return Math.abs(x.importe) >= 0.005; });
         }
         function seccionCc(sec) {
-            html += fila('ccr-titulo', '', escapar(NOMBRES[sec].toUpperCase()), '', '', '', '', sec);
-            if (!datos[sec].length) html += fila('ccr-vacio', '', 'Sin conceptos capturados', '', '', '', '', sec);
+            fila('ccr-titulo', '', NOMBRES[sec].toUpperCase(), null, null, null, null, sec);
+            if (!datos[sec].length) fila('ccr-vacio', '', 'Sin conceptos capturados', null, null, null, null, sec);
             datos[sec].forEach(function (r) {
                 var imp = num(r.presupuesto), num_ = ++n;
                 var subs = r.calc === 'pu' ? desglosePU(sec) : [];
                 if (subs.length) {
-                    html += fila('ccr-grupo', num_, escapar(r.concepto), '', dinero(imp), '', porc(imp), sec);
-                    subs.forEach(function (x, i) { html += fila('ccr-sub', num_ + '.' + (i + 1), escapar(x.nombre), dinero(x.importe), '', '', '', 'pu'); });
+                    fila('ccr-grupo', num_, r.concepto, null, imp, null, porc(imp), sec);
+                    subs.forEach(function (x, i) { fila('ccr-sub', num_ + '.' + (i + 1), x.nombre, x.importe, null, null, null, 'pu'); });
                 } else {
-                    html += fila(r.calc ? 'ccr-calc' : '', num_, escapar(r.concepto || '(sin concepto)'), dinero(imp), '', '', porc(imp), sec);
+                    fila(r.calc ? 'ccr-calc' : '', num_, r.concepto || '(sin concepto)', imp, null, null, porc(imp), sec);
                 }
             });
         }
         seccionCc('mp');
-        html += fila('ccr-total', '(=)', 'TOTAL MATERIA PRIMA', '', '', dinero(t.mp), porc(t.mp));
+        fila('ccr-total', '(=)', 'TOTAL MATERIA PRIMA', null, null, t.mp, porc(t.mp));
         seccionCc('mo');
-        html += fila('ccr-total', '(+)', 'TOTAL MANO DE OBRA', '', dinero(t.mo), dinero(t.mo), porc(t.mo));
-        html += fila('ccr-total ccr-fuerte', '(=)', 'TOTAL COSTO PRIMO', '', '', dinero(primo), porc(primo));
-        html += fila('ccr-total', '(−)(=)', 'MARGEN DE UTILIDAD BRUTA', '', '', dinero(bruta), porc(bruta));
+        fila('ccr-total', '(+)', 'TOTAL MANO DE OBRA', null, t.mo, t.mo, porc(t.mo));
+        fila('ccr-total ccr-fuerte', '(=)', 'TOTAL COSTO PRIMO', null, null, primo, porc(primo));
+        fila('ccr-total', '(−)(=)', 'MARGEN DE UTILIDAD BRUTA', null, null, bruta, porc(bruta));
         seccionCc('go');
-        html += fila('ccr-total', '(−)', 'TOTAL GASTOS DE OPERACION', '', '', dinero(t.go), porc(t.go));
-        html += fila('ccr-total ccr-fuerte', '(=)', 'UTILIDAD NETA', '', '', dinero(neta), porc(neta));
-        html += fila('ccr-nota', '', 'PORCENTAJE DE GANANCIA SOBRE PRECIO DE VENTA', '', '', subtotal > 0 ? pct(neta / subtotal * 100) : '', '');
-        html += fila('ccr-final', '', 'SUBTOTAL', '', '', fmt(subtotal), subtotal > 0 ? pct(100) : '');
-        html += fila('ccr-final', '', 'IVA ' + pct(IVA * 100), '', '', fmt(iva), '');
-        html += fila('ccr-final ccr-fuerte', '', 'TOTAL', '', '', fmt(subtotal + iva), '');
-        if (TC_USD > 0) html += fila('ccr-final', '', 'TOTAL EN DÓLARES IVA INCLUIDO <small>(T.C. ' + fmt(TC_USD) + ')</small>', '', '', 'US$ ' + fmt((subtotal + iva) / TC_USD), '');
-        html += '<tr class="ccr-letra"><td colspan="6">' + escapar(importeConLetra(subtotal + iva)) + '</td></tr>';
+        fila('ccr-total', '(−)', 'TOTAL GASTOS DE OPERACION', null, null, t.go, porc(t.go));
+        fila('ccr-total ccr-fuerte', '(=)', 'UTILIDAD NETA', null, null, neta, porc(neta));
+        fila('ccr-nota', '', 'PORCENTAJE DE GANANCIA SOBRE PRECIO DE VENTA', null, null, porc(neta), null).como = 'pct';
+        fila('ccr-final', '', 'SUBTOTAL', null, null, subtotal, subtotal > 0 ? 100 : null).como = 'fijo';
+        fila('ccr-final', '', 'IVA ' + pct(IVA * 100), null, null, iva, null).como = 'fijo';
+        fila('ccr-final ccr-fuerte', '', 'TOTAL', null, null, subtotal + iva, null).como = 'fijo';
+        if (TC_USD > 0) fila('ccr-final', '', 'TOTAL EN DÓLARES IVA INCLUIDO', null, null, (subtotal + iva) / TC_USD, null, '', 'T.C. ' + fmt(TC_USD)).como = 'usd';
+        return { filas: filas, subtotal: subtotal, iva: iva, total: subtotal + iva, letra: importeConLetra(subtotal + iva) };
+    }
+
+    function renderResumenCc() {
+        var r = filasResumenCc();
+        var dinero = function (n) { return n == null ? '' : Math.abs(n) < 0.005 ? '-' : fmt(n); };
+        var html = r.filas.map(function (f) {
+            var tot = f.tot == null ? '' : f.como === 'pct' ? pct(f.tot) : f.como === 'usd' ? 'US$ ' + fmt(f.tot) : f.como === 'fijo' ? fmt(f.tot) : dinero(f.tot);
+            return '<tr class="' + f.clase + '"' + (f.ir ? ' data-ccr-ir="' + f.ir + '" title="Ir a ' + escapar(NOMBRES[f.ir]) + '"' : '') + '>' +
+                '<td class="ccr-anexo">' + escapar(f.anexo) + '</td><td class="izq">' + escapar(f.nombre) + (f.extra ? ' <small>(' + escapar(f.extra) + ')</small>' : '') + '</td>' +
+                '<td class="ro">' + dinero(f.pres) + '</td><td class="ro">' + dinero(f.sub) + '</td><td class="ro">' + tot + '</td>' +
+                '<td class="ro">' + (f.p == null ? '' : pct(f.p)) + '</td></tr>';
+        }).join('');
+        html += '<tr class="ccr-letra"><td colspan="6">' + escapar(r.letra) + '</td></tr>';
         $('ccrCuerpo').innerHTML = html;
     }
     // Un clic en un renglón lleva a la pestaña donde se captura
@@ -2131,6 +2145,17 @@
     //       propuesta (para el cliente: especificación técnica, P.U. e importes, sin costos internos)
     function esModoPU(modo) { return modo === 'pu' || modo === 'pu-detalle' || modo === 'propuesta'; }
     function prepararImpresion(modo) {
+        if (modo === 'analisis') {
+            // Análisis de Cancelería: el resumen del Catálogo de Conceptos en el formato de la hoja de Excel
+            var r = filasResumenCc();
+            $('formatoImpresion').innerHTML = FormatoAnalisis({
+                folio: $('folio').value, fecha: $('fecha').value, cliente: $('cliente').value,
+                proyecto: $('proyecto').value, ubicacion: $('ubicacion').value, tc: TC_USD,
+                subtotal: r.subtotal, iva: r.iva, total: r.total, letra: r.letra, filas: r.filas
+            }, window.ACRI_MEMBRETE || {});
+            impresionLista = true;
+            return;
+        }
         var doc = documentoImpresion(), pu = esModoPU(modo);
         if (pu) {
             var x = documentoPU(modo === 'pu-detalle');

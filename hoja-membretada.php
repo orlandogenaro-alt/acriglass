@@ -24,7 +24,7 @@ $m = membreteImpresion();
 
 <header class="c-cabecera">
     <h1><span class="m-acri">ACRI</span> <span class="m-glass">GLASS</span> <span class="h-texto">Hoja Membretada</span></h1>
-    <p>Encabezado, logo y firmas de los formatos impresos (<b>Imprimir</b> e <b>Imprimir Detalle</b> del Presupuesto de Obra).
+    <p>Encabezado, logo y firmas de los formatos impresos (<b>Imprimir</b>, <b>Imprimir Detalle</b> y <b>Análisis de Cancelería</b> del Presupuesto de Obra).
         La vista previa de la derecha usa datos de ejemplo y muestra cómo sale la hoja. Los cambios aplican a todos los usuarios
         la próxima vez que abran un presupuesto.</p>
 </header>
@@ -70,6 +70,22 @@ $m = membreteImpresion();
             <label class="c-campo completo"><textarea name="pie" maxlength="300" placeholder="Ej. Precios sujetos a cambio sin previo aviso."></textarea></label>
         </div>
 
+        <div class="c-seccion">Análisis de Cancelería <small>Imprimir › Análisis de Cancelería (usa el mismo logo).</small></div>
+        <div class="c-campos">
+            <label class="c-campo"><span>Título</span><input name="an_titulo" maxlength="60"></label>
+            <label class="c-campo"><span>Subtítulo (renglón con relleno)</span><input name="an_subtitulo" maxlength="60"></label>
+            <label class="c-campo"><span>Código</span><input name="an_codigo" maxlength="20"></label>
+            <label class="c-campo"><span>Revisión</span><input name="an_revision" maxlength="10"></label>
+            <label class="c-campo"><span>Fecha de emisión del formato</span><input name="an_fecha_emision" maxlength="20" placeholder="08-07-2020"></label>
+            <label class="c-campo"><span>Etiqueta del cliente</span><input name="an_etiqueta_cliente" maxlength="30" placeholder="ARQUITECTO"></label>
+            <label class="c-campo"><span>Color del relleno</span><input type="color" name="an_color"></label>
+            <label class="c-campo check"><input type="checkbox" name="an_dolares"> Mostrar el total en dólares</label>
+            <label class="c-campo completo"><span>Nota</span><textarea name="an_nota" maxlength="500"></textarea></label>
+            <label class="c-campo"><span>Leyenda de la firma</span><input name="an_autorizo" maxlength="40" placeholder="Autorizó"></label>
+            <label class="c-campo"><span>Puesto</span><input name="an_puesto" maxlength="60"></label>
+            <label class="c-campo completo"><span>Nombre de quien autoriza</span><input name="an_nombre" maxlength="80"></label>
+        </div>
+
         <div class="hm-botones">
             <button type="button" class="c-btn" id="restablecer">Restablecer textos</button>
             <span class="c-espacio"></span>
@@ -83,6 +99,7 @@ $m = membreteImpresion();
             <span>Vista previa</span>
             <label><input type="radio" name="tipoPrevia" value="normal" checked> Imprimir</label>
             <label><input type="radio" name="tipoPrevia" value="detalle"> Imprimir Detalle</label>
+            <label><input type="radio" name="tipoPrevia" value="analisis"> Análisis de Cancelería</label>
         </div>
         <div class="hm-papel" id="previa"></div>
     </section>
@@ -93,6 +110,7 @@ $m = membreteImpresion();
     window.ACRI_USUARIO = <?= json_encode($usuarioSesion, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <script src="<?= recurso('js/formato-presupuesto.js') ?>"></script>
+<script src="<?= recurso('js/formato-analisis.js') ?>"></script>
 <script src="<?= recurso('js/hoja-membretada.js') ?>"></script>
 </body>
 </html>

@@ -259,6 +259,7 @@ $secciones = [
             <button data-imprimir="propuesta">Propuesta para el cliente (PDF)</button>
             <button data-imprimir="pu">Imprimir Precios Unitarios</button>
             <button data-imprimir="pu-detalle">Imprimir Análisis de P.U.</button>
+            <button data-imprimir="analisis">Análisis de Cancelería</button>
             <button data-versiones>Versiones aprobadas…</button>
         </div>
     </div>
@@ -827,6 +828,7 @@ $secciones = [
     window.ACRI_CONCEPTOS_PU = <?= json_encode($conceptosPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <script src="<?= recurso('js/formato-presupuesto.js') ?>"></script>
+<script src="<?= recurso('js/formato-analisis.js') ?>"></script>
 <script src="<?= recurso('js/ruta-critica.js') ?>"></script>
 <script src="<?= recurso('js/conceptos-tareas.js') ?>"></script>
 <script src="<?= recurso('js/presupuesto.js') ?>"></script>

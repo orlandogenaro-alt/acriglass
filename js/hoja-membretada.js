@@ -37,14 +37,61 @@
         ]
     };
 
+    var TEXTOS = ['empresa', 'datos', 'titulo', 'titulo_detalle', 'codigo', 'revision', 'leyenda_firma', 'pie', 'color',
+        'an_titulo', 'an_subtitulo', 'an_codigo', 'an_revision', 'an_fecha_emision', 'an_etiqueta_cliente',
+        'an_nota', 'an_autorizo', 'an_puesto', 'an_nombre', 'an_color'];
+    var CASILLAS = ['mostrar_notas', 'an_dolares'];
+
+    // Renglones de ejemplo del Análisis de Cancelería (mismo arreglo que filasResumenCc de presupuesto.js)
+    function ejemploAnalisis() {
+        var sub = 27580.78, iva = sub * 0.16, p = function (v) { return v / sub * 100; };
+        var f = function (clase, anexo, nombre, pres, s, tot, pc, como) {
+            return { clase: clase, anexo: anexo, nombre: nombre, pres: pres, sub: s, tot: tot, p: pc, como: como };
+        };
+        var usd = f('ccr-final', '', 'TOTAL EN DÓLARES IVA INCLUIDO', null, null, (sub + iva) / 18.5, null, 'usd');
+        usd.extra = 'T.C. 18.50';
+        return {
+            folio: 1, fecha: new Date().toISOString().substr(0, 10), cliente: 'ARQ. OMAR MIRANDA / ARQ. RAUL DE JESUS',
+            proyecto: 'TALLER DE TINTAS INDISA', ubicacion: 'CDMX', tc: 18.5, subtotal: sub, iva: iva, total: sub + iva,
+            letra: '(TREINTA Y UN MIL NOVECIENTOS NOVENTA Y TRES PESOS 70/100 M.N.)',
+            filas: [
+                f('ccr-titulo', '', 'MATERIA PRIMA'),
+                f('', 1, 'ALUMINIO', 7044.34, null, null, p(7044.34)),
+                f('', 2, 'HERRAJES', 559.04, null, null, p(559.04)),
+                f('', 3, 'ACCESORIOS', 534.22, null, null, p(534.22)),
+                f('ccr-grupo', 4, 'CRISTAL', null, 5313.60, null, p(5313.60)),
+                f('ccr-sub', '4.1', 'PLANILUX 6MM (7.38)', 5313.60),
+                f('ccr-total', '(=)', 'TOTAL MATERIA PRIMA', null, null, 13727.01, p(13727.01)),
+                f('ccr-titulo', '', 'MANO DE OBRA'),
+                f('', 5, 'MANO DE OBRA EXTERNA', 5525, null, null, p(5525)),
+                f('', 6, 'MANO DE OBRA INTERNA', 972.86, null, null, p(972.86)),
+                f('ccr-calc', 7, 'COMISIONES', 1516.94, null, null, p(1516.94)),
+                f('ccr-total', '(+)', 'TOTAL MANO DE OBRA', null, 8014.80, 8014.80, p(8014.80)),
+                f('ccr-total ccr-fuerte', '(=)', 'TOTAL COSTO PRIMO', null, null, 21741.81, p(21741.81)),
+                f('ccr-total', '(−)(=)', 'MARGEN DE UTILIDAD BRUTA', null, null, 5838.97, p(5838.97)),
+                f('ccr-titulo', '', 'GASTOS DE OPERACION'),
+                f('ccr-calc', 8, 'INDIRECTOS OFICINA Y CAMPO (4.5%)', 490.64, null, null, p(490.64)),
+                f('', 9, 'EQUIPO DE HERRAMIENTA 0.15%', 68.95, null, null, p(68.95)),
+                f('', 10, 'COMIDAS', 0, null, null, 0),
+                f('', 11, 'FLETES', 0, null, null, 0),
+                f('', 12, 'OTROS GASTOS 4%', 179.28, null, null, p(179.28)),
+                f('ccr-total', '(−)', 'TOTAL GASTOS DE OPERACION', null, null, 738.87, p(738.87)),
+                f('ccr-total ccr-fuerte', '(=)', 'UTILIDAD NETA', null, null, 5100.10, p(5100.10)),
+                f('ccr-nota', '', 'PORCENTAJE DE GANANCIA SOBRE PRECIO DE VENTA', null, null, p(5100.10), null, 'pct'),
+                f('ccr-final', '', 'SUBTOTAL', null, null, sub, 100, 'fijo'),
+                f('ccr-final', '', 'IVA 16.00 %', null, null, iva, null, 'fijo'),
+                f('ccr-final ccr-fuerte', '', 'TOTAL', null, null, sub + iva, null, 'fijo'),
+                usd
+            ]
+        };
+    }
+
     function mensaje(t, tipo) { $('mensaje').textContent = t || ''; $('mensaje').className = 'c-mensaje ' + (tipo || ''); }
 
     function llenar(d) {
         m = d;
-        ['empresa', 'datos', 'titulo', 'titulo_detalle', 'codigo', 'revision', 'leyenda_firma', 'pie', 'color'].forEach(function (k) {
-            form.elements[k].value = d[k] || '';
-        });
-        form.elements.mostrar_notas.checked = !!d.mostrar_notas;
+        TEXTOS.forEach(function (k) { form.elements[k].value = d[k] || ''; });
+        CASILLAS.forEach(function (k) { form.elements[k].checked = !!d[k]; });
         for (var i = 0; i < 4; i++) form.elements['firma' + i].value = d.firmas[i] || '';
         pintarLogo(d);
     }
@@ -61,10 +108,8 @@
 
     function valores() {
         var v = {};
-        ['empresa', 'datos', 'titulo', 'titulo_detalle', 'codigo', 'revision', 'leyenda_firma', 'pie', 'color'].forEach(function (k) {
-            v[k] = form.elements[k].value;
-        });
-        v.mostrar_notas = form.elements.mostrar_notas.checked;
+        TEXTOS.forEach(function (k) { v[k] = form.elements[k].value; });
+        CASILLAS.forEach(function (k) { v[k] = form.elements[k].checked; });
         for (var i = 0; i < 4; i++) v['firma' + i] = form.elements['firma' + i].value;
         return v;
     }
@@ -75,8 +120,8 @@
         var p = Object.assign({}, m, v, {
             firmas: [0, 1, 2, 3].map(function (i) { return v['firma' + i].trim(); }).filter(Boolean)
         });
-        var detalle = document.querySelector('input[name="tipoPrevia"]:checked').value === 'detalle';
-        $('previa').innerHTML = FormatoPresupuesto(EJEMPLO, p, detalle);
+        var tipo = document.querySelector('input[name="tipoPrevia"]:checked').value;
+        $('previa').innerHTML = tipo === 'analisis' ? FormatoAnalisis(ejemploAnalisis(), p) : FormatoPresupuesto(EJEMPLO, p, tipo === 'detalle');
     }
 
     function pedir(url, op) {

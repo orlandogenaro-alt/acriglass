@@ -771,12 +771,12 @@ $secciones = [
         <button type="button" class="hs-cerrar" data-cci-cerrar title="Cerrar">✕</button>
     </div>
     <p class="pu-dlg-ayuda">En Excel selecciona las columnas <b>con su encabezado</b> (Código, Concepto, Unidad, Cantidad, P. Unitario; opcionales Partida y Especificación)
-        y pégalas aquí, o elige un archivo .csv. Si el código está en <b>Catalogos › Conceptos P.U.</b> se toma su análisis con los precios vigentes (automático);
+        y pégalas aquí, o elige el archivo de Excel (.xlsx) o .csv. Si el código está en <b>Catalogos › Conceptos P.U.</b> se toma su análisis con los precios vigentes (automático);
         si no, el concepto entra con el P. Unitario del archivo. Lo que ya está en el presupuesto (mismo código) no se vuelve a sumar: solo se actualiza si cambió.</p>
     <div class="cci-entrada">
         <textarea id="cciPegar" rows="6" placeholder="Pega aquí las celdas copiadas de Excel"></textarea>
         <div class="cci-opciones">
-            <label>Archivo CSV (opcional): <input type="file" id="cciArchivo" accept=".csv,.txt,text/csv,text/plain"></label>
+            <label>Archivo de Excel (.xlsx) o CSV (opcional): <input type="file" id="cciArchivo" accept=".xlsx,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
             <label><input type="checkbox" id="cciVenta"> Precio fijo para el cliente: el P. Unitario del archivo no suma al costo, porque el costo ya viene del Análisis (Materia Prima, Mano de Obra y Gastos de Operacion)</label>
             <label><input type="checkbox" id="cciCatalogo" checked> Usar el análisis del catálogo cuando el código exista</label>
             <button type="button" class="ct-btn" id="cciLeer">Revisar</button>
@@ -802,12 +802,12 @@ $secciones = [
         <button type="button" class="hs-cerrar" data-ani-cerrar title="Cerrar">✕</button>
     </div>
     <p class="pu-dlg-ayuda">En la hoja de Excel del Análisis selecciona desde el encabezado (<b>Anexos, Partidas, Presupuesto sugerido, Subtotal…</b>) hasta el Total de Gastos de Operacion
-        y pégalo aquí, o elige un archivo .csv (el que descarga Exportar a Excel). Los renglones bajo <b>Materia Prima</b>, <b>Mano de Obra</b> y <b>Gastos de Operacion</b>
+        y pégalo aquí, o elige el archivo de Excel (el que descarga Exportar a Excel). Los renglones bajo <b>Materia Prima</b>, <b>Mano de Obra</b> y <b>Gastos de Operacion</b>
         actualizan el importe del concepto con el mismo nombre o se agregan como nuevos; los renglones automáticos (calculados) no se cambian.</p>
     <div class="cci-entrada">
         <textarea id="aniPegar" rows="6" placeholder="Pega aquí las celdas copiadas de Excel"></textarea>
         <div class="cci-opciones">
-            <label>Archivo CSV (opcional): <input type="file" id="aniArchivo" accept=".csv,.txt,text/csv,text/plain"></label>
+            <label>Archivo de Excel (.xlsx) o CSV (opcional): <input type="file" id="aniArchivo" accept=".xlsx,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
             <label><input type="checkbox" id="aniQuitar"> Quitar los conceptos que no vengan en el archivo (de las secciones que sí vienen)</label>
             <label id="aniSubtotalCaja" hidden><input type="checkbox" id="aniSubtotal" checked> <span id="aniSubtotalTxt"></span></label>
             <label id="aniVentaCaja" hidden><input type="checkbox" id="aniVenta" checked> Los conceptos del Catálogo de Conceptos quedan con su P. Unitario como precio fijo para el cliente (ya no suman al costo)</label>
@@ -901,6 +901,7 @@ $secciones = [
 </script>
 <script src="<?= recurso('js/formato-presupuesto.js') ?>"></script>
 <script src="<?= recurso('js/formato-analisis.js') ?>"></script>
+<script src="<?= recurso('js/xlsx-simple.js') ?>"></script>
 <script src="<?= recurso('js/formato-catalogo.js') ?>"></script>
 <script src="<?= recurso('js/ruta-critica.js') ?>"></script>
 <script src="<?= recurso('js/conceptos-tareas.js') ?>"></script>

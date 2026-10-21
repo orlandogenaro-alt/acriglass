@@ -1171,22 +1171,20 @@
 
     // ---------- Exportar / importar el Análisis con Excel ----------
     // Exportar: CSV con las mismas columnas de la pestaña (Anexos, Partidas, Presupuesto sugerido, Subtotal, Total, %)
+    // Exportar: Excel (.xlsx) con las mismas columnas de la pestaña (Anexos, Partidas, Presupuesto sugerido, Subtotal, Total, %)
     function exportarAn() {
         var r = filasResumenCc();
-        var celda = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
-        var numero = function (n) { return n == null ? '' : (Math.round(n * 100) / 100).toFixed(2); };
-        var filas = [['Anexos', 'Partidas', 'Presupuesto sugerido', 'Subtotal', 'Total', '%']];
+        var dinero = function (n, fuerte) { return n == null ? null : { v: redondear(n), e: fuerte ? 'total' : 'dinero' }; };
+        var porc = function (n) { return n == null ? null : { v: Math.round(n * 100) / 10000, e: 'pct' }; };
+        var filas = [['Anexos', 'Partidas', 'Presupuesto sugerido', 'Subtotal', 'Total', '%'].map(function (t) { return { v: t, e: 'titulo' }; })];
         r.filas.forEach(function (f) {
-            var tot = f.como === 'pct' ? (f.tot == null ? '' : numero(f.tot) + '%') : numero(f.tot);
-            filas.push([f.anexo, f.nombre + (f.extra ? ' (' + f.extra + ')' : ''), numero(f.pres), numero(f.sub), tot, f.p == null ? '' : numero(f.p) + '%']);
+            var fuerte = /ccr-(titulo|total|final)/.test(f.clase);
+            filas.push([f.anexo, { v: f.nombre + (f.extra ? ' (' + f.extra + ')' : ''), e: fuerte ? 'negrita' : 'texto' }, dinero(f.pres), dinero(f.sub),
+                        f.como === 'pct' ? porc(f.tot) : dinero(f.tot, fuerte), porc(f.p)]);
         });
-        filas.push(['', r.letra]);
-        var csv = filas.map(function (f) { return f.map(celda).join(','); }).join('\r\n');
-        var enlace = document.createElement('a');
-        enlace.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
-        enlace.download = ('Analisis ' + (txt($('proyecto').value) || 'presupuesto')).replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.csv';
-        enlace.click();
-        setTimeout(function () { URL.revokeObjectURL(enlace.href); }, 1000);
+        filas.push(['', { v: r.letra, e: 'negrita' }]);
+        XlsxSimple.descargar(XlsxSimple.crear({ nombre: 'Análisis', anchos: [9, 52, 18, 16, 18, 10], fijarFila: 1, filas: filas }),
+                             'Analisis ' + (txt($('proyecto').value) || 'presupuesto'));
     }
     $('anExportar').addEventListener('click', exportarAn);
 
@@ -1322,9 +1320,7 @@
     $('aniArchivo').addEventListener('change', function () {
         var f = this.files[0];
         if (!f) return;
-        var lector = new FileReader();
-        lector.onload = function () { $('aniPegar').value = lector.result; leerImportacionAn(); };
-        lector.readAsText(f, 'UTF-8');
+        leerArchivoImportar(f, 'aniPegar', leerImportacionAn);
     });
     $('aniLeer').addEventListener('click', leerImportacionAn);
     $('aniAplicar').addEventListener('click', aplicarImportacionAn);
@@ -1473,15 +1469,17 @@
 
     // ---------- Exportar / importar el catálogo con Excel ----------
     // Exportar: CSV que abre Excel (como Exportar a Excel de la Obra), una fila por concepto y los totales al final
+    // Exportar: Excel (.xlsx) como el PDF, con el concepto y su especificación completos en la misma celda (ajustar texto)
     function exportarCc() {
         var r = calcularPU(), a = arbolCc(r);
-        var celda = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
-        var numero = function (n) { return (Math.round(n * 100) / 100).toFixed(2); };
-        var filas = [['Partida', 'Código', 'Concepto', 'Especificación', 'Unidad', 'Cantidad', 'P. Unitario', 'Importe']];
+        var dinero = function (n, fuerte) { return { v: redondear(n), e: fuerte ? 'total' : 'dinero' }; };
+        var filas = [['Partida', 'Código', 'Concepto', 'Unidad', 'Cantidad', 'P. Unitario', 'Importe'].map(function (t) { return { v: t, e: 'titulo' }; })];
         a.partidas.forEach(function (p) {
             var poner = function (lista, partida) {
                 lista.forEach(function (x) {
-                    filas.push([partida, x.clave, x.descripcion, x.c ? x.c.especificacion : '', x.unidad, x.cantidad, numero(x.pu), numero(x.importe)]);
+                    var espec = x.c ? String(x.c.especificacion || '').trim() : '';
+                    filas.push([{ v: partida, e: 'texto' }, x.clave, { v: x.descripcion + (espec ? '\n' + espec : ''), e: 'texto' }, x.unidad,
+                                { v: num(x.cantidad), e: 'cantidad' }, dinero(x.pu), dinero(x.importe)]);
                 });
             };
             poner(p.conceptos, p.nombre);
@@ -1489,18 +1487,27 @@
         });
         if (filas.length < 2) { alert('El catálogo está vacío: no hay nada que exportar.'); return; }
         filas.push([]);
-        filas.push(['', '', 'TOTAL SIN IVA', '', '', '', '', numero(a.total)]);
-        filas.push(['', '', 'IVA ' + pct(IVA * 100), '', '', '', '', numero(a.total * IVA)]);
-        filas.push(['', '', 'TOTAL', '', '', '', '', numero(a.total * (1 + IVA))]);
-        filas.push(['', '', importeConLetra(a.total * (1 + IVA))]);
-        var csv = filas.map(function (f) { return f.map(celda).join(','); }).join('\r\n');
-        var enlace = document.createElement('a');
-        enlace.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
-        enlace.download = ('Catalogo de conceptos ' + (txt($('proyecto').value) || 'presupuesto')).replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.csv';
-        enlace.click();
-        setTimeout(function () { URL.revokeObjectURL(enlace.href); }, 1000);
+        filas.push(['', '', { v: 'TOTAL SIN IVA', e: 'negrita' }, '', '', '', dinero(a.total, true)]);
+        filas.push(['', '', { v: 'IVA ' + pct(IVA * 100), e: 'negrita' }, '', '', '', dinero(a.total * IVA, true)]);
+        filas.push(['', '', { v: 'TOTAL', e: 'negrita' }, '', '', '', dinero(a.total * (1 + IVA), true)]);
+        filas.push(['', '', { v: importeConLetra(a.total * (1 + IVA)), e: 'texto' }]);
+        XlsxSimple.descargar(XlsxSimple.crear({ nombre: 'Catálogo de Conceptos', anchos: [18, 10, 70, 8, 11, 15, 16], fijarFila: 1, filas: filas }),
+                             'Catalogo de conceptos ' + (txt($('proyecto').value) || 'presupuesto'));
     }
     $('ccExportar').addEventListener('click', exportarCc);
+
+    // Archivo para importar: Excel (.xlsx) o CSV; queda en la caja de texto como si se hubiera pegado
+    function leerArchivoImportar(f, caja, listo) {
+        if (/\.xlsx$/i.test(f.name)) {
+            XlsxSimple.leer(f).then(function (filas) { $(caja).value = XlsxSimple.aTexto(filas); listo(); })
+                .catch(function (e) { alert('No se pudo leer el archivo de Excel: ' + (e && e.message || e)); });
+            return;
+        }
+        if (/\.xls$/i.test(f.name)) { alert('Ese archivo es de Excel antiguo (.xls): en Excel guárdalo como .xlsx, o copia las celdas y pégalas.'); return; }
+        var lector = new FileReader();
+        lector.onload = function () { $(caja).value = lector.result; listo(); };
+        lector.readAsText(f, 'UTF-8');
+    }
 
     // Importar: celdas copiadas de Excel (tabuladores) o CSV (coma o punto y coma), con comillas y saltos de línea dentro de la celda
     var COLUMNAS_CCI = [
@@ -1699,9 +1706,7 @@
     $('cciArchivo').addEventListener('change', function () {
         var f = this.files[0];
         if (!f) return;
-        var lector = new FileReader();
-        lector.onload = function () { $('cciPegar').value = lector.result; leerImportacion(); };
-        lector.readAsText(f, 'UTF-8');
+        leerArchivoImportar(f, 'cciPegar', leerImportacion);
     });
     $('cciLeer').addEventListener('click', leerImportacion);
     $('cciCatalogo').addEventListener('change', function () { if (cciFilas.length) leerImportacion(); });

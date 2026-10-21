@@ -1220,7 +1220,8 @@
             else if (r && r.calc) { x.accion = 'Automático, no se cambia'; padreCalc[x.sec + x.anexo] = true; }
             else if (hijos) x.accion = 'Se toman sus sub-anexos';
             else if (!(x.importe > 0)) x.accion = 'Sin importe';
-            else { x.aplica = true; x.accion = r ? (Math.abs(x.actual - x.importe) < 0.005 ? 'Sin cambio' : 'Actualiza el importe') : 'Concepto nuevo'; }
+            else if (r && Math.abs(x.actual - x.importe) < 0.005) x.accion = 'Ya está, sin cambio';
+            else { x.aplica = true; x.accion = r ? 'Actualiza el importe' : 'Concepto nuevo'; }
             anFilas.push(x);
         });
         pintarImportacionAn(anFilas.length ? '' : 'No encontré renglones bajo Materia Prima, Mano de Obra o Gastos de Operacion.');
@@ -1505,6 +1506,12 @@
         var porCodigo = {};
         CONCEPTOS_PU.forEach(function (c) { porCodigo[clave(c.codigo)] = c; });
         var usarCat = $('cciCatalogo').checked;
+        // Lo que ya está en el catálogo (analizados y capturados por importe en MP / MO), para no sumarlo dos veces
+        var yaPorClave = {}, yaPorDesc = {}, enArchivo = {};
+        catalogoPU(calcularPU()).forEach(function (x) {
+            if (clave(x.clave)) yaPorClave[clave(x.clave)] = yaPorClave[clave(x.clave)] || x;
+            if (clave(x.descripcion)) yaPorDesc[clave(x.descripcion)] = yaPorDesc[clave(x.descripcion)] || x;
+        });
         celdas.slice(1).forEach(function (f) {
             var v = function (k) { return col[k] === undefined ? '' : f[col[k]] || ''; };
             var desc = v('descripcion'), codigo = txt(v('clave')), espec = v('especificacion');
@@ -1517,9 +1524,31 @@
                 desc = desc.slice(0, desc.indexOf('\n'));
             }
             var cat = usarCat && codigo ? porCodigo[clave(codigo)] : null;
-            cciFilas.push({ clave: codigo, partida: txt(v('partida')).replace(/\s*\/\s*/g, ' / '), descripcion: txt(desc) || (cat ? cat.descripcion : ''),
-                            especificacion: espec.trim() || (cat ? cat.especificacion || '' : ''), unidad: txt(v('unidad')) || (cat ? cat.unidad : ''),
-                            cantidad: cantidad || 1, pu: pu, cat: cat });
+            var x = { clave: codigo, partida: txt(v('partida')).replace(/\s*\/\s*/g, ' / '), descripcion: txt(desc) || (cat ? cat.descripcion : ''),
+                      especificacion: espec.trim() || (cat ? cat.especificacion || '' : ''), unidad: txt(v('unidad')) || (cat ? cat.unidad : ''),
+                      cantidad: cantidad || 1, pu: pu, cat: cat };
+            // El mismo código (o, sin código, la misma descripción) ya está: se compara en lugar de agregarlo otra vez
+            var llave = clave(codigo) || clave(x.descripcion);
+            x.existe = codigo ? yaPorClave[clave(codigo)] : yaPorDesc[clave(x.descripcion)];
+            if (llave && enArchivo[llave]) x.accion = 'Repetido en el archivo';
+            else if (x.existe) {
+                var e = x.existe, mismaCant = Math.abs(num(e.cantidad) - x.cantidad) < 0.005, mismoPU = !pu || Math.abs(e.pu - pu) < 0.01;
+                if (e.otro) x.accion = 'Ya está en ' + NOMBRES[e.sec] + (mismaCant && mismoPU ? '' : ' (su importe se cambia allá)');
+                else if (mismaCant && mismoPU) x.accion = 'Ya está, sin cambio';
+                else {
+                    // Solo se cambia el P.U. de un concepto sin análisis propio (importado) o con el análisis del catálogo
+                    var plano = e.c.insumos.length === 1 && e.c.insumos[0].descripcion === 'Precio unitario importado';
+                    x.ponerPU = !mismoPU && (plano || !!cat);
+                    x.actualiza = !mismaCant || x.ponerPU;
+                    x.accion = (x.actualiza ? 'Actualiza ' + [mismaCant ? '' : 'la cantidad', x.ponerPU ? 'el P. Unitario' : ''].filter(Boolean).join(' y ') : 'Ya está') +
+                               (!mismoPU && !x.ponerPU ? ' (el P. Unitario sale de su análisis)' : '');
+                }
+            }
+            else if (importable(x)) { x.aplica = true; x.accion = cat ? 'Nuevo, con el análisis del catálogo' : 'Nuevo, con el P. Unitario del archivo'; }
+            else x.accion = x.descripcion ? 'Sin precio' : 'Sin concepto';
+            if (x.actualiza) x.aplica = true;
+            if (llave) enArchivo[llave] = true;
+            cciFilas.push(x);
         });
         pintarImportacion(cciFilas.length ? '' : 'No hay renglones con concepto para agregar.');
     }
@@ -1527,40 +1556,53 @@
     function importable(x) { return !!x.descripcion && (!!x.cat || x.pu > 0); }
     function pintarImportacion(error) {
         var html = cciFilas.map(function (x) {
-            var bien = importable(x);
-            return '<tr class="' + (x.cat ? 'cci-cat' : bien ? '' : 'cci-error') + '"><td>' + escapar(x.clave) + '</td><td class="izq">' + escapar(x.descripcion) + '</td>' +
+            return '<tr class="' + (!x.aplica ? 'cci-error' : x.cat ? 'cci-cat' : '') + '"><td>' + escapar(x.clave) + '</td><td class="izq">' + escapar(x.descripcion) + '</td>' +
                 '<td>' + escapar(x.partida) + '</td><td>' + escapar(x.unidad) + '</td><td class="ro">' + cant(x.cantidad) + '</td>' +
-                '<td class="ro">' + (x.pu ? fmt(x.pu) : '') + '</td><td>' + (x.cat ? 'Análisis del catálogo' : bien ? 'Del archivo' : (x.descripcion ? 'Sin precio' : 'Sin concepto')) + '</td></tr>';
+                '<td class="ro">' + (x.pu ? fmt(x.pu) : '') + '</td><td>' + escapar(x.accion) + '</td></tr>';
         }).join('');
-        var validos = cciFilas.filter(importable).length;
+        var nuevos = cciFilas.filter(function (x) { return x.aplica && !x.actualiza; }).length;
+        var cambian = cciFilas.filter(function (x) { return x.actualiza; }).length;
+        var ya = cciFilas.filter(function (x) { return x.existe && !x.actualiza; }).length;
         $('cciVista').innerHTML = html || '<tr class="vacio-fila"><td colspan="7">' + escapar(error || 'Pega las celdas y presiona Revisar.') + '</td></tr>';
-        $('cciResumen').textContent = !cciFilas.length ? '' : validos + ' de ' + cciFilas.length + ' conceptos se agregarán' +
-            (validos < cciFilas.length ? ' (los tachados no tienen concepto o precio)' : '');
-        $('cciAgregar').disabled = !validos;
+        $('cciResumen').textContent = !cciFilas.length ? '' : nuevos + ' nuevos, ' + cambian + ' se actualizan y ' + ya + ' ya están en el presupuesto' +
+            (ya ? ' (no se vuelven a sumar)' : '');
+        $('cciAgregar').disabled = !(nuevos + cambian);
     }
 
     function agregarImportacion() {
         if (soloLectura) { avisoSoloLectura(); return; }
-        var nuevos = [];
-        cciFilas.filter(importable).forEach(function (x) {
+        var ajustar = [], nuevos = 0, cambiados = 0;
+        cciFilas.forEach(function (x) {
+            if (!x.aplica) return;
+            if (x.actualiza) {
+                var e = x.existe.c;
+                e.cantidad = x.cantidad;
+                if (x.unidad) e.unidad = x.unidad;
+                if (x.especificacion) e.especificacion = x.especificacion;
+                if (x.ponerPU && x.cat) e.insumos = x.cat.insumos.map(limpiarInsumo);
+                else if (x.ponerPU) ajustar.push({ c: e, pu: x.pu });
+                cambiados++;
+                return;
+            }
             var c = nuevoConcepto({ clave: x.clave, partida: x.partida || (x.cat ? x.cat.partida : '') || 'Importados', descripcion: x.descripcion,
                                     especificacion: x.especificacion, unidad: x.unidad, cantidad: x.cantidad,
                                     insumos: x.cat ? x.cat.insumos : [{ tipo: 'MAT', descripcion: 'Precio unitario importado', unidad: x.unidad, cantidad: 1, costo: x.pu }] });
             analisis.conceptos.push(c);
-            nuevos.push({ c: c, pu: x.cat ? 0 : x.pu });
+            if (!x.cat) ajustar.push({ c: c, pu: x.pu });
+            nuevos++;
         });
         // El P. Unitario del archivo es el precio de venta: el costo se ajusta con el factor del presupuesto para que quede igual
         for (var vuelta = 0; vuelta < 8; vuelta++) {
             var r = calcularPU();
             if (!(r.factor > 0)) break;
-            nuevos.forEach(function (n) { if (n.pu) n.c.insumos[0].costo = n.pu / r.factor; });
+            ajustar.forEach(function (n) { n.c.insumos[0].costo = n.pu / r.factor; });
         }
-        huboAnalisis = huboAnalisis || nuevos.length > 0;
+        huboAnalisis = huboAnalisis || nuevos > 0;
         $('ccImpDialogo').close();
         marcarCambio();
         calcularTotales();
         renderCc();
-        alert('Se agregaron ' + nuevos.length + ' conceptos al catálogo.');
+        alert('Se agregaron ' + nuevos + ' conceptos y se actualizaron ' + cambiados + '.');
     }
 
     $('ccImportar').addEventListener('click', function () {

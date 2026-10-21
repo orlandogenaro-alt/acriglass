@@ -772,7 +772,7 @@ $secciones = [
     </div>
     <p class="pu-dlg-ayuda">En Excel selecciona las columnas <b>con su encabezado</b> (Código, Concepto, Unidad, Cantidad, P. Unitario; opcionales Partida y Especificación)
         y pégalas aquí, o elige un archivo .csv. Si el código está en <b>Catalogos › Conceptos P.U.</b> se toma su análisis con los precios vigentes (automático);
-        si no, el concepto entra con el P. Unitario del archivo.</p>
+        si no, el concepto entra con el P. Unitario del archivo. Lo que ya está en el presupuesto (mismo código) no se vuelve a sumar: solo se actualiza si cambió.</p>
     <div class="cci-entrada">
         <textarea id="cciPegar" rows="6" placeholder="Pega aquí las celdas copiadas de Excel"></textarea>
         <div class="cci-opciones">
@@ -783,7 +783,7 @@ $secciones = [
     </div>
     <div class="extra-caja pr-tabla">
         <table class="grid mini-grid">
-            <thead><tr><th>Código</th><th>Concepto</th><th>Partida</th><th>Unidad</th><th class="num">Cantidad</th><th class="num">P. Unitario</th><th>Precio</th></tr></thead>
+            <thead><tr><th>Código</th><th>Concepto</th><th>Partida</th><th>Unidad</th><th class="num">Cantidad</th><th class="num">P. Unitario</th><th>Qué se hace</th></tr></thead>
             <tbody id="cciVista"><tr class="vacio-fila"><td colspan="7">Pega las celdas y presiona Revisar.</td></tr></tbody>
         </table>
     </div>

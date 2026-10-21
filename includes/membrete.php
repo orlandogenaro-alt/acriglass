@@ -30,6 +30,17 @@ const ACRI_MEMBRETE_DEFECTO = [
     'an_color'           => '#daeef3',   // relleno de encabezados de columna y totales
     'an_color_titulo'    => '#95b3d7',   // relleno del subtítulo (ANALISIS CANCELERIA)
     'an_dolares'         => true,        // renglón Total en dólares (con el tipo de cambio)
+    // Formato Catálogo de Conceptos (Imprimir › Catálogo de Conceptos), como el PDF PRESUPUESTO DE OBRA
+    'cc_empresa'            => 'GRUPO KAFER Lt De MEXICO S De R.L De CV.',
+    'cc_subtitulo'          => 'Acristala Arquitectura Transparente',
+    'cc_titulo'             => 'PRESUPUESTO DE OBRA',
+    'cc_condiciones_titulo' => 'CONDICIONES COMERCIALES',
+    'cc_condiciones'        => "Para dar inicio a los trabajos se requiere un anticipo mínimo del *70%* del total.\n"
+        . "El *30%* restante será sobre estimaciones y deberá quedar cubierto al 100% antes de concluir los trabajos.\n"
+        . "Plazo para iniciar obra: *5 días hábiles* después del pago o anticipo.\n"
+        . "Esta cotización tiene una vigencia de *8 días* a partir de la fecha de emisión.",
+    'cc_pie'                => 'GERENTE GENERAL: LIC. FERNANDO LOVERA COLIN',
+    'cc_color'              => '#000000',   // barra de las columnas
 ];
 
 // Campos de texto: nombre => largo máximo
@@ -38,6 +49,7 @@ const ACRI_MEMBRETE_TEXTOS = [
     'codigo' => 20, 'revision' => 10, 'leyenda_firma' => 40, 'pie' => 300,
     'an_titulo' => 60, 'an_subtitulo' => 60, 'an_codigo' => 20, 'an_revision' => 10, 'an_fecha_emision' => 20,
     'an_etiqueta_cliente' => 30, 'an_nota' => 500, 'an_autorizo' => 40, 'an_puesto' => 60, 'an_nombre' => 80,
+    'cc_empresa' => 120, 'cc_subtitulo' => 120, 'cc_titulo' => 60, 'cc_condiciones_titulo' => 60, 'cc_condiciones' => 1500, 'cc_pie' => 150,
 ];
 
 function membrete(): array
@@ -45,7 +57,7 @@ function membrete(): array
     $m = array_replace(ACRI_MEMBRETE_DEFECTO, configLeer('hoja_membretada'));
     $firmas = array_values(array_filter(array_map(fn($f) => trim((string) $f), (array) $m['firmas']), fn($f) => $f !== ''));
     $m['firmas'] = array_slice($firmas ?: ACRI_MEMBRETE_DEFECTO['firmas'], 0, 4);
-    foreach (['color', 'an_color', 'an_color_titulo'] as $k) {
+    foreach (['color', 'an_color', 'an_color_titulo', 'cc_color'] as $k) {
         if (!preg_match('/^#[0-9a-f]{6}$/i', (string) $m[$k])) $m[$k] = ACRI_MEMBRETE_DEFECTO[$k];
     }
     $m['mostrar_notas'] = (bool) $m['mostrar_notas'];
@@ -72,7 +84,7 @@ function membreteGuardar(array $in): array
     for ($i = 0; $i < 4; $i++) {
         if (array_key_exists("firma$i", $in)) $m['firmas'][$i] = mb_substr(trim((string) $in["firma$i"]), 0, 30);
     }
-    foreach (['color', 'an_color', 'an_color_titulo'] as $k) {
+    foreach (['color', 'an_color', 'an_color_titulo', 'cc_color'] as $k) {
         if (isset($in[$k]) && preg_match('/^#[0-9a-f]{6}$/i', (string) $in[$k])) $m[$k] = strtolower($in[$k]);
     }
     foreach (['mostrar_notas', 'an_dolares'] as $k) {

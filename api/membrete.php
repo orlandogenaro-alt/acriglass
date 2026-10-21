@@ -3,7 +3,8 @@
 // GET  ?accion=leer
 // POST ?accion=guardar     {empresa, datos, titulo, titulo_detalle, codigo, revision, firma0..3, leyenda_firma, pie, color, mostrar_notas,
 //                           an_titulo, an_subtitulo, an_codigo, an_revision, an_fecha_emision, an_etiqueta_cliente,
-//                           an_nota, an_autorizo, an_puesto, an_nombre, an_color, an_color_titulo, an_dolares}  (Análisis de Cancelería)
+//                           an_nota, an_autorizo, an_puesto, an_nombre, an_color, an_color_titulo, an_dolares,  (Análisis de Cancelería)
+//                           cc_empresa, cc_subtitulo, cc_titulo, cc_condiciones_titulo, cc_condiciones, cc_pie, cc_color}  (Catálogo de Conceptos)
 // POST ?accion=restablecer vuelve a los textos que trae el sistema (el logo se quita con api/imagenes.php)
 define('ACRI_API', true);
 require __DIR__ . '/../includes/sesion.php';

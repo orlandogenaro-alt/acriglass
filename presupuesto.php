@@ -261,6 +261,7 @@ $secciones = [
             <button data-imprimir="pu">Imprimir Precios Unitarios</button>
             <button data-imprimir="pu-detalle">Imprimir Análisis de P.U.</button>
             <button data-imprimir="analisis">Análisis de Cancelería</button>
+            <button data-imprimir="catalogo">Catálogo de Conceptos</button>
             <button data-versiones>Versiones aprobadas…</button>
         </div>
     </div>
@@ -862,6 +863,7 @@ $secciones = [
 </script>
 <script src="<?= recurso('js/formato-presupuesto.js') ?>"></script>
 <script src="<?= recurso('js/formato-analisis.js') ?>"></script>
+<script src="<?= recurso('js/formato-catalogo.js') ?>"></script>
 <script src="<?= recurso('js/ruta-critica.js') ?>"></script>
 <script src="<?= recurso('js/conceptos-tareas.js') ?>"></script>
 <script src="<?= recurso('js/presupuesto.js') ?>"></script>

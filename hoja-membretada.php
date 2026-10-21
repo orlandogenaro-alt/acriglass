@@ -24,7 +24,7 @@ $m = membreteImpresion();
 
 <header class="c-cabecera">
     <h1><span class="m-acri">ACRI</span> <span class="m-glass">GLASS</span> <span class="h-texto">Hoja Membretada</span></h1>
-    <p>Encabezado, logo y firmas de los formatos impresos (<b>Imprimir</b>, <b>Imprimir Detalle</b> y <b>Análisis de Cancelería</b> del Presupuesto de Obra).
+    <p>Encabezado, logo y firmas de los formatos impresos (<b>Imprimir</b>, <b>Imprimir Detalle</b>, <b>Análisis de Cancelería</b> y <b>Catálogo de Conceptos</b> del Presupuesto de Obra).
         La vista previa de la derecha usa datos de ejemplo y muestra cómo sale la hoja. Los cambios aplican a todos los usuarios
         la próxima vez que abran un presupuesto.</p>
 </header>
@@ -87,6 +87,18 @@ $m = membreteImpresion();
             <label class="c-campo completo"><span>Nombre de quien autoriza</span><input name="an_nombre" maxlength="80"></label>
         </div>
 
+        <div class="c-seccion">Catálogo de Conceptos <small>Imprimir › Catálogo de Conceptos (usa el mismo logo).</small></div>
+        <div class="c-campos">
+            <label class="c-campo completo"><span>Empresa (arriba a la izquierda)</span><input name="cc_empresa" maxlength="120"></label>
+            <label class="c-campo completo"><span>Subtítulo (en gris, bajo la empresa)</span><input name="cc_subtitulo" maxlength="120"></label>
+            <label class="c-campo"><span>Título</span><input name="cc_titulo" maxlength="60" placeholder="PRESUPUESTO DE OBRA"></label>
+            <label class="c-campo"><span>Color de la barra de columnas</span><input type="color" name="cc_color"></label>
+            <label class="c-campo completo"><span>Título de las condiciones</span><input name="cc_condiciones_titulo" maxlength="60" placeholder="CONDICIONES COMERCIALES"></label>
+            <label class="c-campo completo"><span>Condiciones (una por renglón)</span><textarea name="cc_condiciones" maxlength="1500" rows="5"></textarea>
+                <small>Cada renglón sale con viñeta. Lo que escribas entre *asteriscos* sale en negritas. Vacío = no se imprimen.</small></label>
+            <label class="c-campo completo"><span>Pie de cada hoja</span><input name="cc_pie" maxlength="150" placeholder="GERENTE GENERAL: …"></label>
+        </div>
+
         <div class="hm-botones">
             <button type="button" class="c-btn" id="restablecer">Restablecer textos</button>
             <span class="c-espacio"></span>
@@ -101,6 +113,7 @@ $m = membreteImpresion();
             <label><input type="radio" name="tipoPrevia" value="normal" checked> Imprimir</label>
             <label><input type="radio" name="tipoPrevia" value="detalle"> Imprimir Detalle</label>
             <label><input type="radio" name="tipoPrevia" value="analisis"> Análisis de Cancelería</label>
+            <label><input type="radio" name="tipoPrevia" value="catalogo"> Catálogo de Conceptos</label>
         </div>
         <div class="hm-papel" id="previa"></div>
     </section>
@@ -112,6 +125,7 @@ $m = membreteImpresion();
 </script>
 <script src="<?= recurso('js/formato-presupuesto.js') ?>"></script>
 <script src="<?= recurso('js/formato-analisis.js') ?>"></script>
+<script src="<?= recurso('js/formato-catalogo.js') ?>"></script>
 <script src="<?= recurso('js/hoja-membretada.js') ?>"></script>
 </body>
 </html>

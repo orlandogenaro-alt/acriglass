@@ -39,7 +39,8 @@
 
     var TEXTOS = ['empresa', 'datos', 'titulo', 'titulo_detalle', 'codigo', 'revision', 'leyenda_firma', 'pie', 'color',
         'an_titulo', 'an_subtitulo', 'an_codigo', 'an_revision', 'an_fecha_emision', 'an_etiqueta_cliente',
-        'an_nota', 'an_autorizo', 'an_puesto', 'an_nombre', 'an_color', 'an_color_titulo'];
+        'an_nota', 'an_autorizo', 'an_puesto', 'an_nombre', 'an_color', 'an_color_titulo',
+        'cc_empresa', 'cc_subtitulo', 'cc_titulo', 'cc_condiciones_titulo', 'cc_condiciones', 'cc_pie', 'cc_color'];
     var CASILLAS = ['mostrar_notas', 'an_dolares'];
 
     // Renglones de ejemplo del Análisis de Cancelería (mismo arreglo que filasResumenCc de presupuesto.js)
@@ -86,6 +87,26 @@
         };
     }
 
+    // Conceptos de ejemplo del Catálogo de Conceptos
+    var INCLUYE = 'El costo incluye cargo directo por el costo de los materiales que intervengan en su elaboración, fletes, limpieza gruesa y todo lo ' +
+        'necesario para su correcta ejecución. Nota: no se consideran trabajos de albañilería, carpintería, herrería u otro ajeno a la obra.';
+    var EJEMPLO_CATALOGO = {
+        fecha: new Date().toISOString().substr(0, 10), cotizacion: 'CASETA DE VIGILANCIA', empresa: 'DALE DESARROLLO',
+        atencion: 'EDUARDO MENDOZA', obra: 'ITP AERO', lugar: 'QUERETARO', iva_pct: 16, subtotal: 79870.24,
+        letra: '(NOVENTA Y DOS MIL SEISCIENTOS CUARENTA Y NUEVE PESOS 48/100 M.N.)',
+        conceptos: [
+            { clave: 'CAN-02', unidad: 'PZA', cantidad: 1, pu: 37553.03, importe: 37553.03,
+              descripcion: 'Suministro y colocación de cancel de ALUMINIO SERIE 1400 EN COLOR NEGRO ANODIZADO, conformado por dos secciones, con vidrio TEMPLADO CLARO DE 10 MM.',
+              especificacion: 'DIMENSIONES:\n- FIJO: 3.08 m x 1.24 m\n- BATIENTE: 1.20 m x 2.32 m\n' + INCLUYE },
+            { clave: 'CAN-03', unidad: 'PZA', cantidad: 1, pu: 40175.21, importe: 40175.21,
+              descripcion: 'Suministro y colocación de cancel de ALUMINIO SERIE 1400 EN COLOR NEGRO ANODIZADO, conformado por tres secciones, con vidrio TEMPLADO CLARO DE 10 MM.',
+              especificacion: 'DIMENSIONES:\n- FIJO: 1.87 m x 1.24 m\n- BATIENTE: 1.20 m x 2.32 m\n' + INCLUYE },
+            { clave: 'CAN-05', unidad: 'PZA', cantidad: 1, pu: 2142, importe: 2142,
+              descripcion: 'Suministro y colocación de ventana de proyección de ALUMINIO SERIE 1400 EN COLOR NEGRO ANODIZADO.',
+              especificacion: 'DIMENSIONES:\n- PROYECCION: .60 cm x .60 cm\n' + INCLUYE }
+        ]
+    };
+
     function mensaje(t, tipo) { $('mensaje').textContent = t || ''; $('mensaje').className = 'c-mensaje ' + (tipo || ''); }
 
     function llenar(d) {
@@ -121,7 +142,8 @@
             firmas: [0, 1, 2, 3].map(function (i) { return v['firma' + i].trim(); }).filter(Boolean)
         });
         var tipo = document.querySelector('input[name="tipoPrevia"]:checked').value;
-        $('previa').innerHTML = tipo === 'analisis' ? FormatoAnalisis(ejemploAnalisis(), p) : FormatoPresupuesto(EJEMPLO, p, tipo === 'detalle');
+        $('previa').innerHTML = tipo === 'analisis' ? FormatoAnalisis(ejemploAnalisis(), p)
+            : tipo === 'catalogo' ? FormatoCatalogo(EJEMPLO_CATALOGO, p) : FormatoPresupuesto(EJEMPLO, p, tipo === 'detalle');
     }
 
     function pedir(url, op) {

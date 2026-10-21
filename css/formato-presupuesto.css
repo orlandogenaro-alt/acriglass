@@ -204,3 +204,66 @@
 .fa-renglon { height: 16px; border-bottom: 1px solid #000; }
 .fa-firma { margin: 36px auto 0; width: 170px; text-align: center; font: 8.5px/1.3 Calibri, Carlito, Arial, sans-serif; break-inside: avoid; }
 .fa-linea { border-top: 1px solid #000; margin: 14px 0 1px; }
+
+/* ---------- Catálogo de Conceptos (js/formato-catalogo.js), como el PDF PRESUPUESTO DE OBRA ---------- */
+.fc {
+    --fc-color: #000;
+    page: catalogo;
+    width: 100%;
+    max-width: 196mm;
+    margin: 0 auto;
+    color: #000;
+    background: #fff;
+    font: 9.5px/1.3 Arial, Helvetica, sans-serif;
+    color-scheme: light;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+.fc * { box-sizing: border-box; }
+.fc table { border-collapse: collapse; width: 100%; }
+.fc .num { text-align: right; white-space: nowrap; }
+
+/* Encabezado: empresa, subtítulo, fecha y cotización | logo en recuadro */
+.fc-hoja { table-layout: fixed; }
+.fc-cab { padding: 0; }
+.fc-enc { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; padding-bottom: 4px; border-bottom: 2px solid #aaa; }
+.fc-empresa { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.fc-sub { color: #999; font-size: 9.5px; }
+.fc-mini { width: auto !important; }
+.fc-mini td { padding: 1px 0; vertical-align: top; }
+.fc-mini td:first-child { width: 26mm; }
+.fc-logo { width: 42mm; min-height: 20mm; display: flex; align-items: center; justify-content: center; border-left: 1px solid #888; border-top: 1px solid #888; padding: 3px; }
+.fc-logo img { max-width: 100%; max-height: 22mm; object-fit: contain; }
+
+/* Empresa / En atención a | Obra / Lugar en caja gris */
+.fc-datos { margin-top: 8px; background: #f2f2f2; border: 2px solid #aaa !important; }
+.fc-datos th, .fc-datos td { padding: 2px 4px; text-align: left; font-weight: 400; }
+.fc-datos th { width: 26mm; font-weight: 700; }
+.fc-datos .fc-der { width: 32%; }
+.fc-titulo { margin: 16px 0 12px; text-align: center; font-size: 13.5px; font-weight: 700; }
+
+/* Columnas: barra negra con separadores */
+.fc-cols th {
+    background: var(--fc-color);
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-align: center;
+    padding: 5px 4px;
+    border-right: 4px solid #888;
+}
+.fc-cols th:last-child { border-right: none; }
+.fc-cols th:nth-child(2) { font-size: 9px; }
+.fc-concepto td { padding: 2px 3px 12px; vertical-align: top; }
+.fc-concepto td:nth-child(3) { text-align: left; }
+.fc-texto { text-align: justify; }
+.fc-concepto { break-inside: avoid; }
+.fc-vacio { color: #666; font-style: italic; padding: 6px 3px; }
+
+/* Totales, importe con letra y condiciones */
+.fc-totales { margin-top: 8px; font-size: 11px; font-weight: 700; break-inside: avoid; }
+.fc-totales td { padding: 0; }
+.fc-cond { margin-top: 18mm; font-size: 10px; line-height: 1.4; break-inside: avoid; }
+.fc-cond > b { display: block; font-size: 10.5px; margin-bottom: 1px; }
+.fc-pie { margin-top: 14mm; text-align: center; font-size: 9px; }
+@media print { .fc-pie { display: none; } }

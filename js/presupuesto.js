@@ -2377,7 +2377,7 @@
             })
         };
     }
-    var impresionLista = false;
+    var impresionLista = false, atencionCatalogo = '';
     // modo: normal · detalle · pu (catálogo con precios unitarios) · pu-detalle (con el análisis de cada concepto)
     //       propuesta (para el cliente: especificación técnica, P.U. e importes, sin costos internos)
     function esModoPU(modo) { return modo === 'pu' || modo === 'pu-detalle' || modo === 'propuesta'; }
@@ -2389,6 +2389,24 @@
                 folio: $('folio').value, fecha: $('fecha').value, cliente: $('cliente').value,
                 proyecto: $('proyecto').value, ubicacion: $('ubicacion').value, tc: TC_USD,
                 subtotal: r.subtotal, iva: r.iva, total: r.total, letra: r.letra, filas: r.filas
+            }, window.ACRI_MEMBRETE || {});
+            impresionLista = true;
+            return;
+        }
+        if (modo === 'catalogo') {
+            // Catálogo de Conceptos en el formato del PDF PRESUPUESTO DE OBRA: los conceptos en el orden del catálogo
+            var a = arbolCc(calcularPU()), conceptos = [];
+            var poner = function (lista) {
+                lista.forEach(function (x) {
+                    conceptos.push({ clave: x.clave, descripcion: x.descripcion, especificacion: x.c ? x.c.especificacion : '',
+                                     unidad: x.unidad, cantidad: x.cantidad, pu: x.pu, importe: x.importe });
+                });
+            };
+            a.partidas.forEach(function (p) { poner(p.conceptos); p.subs.forEach(function (s) { poner(s.conceptos); }); });
+            $('formatoImpresion').innerHTML = FormatoCatalogo({
+                fecha: $('fecha').value, cotizacion: $('proyecto').value, empresa: $('cliente').value, atencion: atencionCatalogo,
+                obra: txt($('obraNombre').value) || $('proyecto').value, lugar: $('ubicacion').value,
+                iva_pct: Math.round(IVA * 100000) / 1000, subtotal: a.total, letra: importeConLetra(a.total * (1 + IVA)), conceptos: conceptos
             }, window.ACRI_MEMBRETE || {});
             impresionLista = true;
             return;
@@ -2407,6 +2425,16 @@
     document.querySelectorAll('[data-imprimir]').forEach(function (b) {
         b.addEventListener('click', function () {
             var modo = b.dataset.imprimir;
+            if (modo === 'catalogo') {
+                if (!arbolCc(calcularPU()).partidas.length) { alert('El Catálogo de Conceptos está vacío: no hay nada que imprimir.'); return; }
+                // «En atención a» no es un campo del presupuesto: se pregunta y se recuerda en este equipo por folio
+                var llave = 'acri-atencion-' + ($('folio').value || 0), previo = '';
+                try { previo = localStorage.getItem(llave) || ''; } catch (e) { /* sin almacenamiento */ }
+                var r = prompt('En atención a (persona que recibe la cotización):', previo);
+                if (r === null) return;
+                atencionCatalogo = r.trim();
+                try { localStorage.setItem(llave, atencionCatalogo); } catch (e) { /* sin almacenamiento */ }
+            }
             if (esModoPU(modo)) {
                 var r = calcularPU();
                 if (!r.cd) { alert('No hay conceptos para imprimir. Captura conceptos en la pestaña Análisis P.U. (o en Materia Prima / Mano de Obra).'); return; }

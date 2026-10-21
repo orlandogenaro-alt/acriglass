@@ -559,6 +559,10 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 /* Análisis: resumen como la hoja de Excel */
 .ccr-resumen { flex: 1; min-height: 0; }
 .ccr-resumen .extra-caja { flex: 1; max-height: none; }
+#aniVista td { padding: 0 8px; }
+#aniVista td.izq { white-space: normal; }
+#aniVista tr.ani-nuevo td:last-child { color: var(--verde, #16a34a); }
+#aniVista tr.ani-omite td { color: var(--texto-3); text-decoration: line-through; }
 .ccr-grid thead th { position: sticky; top: 0; z-index: 1; }
 .ccr-grid th.ccr-anexo { width: 80px; }
 .ccr-grid td { height: 28px; }

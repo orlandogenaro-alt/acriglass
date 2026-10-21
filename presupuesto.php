@@ -442,6 +442,11 @@ $secciones = [
                  márgenes, Gastos de Operacion y Utilidad Neta -->
             <div class="cc-panel" id="anPanel" hidden>
                 <section class="extra ccr-resumen">
+                    <div class="extra-barra">
+                        <button type="button" class="ct-btn" id="anImportar" title="Pone los importes de Materia Prima, Mano de Obra y Gastos de Operacion desde la hoja de Excel del Análisis">Importar de Excel</button>
+                        <button type="button" class="ct-btn" id="anExportar" title="Descarga el Análisis para abrirlo en Excel">Exportar a Excel</button>
+                        <span class="extra-ayuda">Clic en un renglón para ir a capturarlo</span>
+                    </div>
                     <div class="extra-caja">
                         <table class="grid mini-grid ccr-grid">
                             <thead><tr><th class="ccr-anexo">Anexos</th><th>Partidas</th><th class="c-num">Presupuesto sugerido</th><th class="c-num">Subtotal</th><th class="c-num">Total</th><th class="c-pct">%</th></tr></thead>
@@ -786,6 +791,36 @@ $secciones = [
         <span id="cciResumen"></span>
         <button type="button" class="hs-btn" data-cci-cerrar>Cancelar</button>
         <button type="button" class="hs-btn principal" id="cciAgregar" disabled>Agregar al catálogo</button>
+    </div>
+</dialog>
+
+<!-- ============ IMPORTAR EL ANÁLISIS DE EXCEL (importes de MP / MO / GO) ============ -->
+<dialog class="hs-dialogo pr-dialogo" id="anImpDialogo">
+    <div class="hs-cabecera">
+        <strong>Importar el Análisis de Excel</strong>
+        <button type="button" class="hs-cerrar" data-ani-cerrar title="Cerrar">✕</button>
+    </div>
+    <p class="pu-dlg-ayuda">En la hoja de Excel del Análisis selecciona desde el encabezado (<b>Anexos, Partidas, Presupuesto sugerido, Subtotal…</b>) hasta el Total de Gastos de Operacion
+        y pégalo aquí, o elige un archivo .csv (el que descarga Exportar a Excel). Los renglones bajo <b>Materia Prima</b>, <b>Mano de Obra</b> y <b>Gastos de Operacion</b>
+        actualizan el importe del concepto con el mismo nombre o se agregan como nuevos; los renglones automáticos (calculados) no se cambian.</p>
+    <div class="cci-entrada">
+        <textarea id="aniPegar" rows="6" placeholder="Pega aquí las celdas copiadas de Excel"></textarea>
+        <div class="cci-opciones">
+            <label>Archivo CSV (opcional): <input type="file" id="aniArchivo" accept=".csv,.txt,text/csv,text/plain"></label>
+            <label><input type="checkbox" id="aniQuitar"> Quitar los conceptos que no vengan en el archivo (de las secciones que sí vienen)</label>
+            <button type="button" class="ct-btn" id="aniLeer">Revisar</button>
+        </div>
+    </div>
+    <div class="extra-caja pr-tabla">
+        <table class="grid mini-grid">
+            <thead><tr><th>Sección</th><th>Anexo</th><th>Partida</th><th class="num">Importe actual</th><th class="num">Importe nuevo</th><th>Qué se hace</th></tr></thead>
+            <tbody id="aniVista"><tr class="vacio-fila"><td colspan="6">Pega las celdas y presiona Revisar.</td></tr></tbody>
+        </table>
+    </div>
+    <div class="hs-pie">
+        <span id="aniResumen"></span>
+        <button type="button" class="hs-btn" data-ani-cerrar>Cancelar</button>
+        <button type="button" class="hs-btn principal" id="aniAplicar" disabled>Aplicar al presupuesto</button>
     </div>
 </dialog>
 

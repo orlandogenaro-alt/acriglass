@@ -1147,6 +1147,7 @@
         }).join('');
         html += '<tr class="ccr-letra"><td colspan="6">' + escapar(r.letra) + '</td></tr>';
         $('ccrCuerpo').innerHTML = html;
+        $('anImportar').disabled = soloLectura;
     }
     // Un clic en un renglón lleva a la pestaña donde se captura
     $('ccrCuerpo').addEventListener('click', function (e) {
@@ -1154,6 +1155,138 @@
         var tab = tr && document.querySelector('.sec-tab[data-sec="' + tr.dataset.ccrIr + '"]');
         if (tab) tab.click();
     });
+
+    // ---------- Exportar / importar el Análisis con Excel ----------
+    // Exportar: CSV con las mismas columnas de la pestaña (Anexos, Partidas, Presupuesto sugerido, Subtotal, Total, %)
+    function exportarAn() {
+        var r = filasResumenCc();
+        var celda = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+        var numero = function (n) { return n == null ? '' : (Math.round(n * 100) / 100).toFixed(2); };
+        var filas = [['Anexos', 'Partidas', 'Presupuesto sugerido', 'Subtotal', 'Total', '%']];
+        r.filas.forEach(function (f) {
+            var tot = f.como === 'pct' ? (f.tot == null ? '' : numero(f.tot) + '%') : numero(f.tot);
+            filas.push([f.anexo, f.nombre + (f.extra ? ' (' + f.extra + ')' : ''), numero(f.pres), numero(f.sub), tot, f.p == null ? '' : numero(f.p) + '%']);
+        });
+        filas.push(['', r.letra]);
+        var csv = filas.map(function (f) { return f.map(celda).join(','); }).join('\r\n');
+        var enlace = document.createElement('a');
+        enlace.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+        enlace.download = ('Analisis ' + (txt($('proyecto').value) || 'presupuesto')).replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.csv';
+        enlace.click();
+        setTimeout(function () { URL.revokeObjectURL(enlace.href); }, 1000);
+    }
+    $('anExportar').addEventListener('click', exportarAn);
+
+    // Importar: la hoja del Análisis (copiada de Excel o el CSV exportado). Los títulos MATERIA PRIMA / MANO DE OBRA /
+    // GASTOS DE OPERACION marcan la sección; cada renglón con anexo y partida pone su importe en el concepto del mismo nombre.
+    // Un anexo con sub-anexos (5 → 5.1, 5.2…) se toma por sus sub-anexos; los renglones automáticos no se tocan.
+    var anFilas = [];
+    var SECCION_AN = [['mp', /^MATERIA PRIMA$/], ['mo', /^MANO DE OBRA$/], ['go', /^GASTOS DE OPERACI[OÓ]N$/]];
+
+    function leerImportacionAn() {
+        var celdas = separarCeldas($('aniPegar').value);
+        anFilas = [];
+        var col = { anexo: 0, nombre: 1, pres: 2, sub: 3 }, inicio = 0;
+        for (var i = 0; i < Math.min(celdas.length, 10); i++) {
+            var j = -1;
+            celdas[i].forEach(function (t, k) { if (j < 0 && /^(partidas?|conceptos?)$/i.test(txt(t))) j = k; });
+            if (j < 0) continue;
+            col = { anexo: -1, nombre: j, pres: j + 1, sub: j + 2 };
+            celdas[i].forEach(function (t, k) {
+                t = txt(t);
+                if (/^anexo/i.test(t)) col.anexo = k;
+                else if (/^presupuesto/i.test(t)) col.pres = k;
+                else if (/^subtotal/i.test(t)) col.sub = k;
+            });
+            inicio = i + 1;
+            break;
+        }
+        calcularTotales();   // marca los renglones automáticos
+        var sec = null, candidatos = [];
+        celdas.slice(inicio).forEach(function (f) {
+            var anexo = col.anexo < 0 ? '' : txt(f[col.anexo]), nombre = txt(f[col.nombre]), k = clave(nombre);
+            if (/^(TOTAL|MARGEN|UTILIDAD|PORCENTAJE|SUBTOTAL|IVA)\b/.test(k)) { if (/^SUBTOTAL/.test(k)) sec = null; return; }
+            for (var s = 0; s < SECCION_AN.length; s++) if (SECCION_AN[s][1].test(k)) { sec = SECCION_AN[s][0]; return; }
+            if (!sec || !nombre || (col.anexo >= 0 && !/^\d+(\.\d+)*$/.test(anexo))) return;
+            candidatos.push({ sec: sec, anexo: anexo, nombre: nombre, importe: numeroCelda(f[col.pres]) || numeroCelda(f[col.sub]) });
+        });
+        var padreCalc = {};
+        candidatos.forEach(function (x) {
+            var padre = x.anexo.indexOf('.') > 0 ? x.anexo.split('.')[0] : '';
+            var hijos = !padre && x.anexo && candidatos.some(function (y) { return y.sec === x.sec && y.anexo.indexOf(x.anexo + '.') === 0 && y.importe; });
+            var r = filaDe(x.sec, x.nombre);
+            x.actual = r ? num(r.presupuesto) : null;
+            if (padre && padreCalc[x.sec + padre]) x.accion = 'Es del análisis automático';
+            else if (r && r.calc) { x.accion = 'Automático, no se cambia'; padreCalc[x.sec + x.anexo] = true; }
+            else if (hijos) x.accion = 'Se toman sus sub-anexos';
+            else if (!(x.importe > 0)) x.accion = 'Sin importe';
+            else { x.aplica = true; x.accion = r ? (Math.abs(x.actual - x.importe) < 0.005 ? 'Sin cambio' : 'Actualiza el importe') : 'Concepto nuevo'; }
+            anFilas.push(x);
+        });
+        pintarImportacionAn(anFilas.length ? '' : 'No encontré renglones bajo Materia Prima, Mano de Obra o Gastos de Operacion.');
+    }
+
+    function pintarImportacionAn(error) {
+        var html = anFilas.map(function (x) {
+            return '<tr class="' + (!x.aplica ? 'ani-omite' : x.actual == null ? 'ani-nuevo' : '') + '"><td>' + escapar(SIGLAS[x.sec]) + '</td><td>' + escapar(x.anexo) + '</td>' +
+                '<td class="izq">' + escapar(x.nombre) + '</td><td class="ro">' + (x.actual == null ? '' : fmt(x.actual)) + '</td>' +
+                '<td class="ro">' + (x.importe ? fmt(x.importe) : '') + '</td><td>' + escapar(x.accion) + '</td></tr>';
+        }).join('');
+        var validos = anFilas.filter(function (x) { return x.aplica; }).length;
+        $('aniVista').innerHTML = html || '<tr class="vacio-fila"><td colspan="6">' + escapar(error || 'Pega las celdas y presiona Revisar.') + '</td></tr>';
+        $('aniResumen').textContent = !anFilas.length ? '' : validos + ' de ' + anFilas.length + ' renglones se aplicarán' +
+            (validos < anFilas.length ? ' (los tachados se omiten)' : '');
+        $('aniAplicar').disabled = !validos;
+    }
+
+    function aplicarImportacionAn() {
+        if (soloLectura) { avisoSoloLectura(); return; }
+        calcularTotales();
+        var vistos = { mp: {}, mo: {}, go: {} }, n = 0;
+        anFilas.forEach(function (x) {
+            if (!x.aplica) return;
+            var r = filaDe(x.sec, x.nombre);
+            if (r && r.calc) return;
+            if (!r) {
+                r = { id: ++consecutivo, concepto: x.nombre, presupuesto: 0, importar: false, folio: '' };
+                datos[x.sec].push(r);
+            }
+            r.presupuesto = redondear(x.importe);
+            vistos[x.sec][clave(x.nombre)] = true;
+            n++;
+        });
+        // Reemplazar: en las secciones que vienen en el archivo se quitan los conceptos capturados que no vienen
+        if ($('aniQuitar').checked) {
+            ['mp', 'mo', 'go'].forEach(function (s) {
+                if (!Object.keys(vistos[s]).length) return;
+                datos[s] = datos[s].filter(function (r) { return r.calc || vistos[s][clave(r.concepto)]; });
+            });
+        }
+        $('anImpDialogo').close();
+        marcarCambio();
+        render();
+        alert('Se aplicaron ' + n + ' importes a Materia Prima, Mano de Obra y Gastos de Operacion.');
+    }
+
+    $('anImportar').addEventListener('click', function () {
+        if (soloLectura) { avisoSoloLectura(); return; }
+        $('aniPegar').value = '';
+        $('aniArchivo').value = '';
+        anFilas = [];
+        pintarImportacionAn('');
+        $('anImpDialogo').showModal();
+        $('aniPegar').focus();
+    });
+    $('aniArchivo').addEventListener('change', function () {
+        var f = this.files[0];
+        if (!f) return;
+        var lector = new FileReader();
+        lector.onload = function () { $('aniPegar').value = lector.result; leerImportacionAn(); };
+        lector.readAsText(f, 'UTF-8');
+    });
+    $('aniLeer').addEventListener('click', leerImportacionAn);
+    $('aniAplicar').addEventListener('click', aplicarImportacionAn);
+    document.querySelectorAll('[data-ani-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('anImpDialogo').close(); }); });
 
     function renderCc() {
         construirSugerencias();

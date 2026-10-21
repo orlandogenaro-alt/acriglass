@@ -256,6 +256,7 @@ body.solo-lectura #ctAgregar, body.solo-lectura #ctImportar,
 body.solo-lectura .ct-orden button, body.solo-lectura .ct-acciones .b-sub, body.solo-lectura .ct-acciones .b-edit,
 body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { display: none; }
 .menu button:hover { background: var(--azul-suave); color: var(--azul-texto); }
+.menu button:disabled { opacity: .45; cursor: default; background: none; color: var(--texto); }
 
 /* Estatus como insignia */
 .estatus {

@@ -131,12 +131,66 @@
         if (campo === 'presupuesto' || campo === 'concepto') refrescarCalculados();
     });
 
-    tbody.addEventListener('click', function (e) {
-        if (!e.target.classList.contains('borrar')) return;
+    function eliminarConcepto(i) {
         if (!confirm('¿Deseas eliminar del presupuesto el concepto seleccionado ?')) return;   // Form46
-        datos[seccion].splice(e.target.closest('tr').dataset.i, 1);
+        datos[seccion].splice(i, 1);
         marcarCambio();
         render();
+    }
+
+    // Sube (d = -1) o baja (d = 1) el concepto; los demás se recorren. Se guarda en ese orden.
+    function moverConcepto(i, d) {
+        var filas = datos[seccion], j = i + d;
+        if (j < 0 || j >= filas.length) return;
+        var r = filas.splice(i, 1)[0];
+        filas.splice(j, 0, r);
+        marcarCambio();
+        render();
+        var tr = tbody.querySelector('tr[data-i="' + j + '"]');
+        if (tr) tr.classList.add('actual');
+    }
+
+    tbody.addEventListener('click', function (e) {
+        if (!e.target.classList.contains('borrar')) return;
+        eliminarConcepto(+e.target.closest('tr').dataset.i);
+    });
+
+    // Materia Prima / Mano de Obra / Gastos de Operacion: clic derecho en un renglón → Eliminar, Subir o Bajar posición
+    var menuFila = document.createElement('div');
+    menuFila.className = 'menu';
+    document.body.appendChild(menuFila);
+    function cerrarMenuFila() { menuFila.classList.remove('abierto'); }
+    document.addEventListener('click', cerrarMenuFila);
+    document.addEventListener('scroll', cerrarMenuFila, true);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') cerrarMenuFila(); });
+    tbody.addEventListener('contextmenu', function (e) {
+        if (!datos[seccion]) return;
+        var tr = e.target.closest('tr[data-i]');
+        if (!tr) return;
+        e.preventDefault();
+        var i = +tr.dataset.i, n = datos[seccion].length;
+        tbody.querySelectorAll('tr.actual').forEach(function (t) { t.classList.remove('actual'); });
+        tr.classList.add('actual');
+        menuFila.innerHTML = '';
+        [
+            ['▲ Subir posición', i > 0, function () { moverConcepto(i, -1); }],
+            ['▼ Bajar posición', i < n - 1, function () { moverConcepto(i, 1); }],
+            ['🗑 Eliminar', true, function () { eliminarConcepto(i); }]
+        ].forEach(function (o) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.textContent = o[0];
+            b.disabled = !o[1];
+            b.addEventListener('click', function () {
+                cerrarMenuFila();
+                if (soloLectura) { avisoSoloLectura(); return; }
+                o[2]();
+            });
+            menuFila.appendChild(b);
+        });
+        menuFila.classList.add('abierto');
+        menuFila.style.left = Math.min(e.clientX, window.innerWidth - menuFila.offsetWidth - 8) + 'px';
+        menuFila.style.top = Math.min(e.clientY, window.innerHeight - menuFila.offsetHeight - 8) + 'px';
     });
 
     tbody.addEventListener('focusin', function (e) {

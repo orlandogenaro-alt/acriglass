@@ -220,6 +220,7 @@ $secciones = [
     'go' => 'Gastos de Operacion',
     'cc' => 'Catálogo de Conceptos',
     'pu' => 'Análisis P.U.',
+    'an' => 'Análisis',
 ];
 ?>
 <!DOCTYPE html>
@@ -408,20 +409,7 @@ $secciones = [
             <!-- Catálogo de Conceptos (como Neodata): los conceptos del Análisis P.U. por partida y subpartida,
                  con clave, unidad, cantidad, P.U., importe y % de cada partida; el total con letra -->
             <div class="cc-panel" id="ccPanel" hidden>
-                <div class="cc-vistas" role="tablist">
-                    <button type="button" class="ct-btn" data-cc-vista="resumen" title="Hoja de resumen como el Excel: Materia Prima, Mano de Obra, Gastos de Operacion y utilidades">Resumen</button>
-                    <button type="button" class="ct-btn" data-cc-vista="partidas" title="Partidas, subpartidas y conceptos con su P.U. (como Neodata)">Por partidas</button>
-                </div>
-                <!-- Resumen como la hoja de Excel: se llena solo con lo capturado en MP / MO / GO -->
-                <section class="extra ccr-resumen" id="ccrResumen">
-                    <div class="extra-caja">
-                        <table class="grid mini-grid ccr-grid">
-                            <thead><tr><th class="ccr-anexo">Anexos</th><th>Partidas</th><th class="c-num">Presupuesto sugerido</th><th class="c-num">Subtotal</th><th class="c-num">Total</th><th class="c-pct">%</th></tr></thead>
-                            <tbody id="ccrCuerpo"></tbody>
-                        </table>
-                    </div>
-                </section>
-                <section class="extra cc-catalogo" id="ccPartidas">
+                <section class="extra cc-catalogo">
                     <div class="extra-barra">
                         <button type="button" class="ct-btn" id="ccPartida" title="Nueva partida (agrupa conceptos, ej. «Cancelería»)">+ Partida</button>
                         <button type="button" class="ct-btn" id="ccSubpartida" title="Nueva subpartida dentro de la partida seleccionada">+ Subpartida</button>
@@ -442,6 +430,19 @@ $secciones = [
                             <thead><tr><th class="c-id cc-clave">Clave</th><th>Descripción</th><th class="cc-unidad">Unidad</th><th class="c-num">Cantidad</th><th class="c-num">P.U.</th><th class="c-num">Importe</th><th class="c-pct">%</th><th class="cc-acc"></th></tr></thead>
                             <tbody id="ccCuerpo"></tbody>
                             <tfoot id="ccPie"></tfoot>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Análisis (como la hoja de Excel): se llena solo con lo capturado en MP / MO / GO, con Costo Primo,
+                 márgenes, Gastos de Operacion y Utilidad Neta -->
+            <div class="cc-panel" id="anPanel" hidden>
+                <section class="extra ccr-resumen">
+                    <div class="extra-caja">
+                        <table class="grid mini-grid ccr-grid">
+                            <thead><tr><th class="ccr-anexo">Anexos</th><th>Partidas</th><th class="c-num">Presupuesto sugerido</th><th class="c-num">Subtotal</th><th class="c-num">Total</th><th class="c-pct">%</th></tr></thead>
+                            <tbody id="ccrCuerpo"></tbody>
                         </table>
                     </div>
                 </section>

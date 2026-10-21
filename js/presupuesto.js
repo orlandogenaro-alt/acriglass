@@ -2,11 +2,11 @@
     // Tasa de IVA del presupuesto (select ivaTasa; las tasas salen de Administrador › Parámetros de presupuesto)
     var PARAMETROS = window.ACRI_PARAMETROS_PRES || { iva_defecto: 16, iva_tasas: [], indirectos: [], financiamiento_pct: 0 };
     var IVA = (PARAMETROS.iva_defecto != null ? Number(PARAMETROS.iva_defecto) : 16) / 100;
-    var NOMBRES = { mp: 'Materia Prima', mo: 'Mano de Obra', go: 'Gastos de Operacion', cc: 'Catálogo de Conceptos', pu: 'Análisis de Precios Unitarios' };
+    var NOMBRES = { mp: 'Materia Prima', mo: 'Mano de Obra', go: 'Gastos de Operacion', cc: 'Catálogo de Conceptos', pu: 'Análisis de Precios Unitarios', an: 'Análisis' };
     var AYUDAS = {
         grid: 'Ctrl + I para agregar un nuevo Concepto',
         cc: 'Como Neodata: partidas, subpartidas y conceptos con su P.U. (el análisis de cada uno está en Análisis P.U.)',
-        ccr: 'Resumen como la hoja de Excel: se llena solo con Materia Prima, Mano de Obra y Gastos de Operacion (clic en un renglón para ir a capturarlo)',
+        an: 'Como la hoja de Excel: se llena solo con Materia Prima, Mano de Obra y Gastos de Operacion (clic en un renglón para ir a capturarlo)',
         pu: 'Como Neodata, con lo capturado en el presupuesto: no cambia el Subtotal ni el Total'
     };
 
@@ -39,6 +39,7 @@
         renderExtras();
         if (seccion === 'cc') { renderCc(); return; }
         if (seccion === 'pu') { renderPu(); return; }
+        if (seccion === 'an') { renderResumenCc(); return; }
         var filas = datos[seccion];
         if (!filas.length) {
             tbody.innerHTML = '<tr class="vacio-fila"><td colspan="10">Sin conceptos. Presiona Ctrl + I para agregar uno.</td></tr>';
@@ -90,6 +91,7 @@
         var subtotal = calcularTotales();
         if (seccion === 'cc') { pintarCc(); return; }
         if (seccion === 'pu') { renderPu(); return; }
+        if (seccion === 'an') { renderResumenCc(); return; }
         var filas = datos[seccion];
         // Los cálculos agregaron un renglón fijo (mano de obra, comisiones, seguro): se vuelve a pintar
         if (tbody.querySelectorAll('tr[data-i]').length !== filas.length) { render(); return; }
@@ -113,7 +115,8 @@
 
     function agregarConcepto() {
         if (seccion === 'pu') { agregarConceptoPU(); return; }
-        if (seccion === 'cc') { if (ccVista === 'partidas') agregarConceptoCc(); return; }
+        if (seccion === 'cc') { agregarConceptoCc(); return; }
+        if (seccion === 'an') return;
         if (soloLectura) { avisoSoloLectura(); return; }
         datos[seccion].push({ id: ++consecutivo, concepto: '', presupuesto: 0, importar: false, folio: '' });
         marcarCambio();
@@ -214,12 +217,13 @@
             document.querySelectorAll('.sec-tab').forEach(function (x) { x.classList.remove('activo'); });
             t.classList.add('activo');
             seccion = t.dataset.sec;
-            var cc = seccion === 'cc', pu = seccion === 'pu';
+            var cc = seccion === 'cc', pu = seccion === 'pu', an = seccion === 'an';
             $('secNombre').textContent = NOMBRES[seccion] + ':';
-            $('secAyuda').textContent = AYUDAS[cc ? 'cc' : pu ? 'pu' : 'grid'];
-            document.querySelector('.grid-caja').hidden = cc || pu;
+            $('secAyuda').textContent = AYUDAS[cc ? 'cc' : pu ? 'pu' : an ? 'an' : 'grid'];
+            document.querySelector('.grid-caja').hidden = cc || pu || an;
             $('ccPanel').hidden = !cc;
             $('puPanel').hidden = !pu;
+            $('anPanel').hidden = !an;
             render();
         });
     });
@@ -977,6 +981,7 @@
         editandoPU = null;
         if (seccion === 'pu') renderPu();
         if (seccion === 'cc') renderCc();
+        if (seccion === 'an') renderResumenCc();
     });
 
     Object.keys(CAMPOS_PU).forEach(function (k) {
@@ -1073,25 +1078,11 @@
         return { partidas: partidas, total: total };
     }
 
-    // ---------- Resumen del catálogo (como la hoja de Excel) ----------
+    // ---------- Análisis (resumen como la hoja de Excel) ----------
     // Materia Prima → Total MP; Mano de Obra → Total MO → Costo Primo; Margen de utilidad bruta (Subtotal − Costo Primo);
     // Gastos de Operacion → Utilidad Neta (Margen bruto − GO); Subtotal, IVA, Total y Total en dólares.
     // Los % son sobre el Subtotal, igual que en las pestañas. Los renglones del Análisis P.U. se abren por concepto.
-    var ccVista = 'resumen';
-    try { if (localStorage.getItem('acri.presupuesto.ccVista') === 'partidas') ccVista = 'partidas'; } catch (e) { /* sin almacenamiento */ }
     var TC_USD = Number(PARAMETROS.tipo_cambio_usd) || 0;
-
-    function ponerVistaCc(v) {
-        ccVista = v === 'partidas' ? 'partidas' : 'resumen';
-        try { localStorage.setItem('acri.presupuesto.ccVista', ccVista); } catch (e) { /* sin almacenamiento */ }
-        document.querySelectorAll('[data-cc-vista]').forEach(function (b) { b.classList.toggle('activo', b.dataset.ccVista === ccVista); });
-        $('ccrResumen').hidden = ccVista !== 'resumen';
-        $('ccPartidas').hidden = ccVista === 'resumen';
-        if (seccion === 'cc') $('secAyuda').textContent = AYUDAS[ccVista === 'resumen' ? 'ccr' : 'cc'];
-    }
-    document.querySelectorAll('[data-cc-vista]').forEach(function (b) {
-        b.addEventListener('click', function () { ponerVistaCc(b.dataset.ccVista); renderCc(); });
-    });
 
     // Renglones del resumen: los usa la pestaña y el formato impreso Análisis de Cancelería (js/formato-analisis.js).
     // Cada renglón: { clase, anexo, nombre, extra, pres, sub, tot, p, ir, como } con importes en número (null = vacío);
@@ -1165,8 +1156,6 @@
     });
 
     function renderCc() {
-        ponerVistaCc(ccVista);
-        if (ccVista === 'resumen') { renderResumenCc(); return; }
         construirSugerencias();
         var r = calcularPU(), a = arbolCc(r), dis = soloLectura ? ' disabled' : '', html = '';
         function filaGrupo(g, sub) {
@@ -1230,7 +1219,6 @@
 
     // Cifras sin volver a pintar los campos (para no perder el cursor mientras se escribe)
     function pintarCc(r, a) {
-        if (ccVista === 'resumen') { renderResumenCc(); return; }
         r = r || calcularPU();
         a = a || arbolCc(r);
         var porPartida = {}, porUid = {};

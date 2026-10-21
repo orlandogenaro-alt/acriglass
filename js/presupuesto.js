@@ -1555,7 +1555,7 @@
         CONCEPTOS_PU.forEach(function (c) { porCodigo[clave(c.codigo)] = c; });
         var usarCat = $('cciCatalogo').checked, venta = $('cciVenta').checked;
         // Lo que ya está en el catálogo (analizados y capturados por importe en MP / MO), para no sumarlo dos veces
-        var yaPorClave = {}, yaPorDesc = {}, enArchivo = {};
+        var yaPorClave = {}, yaPorDesc = {}, enArchivo = {}, contTexto = true;
         catalogoPU(calcularPU()).forEach(function (x) {
             if (clave(x.clave)) yaPorClave[clave(x.clave)] = yaPorClave[clave(x.clave)] || x;
             if (clave(x.descripcion)) yaPorDesc[clave(x.descripcion)] = yaPorDesc[clave(x.descripcion)] || x;
@@ -1565,7 +1565,21 @@
             var desc = v('descripcion'), codigo = txt(v('clave')), espec = v('especificacion');
             var cantidad = numeroCelda(v('cantidad')), pu = numeroCelda(v('pu'));
             if (!pu && cantidad > 0 && numeroCelda(v('importe'))) pu = numeroCelda(v('importe')) / cantidad;
-            if (!codigo && !pu && !cantidad) return;   // títulos, totales o renglones vacíos
+            // Encabezado repetido en cada hoja del PDF (Código, Concepto, Unidad…)
+            if (/^c[oó]digo$/i.test(codigo) || (!codigo && /^concepto$/i.test(txt(desc)))) return;
+            if (!codigo && !pu && !cantidad) {
+                // Renglón sin código ni importes: es el texto que sigue del concepto de arriba (en el PDF se pasa a la hoja
+                // siguiente o va en otro renglón al convertirlo a Excel); los títulos, totales y pies de página se ignoran
+                var resto = String(desc || espec).trim(), anterior = cciFilas[cciFilas.length - 1];
+                if (/^(total|iva\b|\(\*|subtotal)/i.test(resto)) { contTexto = false; return; }
+                if (!resto || !anterior || !contTexto || /^(presupuesto de obra|gerente general|p[aá]gina \d|fecha:|cotizaci[oó]n:|empresa:|en atenci[oó]n|obra:|lugar:)/i.test(resto)) return;
+                var antes = anterior.especificacion || '', ultimaLinea = (antes || anterior.descripcion).split('\n').pop();
+                // Como en el PDF: los renglones que terminan en punto o dos puntos, o empiezan con viñeta, van en línea aparte
+                var corte = /[.:]\s*$/.test(ultimaLinea) || /^[*•\-]/.test(resto) ? '\n' : ' ';
+                anterior.especificacion = antes ? antes.replace(/\s+$/, '') + corte + resto : resto;
+                return;
+            }
+            contTexto = true;
             // Como en el PDF: la primera línea es el concepto y lo demás su especificación
             if (!espec && desc.indexOf('\n') >= 0) {
                 espec = desc.slice(desc.indexOf('\n') + 1);
@@ -1604,6 +1618,13 @@
             if (x.actualiza) x.aplica = true;
             if (llave) enArchivo[llave] = true;
             cciFilas.push(x);
+        });
+        // Un concepto que ya está pero con la especificación incompleta (importado antes sin el texto que seguía en otra hoja)
+        cciFilas.forEach(function (x) {
+            if (!x.existe || x.existe.otro || x.aplica || !x.especificacion) return;
+            if (txt(x.especificacion) === txt(x.existe.c.especificacion)) return;
+            x.actualiza = x.aplica = true;
+            x.accion = 'Completa la especificación';
         });
         pintarImportacion(cciFilas.length ? '' : 'No hay renglones con concepto para agregar.');
     }

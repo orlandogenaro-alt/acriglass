@@ -777,6 +777,7 @@ $secciones = [
         <textarea id="cciPegar" rows="6" placeholder="Pega aquí las celdas copiadas de Excel"></textarea>
         <div class="cci-opciones">
             <label>Archivo CSV (opcional): <input type="file" id="cciArchivo" accept=".csv,.txt,text/csv,text/plain"></label>
+            <label><input type="checkbox" id="cciVenta"> Precio fijo para el cliente: el P. Unitario del archivo no suma al costo, porque el costo ya viene del Análisis (Materia Prima, Mano de Obra y Gastos de Operacion)</label>
             <label><input type="checkbox" id="cciCatalogo" checked> Usar el análisis del catálogo cuando el código exista</label>
             <button type="button" class="ct-btn" id="cciLeer">Revisar</button>
         </div>
@@ -808,6 +809,8 @@ $secciones = [
         <div class="cci-opciones">
             <label>Archivo CSV (opcional): <input type="file" id="aniArchivo" accept=".csv,.txt,text/csv,text/plain"></label>
             <label><input type="checkbox" id="aniQuitar"> Quitar los conceptos que no vengan en el archivo (de las secciones que sí vienen)</label>
+            <label id="aniSubtotalCaja" hidden><input type="checkbox" id="aniSubtotal" checked> <span id="aniSubtotalTxt"></span></label>
+            <label id="aniVentaCaja" hidden><input type="checkbox" id="aniVenta" checked> Los conceptos del Catálogo de Conceptos quedan con su P. Unitario como precio fijo para el cliente (ya no suman al costo)</label>
             <button type="button" class="ct-btn" id="aniLeer">Revisar</button>
         </div>
     </div>

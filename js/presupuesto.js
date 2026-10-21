@@ -444,8 +444,12 @@
         c = c || {};
         return { uid: ++uidPU, clave: String(c.clave || '') || siguienteClave(), partida: String(c.partida || ''),
                  descripcion: String(c.descripcion || ''), unidad: String(c.unidad || ''), cantidad: num(c.cantidad),
-                 especificacion: String(c.especificacion || ''), insumos: (c.insumos || []).map(limpiarInsumo) };
+                 especificacion: String(c.especificacion || ''), venta: Math.max(0, num(c.venta)), insumos: (c.insumos || []).map(limpiarInsumo) };
     }
+    // Precio fijo para el cliente (importado del Catálogo junto con el Análisis): su P.U. es el del archivo y no suma al costo,
+    // porque el costo ya está en Materia Prima, Mano de Obra y Gastos de Operacion
+    function esVenta(c) { return c.venta > 0; }
+    function hayVenta() { return analisis.conceptos.some(esVenta); }
 
     function ponerAnalisisPU(a) {
         a = a || {};
@@ -463,7 +467,8 @@
             fsr: analisis.fsr, hm: analisis.hm, fin: analisis.fin, util: null,
             conceptos: analisis.conceptos.map(function (c) {
                 return { clave: c.clave, partida: c.partida, descripcion: c.descripcion, unidad: c.unidad, cantidad: c.cantidad,
-                         especificacion: c.especificacion || '', insumos: c.insumos.map(function (i) { return limpiarInsumo(i); }) };
+                         especificacion: c.especificacion || '', venta: esVenta(c) ? c.venta : 0,
+                         insumos: esVenta(c) ? [] : c.insumos.map(function (i) { return limpiarInsumo(i); }) };
             })
         };
     }
@@ -473,7 +478,7 @@
     // Costo de UNA unidad del concepto
     function costoUnitario(c) {
         var r = { mat: 0, mo: 0, eq: 0 };
-        c.insumos.forEach(function (i) { r[i.tipo.toLowerCase()] += cantidadInsumo(i) * i.costo; });
+        if (!esVenta(c)) c.insumos.forEach(function (i) { r[i.tipo.toLowerCase()] += cantidadInsumo(i) * i.costo; });
         r.moReal = r.mo * factorFsr();
         r.hm = r.moReal * analisis.hm / 100;
         r.cd = r.mat + r.eq + r.moReal + r.hm;
@@ -492,6 +497,7 @@
         if (!c.descripcion.trim()) return 'Falta el nombre';
         if (!c.unidad.trim()) return 'Falta la unidad';
         if (c.cantidad <= 0) return 'Falta la cantidad';
+        if (esVenta(c)) return '';
         if (!c.insumos.length) return 'Falta el análisis';
         if (c.insumos.some(function (i) { return !i.descripcion.trim() || cantidadInsumo(i) <= 0 || i.costo <= 0; })) return 'Insumo incompleto';
         return '';
@@ -617,9 +623,9 @@
     // Catálogo para pintar e imprimir: conceptos analizados y los capturados por importe, con su P.U.
     function catalogoPU(r) {
         var lista = analisis.conceptos.map(function (c) {
-            var u = costoUnitario(c);
+            var u = costoUnitario(c), pu = esVenta(c) ? c.venta : u.cd * r.factor;
             return { c: c, clave: c.clave, partida: txt(c.partida) || 'Sin partida', descripcion: c.descripcion, unidad: c.unidad,
-                     cantidad: c.cantidad, cdU: u.cd, pu: u.cd * r.factor, importe: u.cd * c.cantidad * r.factor };
+                     cantidad: c.cantidad, cdU: u.cd, pu: pu, importe: pu * c.cantidad, venta: esVenta(c) };
         });
         var tareas = {};
         if (r.otros.length) ct.exportar().tareas.forEach(function (x) { if (x.origen) tareas[x.origen] = x; });
@@ -630,6 +636,12 @@
                          pu: o.cd * r.factor / cantidad, importe: o.cd * r.factor, articulos: o.fila.articulos || [] });
         });
         return lista;
+    }
+    // Lo que ve el cliente (Catálogo de Conceptos e impresos): con precios fijos importados, lo capturado por importe
+    // en MP / MO ya está dentro de esos precios y no se lista aparte
+    function catalogoCliente(r) {
+        var venta = hayVenta();
+        return catalogoPU(r).filter(function (x) { return !(venta && x.otro); });
     }
 
     function renderPu() {
@@ -659,7 +671,8 @@
                 '<td><input type="number" class="num" data-pu="cantidad" step="0.01" min="0" value="' + (c.cantidad || '') + '"' + dis + '></td>' +
                 '<td class="ro" data-pu-calc="pu">' + fmt(x.pu) + '</td><td class="ro" data-pu-calc="importe">' + fmt(x.importe) + '</td>' +
                 '<td class="ro izq pu-rev' + (falta ? ' falta' : ' ok') + '" data-pu-calc="rev">' + (falta ? '⚠ ' + falta : '✓ Listo') + '</td>' +
-                '<td class="pu-acciones"><button type="button" class="ct-btn" data-pu-accion="analizar" title="Capturar lo que lleva una unidad">Analizar</button>' +
+                '<td class="pu-acciones">' + (esVenta(c) ? '<span class="cc-nota" title="Precio importado del Catálogo: el costo viene de Materia Prima, Mano de Obra y Gastos de Operacion">Precio fijo</span>'
+                    : '<button type="button" class="ct-btn" data-pu-accion="analizar" title="Capturar lo que lleva una unidad">Analizar</button>') +
                 '<button type="button" class="pu-mini" data-pu-accion="duplicar" title="Duplicar el concepto con su análisis"' + dis + '>⧉</button>' +
                 '<button type="button" class="pu-mini borrar" data-pu-accion="quitar" title="Quitar el concepto"' + dis + '>✕</button></td></tr>';
         });
@@ -819,7 +832,7 @@
         if (acc === 'analizar') { abrirAnalisis(c); return; }
         if (soloLectura) { avisoSoloLectura(); return; }
         if (acc === 'duplicar') {
-            var copia = nuevoConcepto({ partida: c.partida, descripcion: c.descripcion + ' (copia)', unidad: c.unidad, cantidad: c.cantidad, insumos: c.insumos });
+            var copia = nuevoConcepto({ partida: c.partida, descripcion: c.descripcion + ' (copia)', unidad: c.unidad, cantidad: c.cantidad, venta: c.venta, insumos: c.insumos });
             analisis.conceptos.splice(analisis.conceptos.indexOf(c) + 1, 0, copia);
         } else if (acc === 'quitar') {
             if (!confirm('¿Quitar el concepto «' + (c.descripcion || c.clave) + '» con su análisis?')) return;
@@ -1004,7 +1017,7 @@
     // Partidas y subpartidas: la partida se escribe «Partida / Subpartida» (dos niveles); cada una lleva número (1, 1.1)
     function documentoPU(detalle) {
         var r = calcularPU(), partidas = [], porNombre = {};
-        catalogoPU(r).forEach(function (x) {
+        catalogoCliente(r).forEach(function (x) {
             var partes = String(x.partida || '').split('/').map(function (s) { return s.trim(); }).filter(Boolean);
             var nomP = partes[0] || 'Sin partida', nomS = partes.slice(1).join(' / ');
             var p = porNombre[nomP.toUpperCase()];
@@ -1054,7 +1067,7 @@
 
     // Partidas con sus conceptos directos y sus subpartidas, en el orden en que aparecen
     function arbolCc(r) {
-        var lista = catalogoPU(r), partidas = [], porNombre = {}, total = 0;
+        var lista = catalogoCliente(r), partidas = [], porNombre = {}, total = 0;
         lista.forEach(function (x) {
             var pp = partesPartida(x.c ? x.c.partida : x.partida), kp = clave(pp.p);
             var p = porNombre[kp];
@@ -1180,23 +1193,25 @@
     // Importar: la hoja del Análisis (copiada de Excel o el CSV exportado). Los títulos MATERIA PRIMA / MANO DE OBRA /
     // GASTOS DE OPERACION marcan la sección; cada renglón con anexo y partida pone su importe en el concepto del mismo nombre.
     // Un anexo con sub-anexos (5 → 5.1, 5.2…) se toma por sus sub-anexos; los renglones automáticos no se tocan.
-    var anFilas = [];
+    var anFilas = [], anSubtotal = 0;
     var SECCION_AN = [['mp', /^MATERIA PRIMA$/], ['mo', /^MANO DE OBRA$/], ['go', /^GASTOS DE OPERACI[OÓ]N$/]];
 
     function leerImportacionAn() {
         var celdas = separarCeldas($('aniPegar').value);
         anFilas = [];
-        var col = { anexo: 0, nombre: 1, pres: 2, sub: 3 }, inicio = 0;
+        anSubtotal = 0;
+        var col = { anexo: 0, nombre: 1, pres: 2, sub: 3, tot: 4 }, inicio = 0;
         for (var i = 0; i < Math.min(celdas.length, 10); i++) {
             var j = -1;
             celdas[i].forEach(function (t, k) { if (j < 0 && /^(partidas?|conceptos?)$/i.test(txt(t))) j = k; });
             if (j < 0) continue;
-            col = { anexo: -1, nombre: j, pres: j + 1, sub: j + 2 };
+            col = { anexo: -1, nombre: j, pres: j + 1, sub: j + 2, tot: j + 3 };
             celdas[i].forEach(function (t, k) {
                 t = txt(t);
                 if (/^anexo/i.test(t)) col.anexo = k;
                 else if (/^presupuesto/i.test(t)) col.pres = k;
                 else if (/^subtotal/i.test(t)) col.sub = k;
+                else if (/^total$/i.test(t)) col.tot = k;
             });
             inicio = i + 1;
             break;
@@ -1205,15 +1220,23 @@
         var sec = null, candidatos = [];
         celdas.slice(inicio).forEach(function (f) {
             var anexo = col.anexo < 0 ? '' : txt(f[col.anexo]), nombre = txt(f[col.nombre]), k = clave(nombre);
-            if (/^(TOTAL|MARGEN|UTILIDAD|PORCENTAJE|SUBTOTAL|IVA)\b/.test(k)) { if (/^SUBTOTAL/.test(k)) sec = null; return; }
+            if (/^(TOTAL|MARGEN|UTILIDAD|PORCENTAJE|SUBTOTAL|IVA)\b/.test(k)) {
+                // El Subtotal del archivo (precio de venta sin IVA) ajusta la Utilidad Neta para que el presupuesto quede igual
+                if (/^SUBTOTAL$/.test(k)) { sec = null; anSubtotal = anSubtotal || numeroCelda(f[col.tot]) || numeroCelda(f[col.sub]); }
+                return;
+            }
             for (var s = 0; s < SECCION_AN.length; s++) if (SECCION_AN[s][1].test(k)) { sec = SECCION_AN[s][0]; return; }
-            if (!sec || !nombre || (col.anexo >= 0 && !/^\d+(\.\d+)*$/.test(anexo))) return;
-            candidatos.push({ sec: sec, anexo: anexo, nombre: nombre, importe: numeroCelda(f[col.pres]) || numeroCelda(f[col.sub]) });
+            // Anexo como número (5, 5.1) o como porcentaje (0.25%, 3%), igual que en la hoja de Excel
+            if (!sec || !nombre || (col.anexo >= 0 && !/^\d+(\.\d+)*%?$/.test(anexo))) return;
+            var pres = numeroCelda(f[col.pres]);
+            candidatos.push({ sec: sec, anexo: anexo, nombre: nombre, pres: pres, importe: pres || numeroCelda(f[col.sub]) });
         });
         var padreCalc = {};
         candidatos.forEach(function (x) {
-            var padre = x.anexo.indexOf('.') > 0 ? x.anexo.split('.')[0] : '';
-            var hijos = !padre && x.anexo && candidatos.some(function (y) { return y.sec === x.sec && y.anexo.indexOf(x.anexo + '.') === 0 && y.importe; });
+            var padre = /^\d+\.\d+$/.test(x.anexo) ? x.anexo.split('.')[0] : '';
+            // Grupo: sin importe propio en Presupuesto sugerido y con sub-anexos (5 → 5.1, 5.2); el 6 con su 6.1 suman los dos
+            var hijos = /^\d+$/.test(x.anexo) && !x.pres &&
+                candidatos.some(function (y) { return y.sec === x.sec && y.anexo.indexOf(x.anexo + '.') === 0 && y.importe; });
             var r = filaDe(x.sec, x.nombre);
             x.actual = r ? num(r.presupuesto) : null;
             if (padre && padreCalc[x.sec + padre]) x.accion = 'Es del análisis automático';
@@ -1237,12 +1260,23 @@
         $('aniVista').innerHTML = html || '<tr class="vacio-fila"><td colspan="6">' + escapar(error || 'Pega las celdas y presiona Revisar.') + '</td></tr>';
         $('aniResumen').textContent = !anFilas.length ? '' : validos + ' de ' + anFilas.length + ' renglones se aplicarán' +
             (validos < anFilas.length ? ' (los tachados se omiten)' : '');
+        $('aniSubtotalCaja').hidden = !(anSubtotal > 0);
+        $('aniSubtotalTxt').textContent = 'Usar el Subtotal del archivo (' + fmt(anSubtotal) + '): ajusta la Utilidad Neta para que el presupuesto quede igual';
+        $('aniVentaCaja').hidden = !analisis.conceptos.some(function (c) { return !esVenta(c); });
         $('aniAplicar').disabled = !validos;
     }
 
     function aplicarImportacionAn() {
         if (soloLectura) { avisoSoloLectura(); return; }
         calcularTotales();
+        // Los conceptos del Catálogo ya están dentro del Análisis: quedan con su P.U. actual como precio fijo y dejan de sumar al costo
+        if (!$('aniVentaCaja').hidden && $('aniVenta').checked) {
+            catalogoPU(calcularPU()).forEach(function (x) {
+                if (x.otro || esVenta(x.c)) return;
+                x.c.venta = Math.max(0.01, redondear(x.pu));
+                x.c.insumos = [];
+            });
+        }
         var vistos = { mp: {}, mo: {}, go: {} }, n = 0;
         anFilas.forEach(function (x) {
             if (!x.aplica) return;
@@ -1262,6 +1296,13 @@
                 if (!Object.keys(vistos[s]).length) return;
                 datos[s] = datos[s].filter(function (r) { return r.calc || vistos[s][clave(r.concepto)]; });
             });
+        }
+        if (!$('aniSubtotalCaja').hidden && $('aniSubtotal').checked) {
+            // Los renglones automáticos (comisiones, % del subtotal) dependen del subtotal: se repite hasta que coincide
+            for (var vuelta = 0; vuelta < 8; vuelta++) {
+                if (subtotalManual) $('tSUB').value = anSubtotal.toFixed(2);
+                else $('pctUtilidad').value = utilidadPorSubtotal(recalcular().costo, anSubtotal).toFixed(4);
+            }
         }
         $('anImpDialogo').close();
         marcarCambio();
@@ -1329,10 +1370,15 @@
                     escapar(c.especificacion) + '</textarea></td>' +
                 '<td><input type="text" data-cc="unidad" list="puUnidades" maxlength="20" value="' + escapar(c.unidad) + '" placeholder="m², pza…"' + dis + '></td>' +
                 '<td><input type="number" class="num" data-cc="cantidad" step="0.01" min="0" value="' + (c.cantidad || '') + '"' + dis + '></td>' +
-                '<td class="ro" data-cc-calc="pu">' + fmt(x.pu) + '</td><td class="ro" data-cc-calc="importe">' + fmt(x.importe) + '</td>' +
+                (esVenta(c)
+                    ? '<td><input type="number" class="num" data-cc="venta" step="0.01" min="0" value="' + c.venta + '" title="Precio fijo para el cliente (importado): no suma al costo"' + dis + '></td>'
+                    : '<td class="ro" data-cc-calc="pu">' + fmt(x.pu) + '</td>') +
+                '<td class="ro" data-cc-calc="importe">' + fmt(x.importe) + '</td>' +
                 '<td class="ro" data-cc-calc="pct">' + p + '</td>' +
-                '<td class="pu-acciones"><button type="button" class="ct-btn' + (falta ? ' cc-falta' : '') + '" data-cc-accion="analizar" title="' +
-                    (falta ? '⚠ ' + falta : 'Ver o cambiar el análisis de una unidad') + '">' + (falta ? '⚠ ' : '') + 'Análisis</button>' +
+                '<td class="pu-acciones">' + (esVenta(c)
+                    ? '<span class="cc-nota" title="Precio importado del Catálogo: el costo viene de Materia Prima, Mano de Obra y Gastos de Operacion">Precio fijo</span>'
+                    : '<button type="button" class="ct-btn' + (falta ? ' cc-falta' : '') + '" data-cc-accion="analizar" title="' +
+                    (falta ? '⚠ ' + falta : 'Ver o cambiar el análisis de una unidad') + '">' + (falta ? '⚠ ' : '') + 'Análisis</button>') +
                 '<button type="button" class="pu-mini" data-cc-accion="subir" title="Subir"' + dis + '>↑</button>' +
                 '<button type="button" class="pu-mini" data-cc-accion="bajar" title="Bajar"' + dis + '>↓</button>' +
                 '<button type="button" class="pu-mini" data-cc-accion="duplicar" title="Duplicar el concepto con su análisis"' + dis + '>⧉</button>' +
@@ -1377,7 +1423,7 @@
         $('ccCuerpo').querySelectorAll('tr[data-uid]').forEach(function (tr) {
             var x = porUid[tr.dataset.uid];
             if (!x) return;
-            tr.querySelector('[data-cc-calc="pu"]').textContent = fmt(x.pu);
+            if (tr.querySelector('[data-cc-calc="pu"]')) tr.querySelector('[data-cc-calc="pu"]').textContent = fmt(x.pu);
             tr.querySelector('[data-cc-calc="importe"]').textContent = fmt(x.importe);
             tr.querySelector('[data-cc-calc="pct"]').textContent = porc(x.importe);
         });
@@ -1387,7 +1433,9 @@
             '<tr><td colspan="5" class="ro">IVA ' + pct(IVA * 100) + '</td><td class="ro">' + fmt(a.total * IVA) + '</td><td colspan="2"></td></tr>' +
             '<tr class="cc-total"><td colspan="5" class="ro">Total</td><td class="ro">' + fmt(a.total * (1 + IVA)) + '</td><td colspan="2"></td></tr>' +
             '<tr class="cc-letra"><td colspan="8">' + escapar(importeConLetra(a.total * (1 + IVA))) +
-                (dif ? '<br><small>El Subtotal del presupuesto es ' + fmt(r.subtotal) + ': la diferencia viene de los ajustes avanzados del Análisis P.U. o de los conceptos con cálculo automático.</small>' : '') +
+                (dif ? '<br><small>El Subtotal del presupuesto es ' + fmt(r.subtotal) + (hayVenta()
+                    ? ': sale de Materia Prima, Mano de Obra y Gastos de Operacion; los conceptos de precio fijo son lo que ve el cliente.'
+                    : ': la diferencia viene de los ajustes avanzados del Análisis P.U. o de los conceptos con cálculo automático.') + '</small>' : '') +
             '</td></tr>';
     }
 
@@ -1505,7 +1553,7 @@
         }
         var porCodigo = {};
         CONCEPTOS_PU.forEach(function (c) { porCodigo[clave(c.codigo)] = c; });
-        var usarCat = $('cciCatalogo').checked;
+        var usarCat = $('cciCatalogo').checked, venta = $('cciVenta').checked;
         // Lo que ya está en el catálogo (analizados y capturados por importe en MP / MO), para no sumarlo dos veces
         var yaPorClave = {}, yaPorDesc = {}, enArchivo = {};
         catalogoPU(calcularPU()).forEach(function (x) {
@@ -1534,6 +1582,12 @@
             else if (x.existe) {
                 var e = x.existe, mismaCant = Math.abs(num(e.cantidad) - x.cantidad) < 0.005, mismoPU = !pu || Math.abs(e.pu - pu) < 0.01;
                 if (e.otro) x.accion = 'Ya está en ' + NOMBRES[e.sec] + (mismaCant && mismoPU ? '' : ' (su importe se cambia allá)');
+                else if (venta && pu > 0 && (!e.venta || !mismaCant || !mismoPU)) {
+                    // Precio fijo: toma el P. Unitario del archivo y deja de sumar al costo
+                    x.actualiza = true;
+                    x.venta = pu;
+                    x.accion = e.venta ? 'Actualiza ' + [mismaCant ? '' : 'la cantidad', mismoPU ? '' : 'el precio fijo'].filter(Boolean).join(' y ') : 'Pasa a precio fijo';
+                }
                 else if (mismaCant && mismoPU) x.accion = 'Ya está, sin cambio';
                 else {
                     // Solo se cambia el P.U. de un concepto sin análisis propio (importado) o con el análisis del catálogo
@@ -1544,6 +1598,7 @@
                                (!mismoPU && !x.ponerPU ? ' (el P. Unitario sale de su análisis)' : '');
                 }
             }
+            else if (venta && x.descripcion && pu > 0) { x.aplica = true; x.venta = pu; x.accion = 'Nuevo, precio fijo para el cliente'; }
             else if (importable(x)) { x.aplica = true; x.accion = cat ? 'Nuevo, con el análisis del catálogo' : 'Nuevo, con el P. Unitario del archivo'; }
             else x.accion = x.descripcion ? 'Sin precio' : 'Sin concepto';
             if (x.actualiza) x.aplica = true;
@@ -1579,16 +1634,17 @@
                 e.cantidad = x.cantidad;
                 if (x.unidad) e.unidad = x.unidad;
                 if (x.especificacion) e.especificacion = x.especificacion;
-                if (x.ponerPU && x.cat) e.insumos = x.cat.insumos.map(limpiarInsumo);
+                if (x.venta) { e.venta = x.venta; e.insumos = []; }
+                else if (x.ponerPU && x.cat) e.insumos = x.cat.insumos.map(limpiarInsumo);
                 else if (x.ponerPU) ajustar.push({ c: e, pu: x.pu });
                 cambiados++;
                 return;
             }
             var c = nuevoConcepto({ clave: x.clave, partida: x.partida || (x.cat ? x.cat.partida : '') || 'Importados', descripcion: x.descripcion,
-                                    especificacion: x.especificacion, unidad: x.unidad, cantidad: x.cantidad,
-                                    insumos: x.cat ? x.cat.insumos : [{ tipo: 'MAT', descripcion: 'Precio unitario importado', unidad: x.unidad, cantidad: 1, costo: x.pu }] });
+                                    especificacion: x.especificacion, unidad: x.unidad, cantidad: x.cantidad, venta: x.venta || 0,
+                                    insumos: x.venta ? [] : x.cat ? x.cat.insumos : [{ tipo: 'MAT', descripcion: 'Precio unitario importado', unidad: x.unidad, cantidad: 1, costo: x.pu }] });
             analisis.conceptos.push(c);
-            if (!x.cat) ajustar.push({ c: c, pu: x.pu });
+            if (!x.cat && !x.venta) ajustar.push({ c: c, pu: x.pu });
             nuevos++;
         });
         // El P. Unitario del archivo es el precio de venta: el costo se ajusta con el factor del presupuesto para que quede igual
@@ -1609,6 +1665,11 @@
         if (soloLectura) { avisoSoloLectura(); return; }
         $('cciPegar').value = '';
         $('cciArchivo').value = '';
+        // Si el costo ya está capturado (o importado del Análisis), el catálogo entra como precio fijo para no sumarlo dos veces
+        calcularTotales();
+        $('cciVenta').checked = hayVenta() || ['mp', 'mo', 'go'].some(function (s) {
+            return datos[s].some(function (r) { return !r.calc && num(r.presupuesto) > 0; });
+        });
         cciFilas = [];
         pintarImportacion('');
         $('ccImpDialogo').showModal();
@@ -1623,6 +1684,7 @@
     });
     $('cciLeer').addEventListener('click', leerImportacion);
     $('cciCatalogo').addEventListener('change', function () { if (cciFilas.length) leerImportacion(); });
+    $('cciVenta').addEventListener('change', function () { if (cciFilas.length) leerImportacion(); });
     $('cciAgregar').addEventListener('click', agregarImportacion);
     document.querySelectorAll('[data-cci-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('ccImpDialogo').close(); }); });
 
@@ -1736,10 +1798,11 @@
         var campo = e.target.dataset.cc, tr = e.target.closest('tr[data-uid]');
         if (!campo || !tr) return;
         var c = conceptoPU(tr.dataset.uid);
-        c[campo] = campo === 'cantidad' ? Math.max(0, num(e.target.value)) : e.target.value;
+        // El precio fijo no baja de un centavo: en cero el concepto dejaría de ser de precio fijo
+        c[campo] = campo === 'cantidad' ? Math.max(0, num(e.target.value)) : campo === 'venta' ? Math.max(0.01, num(e.target.value)) : e.target.value;
         marcarCambio();
         if (campo === 'especificacion') ajustarEspec(e.target);
-        if (campo === 'cantidad') { calcularTotales(); pintarCc(); }
+        if (campo === 'cantidad' || campo === 'venta') { calcularTotales(); pintarCc(); }
     });
     $('ccCuerpo').addEventListener('change', function (e) {
         var tr = e.target.closest('tr');
@@ -1785,7 +1848,7 @@
                 if (!moverConcepto(c, acc === 'subir' ? -1 : 1)) return;
             } else if (acc === 'duplicar') {
                 analisis.conceptos.splice(analisis.conceptos.indexOf(c) + 1, 0, nuevoConcepto({ partida: c.partida, descripcion: c.descripcion + ' (copia)',
-                    unidad: c.unidad, cantidad: c.cantidad, especificacion: c.especificacion, insumos: c.insumos }));
+                    unidad: c.unidad, cantidad: c.cantidad, especificacion: c.especificacion, venta: c.venta, insumos: c.insumos }));
             } else if (acc === 'quitar') {
                 if (!confirm('¿Quitar el concepto «' + (c.descripcion || c.clave) + '» con su análisis?')) return;
                 analisis.conceptos.splice(analisis.conceptos.indexOf(c), 1);

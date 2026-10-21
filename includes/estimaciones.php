@@ -26,9 +26,19 @@ function estimacionCatalogo(array $analisis, array $renglones, array $fijos, boo
     $hm = (float) ($analisis['hm'] ?? 0) / 100;
     $clave = fn($s) => mb_strtoupper(trim((string) $s));
     $lista = [];
+    // Precios fijos para el cliente (Catálogo importado junto con el Análisis): el catálogo es solo esos conceptos, repartidos
+    // por su precio; lo capturado por importe en MP / MO ya está dentro de esos precios
+    $hayVenta = false;
+    foreach ($analisis['conceptos'] ?? [] as $c) if ((float) ($c['venta'] ?? 0) > 0) $hayVenta = true;
     foreach ($analisis['conceptos'] ?? [] as $i => $c) {
         $cant = (float) ($c['cantidad'] ?? 0);
         if ($cant <= 0) continue;
+        if ($hayVenta) {
+            if ((float) ($c['venta'] ?? 0) <= 0) continue;
+            $lista[] = ['clave' => (string) ($c['clave'] ?? ''), 'partida' => (string) ($c['partida'] ?? ''), 'descripcion' => (string) ($c['descripcion'] ?? ''),
+                        'unidad' => (string) ($c['unidad'] ?? ''), 'cantidad' => $cant, 'cd_unitario' => (float) $c['venta'], 'origen' => 'analisis'];
+            continue;
+        }
         $u = ['MAT' => 0.0, 'MO' => 0.0, 'EQ' => 0.0];
         foreach ($c['insumos'] ?? [] as $x) {
             $tipo = in_array($x['tipo'] ?? '', ['MAT', 'MO', 'EQ'], true) ? $x['tipo'] : 'MAT';
@@ -40,7 +50,7 @@ function estimacionCatalogo(array $analisis, array $renglones, array $fijos, boo
                     'unidad' => (string) ($c['unidad'] ?? ''), 'cantidad' => $cant, 'cd_unitario' => $cd, 'origen' => 'analisis'];
     }
     $n = 0;
-    foreach ($renglones as $r) {
+    foreach ($hayVenta ? [] : $renglones as $r) {
         $tipo = strtoupper(trim((string) $r['tipo']));
         $k = $clave($r['concepto']);
         $base = (float) $r['presupuesto'];

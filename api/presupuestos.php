@@ -127,6 +127,9 @@ function analisisPU($d): ?string
             'especificacion' => texto($c['especificacion'] ?? '', 4000) ?? '',
             'insumos'     => $insumos,
         ];
+        // Precio fijo para el cliente (importado del Catálogo): no suma al costo, el costo viene de MP / MO / GO
+        $venta = max(0, numero($c['venta'] ?? 0, 4));
+        if ($venta > 0) $concepto['venta'] = $venta;
         // Renglón totalmente vacío: no se guarda
         if ($concepto['descripcion'] === '' && !$concepto['cantidad'] && !$insumos) continue;
         $r['conceptos'][] = $concepto;

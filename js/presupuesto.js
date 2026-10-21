@@ -1190,7 +1190,9 @@
             var c = x.c, falta = revisionConcepto(c);
             return '<tr data-uid="' + c.uid + '" data-buscar="' + escapar(clave(c.clave + ' ' + c.descripcion)) + '">' +
                 '<td><input type="text" data-cc="clave" maxlength="20" value="' + escapar(c.clave) + '"' + dis + '></td>' +
-                '<td><input type="text" data-cc="descripcion" list="puSugConceptos" maxlength="300" value="' + escapar(c.descripcion) + '" placeholder="¿Qué trabajo es?"' + dis + '></td>' +
+                '<td><input type="text" data-cc="descripcion" list="puSugConceptos" maxlength="300" value="' + escapar(c.descripcion) + '" placeholder="¿Qué trabajo es?"' + dis + '>' +
+                    '<textarea class="cc-espec" data-cc="especificacion" maxlength="4000" rows="1" placeholder="Especificación: materiales, acabados, dimensiones, lo que incluye…"' + dis + '>' +
+                    escapar(c.especificacion) + '</textarea></td>' +
                 '<td><input type="text" data-cc="unidad" list="puUnidades" maxlength="20" value="' + escapar(c.unidad) + '" placeholder="m², pza…"' + dis + '></td>' +
                 '<td><input type="number" class="num" data-cc="cantidad" step="0.01" min="0" value="' + (c.cantidad || '') + '"' + dis + '></td>' +
                 '<td class="ro" data-cc-calc="pu">' + fmt(x.pu) + '</td><td class="ro" data-cc-calc="importe">' + fmt(x.importe) + '</td>' +
@@ -1212,7 +1214,8 @@
         });
         $('ccCuerpo').innerHTML = html ||
             '<tr class="vacio-fila"><td colspan="8">El catálogo está vacío. Empieza con «+ Partida» (ej. Cancelería) y agrega sus conceptos con su unidad y cantidad.</td></tr>';
-        ['ccPartida', 'ccSubpartida', 'ccConcepto', 'ccRenumerar', 'ccPlantilla'].forEach(function (id) { if ($(id)) $(id).disabled = soloLectura; });
+        ['ccPartida', 'ccSubpartida', 'ccConcepto', 'ccRenumerar', 'ccPlantilla', 'ccImportar'].forEach(function (id) { if ($(id)) $(id).disabled = soloLectura; });
+        $('ccCuerpo').querySelectorAll('textarea.cc-espec').forEach(ajustarEspec);
         filtrarCc();
         pintarCc(r, a);
     }
@@ -1279,6 +1282,174 @@
         var letra = numeroConLetra(entero);
         return '(' + letra + (entero && entero % 1e6 === 0 ? ' DE' : '') + (entero === 1 ? ' PESO ' : ' PESOS ') + ('0' + centavos % 100).slice(-2) + '/100 M.N.)';
     }
+
+    // La especificación crece con su texto, como el renglón del PDF
+    function ajustarEspec(t) {
+        t.style.height = 'auto';
+        t.style.height = t.scrollHeight + 'px';
+    }
+
+    // ---------- Exportar / importar el catálogo con Excel ----------
+    // Exportar: CSV que abre Excel (como Exportar a Excel de la Obra), una fila por concepto y los totales al final
+    function exportarCc() {
+        var r = calcularPU(), a = arbolCc(r);
+        var celda = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+        var numero = function (n) { return (Math.round(n * 100) / 100).toFixed(2); };
+        var filas = [['Partida', 'Código', 'Concepto', 'Especificación', 'Unidad', 'Cantidad', 'P. Unitario', 'Importe']];
+        a.partidas.forEach(function (p) {
+            var poner = function (lista, partida) {
+                lista.forEach(function (x) {
+                    filas.push([partida, x.clave, x.descripcion, x.c ? x.c.especificacion : '', x.unidad, x.cantidad, numero(x.pu), numero(x.importe)]);
+                });
+            };
+            poner(p.conceptos, p.nombre);
+            p.subs.forEach(function (s) { poner(s.conceptos, unirPartida(p.nombre, s.nombre)); });
+        });
+        if (filas.length < 2) { alert('El catálogo está vacío: no hay nada que exportar.'); return; }
+        filas.push([]);
+        filas.push(['', '', 'TOTAL SIN IVA', '', '', '', '', numero(a.total)]);
+        filas.push(['', '', 'IVA ' + pct(IVA * 100), '', '', '', '', numero(a.total * IVA)]);
+        filas.push(['', '', 'TOTAL', '', '', '', '', numero(a.total * (1 + IVA))]);
+        filas.push(['', '', importeConLetra(a.total * (1 + IVA))]);
+        var csv = filas.map(function (f) { return f.map(celda).join(','); }).join('\r\n');
+        var enlace = document.createElement('a');
+        enlace.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+        enlace.download = ('Catalogo de conceptos ' + (txt($('proyecto').value) || 'presupuesto')).replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.csv';
+        enlace.click();
+        setTimeout(function () { URL.revokeObjectURL(enlace.href); }, 1000);
+    }
+    $('ccExportar').addEventListener('click', exportarCc);
+
+    // Importar: celdas copiadas de Excel (tabuladores) o CSV (coma o punto y coma), con comillas y saltos de línea dentro de la celda
+    var COLUMNAS_CCI = [
+        ['partida', /^(partida|agrupador|grupo|familia)/i],
+        ['clave', /^(c[oó]digo|clave|cve)/i],
+        ['especificacion', /^(especific|descripci[oó]n t[eé]cnica|detalle)/i],
+        ['descripcion', /^(concepto|descripci[oó]n|nombre)/i],
+        ['unidad', /^(unidad|u\.?m\.?$|um$)/i],
+        ['cantidad', /^(cantidad|cant)/i],
+        ['pu', /^(p\.?\s*unit|precio unit|p\.?u\.?$|precio$)/i],
+        ['importe', /^(importe|total)/i]
+    ];
+    var cciFilas = [];
+
+    function separarCeldas(texto) {
+        texto = texto.replace(/\r\n?/g, '\n');
+        var primera = texto.split('\n')[0];
+        var sep = primera.indexOf('\t') >= 0 ? '\t' : (primera.split(';').length > primera.split(',').length ? ';' : ',');
+        var filas = [], fila = [], actual = '', comillas = false;
+        for (var i = 0; i < texto.length; i++) {
+            var ch = texto[i];
+            if (comillas) {
+                if (ch === '"' && texto[i + 1] === '"') { actual += '"'; i++; }
+                else if (ch === '"') comillas = false;
+                else actual += ch;
+            } else if (ch === '"' && actual === '') comillas = true;
+            else if (ch === sep) { fila.push(actual.trim()); actual = ''; }
+            else if (ch === '\n') { fila.push(actual.trim()); filas.push(fila); fila = []; actual = ''; }
+            else actual += ch;
+        }
+        if (actual !== '' || fila.length) { fila.push(actual.trim()); filas.push(fila); }
+        return filas.filter(function (f) { return f.some(function (x) { return x !== ''; }); });
+    }
+    // Importes como «$37,553.03» o «1.0000»
+    function numeroCelda(v) { return num(String(v || '').replace(/[$\s,]/g, '')); }
+
+    function leerImportacion() {
+        var celdas = separarCeldas($('cciPegar').value);
+        cciFilas = [];
+        if (celdas.length < 2) { pintarImportacion('Pega el encabezado y al menos un renglón.'); return; }
+        var col = {};
+        celdas[0].forEach(function (titulo, i) {
+            for (var k = 0; k < COLUMNAS_CCI.length; k++) {
+                if (col[COLUMNAS_CCI[k][0]] === undefined && COLUMNAS_CCI[k][1].test(txt(titulo))) { col[COLUMNAS_CCI[k][0]] = i; return; }
+            }
+        });
+        if (col.descripcion === undefined && col.clave === undefined) {
+            pintarImportacion('No encontré la columna Concepto ni la de Código en el encabezado: ' + celdas[0].join(' · '));
+            return;
+        }
+        var porCodigo = {};
+        CONCEPTOS_PU.forEach(function (c) { porCodigo[clave(c.codigo)] = c; });
+        var usarCat = $('cciCatalogo').checked;
+        celdas.slice(1).forEach(function (f) {
+            var v = function (k) { return col[k] === undefined ? '' : f[col[k]] || ''; };
+            var desc = v('descripcion'), codigo = txt(v('clave')), espec = v('especificacion');
+            var cantidad = numeroCelda(v('cantidad')), pu = numeroCelda(v('pu'));
+            if (!pu && cantidad > 0 && numeroCelda(v('importe'))) pu = numeroCelda(v('importe')) / cantidad;
+            if (!codigo && !pu && !cantidad) return;   // títulos, totales o renglones vacíos
+            // Como en el PDF: la primera línea es el concepto y lo demás su especificación
+            if (!espec && desc.indexOf('\n') >= 0) {
+                espec = desc.slice(desc.indexOf('\n') + 1);
+                desc = desc.slice(0, desc.indexOf('\n'));
+            }
+            var cat = usarCat && codigo ? porCodigo[clave(codigo)] : null;
+            cciFilas.push({ clave: codigo, partida: txt(v('partida')).replace(/\s*\/\s*/g, ' / '), descripcion: txt(desc) || (cat ? cat.descripcion : ''),
+                            especificacion: espec.trim() || (cat ? cat.especificacion || '' : ''), unidad: txt(v('unidad')) || (cat ? cat.unidad : ''),
+                            cantidad: cantidad || 1, pu: pu, cat: cat });
+        });
+        pintarImportacion(cciFilas.length ? '' : 'No hay renglones con concepto para agregar.');
+    }
+
+    function importable(x) { return !!x.descripcion && (!!x.cat || x.pu > 0); }
+    function pintarImportacion(error) {
+        var html = cciFilas.map(function (x) {
+            var bien = importable(x);
+            return '<tr class="' + (x.cat ? 'cci-cat' : bien ? '' : 'cci-error') + '"><td>' + escapar(x.clave) + '</td><td class="izq">' + escapar(x.descripcion) + '</td>' +
+                '<td>' + escapar(x.partida) + '</td><td>' + escapar(x.unidad) + '</td><td class="ro">' + cant(x.cantidad) + '</td>' +
+                '<td class="ro">' + (x.pu ? fmt(x.pu) : '') + '</td><td>' + (x.cat ? 'Análisis del catálogo' : bien ? 'Del archivo' : (x.descripcion ? 'Sin precio' : 'Sin concepto')) + '</td></tr>';
+        }).join('');
+        var validos = cciFilas.filter(importable).length;
+        $('cciVista').innerHTML = html || '<tr class="vacio-fila"><td colspan="7">' + escapar(error || 'Pega las celdas y presiona Revisar.') + '</td></tr>';
+        $('cciResumen').textContent = !cciFilas.length ? '' : validos + ' de ' + cciFilas.length + ' conceptos se agregarán' +
+            (validos < cciFilas.length ? ' (los tachados no tienen concepto o precio)' : '');
+        $('cciAgregar').disabled = !validos;
+    }
+
+    function agregarImportacion() {
+        if (soloLectura) { avisoSoloLectura(); return; }
+        var nuevos = [];
+        cciFilas.filter(importable).forEach(function (x) {
+            var c = nuevoConcepto({ clave: x.clave, partida: x.partida || (x.cat ? x.cat.partida : '') || 'Importados', descripcion: x.descripcion,
+                                    especificacion: x.especificacion, unidad: x.unidad, cantidad: x.cantidad,
+                                    insumos: x.cat ? x.cat.insumos : [{ tipo: 'MAT', descripcion: 'Precio unitario importado', unidad: x.unidad, cantidad: 1, costo: x.pu }] });
+            analisis.conceptos.push(c);
+            nuevos.push({ c: c, pu: x.cat ? 0 : x.pu });
+        });
+        // El P. Unitario del archivo es el precio de venta: el costo se ajusta con el factor del presupuesto para que quede igual
+        for (var vuelta = 0; vuelta < 8; vuelta++) {
+            var r = calcularPU();
+            if (!(r.factor > 0)) break;
+            nuevos.forEach(function (n) { if (n.pu) n.c.insumos[0].costo = n.pu / r.factor; });
+        }
+        huboAnalisis = huboAnalisis || nuevos.length > 0;
+        $('ccImpDialogo').close();
+        marcarCambio();
+        calcularTotales();
+        renderCc();
+        alert('Se agregaron ' + nuevos.length + ' conceptos al catálogo.');
+    }
+
+    $('ccImportar').addEventListener('click', function () {
+        if (soloLectura) { avisoSoloLectura(); return; }
+        $('cciPegar').value = '';
+        $('cciArchivo').value = '';
+        cciFilas = [];
+        pintarImportacion('');
+        $('ccImpDialogo').showModal();
+        $('cciPegar').focus();
+    });
+    $('cciArchivo').addEventListener('change', function () {
+        var f = this.files[0];
+        if (!f) return;
+        var lector = new FileReader();
+        lector.onload = function () { $('cciPegar').value = lector.result; leerImportacion(); };
+        lector.readAsText(f, 'UTF-8');
+    });
+    $('cciLeer').addEventListener('click', leerImportacion);
+    $('cciCatalogo').addEventListener('change', function () { if (cciFilas.length) leerImportacion(); });
+    $('cciAgregar').addEventListener('click', agregarImportacion);
+    document.querySelectorAll('[data-cci-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('ccImpDialogo').close(); }); });
 
     function filtrarCc() {
         var q = clave($('ccBuscar').value);
@@ -1392,6 +1563,7 @@
         var c = conceptoPU(tr.dataset.uid);
         c[campo] = campo === 'cantidad' ? Math.max(0, num(e.target.value)) : e.target.value;
         marcarCambio();
+        if (campo === 'especificacion') ajustarEspec(e.target);
         if (campo === 'cantidad') { calcularTotales(); pintarCc(); }
     });
     $('ccCuerpo').addEventListener('change', function (e) {

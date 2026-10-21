@@ -423,11 +423,13 @@ $secciones = [
                         </select>
                         <?php endif; ?>
                         <button type="button" class="ct-btn" id="ccRenumerar" title="Vuelve a poner las claves en orden por partida: 01-001, 01.01-001…">Renumerar claves</button>
+                        <button type="button" class="ct-btn" id="ccImportar" title="Agrega conceptos copiados de Excel o de un archivo CSV (Código, Concepto, Unidad, Cantidad, P. Unitario…)">Importar de Excel</button>
+                        <button type="button" class="ct-btn" id="ccExportar" title="Descarga el catálogo para abrirlo en Excel">Exportar a Excel</button>
                         <input type="search" id="ccBuscar" class="cc-buscar" placeholder="Buscar clave o descripción" autocomplete="off">
                     </div>
                     <div class="extra-caja">
                         <table class="grid mini-grid cc-grid">
-                            <thead><tr><th class="c-id cc-clave">Clave</th><th>Descripción</th><th class="cc-unidad">Unidad</th><th class="c-num">Cantidad</th><th class="c-num">P.U.</th><th class="c-num">Importe</th><th class="c-pct">%</th><th class="cc-acc"></th></tr></thead>
+                            <thead><tr><th class="c-id cc-clave">Código</th><th>Concepto</th><th class="cc-unidad">Unidad</th><th class="c-num">Cantidad</th><th class="c-num">P. Unitario</th><th class="c-num">Importe</th><th class="c-pct">%</th><th class="cc-acc"></th></tr></thead>
                             <tbody id="ccCuerpo"></tbody>
                             <tfoot id="ccPie"></tfoot>
                         </table>
@@ -753,6 +755,36 @@ $secciones = [
     <div class="hs-pie">
         <span></span>
         <button type="button" class="hs-btn principal" data-pr-cerrar>Entendido</button>
+    </div>
+</dialog>
+
+<!-- ============ IMPORTAR CONCEPTOS DE EXCEL AL CATÁLOGO ============ -->
+<dialog class="hs-dialogo pr-dialogo" id="ccImpDialogo">
+    <div class="hs-cabecera">
+        <strong>Importar conceptos de Excel</strong>
+        <button type="button" class="hs-cerrar" data-cci-cerrar title="Cerrar">✕</button>
+    </div>
+    <p class="pu-dlg-ayuda">En Excel selecciona las columnas <b>con su encabezado</b> (Código, Concepto, Unidad, Cantidad, P. Unitario; opcionales Partida y Especificación)
+        y pégalas aquí, o elige un archivo .csv. Si el código está en <b>Catalogos › Conceptos P.U.</b> se toma su análisis con los precios vigentes (automático);
+        si no, el concepto entra con el P. Unitario del archivo.</p>
+    <div class="cci-entrada">
+        <textarea id="cciPegar" rows="6" placeholder="Pega aquí las celdas copiadas de Excel"></textarea>
+        <div class="cci-opciones">
+            <label>Archivo CSV (opcional): <input type="file" id="cciArchivo" accept=".csv,.txt,text/csv,text/plain"></label>
+            <label><input type="checkbox" id="cciCatalogo" checked> Usar el análisis del catálogo cuando el código exista</label>
+            <button type="button" class="ct-btn" id="cciLeer">Revisar</button>
+        </div>
+    </div>
+    <div class="extra-caja pr-tabla">
+        <table class="grid mini-grid">
+            <thead><tr><th>Código</th><th>Concepto</th><th>Partida</th><th>Unidad</th><th class="num">Cantidad</th><th class="num">P. Unitario</th><th>Precio</th></tr></thead>
+            <tbody id="cciVista"><tr class="vacio-fila"><td colspan="7">Pega las celdas y presiona Revisar.</td></tr></tbody>
+        </table>
+    </div>
+    <div class="hs-pie">
+        <span id="cciResumen"></span>
+        <button type="button" class="hs-btn" data-cci-cerrar>Cancelar</button>
+        <button type="button" class="hs-btn principal" id="cciAgregar" disabled>Agregar al catálogo</button>
     </div>
 </dialog>
 

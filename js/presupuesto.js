@@ -168,26 +168,28 @@
         var tr = e.target.closest('tr[data-i]');
         if (!tr) return;
         e.preventDefault();
-        var i = +tr.dataset.i, n = datos[seccion].length;
+        var i = +tr.dataset.i, n = datos[seccion].length, dis = soloLectura;
         tbody.querySelectorAll('tr.actual').forEach(function (t) { t.classList.remove('actual'); });
         tr.classList.add('actual');
         menuFila.innerHTML = '';
         [
-            ['▲ Subir posición', i > 0, function () { moverConcepto(i, -1); }],
-            ['▼ Bajar posición', i < n - 1, function () { moverConcepto(i, 1); }],
-            ['🗑 Eliminar', true, function () { eliminarConcepto(i); }]
+            ['▲ Subir posición', !dis && i > 0, function () { moverConcepto(i, -1); }],
+            ['▼ Bajar posición', !dis && i < n - 1, function () { moverConcepto(i, 1); }],
+            ['🗑 Eliminar', !dis, function () { eliminarConcepto(i); }]
         ].forEach(function (o) {
             var b = document.createElement('button');
             b.type = 'button';
             b.textContent = o[0];
             b.disabled = !o[1];
-            b.addEventListener('click', function () {
-                cerrarMenuFila();
-                if (soloLectura) { avisoSoloLectura(); return; }
-                o[2]();
-            });
+            b.addEventListener('click', function () { cerrarMenuFila(); o[2](); });
             menuFila.appendChild(b);
         });
+        if (dis) {
+            var aviso = document.createElement('div');
+            aviso.className = 'menu-aviso';
+            aviso.textContent = '🔒 Presiona «Modificar» para habilitarlo';
+            menuFila.appendChild(aviso);
+        }
         menuFila.classList.add('abierto');
         menuFila.style.left = Math.min(e.clientX, window.innerWidth - menuFila.offsetWidth - 8) + 'px';
         menuFila.style.top = Math.min(e.clientY, window.innerHeight - menuFila.offsetHeight - 8) + 'px';
@@ -1811,6 +1813,7 @@
     function pintarEstatus(e) {
         $('estatus').textContent = e;
         $('estatus').className = 'estatus c-' + ((window.ACRI_ESTATUS || {})[e] || 'gris');
+        aplicarBarra();
     }
     // Reglas del Form46 (mismas que estatusTransicion() en includes/estatus.php)
     function motivoEstatus(antes, despues) {
@@ -1871,7 +1874,27 @@
         $('modo').hidden = !soloLectura;
         var b = document.querySelector('.tb[data-accion="modificar"]');
         if (b) b.classList.toggle('activo', !soloLectura && !!presupuestoId);
+        aplicarBarra();
         render();
+    }
+
+    // En solo lectura los botones que cambian el presupuesto se deshabilitan hasta presionar «Modificar».
+    // Se quedan los que solo consultan (Imprimir, Duplicar, Bitácora, Cerrar, Tour) y los que se usan en un
+    // estatus que ya no se puede modificar: Registrar Obra de un Aceptado (o abrir su obra) y Eliminar un Cancelado.
+    function aplicarBarra() {
+        var est = $('estatus').textContent.trim().toUpperCase();
+        var bloqueo = {
+            'guardar': true, 'guardar-cerrar': true, 'prueba': true, 'estatus': true, 'cancelar': true,
+            'registrar-obra': !obraId && est !== 'ACEPTADO',
+            'eliminar': est !== 'CANCELADO'
+        };
+        Object.keys(bloqueo).forEach(function (a) {
+            var b = document.querySelector('.tb[data-accion="' + a + '"]');
+            if (!b) return;
+            if (b.dataset.titulo === undefined) b.dataset.titulo = b.title;
+            b.disabled = soloLectura && bloqueo[a];
+            b.title = b.disabled ? 'Presiona «Modificar» para habilitarlo' : (b.dataset.titulo || '');
+        });
     }
 
     var enPestana = window.parent !== window;

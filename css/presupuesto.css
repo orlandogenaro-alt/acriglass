@@ -539,6 +539,33 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .cc-grid tfoot tr.cc-total td { font-size: 14px; }
 .cc-grid tfoot tr.cc-letra td { height: auto; padding: 6px 8px; font-weight: 600; color: var(--texto-2); white-space: normal; }
 .cc-grid tfoot tr.cc-letra small { font-weight: 400; color: var(--texto-3); }
+/* Catálogo de Conceptos: vista Resumen (como la hoja de Excel) o Por partidas (Neodata) */
+.cc-vistas { display: flex; gap: 6px; margin-bottom: 8px; }
+.cc-vistas .ct-btn { margin: 0; height: 28px; }
+.cc-vistas .ct-btn.activo { background: var(--azul); border-color: var(--azul); color: #fff; }
+.ccr-resumen { flex: 1; min-height: 0; }
+.ccr-resumen .extra-caja { flex: 1; max-height: none; }
+.ccr-grid thead th { position: sticky; top: 0; z-index: 1; }
+.ccr-grid th.ccr-anexo { width: 80px; }
+.ccr-grid td { height: 28px; }
+.ccr-grid td.ccr-anexo { text-align: center; color: var(--texto-3); }
+.ccr-grid td.izq { padding: 0 8px; }
+.ccr-grid tr[data-ccr-ir] { cursor: pointer; }
+.ccr-grid tr[data-ccr-ir]:hover td { background: var(--azul-suave); }
+.ccr-grid tr.ccr-titulo td { background: var(--sub) !important; font-weight: 700; color: var(--enfasis); text-align: center; border-top: 1px solid var(--borde-2); }
+.ccr-grid tr.ccr-titulo td.izq { text-align: center; }
+.ccr-grid tr.ccr-vacio td { color: var(--texto-3); font-style: italic; }
+.ccr-grid tr.ccr-grupo td { font-weight: 600; color: var(--enfasis); }
+.ccr-grid tr.ccr-sub td.izq { padding-left: 24px; }
+.ccr-grid tr.ccr-calc td { color: var(--texto-2); }
+.ccr-grid tr.ccr-total td { background: var(--sub) !important; font-weight: 700; color: var(--enfasis); border-top: 1px solid var(--borde-2); }
+.ccr-grid tr.ccr-total td.ccr-anexo { color: var(--enfasis); }
+.ccr-grid tr.ccr-fuerte td { font-size: 14px; }
+.ccr-grid tr.ccr-nota td { font-weight: 600; color: var(--texto-2); }
+.ccr-grid tr.ccr-final td { font-weight: 700; color: var(--enfasis); }
+.ccr-grid tr.ccr-nota td { border-top: 1px solid var(--borde-2); }
+.ccr-grid tr.ccr-final small { font-weight: 400; color: var(--texto-3); }
+.ccr-grid tr.ccr-letra td { height: auto; padding: 6px 8px; font-weight: 600; color: var(--texto-2); white-space: normal; }
 
 /* Análisis de Precios Unitarios (Neodata) */
 .pu-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: auto; }

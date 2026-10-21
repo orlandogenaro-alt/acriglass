@@ -6,6 +6,7 @@
     var AYUDAS = {
         grid: 'Ctrl + I para agregar un nuevo Concepto',
         cc: 'Como Neodata: partidas, subpartidas y conceptos con su P.U. (el análisis de cada uno está en Análisis P.U.)',
+        ccr: 'Resumen como la hoja de Excel: se llena solo con Materia Prima, Mano de Obra y Gastos de Operacion (clic en un renglón para ir a capturarlo)',
         pu: 'Como Neodata, con lo capturado en el presupuesto: no cambia el Subtotal ni el Total'
     };
 
@@ -112,7 +113,7 @@
 
     function agregarConcepto() {
         if (seccion === 'pu') { agregarConceptoPU(); return; }
-        if (seccion === 'cc') { agregarConceptoCc(); return; }
+        if (seccion === 'cc') { if (ccVista === 'partidas') agregarConceptoCc(); return; }
         if (soloLectura) { avisoSoloLectura(); return; }
         datos[seccion].push({ id: ++consecutivo, concepto: '', presupuesto: 0, importar: false, folio: '' });
         marcarCambio();
@@ -1016,7 +1017,86 @@
         return { partidas: partidas, total: total };
     }
 
+    // ---------- Resumen del catálogo (como la hoja de Excel) ----------
+    // Materia Prima → Total MP; Mano de Obra → Total MO → Costo Primo; Margen de utilidad bruta (Subtotal − Costo Primo);
+    // Gastos de Operacion → Utilidad Neta (Margen bruto − GO); Subtotal, IVA, Total y Total en dólares.
+    // Los % son sobre el Subtotal, igual que en las pestañas. Los renglones del Análisis P.U. se abren por concepto.
+    var ccVista = 'resumen';
+    try { if (localStorage.getItem('acri.presupuesto.ccVista') === 'partidas') ccVista = 'partidas'; } catch (e) { /* sin almacenamiento */ }
+    var TC_USD = Number(PARAMETROS.tipo_cambio_usd) || 0;
+
+    function ponerVistaCc(v) {
+        ccVista = v === 'partidas' ? 'partidas' : 'resumen';
+        try { localStorage.setItem('acri.presupuesto.ccVista', ccVista); } catch (e) { /* sin almacenamiento */ }
+        document.querySelectorAll('[data-cc-vista]').forEach(function (b) { b.classList.toggle('activo', b.dataset.ccVista === ccVista); });
+        $('ccrResumen').hidden = ccVista !== 'resumen';
+        $('ccPartidas').hidden = ccVista === 'resumen';
+        if (seccion === 'cc') $('secAyuda').textContent = AYUDAS[ccVista === 'resumen' ? 'ccr' : 'cc'];
+    }
+    document.querySelectorAll('[data-cc-vista]').forEach(function (b) {
+        b.addEventListener('click', function () { ponerVistaCc(b.dataset.ccVista); renderCc(); });
+    });
+
+    function renderResumenCc() {
+        var subtotal = calcularTotales();
+        var t = { mp: suma(datos.mp), mo: suma(datos.mo), go: suma(datos.go) };
+        var primo = t.mp + t.mo, bruta = subtotal - primo, neta = bruta - t.go, iva = subtotal * IVA;
+        var dinero = function (n) { return Math.abs(n) < 0.005 ? '-' : fmt(n); };
+        var porc = function (n) { return subtotal > 0 ? pct(n / subtotal * 100) : ''; };
+        var html = '', n = 0;
+        function fila(clase, anexo, nombre, pres, sub, tot, p, ir) {
+            return '<tr class="' + clase + '"' + (ir ? ' data-ccr-ir="' + ir + '" title="Ir a ' + escapar(NOMBRES[ir]) + '"' : '') + '>' +
+                '<td class="ccr-anexo">' + anexo + '</td><td class="izq">' + nombre + '</td>' +
+                '<td class="ro">' + pres + '</td><td class="ro">' + sub + '</td><td class="ro">' + tot + '</td><td class="ro">' + p + '</td></tr>';
+        }
+        // Analizados: lo que cada concepto del Análisis P.U. pone en Materia Prima (materiales, equipo, herramienta) o en Mano de Obra
+        function desglosePU(sec) {
+            return analisis.conceptos.map(function (c) {
+                var u = costoUnitario(c);
+                return { nombre: txt(c.clave + ' ' + c.descripcion), importe: (sec === 'mp' ? u.mat + u.eq + u.hm : u.moReal) * c.cantidad };
+            }).filter(function (x) { return Math.abs(x.importe) >= 0.005; });
+        }
+        function seccionCc(sec) {
+            html += fila('ccr-titulo', '', escapar(NOMBRES[sec].toUpperCase()), '', '', '', '', sec);
+            if (!datos[sec].length) html += fila('ccr-vacio', '', 'Sin conceptos capturados', '', '', '', '', sec);
+            datos[sec].forEach(function (r) {
+                var imp = num(r.presupuesto), num_ = ++n;
+                var subs = r.calc === 'pu' ? desglosePU(sec) : [];
+                if (subs.length) {
+                    html += fila('ccr-grupo', num_, escapar(r.concepto), '', dinero(imp), '', porc(imp), sec);
+                    subs.forEach(function (x, i) { html += fila('ccr-sub', num_ + '.' + (i + 1), escapar(x.nombre), dinero(x.importe), '', '', '', 'pu'); });
+                } else {
+                    html += fila(r.calc ? 'ccr-calc' : '', num_, escapar(r.concepto || '(sin concepto)'), dinero(imp), '', '', porc(imp), sec);
+                }
+            });
+        }
+        seccionCc('mp');
+        html += fila('ccr-total', '(=)', 'TOTAL MATERIA PRIMA', '', '', dinero(t.mp), porc(t.mp));
+        seccionCc('mo');
+        html += fila('ccr-total', '(+)', 'TOTAL MANO DE OBRA', '', dinero(t.mo), dinero(t.mo), porc(t.mo));
+        html += fila('ccr-total ccr-fuerte', '(=)', 'TOTAL COSTO PRIMO', '', '', dinero(primo), porc(primo));
+        html += fila('ccr-total', '(−)(=)', 'MARGEN DE UTILIDAD BRUTA', '', '', dinero(bruta), porc(bruta));
+        seccionCc('go');
+        html += fila('ccr-total', '(−)', 'TOTAL GASTOS DE OPERACION', '', '', dinero(t.go), porc(t.go));
+        html += fila('ccr-total ccr-fuerte', '(=)', 'UTILIDAD NETA', '', '', dinero(neta), porc(neta));
+        html += fila('ccr-nota', '', 'PORCENTAJE DE GANANCIA SOBRE PRECIO DE VENTA', '', '', subtotal > 0 ? pct(neta / subtotal * 100) : '', '');
+        html += fila('ccr-final', '', 'SUBTOTAL', '', '', fmt(subtotal), subtotal > 0 ? pct(100) : '');
+        html += fila('ccr-final', '', 'IVA ' + pct(IVA * 100), '', '', fmt(iva), '');
+        html += fila('ccr-final ccr-fuerte', '', 'TOTAL', '', '', fmt(subtotal + iva), '');
+        if (TC_USD > 0) html += fila('ccr-final', '', 'TOTAL EN DÓLARES IVA INCLUIDO <small>(T.C. ' + fmt(TC_USD) + ')</small>', '', '', 'US$ ' + fmt((subtotal + iva) / TC_USD), '');
+        html += '<tr class="ccr-letra"><td colspan="6">' + escapar(importeConLetra(subtotal + iva)) + '</td></tr>';
+        $('ccrCuerpo').innerHTML = html;
+    }
+    // Un clic en un renglón lleva a la pestaña donde se captura
+    $('ccrCuerpo').addEventListener('click', function (e) {
+        var tr = e.target.closest('tr[data-ccr-ir]');
+        var tab = tr && document.querySelector('.sec-tab[data-sec="' + tr.dataset.ccrIr + '"]');
+        if (tab) tab.click();
+    });
+
     function renderCc() {
+        ponerVistaCc(ccVista);
+        if (ccVista === 'resumen') { renderResumenCc(); return; }
         construirSugerencias();
         var r = calcularPU(), a = arbolCc(r), dis = soloLectura ? ' disabled' : '', html = '';
         function filaGrupo(g, sub) {
@@ -1080,6 +1160,7 @@
 
     // Cifras sin volver a pintar los campos (para no perder el cursor mientras se escribe)
     function pintarCc(r, a) {
+        if (ccVista === 'resumen') { renderResumenCc(); return; }
         r = r || calcularPU();
         a = a || arbolCc(r);
         var porPartida = {}, porUid = {};

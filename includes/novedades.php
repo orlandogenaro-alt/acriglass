@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-10-21',
+        'cambios' => [
+            ['mejora', 'Presupuesto: Catálogo de Conceptos en resumen como la hoja de Excel', 'La pestaña Catálogo de Conceptos abre ahora en la vista Resumen, acomodada como la hoja de Excel de presupuesto: Anexos, Partidas, Presupuesto sugerido, Subtotal, Total y %. Se llena sola con lo capturado en Materia Prima, Mano de Obra y Gastos de Operacion, numerado en orden (1, 2, 3…), con Total Materia Prima, Total Mano de Obra, Total Costo Primo, Margen de Utilidad Bruta (Subtotal − Costo Primo), Total Gastos de Operacion, Utilidad Neta (Margen bruto − Gastos de Operacion), el porcentaje de ganancia sobre el precio de venta, Subtotal, IVA, Total, el Total en dólares IVA incluido (con el tipo de cambio vigente de Catalogos, si lo hay) y el importe con letra. Los % son sobre el Subtotal. Los materiales y la mano de obra del Análisis P.U. se abren por concepto (5.1, 5.2…). Con un clic en un renglón se va a la pestaña donde se captura. La vista anterior por partidas (como Neodata) sigue en el botón Por partidas, y cada usuario regresa a la última vista que usó.'],
+        ],
+    ],
+    [
         'fecha' => '2026-10-20',
         'cambios' => [
             ['nuevo', 'Presupuesto: Catálogo de Conceptos como Neodata', 'La pestaña Conceptos/Tareas del Presupuesto de Obra ahora es el Catálogo de Conceptos, como en Neodata: los conceptos se acomodan en partidas y subpartidas numeradas (1, 1.1…), cada concepto con Clave, Descripción, Unidad, Cantidad, P.U., Importe y su %, y cada partida con su subtotal y su %. Abajo salen el Total del catálogo, el IVA, el Total y el importe con letra. Con los botones + Partida, + Subpartida y + Concepto (o Ctrl + I) se arma el catálogo; también se pueden agregar los conceptos de una plantilla, renombrar una partida escribiendo sobre su nombre, subir o bajar partidas y conceptos, duplicarlos, quitarlos, buscar por clave o descripción y Renumerar claves (01-001, 01.01-001…). El botón Análisis de cada concepto abre su análisis de precio unitario; son los mismos conceptos de la pestaña Análisis P.U., así que lo que cambies en una se ve en la otra. Lo capturado por importe en Materia Prima o Mano de Obra aparece en su partida y se puede pasar al análisis. Los Conceptos/Tareas (fechas, responsable, avance y Gantt) se siguen generando y guardando con el presupuesto y se manejan en la Obra, pestaña 13-Conceptos/Tareas.'],

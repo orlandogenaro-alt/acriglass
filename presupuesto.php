@@ -102,7 +102,16 @@ $paramsJs = [
     'utilidad_modo' => $paramsPres['utilidad_modo'], 'financiamiento_pct' => (float) $paramsPres['financiamiento_pct'],
     'indirectos' => array_keys(parametrosIndirectosActivos($paramsPres)),
     'iva_tasas' => $paramsPres['iva_tasas'], 'iva_defecto' => (float) $paramsPres['iva_defecto'],
+    'tipo_cambio_usd' => 0,
 ];
+// Tipo de cambio vigente (Catalogos › Tipos de cambio) para el «Total en dólares» del resumen del catálogo
+if (!modoConfiguracion()) {
+    try {
+        $paramsJs['tipo_cambio_usd'] = (float) (puTiposCambio()['USD'] ?? 0);
+    } catch (Throwable $e) {
+        error_log('AcriGlass presupuesto tipo de cambio: ' . $e->getMessage());
+    }
+}
 
 // Análisis P.U.: insumos del catálogo (Catalogos › Insumos) con su precio vigente en pesos, para sugerirlos primero.
 // La mano de obra va con su salario base (sin FSR): el análisis le aplica su propio FSR y así no se aplica dos veces.
@@ -398,7 +407,20 @@ $secciones = [
             <!-- Catálogo de Conceptos (como Neodata): los conceptos del Análisis P.U. por partida y subpartida,
                  con clave, unidad, cantidad, P.U., importe y % de cada partida; el total con letra -->
             <div class="cc-panel" id="ccPanel" hidden>
-                <section class="extra cc-catalogo">
+                <div class="cc-vistas" role="tablist">
+                    <button type="button" class="ct-btn" data-cc-vista="resumen" title="Hoja de resumen como el Excel: Materia Prima, Mano de Obra, Gastos de Operacion y utilidades">Resumen</button>
+                    <button type="button" class="ct-btn" data-cc-vista="partidas" title="Partidas, subpartidas y conceptos con su P.U. (como Neodata)">Por partidas</button>
+                </div>
+                <!-- Resumen como la hoja de Excel: se llena solo con lo capturado en MP / MO / GO -->
+                <section class="extra ccr-resumen" id="ccrResumen">
+                    <div class="extra-caja">
+                        <table class="grid mini-grid ccr-grid">
+                            <thead><tr><th class="ccr-anexo">Anexos</th><th>Partidas</th><th class="c-num">Presupuesto sugerido</th><th class="c-num">Subtotal</th><th class="c-num">Total</th><th class="c-pct">%</th></tr></thead>
+                            <tbody id="ccrCuerpo"></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="extra cc-catalogo" id="ccPartidas">
                     <div class="extra-barra">
                         <button type="button" class="ct-btn" id="ccPartida" title="Nueva partida (agrupa conceptos, ej. «Cancelería»)">+ Partida</button>
                         <button type="button" class="ct-btn" id="ccSubpartida" title="Nueva subpartida dentro de la partida seleccionada">+ Subpartida</button>

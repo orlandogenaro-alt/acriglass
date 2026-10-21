@@ -27,7 +27,8 @@ const ACRI_MEMBRETE_DEFECTO = [
     'an_autorizo'        => 'Autorizó',
     'an_puesto'          => 'Dirección General',
     'an_nombre'          => 'LIC. FERNANDO LOVERA COLÍN',
-    'an_color'           => '#dbeef4',   // relleno de títulos y totales
+    'an_color'           => '#daeef3',   // relleno de encabezados de columna y totales
+    'an_color_titulo'    => '#95b3d7',   // relleno del subtítulo (ANALISIS CANCELERIA)
     'an_dolares'         => true,        // renglón Total en dólares (con el tipo de cambio)
 ];
 
@@ -44,7 +45,7 @@ function membrete(): array
     $m = array_replace(ACRI_MEMBRETE_DEFECTO, configLeer('hoja_membretada'));
     $firmas = array_values(array_filter(array_map(fn($f) => trim((string) $f), (array) $m['firmas']), fn($f) => $f !== ''));
     $m['firmas'] = array_slice($firmas ?: ACRI_MEMBRETE_DEFECTO['firmas'], 0, 4);
-    foreach (['color', 'an_color'] as $k) {
+    foreach (['color', 'an_color', 'an_color_titulo'] as $k) {
         if (!preg_match('/^#[0-9a-f]{6}$/i', (string) $m[$k])) $m[$k] = ACRI_MEMBRETE_DEFECTO[$k];
     }
     $m['mostrar_notas'] = (bool) $m['mostrar_notas'];
@@ -71,7 +72,7 @@ function membreteGuardar(array $in): array
     for ($i = 0; $i < 4; $i++) {
         if (array_key_exists("firma$i", $in)) $m['firmas'][$i] = mb_substr(trim((string) $in["firma$i"]), 0, 30);
     }
-    foreach (['color', 'an_color'] as $k) {
+    foreach (['color', 'an_color', 'an_color_titulo'] as $k) {
         if (isset($in[$k]) && preg_match('/^#[0-9a-f]{6}$/i', (string) $in[$k])) $m[$k] = strtolower($in[$k]);
     }
     foreach (['mostrar_notas', 'an_dolares'] as $k) {

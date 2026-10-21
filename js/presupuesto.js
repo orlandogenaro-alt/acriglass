@@ -1076,10 +1076,10 @@
         seccionCc('mo');
         fila('ccr-total', '(+)', 'TOTAL MANO DE OBRA', null, t.mo, t.mo, porc(t.mo));
         fila('ccr-total ccr-fuerte', '(=)', 'TOTAL COSTO PRIMO', null, null, primo, porc(primo));
-        fila('ccr-total', '(−)(=)', 'MARGEN DE UTILIDAD BRUTA', null, null, bruta, porc(bruta));
+        fila('ccr-total ccr-centro', '(−)(=)', 'MARGEN DE UTILIDAD BRUTA', null, null, bruta, porc(bruta));
         seccionCc('go');
         fila('ccr-total', '(−)', 'TOTAL GASTOS DE OPERACION', null, null, t.go, porc(t.go));
-        fila('ccr-total ccr-fuerte', '(=)', 'UTILIDAD NETA', null, null, neta, porc(neta));
+        fila('ccr-total ccr-fuerte ccr-centro', '(=)', 'UTILIDAD NETA', null, null, neta, porc(neta));
         fila('ccr-nota', '', 'PORCENTAJE DE GANANCIA SOBRE PRECIO DE VENTA', null, null, porc(neta), null).como = 'pct';
         fila('ccr-final', '', 'SUBTOTAL', null, null, subtotal, subtotal > 0 ? 100 : null).como = 'fijo';
         fila('ccr-final', '', 'IVA ' + pct(IVA * 100), null, null, iva, null).como = 'fijo';

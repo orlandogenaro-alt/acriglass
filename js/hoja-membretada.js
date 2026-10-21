@@ -39,7 +39,7 @@
 
     var TEXTOS = ['empresa', 'datos', 'titulo', 'titulo_detalle', 'codigo', 'revision', 'leyenda_firma', 'pie', 'color',
         'an_titulo', 'an_subtitulo', 'an_codigo', 'an_revision', 'an_fecha_emision', 'an_etiqueta_cliente',
-        'an_nota', 'an_autorizo', 'an_puesto', 'an_nombre', 'an_color'];
+        'an_nota', 'an_autorizo', 'an_puesto', 'an_nombre', 'an_color', 'an_color_titulo'];
     var CASILLAS = ['mostrar_notas', 'an_dolares'];
 
     // Renglones de ejemplo del Análisis de Cancelería (mismo arreglo que filasResumenCc de presupuesto.js)
@@ -68,7 +68,7 @@
                 f('ccr-calc', 7, 'COMISIONES', 1516.94, null, null, p(1516.94)),
                 f('ccr-total', '(+)', 'TOTAL MANO DE OBRA', null, 8014.80, 8014.80, p(8014.80)),
                 f('ccr-total ccr-fuerte', '(=)', 'TOTAL COSTO PRIMO', null, null, 21741.81, p(21741.81)),
-                f('ccr-total', '(−)(=)', 'MARGEN DE UTILIDAD BRUTA', null, null, 5838.97, p(5838.97)),
+                f('ccr-total ccr-centro', '(−)(=)', 'MARGEN DE UTILIDAD BRUTA', null, null, 5838.97, p(5838.97)),
                 f('ccr-titulo', '', 'GASTOS DE OPERACION'),
                 f('ccr-calc', 8, 'INDIRECTOS OFICINA Y CAMPO (4.5%)', 490.64, null, null, p(490.64)),
                 f('', 9, 'EQUIPO DE HERRAMIENTA 0.15%', 68.95, null, null, p(68.95)),
@@ -76,7 +76,7 @@
                 f('', 11, 'FLETES', 0, null, null, 0),
                 f('', 12, 'OTROS GASTOS 4%', 179.28, null, null, p(179.28)),
                 f('ccr-total', '(−)', 'TOTAL GASTOS DE OPERACION', null, null, 738.87, p(738.87)),
-                f('ccr-total ccr-fuerte', '(=)', 'UTILIDAD NETA', null, null, 5100.10, p(5100.10)),
+                f('ccr-total ccr-fuerte ccr-centro', '(=)', 'UTILIDAD NETA', null, null, 5100.10, p(5100.10)),
                 f('ccr-nota', '', 'PORCENTAJE DE GANANCIA SOBRE PRECIO DE VENTA', null, null, p(5100.10), null, 'pct'),
                 f('ccr-final', '', 'SUBTOTAL', null, null, sub, 100, 'fijo'),
                 f('ccr-final', '', 'IVA 16.00 %', null, null, iva, null, 'fijo'),

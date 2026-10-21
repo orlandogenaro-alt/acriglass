@@ -78,7 +78,8 @@ $m = membreteImpresion();
             <label class="c-campo"><span>Revisión</span><input name="an_revision" maxlength="10"></label>
             <label class="c-campo"><span>Fecha de emisión del formato</span><input name="an_fecha_emision" maxlength="20" placeholder="08-07-2020"></label>
             <label class="c-campo"><span>Etiqueta del cliente</span><input name="an_etiqueta_cliente" maxlength="30" placeholder="ARQUITECTO"></label>
-            <label class="c-campo"><span>Color del relleno</span><input type="color" name="an_color"></label>
+            <label class="c-campo"><span>Relleno del subtítulo</span><input type="color" name="an_color_titulo"></label>
+            <label class="c-campo"><span>Relleno de columnas y totales</span><input type="color" name="an_color"></label>
             <label class="c-campo check"><input type="checkbox" name="an_dolares"> Mostrar el total en dólares</label>
             <label class="c-campo completo"><span>Nota</span><textarea name="an_nota" maxlength="500"></textarea></label>
             <label class="c-campo"><span>Leyenda de la firma</span><input name="an_autorizo" maxlength="40" placeholder="Autorizó"></label>

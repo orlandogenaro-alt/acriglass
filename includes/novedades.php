@@ -6,6 +6,7 @@ return [
     [
         'fecha' => '2026-10-22',
         'cambios' => [
+            ['mejora', 'Presupuesto: doble clic en un concepto del Catálogo abre su análisis, como en Neodata', 'En el Catálogo de Conceptos, doble clic en un concepto (también sobre su descripción) abre su análisis con los insumos: materiales, mano de obra y equipo, igual que la matriz de Neodata. Los conceptos de precio fijo importados no tienen análisis: esos siguen llevando a su renglón en Materia Prima, Mano de Obra o Gastos de Operacion, y los capturados por importe a su renglón.'],
             ['mejora', 'Presupuesto: Catálogo de Conceptos es la primera pestaña', 'La pestaña Catálogo de Conceptos ahora aparece arriba de Materia Prima en la barra de la izquierda del presupuesto. Al abrir un presupuesto sigue mostrándose Materia Prima.'],
             ['nuevo', 'Presupuesto: doble clic en un concepto del Catálogo lleva a su renglón', 'En el Catálogo de Conceptos, doble clic en un concepto abre la pestaña donde está (Materia Prima, Mano de Obra o Gastos de Operacion) y resalta su renglón. Se busca por la clave (C-01) o la descripción; un concepto analizado sin renglón propio lleva al renglón del Análisis P.U. Si es de precio fijo y no tiene renglón propio, avisa que su costo está repartido en esas pestañas. Con el presupuesto en Modificar, el doble clic sobre un campo de texto sigue seleccionando la palabra.'],
         ],

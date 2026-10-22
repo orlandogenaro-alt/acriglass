@@ -1848,9 +1848,8 @@
             renderCc();
         }
     });
-    // Doble clic en un concepto: lleva a su renglón en Materia Prima, Mano de Obra o Gastos de Operacion.
-    // Se busca por la clave (C-01) en el nombre del renglón y, si no está, por la descripción; un concepto analizado
-    // sin renglón propio está en el renglón automático del Análisis P.U.
+    // Renglones de Materia Prima, Mano de Obra o Gastos de Operacion de un concepto de precio fijo:
+    // se buscan por la clave (C-01) en el nombre del renglón y, si no está, por la descripción
     function renglonesDeConcepto(c) {
         var k = clave(c.clave), d = clave(c.descripcion);
         var porClave = k && new RegExp('(^|[^A-Z0-9])' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^A-Z0-9]|$)');
@@ -1863,7 +1862,6 @@
         }
         var h = porClave ? buscar(function (n) { return porClave.test(n); }) : [];
         if (!h.length && d.length >= 4) h = buscar(function (n) { return n.indexOf(d) >= 0; });
-        if (!h.length && !esVenta(c)) h = buscar(function (n, r) { return r.calc === 'pu'; });
         return h;
     }
     function irARenglones(hallados) {
@@ -1878,18 +1876,20 @@
         });
         if (primero) primero.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
+    // Doble clic en un concepto (como en Neodata): abre su análisis (la matriz con sus insumos). Uno de precio fijo no tiene
+    // análisis y uno capturado por importe tampoco: esos llevan a su renglón en Materia Prima, Mano de Obra o Gastos de Operacion
     $('ccCuerpo').addEventListener('dblclick', function (e) {
-        // En un campo que se está editando el doble clic selecciona la palabra
-        if (e.target.closest('button') || (e.target.matches('input, textarea') && !e.target.disabled)) return;
+        if (e.target.closest('button')) return;
         var tr = e.target.closest('tr[data-uid], tr[data-ir-sec]');
         if (!tr) return;
         if (tr.dataset.irSec) { irARenglones([{ sec: tr.dataset.irSec, id: num(tr.dataset.irId) }]); return; }
         var c = conceptoPU(tr.dataset.uid);
+        if (!esVenta(c)) { abrirAnalisis(c); return; }
         calcularTotales();
         var h = renglonesDeConcepto(c);
         if (h.length) { irARenglones(h); return; }
         alert('«' + txt((c.clave ? c.clave + ' ' : '') + c.descripcion) + '» no tiene un renglón propio en Materia Prima, Mano de Obra ni Gastos de Operacion.' +
-              (esVenta(c) ? '\n\nEs de precio fijo: su costo está repartido en los renglones de esas pestañas.' : ''));
+              '\n\nEs de precio fijo (importado), sin análisis: su costo está repartido en los renglones de esas pestañas.');
     });
     $('ccCuerpo').addEventListener('click', function (e) {
         var b = e.target.closest('[data-cc-accion]');

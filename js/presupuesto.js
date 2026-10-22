@@ -1351,7 +1351,7 @@
         function filaConcepto(x) {
             var p = a.total ? pct(x.importe / a.total * 100) : '';
             if (x.otro) {
-                return '<tr class="cc-otro" data-buscar="' + escapar(clave(x.clave + ' ' + x.descripcion)) + '"><td class="id">' + escapar(x.clave) + '</td>' +
+                return '<tr class="cc-otro" data-ir-sec="' + x.sec + '" data-ir-id="' + x.fila.id + '" data-buscar="' + escapar(clave(x.clave + ' ' + x.descripcion)) + '"><td class="id">' + escapar(x.clave) + '</td>' +
                     '<td class="ro izq">' + escapar(x.descripcion) + '</td><td class="ro izq">' + escapar(x.unidad) + '</td>' +
                     '<td class="ro">' + cant(x.cantidad) + '</td><td class="ro">' + fmt(x.pu) + '</td><td class="ro">' + fmt(x.importe) + '</td>' +
                     '<td class="ro">' + p + '</td><td class="pu-acciones">' + (x.fila.calc ? '<span class="cc-nota">Automático</span>' :
@@ -1847,6 +1847,49 @@
             calcularTotales();
             renderCc();
         }
+    });
+    // Doble clic en un concepto: lleva a su renglón en Materia Prima, Mano de Obra o Gastos de Operacion.
+    // Se busca por la clave (C-01) en el nombre del renglón y, si no está, por la descripción; un concepto analizado
+    // sin renglón propio está en el renglón automático del Análisis P.U.
+    function renglonesDeConcepto(c) {
+        var k = clave(c.clave), d = clave(c.descripcion);
+        var porClave = k && new RegExp('(^|[^A-Z0-9])' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^A-Z0-9]|$)');
+        function buscar(prueba) {
+            var hallados = [];
+            ['mp', 'mo', 'go'].forEach(function (s) {
+                datos[s].forEach(function (r) { if (prueba(clave(r.concepto), r)) hallados.push({ sec: s, id: r.id }); });
+            });
+            return hallados;
+        }
+        var h = porClave ? buscar(function (n) { return porClave.test(n); }) : [];
+        if (!h.length && d.length >= 4) h = buscar(function (n) { return n.indexOf(d) >= 0; });
+        if (!h.length && !esVenta(c)) h = buscar(function (n, r) { return r.calc === 'pu'; });
+        return h;
+    }
+    function irARenglones(hallados) {
+        var sec = hallados[0].sec, ids = hallados.filter(function (x) { return x.sec === sec; }).map(function (x) { return x.id; });
+        document.querySelector('.sec-tab[data-sec="' + sec + '"]').click();
+        var primero = null;
+        tbody.querySelectorAll('tr[data-i]').forEach(function (tr) {
+            if (ids.indexOf(datos[sec][tr.dataset.i].id) < 0) return;
+            primero = primero || tr;
+            tr.classList.add('ir-resaltado');
+            setTimeout(function () { tr.classList.remove('ir-resaltado'); }, 2500);
+        });
+        if (primero) primero.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    $('ccCuerpo').addEventListener('dblclick', function (e) {
+        // En un campo que se está editando el doble clic selecciona la palabra
+        if (e.target.closest('button') || (e.target.matches('input, textarea') && !e.target.disabled)) return;
+        var tr = e.target.closest('tr[data-uid], tr[data-ir-sec]');
+        if (!tr) return;
+        if (tr.dataset.irSec) { irARenglones([{ sec: tr.dataset.irSec, id: num(tr.dataset.irId) }]); return; }
+        var c = conceptoPU(tr.dataset.uid);
+        calcularTotales();
+        var h = renglonesDeConcepto(c);
+        if (h.length) { irARenglones(h); return; }
+        alert('«' + txt((c.clave ? c.clave + ' ' : '') + c.descripcion) + '» no tiene un renglón propio en Materia Prima, Mano de Obra ni Gastos de Operacion.' +
+              (esVenta(c) ? '\n\nEs de precio fijo: su costo está repartido en los renglones de esas pestañas.' : ''));
     });
     $('ccCuerpo').addEventListener('click', function (e) {
         var b = e.target.closest('[data-cc-accion]');

@@ -535,6 +535,9 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .cc-grid tr.cc-partida input, .cc-grid tr.cc-sub input { font-weight: inherit; color: inherit; }
 .cc-grid .cc-nombre { padding: 0 8px; }
 .cc-grid tr.cc-otro td { color: var(--texto-3); }
+/* Doble clic en un concepto lleva a su renglón en MP / MO / GO: los campos bloqueados dejan pasar el clic al renglón */
+.cc-grid tr[data-uid] :is(input, textarea):disabled { pointer-events: none; }
+#grid tbody tr.ir-resaltado td { background: var(--azul-suave) !important; transition: background .3s; }
 .cc-grid .cc-nota { padding: 0 6px; font-size: 12px; color: var(--texto-3); }
 .cc-grid .ct-btn.cc-falta { color: var(--ambar); }
 .cc-grid textarea.cc-espec { display: block; width: 100%; min-height: 26px; border: none; padding: 2px 8px 6px; background: transparent; color: var(--texto-2);

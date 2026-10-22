@@ -449,6 +449,8 @@
     // Precio fijo para el cliente (importado del Catálogo junto con el Análisis): su P.U. es el del archivo y no suma al costo,
     // porque el costo ya está en Materia Prima, Mano de Obra y Gastos de Operacion
     function esVenta(c) { return c.venta > 0; }
+    var TITULO_FIJO = 'Precio importado del Catálogo: el costo viene de Materia Prima, Mano de Obra y Gastos de Operacion. ' +
+                      'Ver o capturar su matriz (informativa: no suma al costo)';
     function hayVenta() { return analisis.conceptos.some(esVenta); }
 
     function ponerAnalisisPU(a) {
@@ -468,17 +470,18 @@
             conceptos: analisis.conceptos.map(function (c) {
                 return { clave: c.clave, partida: c.partida, descripcion: c.descripcion, unidad: c.unidad, cantidad: c.cantidad,
                          especificacion: c.especificacion || '', venta: esVenta(c) ? c.venta : 0,
-                         insumos: esVenta(c) ? [] : c.insumos.map(function (i) { return limpiarInsumo(i); }) };
+                         insumos: c.insumos.map(function (i) { return limpiarInsumo(i); }) };
             })
         };
     }
 
     // Mano de obra: si se captura lo que rinde por jornada, la cantidad es 1 / rendimiento
     function cantidadInsumo(i) { return i.tipo === 'MO' && i.rinde > 0 ? 1 / i.rinde : i.cantidad; }
-    // Costo de UNA unidad del concepto
-    function costoUnitario(c) {
+    // Costo de UNA unidad del concepto. Uno de precio fijo no suma al costo: su matriz es informativa
+    // (informativa = true la calcula igual, para mostrarla en la ventana del análisis)
+    function costoUnitario(c, informativa) {
         var r = { mat: 0, mo: 0, eq: 0 };
-        if (!esVenta(c)) c.insumos.forEach(function (i) { r[i.tipo.toLowerCase()] += cantidadInsumo(i) * i.costo; });
+        if (informativa || !esVenta(c)) c.insumos.forEach(function (i) { r[i.tipo.toLowerCase()] += cantidadInsumo(i) * i.costo; });
         r.moReal = r.mo * factorFsr();
         r.hm = r.moReal * analisis.hm / 100;
         r.cd = r.mat + r.eq + r.moReal + r.hm;
@@ -671,7 +674,7 @@
                 '<td><input type="number" class="num" data-pu="cantidad" step="0.01" min="0" value="' + (c.cantidad || '') + '"' + dis + '></td>' +
                 '<td class="ro" data-pu-calc="pu">' + fmt(x.pu) + '</td><td class="ro" data-pu-calc="importe">' + fmt(x.importe) + '</td>' +
                 '<td class="ro izq pu-rev' + (falta ? ' falta' : ' ok') + '" data-pu-calc="rev">' + (falta ? '⚠ ' + falta : '✓ Listo') + '</td>' +
-                '<td class="pu-acciones">' + (esVenta(c) ? '<span class="cc-nota" title="Precio importado del Catálogo: el costo viene de Materia Prima, Mano de Obra y Gastos de Operacion">Precio fijo</span>'
+                '<td class="pu-acciones">' + (esVenta(c) ? '<button type="button" class="ct-btn" data-pu-accion="analizar" title="' + TITULO_FIJO + '">Precio fijo</button>'
                     : '<button type="button" class="ct-btn" data-pu-accion="analizar" title="Capturar lo que lleva una unidad">Analizar</button>') +
                 '<button type="button" class="pu-mini" data-pu-accion="duplicar" title="Duplicar el concepto con su análisis"' + dis + '>⧉</button>' +
                 '<button type="button" class="pu-mini borrar" data-pu-accion="quitar" title="Quitar el concepto"' + dis + '>✕</button></td></tr>';
@@ -740,6 +743,8 @@
             insumos[k].importe += importe;
         }
         analisis.conceptos.forEach(function (c) {
+            // La matriz de un precio fijo es informativa: su costo ya está en Materia Prima, Mano de Obra y Gastos de Operacion
+            if (esVenta(c)) return;
             c.insumos.forEach(function (i) {
                 var q = cantidadInsumo(i) * c.cantidad;
                 if (q) sumar(TIPOS_INSUMO[i.tipo], i.descripcion, i.unidad, q, q * i.costo);
@@ -892,7 +897,8 @@
     function renderDialogo() {
         var c = editandoPU, dis = soloLectura ? ' disabled' : '', u = txt(c.unidad) || 'unidad';
         $('puDAyuda').innerHTML = 'Anota lo que lleva <b>1 ' + escapar(u) + '</b> de «' + escapar(c.descripcion || 'este concepto') + '». ' +
-            'Ejemplo para 1 m² de cancel: 1.05 m² de vidrio (con desperdicio), 3.2 m de perfil, y la mano de obra con lo que hace un instalador en una jornada (8 m² → escribe 8 en «Rinde por jornada»).';
+            'Ejemplo para 1 m² de cancel: 1.05 m² de vidrio (con desperdicio), 3.2 m de perfil, y la mano de obra con lo que hace un instalador en una jornada (8 m² → escribe 8 en «Rinde por jornada»).' +
+            (esVenta(c) ? '<br><b>Precio fijo para el cliente:</b> esta matriz es informativa; no cambia el P. Unitario ni suma al costo, que ya viene de Materia Prima, Mano de Obra y Gastos de Operacion.' : '');
         $('puDColCant').textContent = 'Cantidad por ' + u;
         $('puDInsumos').innerHTML = c.insumos.length ? c.insumos.map(function (i, n) {
             var mo = i.tipo === 'MO', calc = mo && i.rinde > 0;
@@ -914,7 +920,7 @@
     }
 
     function pintarDialogo() {
-        var c = editandoPU, u = costoUnitario(c), r = calcularPU(), unidad = escapar(txt(c.unidad) || 'unidad');
+        var c = editandoPU, fijo = esVenta(c), u = costoUnitario(c, true), r = calcularPU(), unidad = escapar(txt(c.unidad) || 'unidad');
         $('puDInsumos').querySelectorAll('tr[data-n]').forEach(function (tr) {
             var i = c.insumos[tr.dataset.n];
             tr.querySelector('[data-ins-calc]').textContent = fmt(cantidadInsumo(i) * i.costo);
@@ -927,9 +933,12 @@
             (u.hm ? '<span>Herramienta menor <b>' + fmt(u.hm) + '</b></span>' : '') +
             '<span>Equipo <b>' + fmt(u.eq) + '</b></span>' +
             '<span>= Costo directo por ' + unidad + ' <b>' + fmt(u.cd) + '</b></span>' +
-            '<span>× Factor de sobrecosto <b>' + cant(Math.round(r.factor * 10000) / 10000) + '</b></span>' +
-            '<span class="pu-pu">= Precio unitario <b>$' + fmt(u.cd * r.factor) + '</b> por ' + unidad + '</span>' +
-            '<span class="pu-pu">Importe (× ' + cant(c.cantidad) + ') <b>$' + fmt(u.cd * r.factor * c.cantidad) + '</b></span>' +
+            (fijo
+                ? '<span class="pu-pu">Precio fijo para el cliente <b>$' + fmt(c.venta) + '</b> por ' + unidad + '</span>' +
+                  '<span class="pu-pu">Importe (× ' + cant(c.cantidad) + ') <b>$' + fmt(c.venta * c.cantidad) + '</b></span>'
+                : '<span>× Factor de sobrecosto <b>' + cant(Math.round(r.factor * 10000) / 10000) + '</b></span>' +
+                  '<span class="pu-pu">= Precio unitario <b>$' + fmt(u.cd * r.factor) + '</b> por ' + unidad + '</span>' +
+                  '<span class="pu-pu">Importe (× ' + cant(c.cantidad) + ') <b>$' + fmt(u.cd * r.factor * c.cantidad) + '</b></span>') +
             (falta ? '<span class="pu-falta">⚠ ' + falta + '</span>' : '');
     }
 
@@ -1037,7 +1046,7 @@
             destino.conceptos.push({
                 clave: x.clave, descripcion: x.descripcion, unidad: x.unidad, cantidad: x.cantidad, pu: x.pu, importe: x.importe,
                 cd: x.cdU, especificacion: x.c ? x.c.especificacion || '' : '',
-                insumos: !detalle ? [] : x.c ? x.c.insumos.map(function (i) {
+                insumos: !detalle || (x.c && esVenta(x.c)) ? [] : x.c ? x.c.insumos.map(function (i) {
                     var q = cantidadInsumo(i);
                     return { tipo: TIPOS_INSUMO[i.tipo], descripcion: i.descripcion, unidad: i.unidad, cantidad: q, costo: i.costo,
                              importe: q * i.costo * (i.tipo === 'MO' ? factorFsr() : 1) };
@@ -1272,7 +1281,7 @@
             catalogoPU(calcularPU()).forEach(function (x) {
                 if (x.otro || esVenta(x.c)) return;
                 x.c.venta = Math.max(0.01, redondear(x.pu));
-                x.c.insumos = [];
+                x.c.insumos = sinPrecioPlano(x.c.insumos);   // su análisis queda como matriz informativa
             });
         }
         var vistos = { mp: {}, mo: {}, go: {} }, n = 0;
@@ -1372,7 +1381,7 @@
                 '<td class="ro" data-cc-calc="importe">' + fmt(x.importe) + '</td>' +
                 '<td class="ro" data-cc-calc="pct">' + p + '</td>' +
                 '<td class="pu-acciones">' + (esVenta(c)
-                    ? '<span class="cc-nota" title="Precio importado del Catálogo: el costo viene de Materia Prima, Mano de Obra y Gastos de Operacion">Precio fijo</span>'
+                    ? '<button type="button" class="ct-btn" data-cc-accion="analizar" title="' + TITULO_FIJO + '">Precio fijo</button>'
                     : '<button type="button" class="ct-btn' + (falta ? ' cc-falta' : '') + '" data-cc-accion="analizar" title="' +
                     (falta ? '⚠ ' + falta : 'Ver o cambiar el análisis de una unidad') + '">' + (falta ? '⚠ ' : '') + 'Análisis</button>') +
                 '<button type="button" class="pu-mini" data-cc-accion="subir" title="Subir"' + dis + '>↑</button>' +
@@ -1636,6 +1645,10 @@
         pintarImportacion(cciFilas.length ? '' : 'No hay renglones con concepto para agregar.');
     }
 
+    // Sin el insumo «Precio unitario importado» (el P.U. del archivo sin análisis propio): no es una matriz real
+    function sinPrecioPlano(insumos) {
+        return insumos.filter(function (i) { return i.descripcion !== 'Precio unitario importado'; });
+    }
     function importable(x) { return !!x.descripcion && (!!x.cat || x.pu > 0); }
     function pintarImportacion(error) {
         var html = cciFilas.map(function (x) {
@@ -1662,7 +1675,7 @@
                 e.cantidad = x.cantidad;
                 if (x.unidad) e.unidad = x.unidad;
                 if (x.especificacion) e.especificacion = x.especificacion;
-                if (x.venta) { e.venta = x.venta; e.insumos = []; }
+                if (x.venta) { e.venta = x.venta; e.insumos = x.cat ? x.cat.insumos.map(limpiarInsumo) : sinPrecioPlano(e.insumos); }
                 else if (x.ponerPU && x.cat) e.insumos = x.cat.insumos.map(limpiarInsumo);
                 else if (x.ponerPU) ajustar.push({ c: e, pu: x.pu });
                 cambiados++;
@@ -1670,7 +1683,7 @@
             }
             var c = nuevoConcepto({ clave: x.clave, partida: x.partida || (x.cat ? x.cat.partida : '') || 'Importados', descripcion: x.descripcion,
                                     especificacion: x.especificacion, unidad: x.unidad, cantidad: x.cantidad, venta: x.venta || 0,
-                                    insumos: x.venta ? [] : x.cat ? x.cat.insumos : [{ tipo: 'MAT', descripcion: 'Precio unitario importado', unidad: x.unidad, cantidad: 1, costo: x.pu }] });
+                                    insumos: x.cat ? x.cat.insumos : x.venta ? [] : [{ tipo: 'MAT', descripcion: 'Precio unitario importado', unidad: x.unidad, cantidad: 1, costo: x.pu }] });
             analisis.conceptos.push(c);
             if (!x.cat && !x.venta) ajustar.push({ c: c, pu: x.pu });
             nuevos++;
@@ -1848,48 +1861,24 @@
             renderCc();
         }
     });
-    // Renglones de Materia Prima, Mano de Obra o Gastos de Operacion de un concepto de precio fijo:
-    // se buscan por la clave (C-01) en el nombre del renglón y, si no está, por la descripción
-    function renglonesDeConcepto(c) {
-        var k = clave(c.clave), d = clave(c.descripcion);
-        var porClave = k && new RegExp('(^|[^A-Z0-9])' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^A-Z0-9]|$)');
-        function buscar(prueba) {
-            var hallados = [];
-            ['mp', 'mo', 'go'].forEach(function (s) {
-                datos[s].forEach(function (r) { if (prueba(clave(r.concepto), r)) hallados.push({ sec: s, id: r.id }); });
-            });
-            return hallados;
-        }
-        var h = porClave ? buscar(function (n) { return porClave.test(n); }) : [];
-        if (!h.length && d.length >= 4) h = buscar(function (n) { return n.indexOf(d) >= 0; });
-        return h;
-    }
-    function irARenglones(hallados) {
-        var sec = hallados[0].sec, ids = hallados.filter(function (x) { return x.sec === sec; }).map(function (x) { return x.id; });
+    // Lleva al renglón de Materia Prima, Mano de Obra o Gastos de Operacion y lo resalta
+    function irARenglon(sec, id) {
         document.querySelector('.sec-tab[data-sec="' + sec + '"]').click();
-        var primero = null;
         tbody.querySelectorAll('tr[data-i]').forEach(function (tr) {
-            if (ids.indexOf(datos[sec][tr.dataset.i].id) < 0) return;
-            primero = primero || tr;
+            if (datos[sec][tr.dataset.i].id !== id) return;
             tr.classList.add('ir-resaltado');
             setTimeout(function () { tr.classList.remove('ir-resaltado'); }, 2500);
+            tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
         });
-        if (primero) primero.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
-    // Doble clic en un concepto (como en Neodata): abre su análisis (la matriz con sus insumos). Uno de precio fijo no tiene
-    // análisis y uno capturado por importe tampoco: esos llevan a su renglón en Materia Prima, Mano de Obra o Gastos de Operacion
+    // Doble clic en un concepto (como en Neodata): abre su análisis, la matriz con sus insumos (en uno de precio fijo es
+    // informativa). Uno capturado por importe no tiene análisis: lleva a su renglón en Materia Prima, Mano de Obra o Gastos
     $('ccCuerpo').addEventListener('dblclick', function (e) {
         if (e.target.closest('button')) return;
         var tr = e.target.closest('tr[data-uid], tr[data-ir-sec]');
         if (!tr) return;
-        if (tr.dataset.irSec) { irARenglones([{ sec: tr.dataset.irSec, id: num(tr.dataset.irId) }]); return; }
-        var c = conceptoPU(tr.dataset.uid);
-        if (!esVenta(c)) { abrirAnalisis(c); return; }
-        calcularTotales();
-        var h = renglonesDeConcepto(c);
-        if (h.length) { irARenglones(h); return; }
-        alert('«' + txt((c.clave ? c.clave + ' ' : '') + c.descripcion) + '» no tiene un renglón propio en Materia Prima, Mano de Obra ni Gastos de Operacion.' +
-              '\n\nEs de precio fijo (importado), sin análisis: su costo está repartido en los renglones de esas pestañas.');
+        if (tr.dataset.irSec) irARenglon(tr.dataset.irSec, num(tr.dataset.irId));
+        else abrirAnalisis(conceptoPU(tr.dataset.uid));
     });
     $('ccCuerpo').addEventListener('click', function (e) {
         var b = e.target.closest('[data-cc-accion]');

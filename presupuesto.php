@@ -215,10 +215,10 @@ $puedeRegistrarObra = tienePermiso('NUEVO_OBRA', 'ADMIN_USER');
 
 // Secciones del presupuesto (pestañas verticales)
 $secciones = [
+    'cc' => 'Catálogo de Conceptos',
     'mp' => 'Materia Prima',
     'mo' => 'Mano de Obra',
     'go' => 'Gastos de Operacion',
-    'cc' => 'Catálogo de Conceptos',
     'pu' => 'Análisis P.U.',
     'an' => 'Análisis',
 ];
@@ -392,9 +392,9 @@ $secciones = [
     <!-- Conceptos -->
     <div class="conceptos">
         <nav class="sec-tabs">
-            <?php $primero = true; foreach ($secciones as $clave => $nombre): ?>
-            <button class="sec-tab<?= $primero ? ' activo' : '' ?>" data-sec="<?= $clave ?>"><span><?= $nombre ?></span></button>
-            <?php $primero = false; endforeach; ?>
+            <?php foreach ($secciones as $clave => $nombre): ?>
+            <button class="sec-tab<?= $clave === 'mp' ? ' activo' : '' ?>" data-sec="<?= $clave ?>"><span><?= $nombre ?></span></button>
+            <?php endforeach; ?>
         </nav>
 
         <div class="sec-cuerpo">

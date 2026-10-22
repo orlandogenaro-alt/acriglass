@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-10-22',
+        'cambios' => [
+            ['mejora', 'Presupuesto: Catálogo de Conceptos es la primera pestaña', 'La pestaña Catálogo de Conceptos ahora aparece arriba de Materia Prima en la barra de la izquierda del presupuesto. Al abrir un presupuesto sigue mostrándose Materia Prima.'],
+        ],
+    ],
+    [
         'fecha' => '2026-10-21',
         'cambios' => [
             ['mejora', 'Presupuesto: Exportar a Excel descarga un .xlsx con el texto completo de cada concepto', 'Exportar a Excel del Catálogo de Conceptos y del Análisis ahora descarga un archivo de Excel (.xlsx) en lugar de CSV. En el Catálogo, el concepto y su especificación van completos en la misma celda, como en el PDF, con «ajustar texto» y la columna ancha para que se lea todo el texto y no solo la primera línea; los importes salen con formato de moneda y los totales en negritas. En el Análisis, los importes con formato de moneda y los % como porcentaje. Importar de Excel ahora también acepta el archivo .xlsx (además de pegar las celdas o un .csv), así que lo exportado se puede volver a importar tal cual.'],

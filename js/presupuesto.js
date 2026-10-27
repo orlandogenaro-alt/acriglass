@@ -912,7 +912,7 @@
         // También el Tipo de Neodata: 1 material, 2 mano de obra, 3 equipo / herramienta (%)
         return /^(MO|MANO|2$)/.test(t) ? 'MO' : /^(EQ|HERR|3$)/.test(t) ? 'EQ' : 'MAT';
     }
-    function importarMatrices(celdas, archivo) {
+    function importarMatrices(celdas) {
         var col = null, inicio = 0;
         for (var n = 0; n < Math.min(celdas.length, 10) && !col; n++) {
             var c = {};
@@ -921,7 +921,7 @@
             });
             if (c.insumo !== undefined && (c.cantidad !== undefined || c.costo !== undefined || c.clave !== undefined || c.concepto !== undefined)) { col = c; inicio = n + 1; }
         }
-        if (!col) { alert('No encontré los títulos de las columnas (Código, Concepto, Tipo, Insumo, Unidad, Cantidad, Costo unitario). Usa el archivo de «Exportar matrices a Excel».'); return; }
+        if (!col) return;
         // Sin columna Concepto es la matriz de UN concepto (como la de Neodata: Renglón, Código, Descripción completa, Tipo…):
         // su Código es el del insumo y va al concepto abierto en la ventana
         var suelta = col.concepto === undefined;
@@ -950,10 +950,7 @@
         // Lo que no es de ningún concepto del catálogo (o una matriz suelta) va al concepto abierto
         if (sinConcepto.length && editandoPU && !aplicar.some(function (x) { return x.c === editandoPU; })) aplicar.push({ c: editandoPU, insumos: sinConcepto });
         aplicar.forEach(function (x) { x.c.insumos = x.insumos; });
-        var total = aplicar.reduce(function (s, x) { return s + x.insumos.length; }, 0);
-        $('puDNota').textContent = '«' + (archivo || 'archivo') + '»: ' + (aplicar.length
-            ? 'se importaron ' + total + ' insumo(s) en ' + aplicar.length + ' concepto(s).'
-            : 'no trae renglones de insumos; ninguna matriz cambió.');
+        // Sin avisos: si el archivo no trae insumos simplemente no cambia nada
         if (!aplicar.length) return;
         marcarCambio();
         calcularTotales();
@@ -970,12 +967,12 @@
         var f = this.files[0];
         if (!f) return;
         if (/\.xlsx$/i.test(f.name)) {
-            XlsxSimple.leer(f).then(function (filas) { importarMatrices(filas, f.name); }).catch(function (e) { alert('No se pudo leer el archivo de Excel: ' + (e && e.message || e)); });
+            XlsxSimple.leer(f).then(function (filas) { importarMatrices(filas); }).catch(function (e) { alert('No se pudo leer el archivo de Excel: ' + (e && e.message || e)); });
         } else if (/\.xls$/i.test(f.name)) {
             alert('Ese archivo es de Excel antiguo (.xls): en Excel guárdalo como .xlsx.');
         } else {
             var lector = new FileReader();
-            lector.onload = function () { importarMatrices(separarCeldas(lector.result), f.name); };
+            lector.onload = function () { importarMatrices(separarCeldas(lector.result)); };
             lector.readAsText(f, 'UTF-8');
         }
     });

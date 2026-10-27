@@ -745,7 +745,7 @@ $secciones = [
     </div>
     <div class="pu-dlg-totales" id="puDTotales"></div>
     <div class="hs-pie">
-        <span class="extra-ayuda">Los cambios se aplican al momento.</span>
+        <span class="extra-ayuda" id="puDNota">Los cambios se aplican al momento.</span>
         <button type="button" class="hs-btn principal" data-pu-cerrar>Listo</button>
     </div>
 </dialog>

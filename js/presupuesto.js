@@ -934,43 +934,27 @@
             if (cve || con) { ultClave = cve; ultConcepto = con; }
             var llave = clave(ultClave) + '|' + clave(ultConcepto);
             if (!porLlave[llave]) { porLlave[llave] = { clave: ultClave, concepto: ultConcepto, insumos: [] }; matrices.push(porLlave[llave]); }
-            var desc = txt(v(f, 'insumo'));
-            if (!desc) return;
-            porLlave[llave].insumos.push(limpiarInsumo({ tipo: tipoInsumo(v(f, 'tipo')), codigo: txt(v(f, 'codigo')), descripcion: desc, unidad: txt(v(f, 'unidad')),
-                cantidad: numeroCelda(v(f, 'cantidad')), rinde: numeroCelda(v(f, 'rinde')), costo: numeroCelda(v(f, 'costo')) }));
+            // Se sube tal cual, sin revisar (para ir juntando datos): basta con que el renglón traiga algo del insumo
+            var ins = { tipo: tipoInsumo(v(f, 'tipo')), codigo: txt(v(f, 'codigo')), descripcion: txt(v(f, 'insumo')), unidad: txt(v(f, 'unidad')),
+                        cantidad: numeroCelda(v(f, 'cantidad')), rinde: numeroCelda(v(f, 'rinde')), costo: numeroCelda(v(f, 'costo')) };
+            if (!ins.codigo && !ins.descripcion && !ins.unidad && !ins.cantidad && !ins.costo) return;
+            porLlave[llave].insumos.push(limpiarInsumo(ins));
         });
-        var aplicar = [], faltan = [], sinConcepto = [];
+        var aplicar = [], sinConcepto = [];
         matrices.forEach(function (m) {
             if (!m.insumos.length) return;
             var c = !suelta && (analisis.conceptos.filter(function (x) { return m.clave && clave(x.clave) === clave(m.clave); })[0] ||
                     analisis.conceptos.filter(function (x) { return m.concepto && clave(x.descripcion) === clave(m.concepto); })[0]);
-            if (c) aplicar.push({ c: c, insumos: m.insumos });
-            else { faltan.push(m.clave || m.concepto || 'sin concepto'); sinConcepto = sinConcepto.concat(m.insumos); }
+            if (c) aplicar.push({ c: c, insumos: m.insumos }); else sinConcepto = sinConcepto.concat(m.insumos);
         });
-        if (!aplicar.length && !sinConcepto.length) {
-            alert('El archivo no trae insumos: debajo de cada concepto llena un renglón por insumo con su Insumo (descripción), Tipo, Unidad, Cantidad y Costo unitario.');
-            return;
-        }
-        // Lo que no es de ningún concepto del catálogo (o una matriz suelta) se puede subir al concepto abierto
-        if (!aplicar.length) {
-            var abierto = editandoPU;
-            if (!abierto) { alert('El archivo no trae insumos de ningún concepto del catálogo.\n\nNo están en el catálogo: ' + faltan.join(', ')); return; }
-            if (!confirm((suelta ? 'El archivo es la matriz de un concepto' : 'Ningún concepto del archivo está en el catálogo (' + faltan.join(', ') + ')') +
-                         ': ' + sinConcepto.length + ' insumos.\n\n¿Ponerlos en la matriz de «' + txt((abierto.clave ? abierto.clave + ' ' : '') + abierto.descripcion) + '»?' +
-                         (abierto.insumos.length ? ' Se reemplazan los ' + abierto.insumos.length + ' insumos que tiene.' : '') +
-                         (esVenta(abierto) ? '' : '\n\nOjo: no es de precio fijo; su P. Unitario se calcula con la matriz y puede cambiar.'))) return;
-            abierto.insumos = sinConcepto;
-            marcarCambio();
-            calcularTotales();
-            render();
-            renderDialogo();
-            return;
-        }
-        var calculan = aplicar.filter(function (x) { return !esVenta(x.c); }).length;
-        if (!confirm('Se reemplaza la matriz de ' + aplicar.length + ' concepto(s) con ' + aplicar.reduce(function (s, x) { return s + x.insumos.length; }, 0) + ' insumos.' +
-                     (calculan ? '\n\nOjo: ' + calculan + ' no son de precio fijo; su P. Unitario se calcula con la matriz y puede cambiar.' : '') +
-                     (faltan.length ? '\n\nNo están en el catálogo (se omiten): ' + faltan.join(', ') : '') + '\n\n¿Continuar?')) return;
+        // Lo que no es de ningún concepto del catálogo (o una matriz suelta) va al concepto abierto
+        if (sinConcepto.length && editandoPU && !aplicar.some(function (x) { return x.c === editandoPU; })) aplicar.push({ c: editandoPU, insumos: sinConcepto });
         aplicar.forEach(function (x) { x.c.insumos = x.insumos; });
+        var total = aplicar.reduce(function (s, x) { return s + x.insumos.length; }, 0);
+        $('puDNota').textContent = aplicar.length
+            ? 'Importado: ' + total + ' insumo(s) en ' + aplicar.length + ' concepto(s).'
+            : 'Importado: el archivo no trae insumos; ninguna matriz cambió.';
+        if (!aplicar.length) return;
         marcarCambio();
         calcularTotales();
         render();
@@ -1008,6 +992,7 @@
         ['puDConcepto', 'puDUnidad', 'puDCantidad', 'puDPartida', 'puDEspecificacion'].forEach(function (id) { $(id).disabled = dis; });
         $('puDialogo').querySelectorAll('[data-pu-insumo]').forEach(function (b) { b.disabled = dis; });
         $('puDImportar').disabled = dis;
+        $('puDNota').textContent = 'Los cambios se aplican al momento.';
         renderDialogo();
         $('puDialogo').showModal();
         if (!dis && !c.insumos.length) $('puDialogo').querySelector('[data-pu-insumo="MAT"]').focus();

@@ -912,7 +912,7 @@
         // También el Tipo de Neodata: 1 material, 2 mano de obra, 3 equipo / herramienta (%)
         return /^(MO|MANO|2$)/.test(t) ? 'MO' : /^(EQ|HERR|3$)/.test(t) ? 'EQ' : 'MAT';
     }
-    function importarMatrices(celdas) {
+    function importarMatrices(celdas, archivo) {
         var col = null, inicio = 0;
         for (var n = 0; n < Math.min(celdas.length, 10) && !col; n++) {
             var c = {};
@@ -951,9 +951,9 @@
         if (sinConcepto.length && editandoPU && !aplicar.some(function (x) { return x.c === editandoPU; })) aplicar.push({ c: editandoPU, insumos: sinConcepto });
         aplicar.forEach(function (x) { x.c.insumos = x.insumos; });
         var total = aplicar.reduce(function (s, x) { return s + x.insumos.length; }, 0);
-        $('puDNota').textContent = aplicar.length
-            ? 'Importado: ' + total + ' insumo(s) en ' + aplicar.length + ' concepto(s).'
-            : 'Importado: el archivo no trae insumos; ninguna matriz cambió.';
+        $('puDNota').textContent = '«' + (archivo || 'archivo') + '»: ' + (aplicar.length
+            ? 'se importaron ' + total + ' insumo(s) en ' + aplicar.length + ' concepto(s).'
+            : 'no trae renglones de insumos; ninguna matriz cambió.');
         if (!aplicar.length) return;
         marcarCambio();
         calcularTotales();
@@ -970,12 +970,12 @@
         var f = this.files[0];
         if (!f) return;
         if (/\.xlsx$/i.test(f.name)) {
-            XlsxSimple.leer(f).then(importarMatrices).catch(function (e) { alert('No se pudo leer el archivo de Excel: ' + (e && e.message || e)); });
+            XlsxSimple.leer(f).then(function (filas) { importarMatrices(filas, f.name); }).catch(function (e) { alert('No se pudo leer el archivo de Excel: ' + (e && e.message || e)); });
         } else if (/\.xls$/i.test(f.name)) {
             alert('Ese archivo es de Excel antiguo (.xls): en Excel guárdalo como .xlsx.');
         } else {
             var lector = new FileReader();
-            lector.onload = function () { importarMatrices(separarCeldas(lector.result)); };
+            lector.onload = function () { importarMatrices(separarCeldas(lector.result), f.name); };
             lector.readAsText(f, 'UTF-8');
         }
     });

@@ -738,7 +738,8 @@ $secciones = [
     </div>
     <div class="extra-caja pu-dlg-tabla">
         <table class="grid mini-grid">
-            <thead><tr><th>Tipo</th><th>Descripción</th><th>Unidad</th><th class="c-num" id="puDColCant">Cantidad</th><th class="c-num" title="Solo mano de obra: cuántas unidades del concepto hace en una jornada">Rinde por jornada</th><th class="c-num">Costo unitario</th><th class="c-num">Importe</th><th class="c-del"></th></tr></thead>
+            <!-- Columnas como la matriz de Neodata -->
+            <thead><tr><th class="pu-c-ren">Renglón</th><th class="pu-c-cod">Código</th><th>Descripción</th><th class="pu-c-tipo">Tipo</th><th class="pu-c-uni">Unidad</th><th class="c-num">Costo</th><th class="c-num" id="puDColCant">Cantidad</th><th class="c-num" title="Solo mano de obra: cuántas unidades del concepto hace en una jornada">Rinde por jornada</th><th class="c-num">Importe</th><th class="c-del"></th></tr></thead>
             <tbody id="puDInsumos"></tbody>
         </table>
     </div>

@@ -437,7 +437,7 @@
         return 'C-' + pad3(n + 1);
     }
     function limpiarInsumo(i) {
-        return { tipo: TIPOS_INSUMO[i.tipo] ? i.tipo : 'MAT', descripcion: String(i.descripcion || ''), unidad: String(i.unidad || ''),
+        return { tipo: TIPOS_INSUMO[i.tipo] ? i.tipo : 'MAT', codigo: String(i.codigo || ''), descripcion: String(i.descripcion || ''), unidad: String(i.unidad || ''),
                  cantidad: num(i.cantidad), rinde: num(i.rinde), costo: num(i.costo) };
     }
     function nuevoConcepto(c) {
@@ -881,7 +881,8 @@
     // ----- Matrices de todos los conceptos con Excel (botones de la ventana de análisis) -----
     // Un renglón por insumo con el código y el concepto; un concepto sin matriz sale en un renglón para llenarlo
     var COLUMNAS_MATRIZ = [
-        ['clave', /^(c[oó]digo|clave|cve)/i],
+        ['codigo', /^(c[oó]digo|clave|cve)\s+(del\s+)?insumo/i],
+        ['clave', /^(c[oó]digo|clave|cve)(?!.*insumo)/i],
         ['concepto', /^concepto/i],
         ['tipo', /^tipo/i],
         ['insumo', /^(insumo|descripci[oó]n)/i],
@@ -891,24 +892,25 @@
         ['costo', /^(costo|precio|p\.?\s*unit)/i]
     ];
     function exportarMatrices() {
-        var filas = [['Código', 'Concepto', 'Tipo', 'Insumo', 'Unidad', 'Cantidad', 'Rinde por jornada', 'Costo unitario', 'Importe']
+        var filas = [['Código', 'Concepto', 'Código insumo', 'Tipo', 'Insumo', 'Unidad', 'Cantidad', 'Rinde por jornada', 'Costo unitario', 'Importe']
             .map(function (t) { return { v: t, e: 'titulo' }; })];
         analisis.conceptos.forEach(function (c) {
             var concepto = { v: c.descripcion, e: 'texto' };
             if (!c.insumos.length) { filas.push([c.clave, concepto]); return; }
             c.insumos.forEach(function (i) {
-                filas.push([c.clave, concepto, TIPOS_INSUMO[i.tipo], { v: i.descripcion, e: 'texto' }, i.unidad, { v: num(i.cantidad), e: 'cantidad' },
+                filas.push([c.clave, concepto, i.codigo, TIPOS_INSUMO[i.tipo], { v: i.descripcion, e: 'texto' }, i.unidad, { v: num(i.cantidad), e: 'cantidad' },
                             i.tipo === 'MO' && i.rinde > 0 ? { v: i.rinde, e: 'cantidad' } : null, { v: num(i.costo), e: 'dinero' },
                             { v: redondear(cantidadInsumo(i) * i.costo), e: 'dinero' }]);
             });
         });
         if (filas.length < 2) { alert('El catálogo está vacío: no hay matrices que exportar.'); return; }
-        XlsxSimple.descargar(XlsxSimple.crear({ nombre: 'Matrices', anchos: [10, 45, 18, 40, 9, 11, 11, 14, 14], fijarFila: 1, filas: filas }),
+        XlsxSimple.descargar(XlsxSimple.crear({ nombre: 'Matrices', anchos: [10, 45, 16, 18, 40, 9, 11, 11, 14, 14], fijarFila: 1, filas: filas }),
                              'Matrices ' + (txt($('proyecto').value) || 'presupuesto'));
     }
     function tipoInsumo(t) {
         t = clave(t);
-        return /^(MO|MANO)/.test(t) ? 'MO' : /^(EQ|HERR)/.test(t) ? 'EQ' : 'MAT';
+        // También el Tipo de Neodata: 1 material, 2 mano de obra, 3 equipo / herramienta (%)
+        return /^(MO|MANO|2$)/.test(t) ? 'MO' : /^(EQ|HERR|3$)/.test(t) ? 'EQ' : 'MAT';
     }
     function importarMatrices(celdas) {
         var col = null, inicio = 0;
@@ -930,7 +932,7 @@
             if (!porLlave[llave]) { porLlave[llave] = { clave: ultClave, concepto: ultConcepto, insumos: [] }; matrices.push(porLlave[llave]); }
             var desc = txt(v(f, 'insumo'));
             if (!desc) return;
-            porLlave[llave].insumos.push(limpiarInsumo({ tipo: tipoInsumo(v(f, 'tipo')), descripcion: desc, unidad: txt(v(f, 'unidad')),
+            porLlave[llave].insumos.push(limpiarInsumo({ tipo: tipoInsumo(v(f, 'tipo')), codigo: txt(v(f, 'codigo')), descripcion: desc, unidad: txt(v(f, 'unidad')),
                 cantidad: numeroCelda(v(f, 'cantidad')), rinde: numeroCelda(v(f, 'rinde')), costo: numeroCelda(v(f, 'costo')) }));
         });
         var aplicar = [], faltan = [];
@@ -996,20 +998,23 @@
         $('puDColCant').textContent = 'Cantidad por ' + u;
         $('puDInsumos').innerHTML = c.insumos.length ? c.insumos.map(function (i, n) {
             var mo = i.tipo === 'MO', calc = mo && i.rinde > 0;
+            // Columnas como la matriz de Neodata: Renglón, Código, Descripción, Tipo, Unidad, Costo, Cantidad, Importe
             return '<tr data-n="' + n + '">' +
+                '<td class="ro">' + (n + 1) + '</td>' +
+                '<td><input type="text" data-ins="codigo" maxlength="30" value="' + escapar(i.codigo) + '" placeholder="Clave"' + dis + '></td>' +
+                '<td><input type="text" data-ins="descripcion" list="puSug' + i.tipo + '" maxlength="200" value="' + escapar(i.descripcion) + '" placeholder="' +
+                    (mo ? 'ej. Instalador + ayudante' : i.tipo === 'EQ' ? 'ej. Andamio, taladro' : 'ej. Vidrio claro 6 mm') + '"' + dis + '></td>' +
                 '<td><select data-ins="tipo"' + dis + '>' + Object.keys(TIPOS_INSUMO).map(function (t) {
                     return '<option value="' + t + '"' + (t === i.tipo ? ' selected' : '') + '>' + TIPOS_INSUMO[t] + '</option>';
                 }).join('') + '</select></td>' +
-                '<td><input type="text" data-ins="descripcion" list="puSug' + i.tipo + '" maxlength="200" value="' + escapar(i.descripcion) + '" placeholder="' +
-                    (mo ? 'ej. Instalador + ayudante' : i.tipo === 'EQ' ? 'ej. Andamio, taladro' : 'ej. Vidrio claro 6 mm') + '"' + dis + '></td>' +
                 '<td><input type="text" data-ins="unidad" list="puUnidades" maxlength="20" value="' + escapar(i.unidad) + '"' + dis + '></td>' +
+                '<td><input type="number" class="num" data-ins="costo" step="0.01" min="0" value="' + (i.costo || '') + '"' + dis + '></td>' +
                 '<td><input type="number" class="num" data-ins="cantidad" step="0.0001" min="0" value="' + (calc ? (Math.round(1 / i.rinde * 10000) / 10000) : (i.cantidad || '')) + '"' +
                     (calc ? ' readonly title="Se calcula con lo que rinde por jornada"' : '') + dis + '></td>' +
                 '<td>' + (mo ? '<input type="number" class="num" data-ins="rinde" step="0.01" min="0" value="' + (i.rinde || '') + '" placeholder="' + escapar(u) + '/día"' + dis + '>' : '<span class="pu-na">—</span>') + '</td>' +
-                '<td><input type="number" class="num" data-ins="costo" step="0.01" min="0" value="' + (i.costo || '') + '"' + dis + '></td>' +
                 '<td class="ro" data-ins-calc>' + fmt(cantidadInsumo(i) * i.costo) + '</td>' +
                 '<td><button type="button" class="borrar" title="Quitar"' + dis + '>✕</button></td></tr>';
-        }).join('') : '<tr class="vacio-fila"><td colspan="8">Agrega lo que lleva con los botones de arriba: Material, Mano de obra o Equipo.</td></tr>';
+        }).join('') : '<tr class="vacio-fila"><td colspan="10">Agrega lo que lleva con los botones de arriba: Material, Mano de obra o Equipo.</td></tr>';
         pintarDialogo();
     }
 

@@ -111,6 +111,7 @@ function analisisPU($d): ?string
             if (!is_array($i)) continue;
             $insumos[] = [
                 'tipo'        => in_array($i['tipo'] ?? '', ['MAT', 'MO', 'EQ'], true) ? $i['tipo'] : 'MAT',
+                'codigo'      => texto($i['codigo'] ?? '', 30) ?? '',
                 'descripcion' => texto($i['descripcion'] ?? '', 200) ?? '',
                 'unidad'      => texto($i['unidad'] ?? '', 20) ?? '',
                 'cantidad'    => max(0, numero($i['cantidad'] ?? 0, 6)),

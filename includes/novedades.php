@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-10-27',
+        'cambios' => [
+            ['nuevo', 'Presupuesto: exportar e importar las matrices de todos los conceptos en Excel', 'En la ventana del análisis de un concepto (doble clic en el Catálogo de Conceptos) están «Exportar matrices a Excel» e «Importar matrices de Excel». Exportar descarga la matriz de todos los conceptos: un renglón por insumo con Código, Concepto, Tipo, Insumo, Unidad, Cantidad, Rinde por jornada, Costo unitario e Importe; los conceptos sin matriz salen en un renglón para llenarlos. Importar lee ese mismo archivo (.xlsx o CSV), identifica cada concepto por su código o su concepto y reemplaza su matriz; antes de aplicar avisa cuántos conceptos cambian y cuáles no están en el catálogo. En los de precio fijo la matriz es informativa y el precio no cambia; en los demás el P. Unitario se calcula con la nueva matriz.'],
+        ],
+    ],
+    [
         'fecha' => '2026-10-22',
         'cambios' => [
             ['nuevo', 'Presupuesto: matriz informativa en los conceptos de precio fijo', 'Los conceptos de precio fijo ahora tienen matriz, como en Neodata: doble clic en el concepto (o el botón «Precio fijo») abre su análisis para ver o capturar sus insumos. Esa matriz es informativa: no cambia el P. Unitario para el cliente ni suma al costo, que ya viene de Materia Prima, Mano de Obra y Gastos de Operacion; tampoco entra en la Explosión de insumos ni en la impresión con detalle. Al pasar un concepto a precio fijo (importando el Catálogo o el Análisis) ya no se borra su análisis: queda como su matriz. Los conceptos importados antes como precio fijo no tienen matriz guardada: se puede capturar a mano o volver a importar desde el catálogo de conceptos.'],

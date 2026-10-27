@@ -878,6 +878,99 @@
         abrirAnalisis(c);
     }
 
+    // ----- Matrices de todos los conceptos con Excel (botones de la ventana de análisis) -----
+    // Un renglón por insumo con el código y el concepto; un concepto sin matriz sale en un renglón para llenarlo
+    var COLUMNAS_MATRIZ = [
+        ['clave', /^(c[oó]digo|clave|cve)/i],
+        ['concepto', /^concepto/i],
+        ['tipo', /^tipo/i],
+        ['insumo', /^(insumo|descripci[oó]n)/i],
+        ['unidad', /^(unidad|u\.?m\.?$|um$)/i],
+        ['cantidad', /^(cantidad|cant)/i],
+        ['rinde', /^rinde/i],
+        ['costo', /^(costo|precio|p\.?\s*unit)/i]
+    ];
+    function exportarMatrices() {
+        var filas = [['Código', 'Concepto', 'Tipo', 'Insumo', 'Unidad', 'Cantidad', 'Rinde por jornada', 'Costo unitario', 'Importe']
+            .map(function (t) { return { v: t, e: 'titulo' }; })];
+        analisis.conceptos.forEach(function (c) {
+            var concepto = { v: c.descripcion, e: 'texto' };
+            if (!c.insumos.length) { filas.push([c.clave, concepto]); return; }
+            c.insumos.forEach(function (i) {
+                filas.push([c.clave, concepto, TIPOS_INSUMO[i.tipo], { v: i.descripcion, e: 'texto' }, i.unidad, { v: num(i.cantidad), e: 'cantidad' },
+                            i.tipo === 'MO' && i.rinde > 0 ? { v: i.rinde, e: 'cantidad' } : null, { v: num(i.costo), e: 'dinero' },
+                            { v: redondear(cantidadInsumo(i) * i.costo), e: 'dinero' }]);
+            });
+        });
+        if (filas.length < 2) { alert('El catálogo está vacío: no hay matrices que exportar.'); return; }
+        XlsxSimple.descargar(XlsxSimple.crear({ nombre: 'Matrices', anchos: [10, 45, 18, 40, 9, 11, 11, 14, 14], fijarFila: 1, filas: filas }),
+                             'Matrices ' + (txt($('proyecto').value) || 'presupuesto'));
+    }
+    function tipoInsumo(t) {
+        t = clave(t);
+        return /^(MO|MANO)/.test(t) ? 'MO' : /^(EQ|HERR)/.test(t) ? 'EQ' : 'MAT';
+    }
+    function importarMatrices(celdas) {
+        var col = null, inicio = 0;
+        for (var n = 0; n < Math.min(celdas.length, 10) && !col; n++) {
+            var c = {};
+            celdas[n].forEach(function (t, k) {
+                COLUMNAS_MATRIZ.forEach(function (p) { if (c[p[0]] === undefined && p[1].test(txt(t))) c[p[0]] = k; });
+            });
+            if (c.insumo !== undefined && (c.clave !== undefined || c.concepto !== undefined)) { col = c; inicio = n + 1; }
+        }
+        if (!col) { alert('No encontré los títulos de las columnas (Código, Concepto, Tipo, Insumo, Unidad, Cantidad, Costo unitario). Usa el archivo de «Exportar matrices a Excel».'); return; }
+        var v = function (f, campo) { return col[campo] === undefined ? '' : f[col[campo]]; };
+        // El código y el concepto se repiten en cada insumo; si vienen vacíos se toma el del renglón de arriba
+        var matrices = [], porLlave = {}, ultClave = '', ultConcepto = '';
+        celdas.slice(inicio).forEach(function (f) {
+            var cve = txt(v(f, 'clave')), con = txt(v(f, 'concepto'));
+            if (cve || con) { ultClave = cve; ultConcepto = con; }
+            var llave = clave(ultClave) + '|' + clave(ultConcepto);
+            if (!porLlave[llave]) { porLlave[llave] = { clave: ultClave, concepto: ultConcepto, insumos: [] }; matrices.push(porLlave[llave]); }
+            var desc = txt(v(f, 'insumo'));
+            if (!desc) return;
+            porLlave[llave].insumos.push(limpiarInsumo({ tipo: tipoInsumo(v(f, 'tipo')), descripcion: desc, unidad: txt(v(f, 'unidad')),
+                cantidad: numeroCelda(v(f, 'cantidad')), rinde: numeroCelda(v(f, 'rinde')), costo: numeroCelda(v(f, 'costo')) }));
+        });
+        var aplicar = [], faltan = [];
+        matrices.forEach(function (m) {
+            if (!m.insumos.length) return;
+            var c = analisis.conceptos.filter(function (x) { return m.clave && clave(x.clave) === clave(m.clave); })[0] ||
+                    analisis.conceptos.filter(function (x) { return m.concepto && clave(x.descripcion) === clave(m.concepto); })[0];
+            if (c) aplicar.push({ c: c, insumos: m.insumos }); else faltan.push(m.clave || m.concepto);
+        });
+        if (!aplicar.length) { alert('El archivo no trae insumos de ningún concepto del catálogo.' + (faltan.length ? '\n\nNo están en el catálogo: ' + faltan.join(', ') : '')); return; }
+        var calculan = aplicar.filter(function (x) { return !esVenta(x.c); }).length;
+        if (!confirm('Se reemplaza la matriz de ' + aplicar.length + ' concepto(s) con ' + aplicar.reduce(function (s, x) { return s + x.insumos.length; }, 0) + ' insumos.' +
+                     (calculan ? '\n\nOjo: ' + calculan + ' no son de precio fijo; su P. Unitario se calcula con la matriz y puede cambiar.' : '') +
+                     (faltan.length ? '\n\nNo están en el catálogo (se omiten): ' + faltan.join(', ') : '') + '\n\n¿Continuar?')) return;
+        aplicar.forEach(function (x) { x.c.insumos = x.insumos; });
+        marcarCambio();
+        calcularTotales();
+        render();
+        if (editandoPU) renderDialogo();
+    }
+    $('puDExportar').addEventListener('click', exportarMatrices);
+    $('puDImportar').addEventListener('click', function () {
+        if (soloLectura) { avisoSoloLectura(); return; }
+        $('puDArchivo').value = '';
+        $('puDArchivo').click();
+    });
+    $('puDArchivo').addEventListener('change', function () {
+        var f = this.files[0];
+        if (!f) return;
+        if (/\.xlsx$/i.test(f.name)) {
+            XlsxSimple.leer(f).then(importarMatrices).catch(function (e) { alert('No se pudo leer el archivo de Excel: ' + (e && e.message || e)); });
+        } else if (/\.xls$/i.test(f.name)) {
+            alert('Ese archivo es de Excel antiguo (.xls): en Excel guárdalo como .xlsx.');
+        } else {
+            var lector = new FileReader();
+            lector.onload = function () { importarMatrices(separarCeldas(lector.result)); };
+            lector.readAsText(f, 'UTF-8');
+        }
+    });
+
     // ----- Ventana de análisis de un concepto -----
     function abrirAnalisis(c) {
         editandoPU = c;
@@ -889,6 +982,7 @@
         $('puDEspecificacion').value = c.especificacion || '';
         ['puDConcepto', 'puDUnidad', 'puDCantidad', 'puDPartida', 'puDEspecificacion'].forEach(function (id) { $(id).disabled = dis; });
         $('puDialogo').querySelectorAll('[data-pu-insumo]').forEach(function (b) { b.disabled = dis; });
+        $('puDImportar').disabled = dis;
         renderDialogo();
         $('puDialogo').showModal();
         if (!dis && !c.insumos.length) $('puDialogo').querySelector('[data-pu-insumo="MAT"]').focus();

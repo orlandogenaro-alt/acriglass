@@ -731,6 +731,10 @@ $secciones = [
         <button type="button" class="ct-btn" data-pu-insumo="MAT">+ Material</button>
         <button type="button" class="ct-btn" data-pu-insumo="MO">+ Mano de obra</button>
         <button type="button" class="ct-btn" data-pu-insumo="EQ">+ Equipo / herramienta</button>
+        <!-- Las matrices de TODOS los conceptos en un Excel (un renglón por insumo); al importarlo se reemplaza la matriz de cada concepto -->
+        <button type="button" class="ct-btn pu-dlg-excel" id="puDExportar" title="Descarga en Excel la matriz de todos los conceptos del catálogo, un renglón por insumo">Exportar matrices a Excel</button>
+        <button type="button" class="ct-btn" id="puDImportar" title="Llena la matriz de los conceptos desde el Excel (el mismo formato que Exportar matrices)">Importar matrices de Excel</button>
+        <input type="file" id="puDArchivo" accept=".xlsx,.csv,.txt" hidden>
     </div>
     <div class="extra-caja pu-dlg-tabla">
         <table class="grid mini-grid">

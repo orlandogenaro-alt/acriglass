@@ -104,6 +104,8 @@ function analisisPU($d): ?string
         'util' => isset($d['util']) && is_numeric($d['util']) ? max(0, min(1000, numero($d['util'], 4))) : null,
         'conceptos' => [],
     ];
+    // La matriz de los conceptos de precio fijo es el costo (presupuestos traídos de Neodata)
+    if (!empty($d['matriz_costo'])) $r['matriz_costo'] = true;
     foreach (array_slice((array) ($d['conceptos'] ?? []), 0, 1000) as $c) {
         if (!is_array($c)) continue;
         $insumos = [];

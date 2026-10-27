@@ -508,6 +508,8 @@ $secciones = [
                                 <input type="number" id="puHm" class="num" step="0.01" min="0" value="0"></label>
                             <label title="Costo del dinero mientras se cobra la obra: % sobre costo directo + indirectos">Financiamiento %
                                 <input type="number" id="puFin" class="num" step="0.01" min="0" value="0"></label>
+                            <label class="check" title="Para presupuestos traídos de Neodata: el Catálogo da el precio al cliente y la matriz de cada concepto su costo. Se marca sola al importar las matrices si Materia Prima y Mano de Obra no tienen importes capturados a mano">
+                                <input type="checkbox" id="puMatrizCosto"> La matriz de los conceptos de precio fijo es el costo (sus insumos van a Materia Prima y Mano de Obra)</label>
                             <p>Indirectos = Gastos de Operacion: <b id="puInd">0.00 %</b> del costo directo · Cargos adicionales = comisiones y seguro: <b id="puCa">0.00 %</b> del precio.</p>
                         </details>
                     </section>

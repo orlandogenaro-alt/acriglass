@@ -313,13 +313,7 @@
             extras.comisiones.forEach(function (c) { c.total = redondear(subtotal * num(c.porcentaje) * 0.01); totCom += c.total; });
             ponerFijo('mo', FIJOS.comisiones, totCom);
         }
-        // Análisis P.U.: lo que llevan los conceptos analizados pasa a Materia Prima (materiales, equipo y herramienta)
-        // y a Mano de Obra (sueldos × FSR)
-        // Si el presupuesto no trae análisis (p. ej. se guardó sin la columna) sus renglones se respetan como están
-        var a = totalesAnalisis();
-        if (analisis.conceptos.length) huboAnalisis = true;
-        if (a.mat + a.eq + a.hm || (huboAnalisis && filaDe('mp', FIJOS_PU.mp))) ponerFijo('mp', FIJOS_PU.mp, a.mat + a.eq + a.hm, 'pu');
-        if (a.moReal || (huboAnalisis && filaDe('mo', FIJOS_PU.mo))) ponerFijo('mo', FIJOS_PU.mo, a.moReal, 'pu');
+        ponerInsumosPU();
         // calcula_conceptos_calc_automatico: % del subtotal; los gastos base_mp, % de la base de MP + MO
         datos.mp.forEach(function (r) {
             var i = infoConcepto('mp', r.concepto);
@@ -341,6 +335,40 @@
             s.total = redondear(subtotal * num(s.porcentaje_1) * 0.01 * num(s.porcentaje_2) * 0.01);
             ponerFijo('go', s.concepto, s.total);
         });
+    }
+
+    // Análisis P.U.: cada insumo de los conceptos analizados es un renglón de Materia Prima (materiales, equipo y herramienta)
+    // o de Mano de Obra (sueldos × FSR), sumado en toda la obra como la explosión de insumos de Neodata.
+    // Los renglones que ya no lleva ningún análisis se quitan (y el renglón único de antes, «MATERIALES SEGUN ANALISIS P.U.»).
+    // Si el presupuesto no trae análisis (p. ej. se guardó sin la columna) sus renglones se respetan como están
+    var filasPU = { mp: {}, mo: {} };
+    function ponerInsumosPU() {
+        if (analisis.conceptos.length) huboAnalisis = true;
+        if (!huboAnalisis) return;
+        var fsr = factorFsr(), nuevos = { mp: {}, mo: {} }, lista = { mp: [], mo: [] }, moReal = 0;
+        function sumar(sec, nombre, importe) {
+            var k = clave(nombre);
+            if (!nuevos[sec][k]) { nuevos[sec][k] = { nombre: txt(nombre), importe: 0 }; lista[sec].push(nuevos[sec][k]); }
+            nuevos[sec][k].importe += importe;
+        }
+        analisis.conceptos.forEach(function (c) {
+            if (!alCosto(c)) return;
+            c.insumos.forEach(function (i) {
+                var sec = i.tipo === 'MO' ? 'mo' : 'mp', imp = cantidadInsumo(i) * i.costo * c.cantidad * (sec === 'mo' ? fsr : 1);
+                if (!imp) return;
+                sumar(sec, txt(i.descripcion) || TIPOS_INSUMO[i.tipo], imp);
+                if (sec === 'mo') moReal += imp;
+            });
+        });
+        if (moReal * analisis.hm) sumar('mp', 'HERRAMIENTA MENOR (% DE LA MANO DE OBRA)', moReal * analisis.hm / 100);
+        ['mp', 'mo'].forEach(function (sec) {
+            for (var n = datos[sec].length - 1; n >= 0; n--) {
+                var k = clave(datos[sec][n].concepto);
+                if (!nuevos[sec][k] && (filasPU[sec][k] || k === clave(FIJOS_PU[sec]))) datos[sec].splice(n, 1);
+            }
+            lista[sec].forEach(function (x) { ponerFijo(sec, x.nombre, x.importe, 'pu'); });
+        });
+        filasPU = nuevos;
     }
 
     function firma() {
@@ -452,21 +480,26 @@
     var TITULO_FIJO = 'Precio importado del Catálogo: el costo viene de Materia Prima, Mano de Obra y Gastos de Operacion. ' +
                       'Ver o capturar su matriz (informativa: no suma al costo)';
     function hayVenta() { return analisis.conceptos.some(esVenta); }
+    // Con «La matriz de los precios fijos es el costo» (presupuestos traídos de Neodata: el Catálogo da el precio y la matriz
+    // el costo) la matriz de un precio fijo suma a Materia Prima y Mano de Obra; sin ella es informativa
+    function alCosto(c) { return !esVenta(c) || analisis.matrizCosto; }
 
     function ponerAnalisisPU(a) {
         a = a || {};
         analisis = {
             fsr: num(a.fsr) > 0 ? num(a.fsr) : 1, hm: num(a.hm), fin: num(a.fin),
             util: a.util === null || a.util === undefined || a.util === '' ? null : num(a.util),
-            conceptos: []
+            matrizCosto: !!a.matriz_costo, conceptos: []
         };
         (a.conceptos || []).forEach(function (c) { analisis.conceptos.push(nuevoConcepto(c)); });
         huboAnalisis = analisis.conceptos.length > 0;
+        filasPU = { mp: {}, mo: {} };
         Object.keys(CAMPOS_PU).forEach(function (k) { $(CAMPOS_PU[k]).value = analisis[k]; });
+        $('puMatrizCosto').checked = analisis.matrizCosto;
     }
     function exportarAnalisis() {
         return {
-            fsr: analisis.fsr, hm: analisis.hm, fin: analisis.fin, util: null,
+            fsr: analisis.fsr, hm: analisis.hm, fin: analisis.fin, util: null, matriz_costo: !!analisis.matrizCosto,
             conceptos: analisis.conceptos.map(function (c) {
                 return { clave: c.clave, partida: c.partida, descripcion: c.descripcion, unidad: c.unidad, cantidad: c.cantidad,
                          especificacion: c.especificacion || '', venta: esVenta(c) ? c.venta : 0,
@@ -477,11 +510,11 @@
 
     // Mano de obra: si se captura lo que rinde por jornada, la cantidad es 1 / rendimiento
     function cantidadInsumo(i) { return i.tipo === 'MO' && i.rinde > 0 ? 1 / i.rinde : i.cantidad; }
-    // Costo de UNA unidad del concepto. Uno de precio fijo no suma al costo: su matriz es informativa
-    // (informativa = true la calcula igual, para mostrarla en la ventana del análisis)
+    // Costo de UNA unidad del concepto. Uno de precio fijo no suma al costo: su matriz es informativa, salvo con «La matriz
+    // de los precios fijos es el costo» (informativa = true la calcula igual, para mostrarla en la ventana del análisis)
     function costoUnitario(c, informativa) {
         var r = { mat: 0, mo: 0, eq: 0 };
-        if (informativa || !esVenta(c)) c.insumos.forEach(function (i) { r[i.tipo.toLowerCase()] += cantidadInsumo(i) * i.costo; });
+        if (informativa || alCosto(c)) c.insumos.forEach(function (i) { r[i.tipo.toLowerCase()] += cantidadInsumo(i) * i.costo; });
         r.moReal = r.mo * factorFsr();
         r.hm = r.moReal * analisis.hm / 100;
         r.cd = r.mat + r.eq + r.moReal + r.hm;
@@ -522,7 +555,7 @@
         ['mp', 'mo'].forEach(function (sec) {
             datos[sec].forEach(function (f) {
                 var k = clave(f.concepto), base = num(f.presupuesto);
-                if (k === clave(FIJOS_PU[sec])) return;                      // ya viene del análisis
+                if (f.calc === 'pu' || k === clave(FIJOS_PU[sec])) return;   // ya viene del análisis
                 if (sec === 'mo' && k === clave(FIJOS.comisiones)) return;   // es cargo adicional
                 if (!k && !base) return;
                 var cd = base, ajuste = 0;
@@ -743,8 +776,9 @@
             insumos[k].importe += importe;
         }
         analisis.conceptos.forEach(function (c) {
-            // La matriz de un precio fijo es informativa: su costo ya está en Materia Prima, Mano de Obra y Gastos de Operacion
-            if (esVenta(c)) return;
+            // La matriz de un precio fijo es informativa (su costo ya está en Materia Prima, Mano de Obra y Gastos de Operacion),
+            // salvo con «La matriz de los precios fijos es el costo»
+            if (!alCosto(c)) return;
             c.insumos.forEach(function (i) {
                 var q = cantidadInsumo(i) * c.cantidad;
                 if (q) sumar(TIPOS_INSUMO[i.tipo], i.descripcion, i.unidad, q, q * i.costo);
@@ -857,7 +891,7 @@
         if (!x || x.fila.calc) return;
         var f = x.fila, base = num(f.presupuesto), cantidad = x.cantidad > 0 ? x.cantidad : 1, tipo = sec === 'mo' ? 'MO' : 'MAT';
         if (!confirm('«' + f.concepto + '» pasará al Análisis de Precios Unitarios con lo que ya tiene capturado y saldrá de ' + NOMBRES[sec] +
-                     '; su importe quedará en el renglón «' + FIJOS_PU[sec] + '».' +
+                     '; sus insumos quedarán como renglones calculados de ' + NOMBRES[sec] + '.' +
                      (tipo === 'MO' && factorFsr() !== 1 ? '\n\nOjo: como mano de obra analizada se le aplica el FSR (× ' + cant(factorFsr()) + ').' : '') +
                      '\n\n¿Continuar?')) return;
         var arts = f.articulos || [], sumaArt = 0;
@@ -952,6 +986,12 @@
         aplicar.forEach(function (x) { x.c.insumos = x.insumos; });
         // Sin avisos: si el archivo no trae insumos simplemente no cambia nada
         if (!aplicar.length) return;
+        // Matrices de precios fijos sin importes capturados a mano en MP / MO (como al traer un presupuesto de Neodata):
+        // la matriz es el costo y sus insumos van a Materia Prima y Mano de Obra
+        if (!analisis.matrizCosto && aplicar.some(function (x) { return esVenta(x.c); }) &&
+            !['mp', 'mo'].some(function (s) { return datos[s].some(function (r) { return !r.calc && num(r.presupuesto) > 0; }); })) {
+            analisis.matrizCosto = $('puMatrizCosto').checked = true;
+        }
         marcarCambio();
         calcularTotales();
         render();
@@ -999,7 +1039,9 @@
         var c = editandoPU, dis = soloLectura ? ' disabled' : '', u = txt(c.unidad) || 'unidad';
         $('puDAyuda').innerHTML = 'Anota lo que lleva <b>1 ' + escapar(u) + '</b> de «' + escapar(c.descripcion || 'este concepto') + '». ' +
             'Ejemplo para 1 m² de cancel: 1.05 m² de vidrio (con desperdicio), 3.2 m de perfil, y la mano de obra con lo que hace un instalador en una jornada (8 m² → escribe 8 en «Rinde por jornada»).' +
-            (esVenta(c) ? '<br><b>Precio fijo para el cliente:</b> esta matriz es informativa; no cambia el P. Unitario ni suma al costo, que ya viene de Materia Prima, Mano de Obra y Gastos de Operacion.' : '');
+            (!esVenta(c) ? '' : alCosto(c)
+                ? '<br><b>Precio fijo para el cliente:</b> esta matriz no cambia el P. Unitario; es el costo: sus insumos van a Materia Prima y Mano de Obra.'
+                : '<br><b>Precio fijo para el cliente:</b> esta matriz es informativa; no cambia el P. Unitario ni suma al costo, que ya viene de Materia Prima, Mano de Obra y Gastos de Operacion.');
         $('puDColCant').textContent = 'Cantidad por ' + u;
         $('puDInsumos').innerHTML = c.insumos.length ? c.insumos.map(function (i, n) {
             var mo = i.tipo === 'MO', calc = mo && i.rinde > 0;
@@ -1120,6 +1162,12 @@
             pintarPu();
         });
     });
+    $('puMatrizCosto').addEventListener('change', function () {
+        analisis.matrizCosto = this.checked;
+        marcarCambio();
+        calcularTotales();
+        render();
+    });
 
     // Conceptos del análisis incompletos (se avisa al guardar, no se impide)
     function conceptosIncompletosPU() {
@@ -1223,25 +1271,13 @@
             filas.push({ clase: clase, anexo: anexo, nombre: nombre, pres: pres, sub: sub, tot: tot, p: p, ir: ir || '', extra: extra || '' });
             return filas[filas.length - 1];
         }
-        // Analizados: lo que cada concepto del Análisis P.U. pone en Materia Prima (materiales, equipo, herramienta) o en Mano de Obra
-        function desglosePU(sec) {
-            return analisis.conceptos.map(function (c) {
-                var u = costoUnitario(c);
-                return { nombre: txt(c.clave + ' ' + c.descripcion), importe: (sec === 'mp' ? u.mat + u.eq + u.hm : u.moReal) * c.cantidad };
-            }).filter(function (x) { return Math.abs(x.importe) >= 0.005; });
-        }
+        // Los insumos del Análisis P.U. ya vienen uno por renglón en Materia Prima y Mano de Obra
         function seccionCc(sec) {
             fila('ccr-titulo', '', NOMBRES[sec].toUpperCase(), null, null, null, null, sec);
             if (!datos[sec].length) fila('ccr-vacio', '', 'Sin conceptos capturados', null, null, null, null, sec);
             datos[sec].forEach(function (r) {
-                var imp = num(r.presupuesto), num_ = ++n;
-                var subs = r.calc === 'pu' ? desglosePU(sec) : [];
-                if (subs.length) {
-                    fila('ccr-grupo', num_, r.concepto, null, imp, null, porc(imp), sec);
-                    subs.forEach(function (x, i) { fila('ccr-sub', num_ + '.' + (i + 1), x.nombre, x.importe, null, null, null, 'pu'); });
-                } else {
-                    fila(r.calc ? 'ccr-calc' : '', num_, r.concepto || '(sin concepto)', imp, null, null, porc(imp), sec);
-                }
+                var imp = num(r.presupuesto);
+                fila(r.calc ? 'ccr-calc' : '', ++n, r.concepto || '(sin concepto)', imp, null, null, porc(imp), sec);
             });
         }
         seccionCc('mp');
@@ -2983,7 +3019,7 @@
         });
         guia.push(['Análisis P.U.', '«PRUEBA - Cancel de baño» 10 m² y «PRUEBA - Muro de tablaroca» 20 m², con sus insumos',
             'Se capturan en la pestaña Análisis P.U. con «Analizar». Los precios se sugieren de los empleados, de los artículos importados y de otros presupuestos. ' +
-            'Lo analizado pasa solo a los renglones «' + FIJOS_PU.mp + '» (Materia Prima) y «' + FIJOS_PU.mo + '» (Mano de Obra).']);
+            'Lo analizado pasa solo a Materia Prima (un renglón por material y equipo) y a Mano de Obra (un renglón por mano de obra).']);
         guia.push(['Catálogo de Conceptos', 'Las partidas «PRUEBA Cancelería» y «PRUEBA Acabados» con sus conceptos',
             'Son los mismos conceptos del Análisis P.U., acomodados por partida como Neodata: clave, unidad, cantidad, P.U., importe, % de cada partida y el total con letra. ' +
             'Los Conceptos/Tareas (fechas, responsable, avance) se siguen generando con MP / MO / GO y se manejan en la Obra.']);

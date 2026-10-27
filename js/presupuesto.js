@@ -919,9 +919,13 @@
             celdas[n].forEach(function (t, k) {
                 COLUMNAS_MATRIZ.forEach(function (p) { if (c[p[0]] === undefined && p[1].test(txt(t))) c[p[0]] = k; });
             });
-            if (c.insumo !== undefined && (c.clave !== undefined || c.concepto !== undefined)) { col = c; inicio = n + 1; }
+            if (c.insumo !== undefined && (c.cantidad !== undefined || c.costo !== undefined || c.clave !== undefined || c.concepto !== undefined)) { col = c; inicio = n + 1; }
         }
         if (!col) { alert('No encontré los títulos de las columnas (Código, Concepto, Tipo, Insumo, Unidad, Cantidad, Costo unitario). Usa el archivo de «Exportar matrices a Excel».'); return; }
+        // Sin columna Concepto es la matriz de UN concepto (como la de Neodata: Renglón, Código, Descripción completa, Tipo…):
+        // su Código es el del insumo y va al concepto abierto en la ventana
+        var suelta = col.concepto === undefined;
+        if (suelta) { if (col.codigo === undefined) col.codigo = col.clave; delete col.clave; }
         var v = function (f, campo) { return col[campo] === undefined ? '' : f[col[campo]]; };
         // El código y el concepto se repiten en cada insumo; si vienen vacíos se toma el del renglón de arriba
         var matrices = [], porLlave = {}, ultClave = '', ultConcepto = '';
@@ -935,14 +939,33 @@
             porLlave[llave].insumos.push(limpiarInsumo({ tipo: tipoInsumo(v(f, 'tipo')), codigo: txt(v(f, 'codigo')), descripcion: desc, unidad: txt(v(f, 'unidad')),
                 cantidad: numeroCelda(v(f, 'cantidad')), rinde: numeroCelda(v(f, 'rinde')), costo: numeroCelda(v(f, 'costo')) }));
         });
-        var aplicar = [], faltan = [];
+        var aplicar = [], faltan = [], sinConcepto = [];
         matrices.forEach(function (m) {
             if (!m.insumos.length) return;
-            var c = analisis.conceptos.filter(function (x) { return m.clave && clave(x.clave) === clave(m.clave); })[0] ||
-                    analisis.conceptos.filter(function (x) { return m.concepto && clave(x.descripcion) === clave(m.concepto); })[0];
-            if (c) aplicar.push({ c: c, insumos: m.insumos }); else faltan.push(m.clave || m.concepto);
+            var c = !suelta && (analisis.conceptos.filter(function (x) { return m.clave && clave(x.clave) === clave(m.clave); })[0] ||
+                    analisis.conceptos.filter(function (x) { return m.concepto && clave(x.descripcion) === clave(m.concepto); })[0]);
+            if (c) aplicar.push({ c: c, insumos: m.insumos });
+            else { faltan.push(m.clave || m.concepto || 'sin concepto'); sinConcepto = sinConcepto.concat(m.insumos); }
         });
-        if (!aplicar.length) { alert('El archivo no trae insumos de ningún concepto del catálogo.' + (faltan.length ? '\n\nNo están en el catálogo: ' + faltan.join(', ') : '')); return; }
+        if (!aplicar.length && !sinConcepto.length) {
+            alert('El archivo no trae insumos: debajo de cada concepto llena un renglón por insumo con su Insumo (descripción), Tipo, Unidad, Cantidad y Costo unitario.');
+            return;
+        }
+        // Lo que no es de ningún concepto del catálogo (o una matriz suelta) se puede subir al concepto abierto
+        if (!aplicar.length) {
+            var abierto = editandoPU;
+            if (!abierto) { alert('El archivo no trae insumos de ningún concepto del catálogo.\n\nNo están en el catálogo: ' + faltan.join(', ')); return; }
+            if (!confirm((suelta ? 'El archivo es la matriz de un concepto' : 'Ningún concepto del archivo está en el catálogo (' + faltan.join(', ') + ')') +
+                         ': ' + sinConcepto.length + ' insumos.\n\n¿Ponerlos en la matriz de «' + txt((abierto.clave ? abierto.clave + ' ' : '') + abierto.descripcion) + '»?' +
+                         (abierto.insumos.length ? ' Se reemplazan los ' + abierto.insumos.length + ' insumos que tiene.' : '') +
+                         (esVenta(abierto) ? '' : '\n\nOjo: no es de precio fijo; su P. Unitario se calcula con la matriz y puede cambiar.'))) return;
+            abierto.insumos = sinConcepto;
+            marcarCambio();
+            calcularTotales();
+            render();
+            renderDialogo();
+            return;
+        }
         var calculan = aplicar.filter(function (x) { return !esVenta(x.c); }).length;
         if (!confirm('Se reemplaza la matriz de ' + aplicar.length + ' concepto(s) con ' + aplicar.reduce(function (s, x) { return s + x.insumos.length; }, 0) + ' insumos.' +
                      (calculan ? '\n\nOjo: ' + calculan + ' no son de precio fijo; su P. Unitario se calcula con la matriz y puede cambiar.' : '') +

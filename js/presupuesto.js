@@ -1040,8 +1040,10 @@
         $('puDAyuda').innerHTML = 'Anota lo que lleva <b>1 ' + escapar(u) + '</b> de «' + escapar(c.descripcion || 'este concepto') + '». ' +
             'Ejemplo para 1 m² de cancel: 1.05 m² de vidrio (con desperdicio), 3.2 m de perfil, y la mano de obra con lo que hace un instalador en una jornada (8 m² → escribe 8 en «Rinde por jornada»).' +
             (!esVenta(c) ? '' : alCosto(c)
-                ? '<br><b>Precio fijo para el cliente:</b> esta matriz no cambia el P. Unitario; es el costo: sus insumos van a Materia Prima y Mano de Obra.'
-                : '<br><b>Precio fijo para el cliente:</b> esta matriz es informativa; no cambia el P. Unitario ni suma al costo, que ya viene de Materia Prima, Mano de Obra y Gastos de Operacion.');
+                ? '<br><b>Precio fijo para el cliente:</b> esta matriz no cambia el P. Unitario; es el costo: sus insumos van a Materia Prima y Mano de Obra. ' +
+                  '<button type="button" class="ct-btn" data-matriz-costo="0"' + dis + '>Dejar las matrices como informativas</button>'
+                : '<br><b>Precio fijo para el cliente:</b> esta matriz es informativa; no cambia el P. Unitario ni suma al costo, que ya viene de Materia Prima, Mano de Obra y Gastos de Operacion. ' +
+                  '<button type="button" class="ct-btn" data-matriz-costo="1"' + dis + '>Pasar los insumos a Materia Prima y Mano de Obra</button>');
         $('puDColCant').textContent = 'Cantidad por ' + u;
         $('puDInsumos').innerHTML = c.insumos.length ? c.insumos.map(function (i, n) {
             var mo = i.tipo === 'MO', calc = mo && i.rinde > 0;
@@ -1162,11 +1164,20 @@
             pintarPu();
         });
     });
-    $('puMatrizCosto').addEventListener('change', function () {
-        analisis.matrizCosto = this.checked;
+    function ponerMatrizCosto(si) {
+        analisis.matrizCosto = $('puMatrizCosto').checked = si;
         marcarCambio();
         calcularTotales();
         render();
+        if (editandoPU) renderDialogo();
+    }
+    $('puMatrizCosto').addEventListener('change', function () { ponerMatrizCosto(this.checked); });
+    // Botón de la ventana del análisis de un precio fijo: la misma opción (vale para todos los conceptos de precio fijo)
+    $('puDAyuda').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-matriz-costo]');
+        if (!b) return;
+        if (soloLectura) { avisoSoloLectura(); return; }
+        ponerMatrizCosto(b.dataset.matrizCosto === '1');
     });
 
     // Conceptos del análisis incompletos (se avisa al guardar, no se impide)

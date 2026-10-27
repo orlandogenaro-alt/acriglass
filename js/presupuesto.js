@@ -3328,6 +3328,24 @@
     }
     document.querySelectorAll('[data-bit-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('bitDialogo').close(); }); });
 
+    // Triángulo del encabezado: lo oculta o lo muestra, como la cinta de Excel (se recuerda en este navegador)
+    (function () {
+        var enc = document.querySelector('.encabezado'), btn = $('encPlegar'), llave = 'acri.presupuesto.encPlegado';
+        function poner(plegado) {
+            enc.classList.toggle('plegado', plegado);
+            btn.title = plegado ? 'Mostrar el encabezado' : 'Ocultar el encabezado';
+            btn.setAttribute('aria-expanded', plegado ? 'false' : 'true');
+        }
+        try { poner(localStorage.getItem(llave) === '1'); } catch (e) { /* sin almacenamiento */ }
+        btn.addEventListener('click', function () {
+            var plegado = !enc.classList.contains('plegado');
+            poner(plegado);
+            try { localStorage.setItem(llave, plegado ? '1' : '0'); } catch (e) { /* sin almacenamiento */ }
+        });
+        // El Tour señala los campos del encabezado: se muestra para recorrerlo
+        if ($('btnTour')) $('btnTour').addEventListener('click', function () { poner(false); });
+    })();
+
     var idInicial = parseInt(document.body.dataset.presupuesto, 10) || 0;
     if (!idInicial) ponerIndirectos();
     render();

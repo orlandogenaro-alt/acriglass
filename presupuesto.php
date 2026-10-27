@@ -387,6 +387,11 @@ $secciones = [
             </label>
             <div class="obra"><strong>OBRA:</strong> <span id="obra"></span></div>
         </div>
+
+        <!-- Como la cinta de Excel: oculta o muestra el encabezado -->
+        <button type="button" class="enc-plegar" id="encPlegar" title="Ocultar el encabezado" aria-expanded="true">
+            <svg viewBox="0 0 12 12"><path d="M2 8.5L6 4l4 4.5z" fill="currentColor"/></svg>
+        </button>
     </div>
 
     <!-- Conceptos -->

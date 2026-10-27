@@ -341,7 +341,21 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
     border: 1px solid var(--borde);
     border-radius: var(--radio);
     box-shadow: var(--sombra);
+    position: relative;
 }
+/* Triángulo para ocultar/mostrar el encabezado (como la cinta de Excel) */
+.enc-plegar {
+    position: absolute; right: 6px; bottom: 3px;
+    width: 22px; height: 16px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid transparent; border-radius: 3px; background: none;
+    color: var(--texto-3); cursor: pointer;
+}
+.enc-plegar svg { width: 11px; height: 11px; transition: transform .15s; }
+.enc-plegar:hover { background: var(--azul-suave); border-color: var(--azul-borde); color: var(--azul-texto); }
+.encabezado.plegado { padding: 0; min-height: 22px; }
+.encabezado.plegado > :not(.enc-plegar) { display: none; }
+.encabezado.plegado .enc-plegar svg { transform: rotate(180deg); }
 .enc-izq { flex: 1 1 340px; max-width: 480px; display: flex; flex-direction: column; gap: 10px; }
 .enc-izq label {
     display: grid;

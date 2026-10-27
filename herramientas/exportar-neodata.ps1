@@ -1,6 +1,7 @@
 # Exporta un presupuesto de Neodata WinPlus (obras locales en SQL Server LocalDB) a dos CSV que lee el sistema:
 #   Catalogo <presupuesto>.csv  -> Presupuesto > Catalogo de Conceptos > Importar de Excel
 #   Matrices <presupuesto>.csv  -> ventana del analisis de un concepto > Importar matrices de Excel
+#   Insumos <presupuesto>.csv   -> Catalogos > Importar insumos (materiales, mano de obra, equipo y basicos con su costo)
 # Solo lee la base de la obra, no cambia nada en Neodata.
 #
 # Uso (PowerShell):
@@ -30,6 +31,14 @@ function Consultar([string]$base, [string]$sql, [hashtable]$parametros = @{}) {
     } finally { $cn.Close() }
 }
 function Numero($v) { if ($v -is [DBNull] -or $null -eq $v) { '' } else { ([decimal]$v).ToString('0.######', $inv) } }
+# Sin renglones no se genera el archivo (Export-Csv lo dejaria vacio, sin encabezado)
+function Guardar($filas, [string]$archivo) {
+    $ruta = Join-Path $Salida $archivo
+    $filas = @($filas | Where-Object { $_ })
+    if (-not $filas.Count) { if (Test-Path $ruta) { Remove-Item $ruta }; return "(sin datos, no se genero) $archivo" }
+    $filas | Export-Csv -Path $ruta -NoTypeInformation -Encoding UTF8
+    return $ruta
+}
 function Texto($v) { if ($v -is [DBNull] -or $null -eq $v) { '' } else { ([string]$v).Trim() } }
 
 # Neodata adjunta cada obra con la ruta del .mdf como nombre de la base
@@ -79,7 +88,7 @@ OPTION (MAXRECURSION 100)
 # Insumos de la matriz de cada concepto del presupuesto, con su costo vigente en pesos
 $sqlMatrices = @"
 SELECT cm.Codigo, ISNULL(NULLIF(LTRIM(RTRIM(cm.DescripcionLarga)), ''), cm.Descripcion) Concepto, t.Descripcion Tipo,
-       ci.Descripcion Insumo, u.Unidad, m.Volumen Cantidad, k.Costo
+       ISNULL(NULLIF(LTRIM(RTRIM(ci.DescripcionLarga)), ''), ci.Descripcion) Insumo, u.Unidad, m.Volumen Cantidad, k.Costo
 FROM (SELECT DISTINCT pc.IdExpIns, MIN(pc.Renglon) OVER (PARTITION BY pc.IdExpIns) Renglon FROM PuPresupuestosConceptos pc WHERE pc.IdPresupuesto = @p) c
 JOIN PuExpIns em ON em.IdExpIns = c.IdExpIns
 JOIN PuCatalogo cm ON cm.IdCodigo = em.IdCodigo
@@ -90,6 +99,21 @@ LEFT JOIN PuTipoInsumos t ON t.IdTipo = ci.IdTipo
 LEFT JOIN PuUnidades u ON u.IdUnidad = ci.IdUnidad
 OUTER APPLY (SELECT TOP 1 x.Costo FROM PuExpInsCostos x WHERE x.IdExpIns = ei.IdExpIns ORDER BY CASE WHEN x.IdMoneda = 1 THEN 0 ELSE 1 END, x.Fecha DESC) k
 ORDER BY c.Renglon, cm.Codigo, m.Renglon
+"@
+
+# Insumos del presupuesto (Obra > Materiales, Mano de obra, Maquinaria de Neodata), sin los conceptos del catalogo.
+# Tipos de Neodata: 1 Materiales, 2 Mano de obra, 3 Equipo y herramienta, 4 Basicos, 5 Subcontratos (entra como material)
+$sqlInsumos = @"
+SELECT c.Codigo, ISNULL(NULLIF(LTRIM(RTRIM(c.DescripcionLarga)), ''), c.Descripcion) Descripcion,
+       CASE c.IdTipo WHEN 2 THEN 'Mano de obra' WHEN 3 THEN 'Equipo' WHEN 4 THEN 'Basico' ELSE 'Material' END Tipo,
+       u.Unidad, k.Costo, CASE k.IdMoneda WHEN 2 THEN 'USD' ELSE 'MXN' END Moneda
+FROM PuExpIns e
+JOIN PuCatalogo c ON c.IdCodigo = e.IdCodigo
+LEFT JOIN PuUnidades u ON u.IdUnidad = c.IdUnidad
+OUTER APPLY (SELECT TOP 1 x.Costo, x.IdMoneda FROM PuExpInsCostos x WHERE x.IdExpIns = e.IdExpIns AND x.IdMoneda IN (1, 2) ORDER BY x.IdMoneda, x.Fecha DESC) k
+WHERE e.IdPresupuesto = @p AND NOT EXISTS (SELECT 1 FROM PuPresupuestosConceptos pc WHERE pc.IdExpIns = e.IdExpIns)
+  AND ISNULL(u.Unidad, '') <> '%'  -- los de porcentaje guardan como costo la base del %, no un precio
+ORDER BY c.IdTipo, c.Codigo
 "@
 
 if (-not (Test-Path $Salida)) { New-Item -ItemType Directory -Path $Salida | Out-Null }
@@ -103,8 +127,7 @@ foreach ($p in $elegidos) {
         [pscustomobject][ordered]@{ 'Partida' = Texto $r.Partida; 'Codigo' = Texto $r.Codigo; 'Concepto' = Texto $r.Concepto; 'Unidad' = Texto $r.Unidad
                                     'Cantidad' = Numero $r.Cantidad; 'P. Unitario' = Numero $r.Precio; 'Importe' = $importe }
     }
-    $archivoCat = Join-Path $Salida "Catalogo $Obra - $nombre.csv"
-    $filas | Export-Csv -Path $archivoCat -NoTypeInformation -Encoding UTF8
+    $archivoCat = Guardar $filas "Catalogo $Obra - $nombre.csv"
 
     $matrices = Consultar $base $sqlMatrices @{ '@p' = $id }
     $filas = foreach ($r in $matrices.Rows) {
@@ -112,10 +135,18 @@ foreach ($p in $elegidos) {
         [pscustomobject][ordered]@{ 'Codigo' = Texto $r.Codigo; 'Concepto' = Texto $r.Concepto; 'Tipo' = Texto $r.Tipo; 'Insumo' = Texto $r.Insumo
                                     'Unidad' = Texto $r.Unidad; 'Cantidad' = Numero $r.Cantidad; 'Costo unitario' = Numero $r.Costo; 'Importe' = $importe }
     }
-    $archivoMat = Join-Path $Salida "Matrices $Obra - $nombre.csv"
-    $filas | Export-Csv -Path $archivoMat -NoTypeInformation -Encoding UTF8
+    $archivoMat = Guardar $filas "Matrices $Obra - $nombre.csv"
 
-    '{0} ({1}): {2} conceptos, {3} insumos de matriz' -f $nombre, $id, $catalogo.Rows.Count, $matrices.Rows.Count
+    $insumos = Consultar $base $sqlInsumos @{ '@p' = $id }
+    $filas = foreach ($r in $insumos.Rows) {
+        # Importar insumos lee un renglon por linea: la descripcion va en una sola linea
+        [pscustomobject][ordered]@{ 'Clave' = Texto $r.Codigo; 'Descripcion' = (Texto $r.Descripcion) -replace '\s*[\r\n]+\s*', ' '; 'Tipo' = $r.Tipo; 'Unidad' = Texto $r.Unidad
+                                    'Precio' = Numero $r.Costo; 'Moneda' = $r.Moneda }
+    }
+    $archivoIns = Guardar $filas "Insumos $Obra - $nombre.csv"
+
+    '{0} ({1}): {2} conceptos, {3} insumos de matriz, {4} insumos' -f $nombre, $id, $catalogo.Rows.Count, $matrices.Rows.Count, $insumos.Rows.Count
     '  ' + $archivoCat
     '  ' + $archivoMat
+    '  ' + $archivoIns
 }

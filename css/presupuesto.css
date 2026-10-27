@@ -643,9 +643,22 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .pu-mini:hover:not(:disabled) { background: var(--fila-hover); color: var(--texto); }
 .pu-mini.borrar { height: 26px; }
 .pu-mini:disabled { opacity: .4; cursor: default; }
-.pu-dialogo { width: min(1200px, calc(100vw - 24px)); }
+/* Casi a pantalla completa y con letra grande (más fácil de leer); la tabla de insumos toma el alto que sobre */
+.hs-dialogo.pu-dialogo { width: calc(100vw - 32px); height: calc(100vh - 32px); max-height: none; font-size: 15px; }
+.hs-dialogo.pu-dialogo[open] { display: flex; flex-direction: column; }
+.pu-dialogo .hs-cabecera strong { font-size: 18px; }
+.pu-dialogo .pu-dlg-concepto, .pu-dialogo .pu-dlg-espec, .pu-dialogo .pu-dlg-ayuda, .pu-dialogo .pu-dlg-totales { font-size: 15px; }
+.pu-dialogo .pu-dlg-concepto input, .pu-dialogo .pu-dlg-espec textarea { height: auto; min-height: 36px; font-size: 15px; }
+.pu-dialogo .ct-btn, .pu-dialogo .hs-btn { font-size: 14.5px; }
+.pu-dialogo .pu-dlg-tabla { flex: 1 1 auto; max-height: none; min-height: 200px; }
+.pu-dialogo .pu-dlg-tabla th { font-size: 13px; }
+.pu-dialogo .pu-dlg-tabla td, .pu-dialogo .pu-dlg-tabla input, .pu-dialogo .pu-dlg-tabla select { font-size: 15px; }
+.pu-dialogo .pu-dlg-tabla td { height: 40px; }
+.pu-dialogo .grid td input[type=text], .pu-dialogo .grid td input[type=number], .pu-dialogo .grid td select { height: 40px; }
+.pu-dialogo .pu-dlg-totales .pu-pu { font-size: 18px; }
+.pu-dialogo .hs-pie { margin-top: auto; }
 .pu-dlg-tabla th.pu-c-ren { width: 64px; }
-.pu-dlg-tabla th.pu-c-cod { width: 130px; }
+.pu-dlg-tabla th.pu-c-cod { width: 170px; }
 .pu-dlg-tabla th.pu-c-tipo { width: 150px; }
 .pu-dlg-tabla th.pu-c-uni { width: 80px; }
 .pu-dlg-concepto { display: grid; grid-template-columns: minmax(0, 1fr) 110px 110px 200px; gap: 8px; padding: 12px 16px 0; font-size: 12.5px; color: var(--texto-2); }

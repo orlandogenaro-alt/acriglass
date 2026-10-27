@@ -1477,9 +1477,8 @@
             var c = x.c, falta = revisionConcepto(c);
             return '<tr data-uid="' + c.uid + '" data-buscar="' + escapar(clave(c.clave + ' ' + c.descripcion)) + '">' +
                 '<td><input type="text" data-cc="clave" maxlength="20" value="' + escapar(c.clave) + '"' + dis + '></td>' +
-                '<td><input type="text" data-cc="descripcion" list="puSugConceptos" maxlength="300" value="' + escapar(c.descripcion) + '" placeholder="¿Qué trabajo es?"' + dis + '>' +
-                    '<textarea class="cc-espec" data-cc="especificacion" maxlength="4000" rows="1" placeholder="Especificación: materiales, acabados, dimensiones, lo que incluye…"' + dis + '>' +
-                    escapar(c.especificacion) + '</textarea></td>' +
+                '<td><textarea class="cc-desc" data-cc="descripcion" maxlength="4300" rows="1" placeholder="¿Qué trabajo es? Materiales, acabados, dimensiones, lo que incluye…"' + dis + '>' +
+                    escapar(descripcionCompleta(c)) + '</textarea></td>' +
                 '<td><input type="text" data-cc="unidad" list="puUnidades" maxlength="20" value="' + escapar(c.unidad) + '" placeholder="m², pza…"' + dis + '></td>' +
                 '<td><input type="number" class="num" data-cc="cantidad" step="0.01" min="0" value="' + (c.cantidad || '') + '"' + dis + '></td>' +
                 (esVenta(c)
@@ -1507,7 +1506,7 @@
         $('ccCuerpo').innerHTML = html ||
             '<tr class="vacio-fila"><td colspan="8">El catálogo está vacío. Empieza con «+ Partida» (ej. Cancelería) y agrega sus conceptos con su unidad y cantidad.</td></tr>';
         ['ccPartida', 'ccSubpartida', 'ccConcepto', 'ccRenumerar', 'ccPlantilla', 'ccImportar'].forEach(function (id) { if ($(id)) $(id).disabled = soloLectura; });
-        $('ccCuerpo').querySelectorAll('textarea.cc-espec').forEach(ajustarEspec);
+        $('ccCuerpo').querySelectorAll('textarea.cc-desc').forEach(ajustarEspec);
         filtrarCc();
         pintarCc(r, a);
     }
@@ -1577,7 +1576,25 @@
         return '(' + letra + (entero && entero % 1e6 === 0 ? ' DE' : '') + (entero === 1 ? ' PESO ' : ' PESOS ') + ('0' + centavos % 100).slice(-2) + '/100 M.N.)';
     }
 
-    // La especificación crece con su texto, como el renglón del PDF
+    // Descripción completa en un solo campo, como en Neodata: la primera línea es el nombre del concepto (con el que se
+    // busca en el catálogo y la biblioteca) y lo demás su especificación
+    function descripcionCompleta(c) {
+        return c.descripcion + (txt(c.especificacion) ? '\n' + c.especificacion : '');
+    }
+    function partirDescripcion(c, texto) {
+        var i = texto.indexOf('\n'), desc = i < 0 ? texto : texto.slice(0, i), espec = i < 0 ? '' : texto.slice(i + 1);
+        // El nombre guarda hasta 300 letras: si la primera línea es más larga, lo que sobra pasa a la especificación
+        if (desc.length > 300) {
+            var corte = desc.lastIndexOf(' ', 300);
+            if (corte < 1) corte = 300;
+            espec = desc.slice(corte).replace(/^ /, '') + (espec ? '\n' + espec : '');
+            desc = desc.slice(0, corte);
+        }
+        c.descripcion = desc;
+        c.especificacion = espec;
+    }
+
+    // La descripción crece con su texto, como el renglón del PDF
     function ajustarEspec(t) {
         t.style.height = 'auto';
         t.style.height = t.scrollHeight + 'px';
@@ -1945,9 +1962,10 @@
         if (!campo || !tr) return;
         var c = conceptoPU(tr.dataset.uid);
         // El precio fijo no baja de un centavo: en cero el concepto dejaría de ser de precio fijo
-        c[campo] = campo === 'cantidad' ? Math.max(0, num(e.target.value)) : campo === 'venta' ? Math.max(0.01, num(e.target.value)) : e.target.value;
+        if (campo === 'descripcion') partirDescripcion(c, e.target.value);
+        else c[campo] = campo === 'cantidad' ? Math.max(0, num(e.target.value)) : campo === 'venta' ? Math.max(0.01, num(e.target.value)) : e.target.value;
         marcarCambio();
-        if (campo === 'especificacion') ajustarEspec(e.target);
+        if (campo === 'descripcion') ajustarEspec(e.target);
         if (campo === 'cantidad' || campo === 'venta') { calcularTotales(); pintarCc(); }
     });
     $('ccCuerpo').addEventListener('change', function (e) {

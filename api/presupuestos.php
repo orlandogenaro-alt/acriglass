@@ -187,9 +187,10 @@ function calcularAnalisis(array $d): array
     foreach ($a['conceptos'] as $c) {
         $r = pcConcepto($c, $a);
         // Precio fijo para el cliente: su P.U. es el del Catálogo
-        $pu = !empty($c['venta']) ? (float) $c['venta'] : ($s ? $r['totales']['cd'] * $s['factor'] : null);
+        $precio = $s ? pcPrecioConcepto($r['totales']['cd'], $s) : null;
+        $pu = !empty($c['venta']) ? (float) $c['venta'] : ($precio['pu'] ?? null);
         $conceptos[] = ['id' => $c['id'] ?? null, 'clave' => $c['clave'], 'descripcion' => $c['descripcion'], 'unidad' => $c['unidad'], 'cantidad' => $c['cantidad'],
-                        'insumos' => $r['insumos'], 'totales' => $r['totales'], 'resumen' => pcResumen($r['totales']),
+                        'insumos' => $r['insumos'], 'totales' => $r['totales'], 'resumen' => pcResumen($r['totales']), 'precio' => $precio,
                         'pu' => $pu, 'importe' => $pu === null ? null : $pu * $c['cantidad']];
     }
     return ['conceptos' => $conceptos, 'explosion' => puExplosion($a), 'sobrecosto' => $s];

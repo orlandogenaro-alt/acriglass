@@ -1072,24 +1072,39 @@
                   '<button type="button" class="ct-btn" data-matriz-costo="1"' + dis + '>Pasar los insumos a Materia Prima y Mano de Obra</button>');
         $('puDColCant').textContent = 'Cantidad por ' + u;
         $('puDInsumos').innerHTML = c.insumos.length ? c.insumos.map(function (i, n) {
-            var mo = i.tipo === 'MO', calc = mo && i.rinde > 0;
-            // Columnas como la matriz de Neodata: Renglón, Código, Descripción, Tipo, Unidad, Costo, Cantidad, Importe
+            var mo = i.tipo === 'MO', modo = modoCalculo(i), rend = modo === 'rendimiento', pctMo = modo === 'pct_mo';
+            function numero(campo, valor, paso, extra) {
+                return '<input type="number" class="num" data-ins="' + campo + '" step="' + paso + '" min="0" value="' + valor + '"' + (extra || '') + dis + '>';
+            }
+            // Columnas como la matriz de Neodata, más cómo se calcula la cantidad (cantidad directa, rendimiento, costo fijo
+            // por concepto o % de la mano de obra), factor, merma, cantidad resultante, % del costo directo, proveedor y fecha
             return '<tr data-n="' + n + '">' +
                 '<td class="ro">' + (n + 1) + '</td>' +
                 '<td><input type="text" data-ins="codigo" maxlength="30" value="' + escapar(i.codigo) + '" placeholder="Clave"' + dis + '></td>' +
                 '<td><input type="text" data-ins="descripcion" list="puSug' + grupoSugerencia(i.tipo) + '" maxlength="200" value="' + escapar(i.descripcion) + '" placeholder="' +
-                    (mo ? 'ej. Instalador + ayudante' : i.tipo === 'EQ' ? 'ej. Andamio, taladro' : 'ej. Vidrio claro 6 mm') + '"' + dis + '></td>' +
+                    escapar(EJEMPLOS_INSUMO[i.tipo]) + '"' + dis + '></td>' +
                 '<td><select data-ins="tipo"' + dis + '>' + Object.keys(TIPOS_INSUMO).map(function (t) {
                     return '<option value="' + t + '"' + (t === i.tipo ? ' selected' : '') + '>' + TIPOS_INSUMO[t] + '</option>';
                 }).join('') + '</select></td>' +
-                '<td><input type="text" data-ins="unidad" list="puUnidades" maxlength="20" value="' + escapar(i.unidad) + '"' + dis + '></td>' +
-                '<td><input type="number" class="num" data-ins="costo" step="0.01" min="0" value="' + (i.costo || '') + '"' + dis + '></td>' +
-                '<td><input type="number" class="num" data-ins="cantidad" step="0.0001" min="0" value="' + (calc ? (Math.round(1 / i.rinde * 10000) / 10000) : (i.cantidad || '')) + '"' +
-                    (calc ? ' readonly title="Se calcula con lo que rinde por jornada"' : '') + dis + '></td>' +
-                '<td>' + (mo ? '<input type="number" class="num" data-ins="rinde" step="0.01" min="0" value="' + (i.rinde || '') + '" placeholder="' + escapar(u) + '/día"' + dis + '>' : '<span class="pu-na">—</span>') + '</td>' +
-                '<td class="ro" data-ins-calc></td>' +
+                '<td><input type="text" data-ins="unidad" list="puUnidades" maxlength="20" value="' + escapar(pctMo ? '%' : i.unidad) + '"' + (pctMo ? ' readonly' : '') + dis + '></td>' +
+                '<td><select data-ins="modo" title="Cómo se calcula la cantidad"' + dis + '>' + Object.keys(CALCULOS_INSUMO).map(function (m) {
+                    return '<option value="' + m + '"' + (m === modo ? ' selected' : '') + '>' + CALCULOS_INSUMO[m] + '</option>';
+                }).join('') + '</select></td>' +
+                '<td>' + (pctMo ? '<span class="pu-na">—</span>' : numero('costo', i.costo || '', '0.01', mo ? ' title="Mano de obra: salario base por jornada (se le aplica el FSR)"' : '')) + '</td>' +
+                '<td>' + numero('cantidad', rend ? (i.rinde > 0 ? Math.round(1 / i.rinde * 10000) / 10000 : '') : (i.cantidad || ''), '0.0001',
+                    rend ? ' readonly title="Se calcula con el rendimiento"' : pctMo ? ' title="% sobre la mano de obra de este concepto (ej. 3)"'
+                         : modo === 'fijo' ? ' title="Cantidad para todo el concepto: se reparte entre su cantidad"' : '') + '</td>' +
+                '<td>' + (rend ? numero('rinde', i.rinde || '', '0.01', ' placeholder="' + escapar(u) + ' por ' + escapar(txt(i.unidad) || 'unidad') + '"')
+                               : '<span class="pu-na">—</span>') + '</td>' +
+                '<td>' + (pctMo ? '<span class="pu-na">—</span>' : numero('factor', i.factor != null ? i.factor : '', '0.0001', ' placeholder="1"')) + '</td>' +
+                '<td>' + (pctMo ? '<span class="pu-na">—</span>' : numero('merma_pct', i.merma_pct != null ? i.merma_pct : '', '0.01', ' placeholder="0"')) + '</td>' +
+                '<td class="ro" data-ins-calc="cantidad"></td>' +
+                '<td class="ro" data-ins-calc="importe"></td>' +
+                '<td class="ro" data-ins-calc="pct"></td>' +
+                '<td><input type="text" data-ins="proveedor" maxlength="150" value="' + escapar(i.proveedor) + '"' + dis + '></td>' +
+                '<td><input type="date" data-ins="fecha_costo" value="' + escapar(i.fecha_costo) + '"' + dis + '></td>' +
                 '<td><button type="button" class="borrar" title="Quitar"' + dis + '>✕</button></td></tr>';
-        }).join('') : '<tr class="vacio-fila"><td colspan="10">Agrega lo que lleva con los botones de arriba: Material, Mano de obra o Equipo.</td></tr>';
+        }).join('') : '<tr class="vacio-fila"><td colspan="17">Agrega lo que lleva con los botones de arriba: Material, Mano de obra, Equipo u Otro.</td></tr>';
         pintarDialogo();
     }
 
@@ -1097,28 +1112,44 @@
         var c = editandoPU, fijo = esVenta(c), u = costoUnitario(c, true), r = calcularPU(), unidad = escapar(txt(c.unidad) || 'unidad');
         var imps = importesInsumos(c);
         $('puDInsumos').querySelectorAll('tr[data-n]').forEach(function (tr) {
-            var i = c.insumos[tr.dataset.n];
-            tr.querySelector('[data-ins-calc]').textContent = fmt(imps[tr.dataset.n].importe);
-            if (i.tipo === 'MO' && i.rinde > 0) tr.querySelector('[data-ins="cantidad"]').value = Math.round(1 / i.rinde * 10000) / 10000;
+            var i = c.insumos[tr.dataset.n], d = imps[tr.dataset.n], modo = modoCalculo(i);
+            tr.querySelector('[data-ins-calc="cantidad"]').textContent = modo === 'pct_mo' ? cant(d.cantidad) + ' %' : cant(Math.round(d.cantidad * 10000) / 10000);
+            tr.querySelector('[data-ins-calc="importe"]').textContent = fmt(d.importe);
+            tr.querySelector('[data-ins-calc="pct"]').textContent = u.cd > 0 ? pct(d.importe / u.cd * 100) : '';
+            if (modo === 'rendimiento') tr.querySelector('[data-ins="cantidad"]').value = i.rinde > 0 ? Math.round(1 / i.rinde * 10000) / 10000 : '';
         });
-        var falta = revisionConcepto(c);
-        $('puDTotales').innerHTML =
-            '<span>Materiales <b>' + fmt(u.mat) + '</b></span>' +
-            '<span>Mano de obra' + (factorFsr() !== 1 ? ' (× FSR ' + cant(factorFsr()) + ')' : '') + ' <b>' + fmt(u.moReal) + '</b></span>' +
-            (u.hm ? '<span>Herramienta menor <b>' + fmt(u.hm) + '</b></span>' : '') +
-            '<span>Equipo <b>' + fmt(u.eq) + '</b></span>' +
-            (u.maq ? '<span>Maquinaria <b>' + fmt(u.maq) + '</b></span>' : '') +
-            (u.her ? '<span>Herramienta <b>' + fmt(u.her) + '</b></span>' : '') +
-            (u.otro ? '<span>Otros <b>' + fmt(u.otro) + '</b></span>' : '') +
-            '<span>= Costo directo por ' + unidad + ' <b>' + fmt(u.cd) + '</b></span>' +
-            (fijo
-                ? '<span class="pu-pu">Precio fijo para el cliente <b>$' + fmt(c.venta) + '</b> por ' + unidad + '</span>' +
-                  '<span class="pu-pu">Importe (× ' + cant(c.cantidad) + ') <b>$' + fmt(c.venta * c.cantidad) + '</b></span>'
-                : '<span>× Factor de sobrecosto <b>' + cant(Math.round(r.factor * 10000) / 10000) + '</b></span>' +
-                  '<span class="pu-pu">= Precio unitario <b>$' + fmt(u.cd * r.factor) + '</b> por ' + unidad + '</span>' +
-                  '<span class="pu-pu">Importe (× ' + cant(c.cantidad) + ') <b>$' + fmt(u.cd * r.factor * c.cantidad) + '</b></span>') +
+        var falta = revisionConcepto(c), res = CALC.resumen(u), p = CALC.precioConcepto(u.cd, r);
+        function fila(nombre, valor, clase) {
+            return '<tr' + (clase ? ' class="' + clase + '"' : '') + '><td class="ro izq">' + nombre + '</td><td class="ro">' + valor + '</td></tr>';
+        }
+        // Resumen del análisis como Neodata: costo directo por tipo de insumo y la integración del precio unitario
+        var costo = fila('Materiales', fmt(res.materiales)) +
+            fila('Mano de obra' + (factorFsr() !== 1 ? ' (× FSR ' + cant(factorFsr()) + ')' : ''), fmt(res.mano_obra)) +
+            fila('Maquinaria / equipo', fmt(res.maquinaria_equipo)) +
+            fila('Gastos de operación' + (u.hm ? ' (incluye herramienta menor ' + fmt(u.hm) + ')' : ''), fmt(res.gastos_operacion)) +
+            fila('Otros (fletes, servicios)', fmt(res.otros)) +
+            fila('Costo directo por ' + unidad, fmt(res.costo_directo), 'pu-total');
+        var precio = fijo
+            ? fila('Precio fijo para el cliente', '$' + fmt(c.venta), 'pu-total') +
+              fila('Cantidad', cant(c.cantidad) + ' ' + unidad) +
+              fila('Importe', '$' + fmt(c.venta * c.cantidad), 'pu-total')
+            : fila('Indirectos', fmt(p.ind)) +
+              fila('Financiamiento', fmt(p.fin)) +
+              fila('Utilidad', fmt(p.util)) +
+              fila('Cargos adicionales', fmt(p.cargos)) +
+              fila('Precio unitario por ' + unidad + ' <small>(factor ' + cant(Math.round(r.factor * 10000) / 10000) + ')</small>', '$' + fmt(p.pu), 'pu-total') +
+              fila('Cantidad', cant(c.cantidad) + ' ' + unidad) +
+              fila('Importe', '$' + fmt(p.pu * c.cantidad), 'pu-total');
+        $('puDTotales').innerHTML = '<table class="grid mini-grid pu-dlg-resumen"><tbody>' + costo + '</tbody></table>' +
+            '<table class="grid mini-grid pu-dlg-resumen"><tbody>' + precio + '</tbody></table>' +
             (falta ? '<span class="pu-falta">⚠ ' + falta + '</span>' : '');
     }
+
+    var CALCULOS_INSUMO = { cantidad: 'Cantidad', rendimiento: 'Rendimiento', fijo: 'Fijo por concepto', pct_mo: '% de la M.O.' };
+    var EJEMPLOS_INSUMO = { MAT: 'ej. Vidrio claro 6 mm', MO: 'ej. Cuadrilla: 1 aluminero + 1 ayudante', EQ: 'ej. Andamio, equipo de seguridad',
+                            MAQ: 'ej. Grúa, plataforma', HER: 'ej. Herramienta menor', OTRO: 'ej. Flete local' };
+    // Cómo se calcula la cantidad del insumo (sin capturarlo: mano de obra con rinde = rendimiento, lo demás cantidad)
+    function modoCalculo(i) { var x = CALC.insumo(i); return x.base === 'unidad' ? x.tipo_calculo : x.base; }
 
     function cambioDialogo(repintar) {
         marcarCambio();
@@ -1155,7 +1186,15 @@
         var campo = e.target.dataset.ins, tr = e.target.closest('tr[data-n]');
         if (!campo || !tr) return;
         var i = editandoPU.insumos[tr.dataset.n];
-        i[campo] = ['cantidad', 'rinde', 'costo'].indexOf(campo) >= 0 ? Math.max(0, num(e.target.value)) : e.target.value;
+        if (campo === 'modo') {
+            // Cantidad directa / rendimiento; o costo fijo por concepto / % de la mano de obra (con cantidad directa)
+            var v = e.target.value;
+            if (v === 'fijo' || v === 'pct_mo') { i.base = v; i.tipo_calculo = 'cantidad'; } else { delete i.base; i.tipo_calculo = v; }
+            cambioDialogo(true);
+            return;
+        }
+        if (CAMPOS_INSUMO[campo] && e.target.value.trim() === '') delete i[campo];   // vacío = su valor por omisión (factor 1, merma 0…)
+        else i[campo] = ['cantidad', 'rinde', 'costo', 'factor', 'merma_pct'].indexOf(campo) >= 0 ? Math.max(0, num(e.target.value)) : e.target.value;
         if (campo === 'tipo') { cambioDialogo(true); return; }
         cambioDialogo(false);
     });

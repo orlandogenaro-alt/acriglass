@@ -80,6 +80,13 @@
             "tipo": "sobrecosto",
             "args": [1000, 0, 0, 20, "margen", 0.05],
             "esperado": { "fin": 0, "util_pct": 26.666667, "util": 266.666667, "pv": 1333.333333, "cargos": 66.666667, "factor": 1.333333 }
+        },
+        {
+            "nombre": "Precio de un concepto con CD $100 en esa obra: los cargos en proporción y P.U. = 100 × 1.3464",
+            "tipo": "precio",
+            "cd": 100,
+            "args": [1000, 100, 2, 20, "costo", 0],
+            "esperado": { "cd": 100, "ind": 10, "fin": 2.2, "util": 22.44, "cargos": 0, "pu": 134.64 }
         }
     ]
 }

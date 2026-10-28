@@ -747,7 +747,14 @@ $secciones = [
     <div class="extra-caja pu-dlg-tabla">
         <table class="grid mini-grid">
             <!-- Columnas como la matriz de Neodata -->
-            <thead><tr><th class="pu-c-ren">Renglón</th><th class="pu-c-cod">Código</th><th>Descripción</th><th class="pu-c-tipo">Tipo</th><th class="pu-c-uni">Unidad</th><th class="c-num">Costo</th><th class="c-num" id="puDColCant">Cantidad</th><th class="c-num" title="Solo mano de obra: cuántas unidades del concepto hace en una jornada">Rinde por jornada</th><th class="c-num">Importe</th><th class="c-del"></th></tr></thead>
+            <thead><tr><th class="pu-c-ren">Renglón</th><th class="pu-c-cod">Código</th><th class="pu-c-desc">Descripción</th><th class="pu-c-tipo">Tipo</th><th class="pu-c-uni">Unidad</th>
+                <th class="pu-c-calc" title="Cantidad: lo que lleva una unidad (3.30 m² de vidrio). Rendimiento: cuántas unidades del concepto rinde una unidad del insumo (una cuadrilla instala 3 canceles por jornada). Fijo por concepto: para todo el concepto (un flete). % de la M.O.: porcentaje de la mano de obra (herramienta 3 %)">Cálculo</th>
+                <th class="c-num pu-c-n">Costo</th><th class="c-num pu-c-n" id="puDColCant">Cantidad</th>
+                <th class="c-num pu-c-n" title="Solo con cálculo por Rendimiento: cuántas unidades del concepto rinde una unidad del insumo (ej. 3 canceles por jornada)">Rendimiento</th>
+                <th class="c-num pu-c-n" title="Multiplica la cantidad (vacío = 1)">Factor</th><th class="c-num pu-c-n" title="Desperdicio en % (vacío = 0)">Merma %</th>
+                <th class="c-num pu-c-n" title="Cantidad por unidad del concepto ya con rendimiento, factor y merma">Cant. resultante</th>
+                <th class="c-num pu-c-n">Importe</th><th class="c-pct" title="% del costo directo del concepto">%</th>
+                <th class="pu-c-prov">Proveedor</th><th class="pu-c-fecha">Fecha de costo</th><th class="c-del"></th></tr></thead>
             <tbody id="puDInsumos"></tbody>
         </table>
     </div>

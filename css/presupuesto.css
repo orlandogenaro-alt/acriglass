@@ -661,6 +661,18 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .pu-dlg-tabla th.pu-c-cod { width: 170px; }
 .pu-dlg-tabla th.pu-c-tipo { width: 150px; }
 .pu-dlg-tabla th.pu-c-uni { width: 80px; }
+/* Matriz con las columnas del motor (cálculo, factor, merma, cantidad resultante, proveedor, fecha): se desplaza a lo ancho */
+.pu-dlg-tabla table { min-width: 1780px; }
+.pu-dlg-tabla th.pu-c-desc { min-width: 260px; }
+.pu-dlg-tabla th.pu-c-calc { width: 150px; }
+.pu-dlg-tabla th.pu-c-n { width: 105px; }
+.pu-dlg-tabla th.pu-c-prov { width: 170px; }
+.pu-dlg-tabla th.pu-c-fecha { width: 150px; }
+/* Resumen del concepto como Neodata: costo directo por tipo e integración del precio unitario */
+.pu-dlg-totales { align-items: flex-start; }
+.pu-dlg-totales .pu-dlg-resumen { width: auto; min-width: min(340px, 100%); }
+.pu-dlg-totales .pu-dlg-resumen td { height: 30px; }
+.pu-dlg-totales .pu-dlg-resumen tr.pu-total td { font-weight: 700; color: var(--enfasis); border-top: 1px solid var(--borde-2); }
 .pu-dlg-concepto { display: grid; grid-template-columns: minmax(0, 1fr) 110px 110px 200px; gap: 8px; padding: 12px 16px 0; font-size: 12.5px; color: var(--texto-2); }
 .pu-dlg-concepto label { display: flex; flex-direction: column; gap: 3px; }
 .pu-dlg-concepto input { height: 30px; padding: 0 8px; background: var(--input); color: var(--texto); border: 1px solid var(--borde-2); border-radius: 4px; }

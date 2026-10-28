@@ -73,6 +73,11 @@
         return { cd: cd, ind: ind, fin: fin, util_pct: utilPct, util: util, ca: ca, cargos: pv * ca, pv: pv, factor: cd > 0 ? pv / cd : 0 };
     }
 
+    function precioConcepto(cdU, s) {
+        var k = s.cd > 0 ? cdU / s.cd : 0;
+        return { cd: cdU, ind: s.ind * k, fin: s.fin * k, util: s.util * k, cargos: s.cargos * k, pu: s.pv * k };
+    }
+
     raiz.AcriCalculoPU = { TIPOS: TIPOS, insumo: insumo, cantidad: cantidad, costoReal: costoReal, concepto: concepto,
-                           resumen: resumen, sobrecosto: sobrecosto };
+                           resumen: resumen, sobrecosto: sobrecosto, precioConcepto: precioConcepto };
 })(typeof window !== 'undefined' ? window : global);

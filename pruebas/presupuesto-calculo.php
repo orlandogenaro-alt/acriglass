@@ -26,6 +26,12 @@ foreach ($casos as $caso) {
             pcComparar($caso['esperado'], pcSobrecosto((float) $a[0], (float) $a[1], (float) $a[2], (float) $a[3], $a[4], (float) $a[5]));
             return;
         }
+        if ($caso['tipo'] === 'precio') {
+            $a = $caso['args'];
+            $s = pcSobrecosto((float) $a[0], (float) $a[1], (float) $a[2], (float) $a[3], $a[4], (float) $a[5]);
+            pcComparar($caso['esperado'], pcPrecioConcepto((float) $caso['cd'], $s));
+            return;
+        }
         $r = pcConcepto($caso['concepto'], $caso['analisis']);
         $r['resumen'] = pcResumen($r['totales']);
         pcComparar($caso['esperado'], $r);

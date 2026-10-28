@@ -19,6 +19,7 @@ console.log('Motor de P.U. de la pantalla');
 casos.forEach(function (caso) {
     try {
         if (caso.tipo === 'sobrecosto') comparar(caso.esperado, M.sobrecosto.apply(null, caso.args), '');
+        else if (caso.tipo === 'precio') comparar(caso.esperado, M.precioConcepto(caso.cd, M.sobrecosto.apply(null, caso.args)), '');
         else {
             var r = M.concepto(caso.concepto, caso.analisis);
             r.resumen = M.resumen(r.totales);

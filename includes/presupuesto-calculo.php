@@ -143,3 +143,13 @@ function pcSobrecosto(float $cd, float $ind, float $finPct, float $utilDocPct, s
     return ['cd' => $cd, 'ind' => $ind, 'fin' => $fin, 'util_pct' => $utilPct, 'util' => $util, 'ca' => $ca,
             'cargos' => $pv * $ca, 'pv' => $pv, 'factor' => $cd > 0 ? $pv / $cd : 0.0];
 }
+
+// Precio unitario de un concepto con el sobrecosto de la obra: cada cargo (indirectos, financiamiento, utilidad y
+// cargos adicionales) en la misma proporción que tiene sobre el costo directo de la obra, así que
+// P.U. = CD del concepto × factor de sobrecosto. $s: el resultado de pcSobrecosto (cd, ind, fin, util, cargos, pv)
+function pcPrecioConcepto(float $cdU, array $s): array
+{
+    $k = (float) ($s['cd'] ?? 0) > 0 ? $cdU / (float) $s['cd'] : 0.0;
+    return ['cd' => $cdU, 'ind' => (float) $s['ind'] * $k, 'fin' => (float) $s['fin'] * $k, 'util' => (float) $s['util'] * $k,
+            'cargos' => (float) $s['cargos'] * $k, 'pu' => (float) $s['pv'] * $k];
+}

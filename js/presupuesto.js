@@ -1343,6 +1343,82 @@
         });
     });
 
+    // ---------- Presupuesto completo (botón de la barra): todos los conceptos en una sola vista ----------
+    // Las mismas partidas, subpartidas y precios del Catálogo de Conceptos (arbolCc / catalogoCliente), con su costo directo,
+    // P.U., importe, % y familia. La familia sale del catálogo Conceptos P.U. por código; lo capturado por importe, su sección.
+    var FAMILIAS = {};
+    CONCEPTOS_PU.forEach(function (c) { if (c.codigo && c.partida) FAMILIAS[clave(c.codigo)] = c.partida; });
+    var pcFilas = [];
+    function abrirCompleto() {
+        $('pcBuscar').value = '';
+        pintarCompleto();
+        $('pcDialogo').showModal();
+    }
+    function pintarCompleto() {
+        var r = calcularPU(), arbol = arbolCc(r), filtro = clave($('pcBuscar').value), cdTotal = 0, total = arbol.total, html = '';
+        pcFilas = [];
+        function concepto(x, p, sub) {
+            var cd = x.cdU * x.cantidad, fam = x.c ? FAMILIAS[clave(x.clave)] || '' : NOMBRES[x.sec];
+            cdTotal += cd;
+            if (filtro && clave([x.clave, x.descripcion, p.nombre, sub ? sub.nombre : '', fam].join(' ')).indexOf(filtro) < 0) return '';
+            pcFilas.push({ partida: p.nombre, sub: sub ? sub.nombre : '', clave: x.clave, descripcion: x.descripcion, unidad: x.unidad, cantidad: x.cantidad,
+                           cdU: x.cdU, cd: cd, pu: x.pu, importe: x.importe, familia: fam });
+            var liga = x.c ? ' data-uid="' + x.c.uid + '"' + (x.c.id ? ' data-id="' + x.c.id + '"' : '') : ' data-ir-sec="' + x.sec + '" data-ir-id="' + x.fila.id + '"';
+            return '<tr class="pc-concepto"' + liga + ' title="Doble clic: ' + (x.c ? 'abrir su análisis' : 'ir a su renglón') + '">' +
+                '<td class="ro izq">' + escapar(p.numero + ' ' + p.nombre) + '</td><td class="ro izq">' + escapar(sub ? sub.numero + ' ' + sub.nombre : '') + '</td>' +
+                '<td class="id">' + escapar(x.clave) + '</td><td class="ro izq pc-desc">' + escapar(x.descripcion) + (x.venta ? ' <small>(precio fijo)</small>' : '') + '</td>' +
+                '<td class="ro izq">' + escapar(x.unidad) + '</td><td class="ro">' + cant(x.cantidad) + '</td>' +
+                '<td class="ro">' + fmt(x.cdU) + '</td><td class="ro">' + fmt(cd) + '</td><td class="ro">' + fmt(x.pu) + '</td><td class="ro">' + fmt(x.importe) + '</td>' +
+                '<td class="ro">' + (total ? pct(x.importe / total * 100) : '') + '</td><td class="ro izq">' + escapar(fam) + '</td></tr>';
+        }
+        function grupo(clase, nombre, importe, filas) {
+            if (!filas) return '';
+            return '<tr class="' + clase + '"><td colspan="9" class="ro izq">' + escapar(nombre) + '</td><td class="ro">' + fmt(importe) + '</td>' +
+                '<td class="ro">' + (total ? pct(importe / total * 100) : '') + '</td><td></td></tr>' + filas;
+        }
+        arbol.partidas.forEach(function (p) {
+            var propias = p.conceptos.map(function (x) { return concepto(x, p, null); }).join('');
+            var subs = p.subs.map(function (sp) {
+                return grupo('pc-sub', sp.numero + ' ' + sp.nombre, sp.importe, sp.conceptos.map(function (x) { return concepto(x, p, sp); }).join(''));
+            }).join('');
+            html += grupo('pc-partida', p.numero + ' ' + p.nombre, p.importe, propias + subs);
+        });
+        $('pcCuerpo').innerHTML = html || '<tr class="vacio-fila"><td colspan="12">' + (filtro ? 'Ningún concepto coincide con la búsqueda.'
+            : 'El presupuesto aún no tiene conceptos: agrégalos en el Catálogo de Conceptos o en Análisis P.U.') + '</td></tr>';
+        var iva = total * IVA;
+        $('pcPie').innerHTML =
+            '<tr class="pu-total"><td colspan="7" class="ro">Total del presupuesto (precio de venta sin IVA)</td><td class="ro">' + fmt(cdTotal) + '</td><td></td>' +
+                '<td class="ro">' + fmt(total) + '</td><td class="ro">' + (total ? '100.00 %' : '') + '</td><td></td></tr>' +
+            '<tr><td colspan="9" class="ro">Factor de sobrecosto (precio ÷ costo directo)</td><td class="ro">' + (cdTotal ? cant(Math.round(total / cdTotal * 10000) / 10000) : '') + '</td><td colspan="2"></td></tr>' +
+            '<tr><td colspan="9" class="ro">IVA ' + pct(IVA * 100) + '</td><td class="ro">' + fmt(iva) + '</td><td colspan="2"></td></tr>' +
+            '<tr class="pu-total"><td colspan="9" class="ro">Total con IVA</td><td class="ro">' + fmt(total + iva) + '</td><td colspan="2"></td></tr>' +
+            '<tr class="pc-letra"><td colspan="12">' + escapar(importeConLetra(total + iva)) + '</td></tr>';
+        $('pcResumen').textContent = arbol.partidas.length + ' partidas · ' + arbol.partidas.reduce(function (n, p) {
+            return n + p.conceptos.length + p.subs.reduce(function (m, sp) { return m + sp.conceptos.length; }, 0);
+        }, 0) + ' conceptos' + (Math.abs(total - r.subtotal) >= 0.5 ? ' · Subtotal del documento $' + fmt(r.subtotal) + ' (la diferencia sale del financiamiento o los ajustes del Análisis P.U.)' : '');
+    }
+    $('pcBuscar').addEventListener('input', pintarCompleto);
+    $('pcCuerpo').addEventListener('dblclick', function (e) {
+        var tr = e.target.closest('tr[data-uid], tr[data-ir-sec]');
+        if (!tr) return;
+        $('pcDialogo').close();
+        if (tr.dataset.irSec) irARenglon(tr.dataset.irSec, num(tr.dataset.irId));
+        else abrirAnalisis(conceptoDeFila(tr));
+    });
+    $('pcExportar').addEventListener('click', function () {
+        var filas = [['Partida', 'Subpartida', 'Código', 'Concepto', 'Unidad', 'Cantidad', 'C.D. unitario', 'C.D. total', 'P. Unitario', 'Importe', 'Familia']
+            .map(function (t) { return { v: t, e: 'titulo' }; })];
+        pcFilas.forEach(function (x) {
+            filas.push([{ v: x.partida, e: 'texto' }, { v: x.sub, e: 'texto' }, x.clave, { v: x.descripcion, e: 'texto' }, x.unidad, { v: x.cantidad, e: 'cantidad' },
+                        { v: redondear(x.cdU), e: 'dinero' }, { v: redondear(x.cd), e: 'dinero' }, { v: redondear(x.pu), e: 'dinero' }, { v: redondear(x.importe), e: 'dinero' },
+                        { v: x.familia, e: 'texto' }]);
+        });
+        if (filas.length < 2) { alert('No hay conceptos que exportar.'); return; }
+        XlsxSimple.descargar(XlsxSimple.crear({ nombre: 'Presupuesto', anchos: [24, 24, 12, 60, 9, 11, 14, 14, 14, 14, 20], fijarFila: 1, filas: filas }),
+                             'Presupuesto completo ' + (txt($('proyecto').value) || 'presupuesto'));
+    });
+    document.querySelectorAll('[data-pc-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('pcDialogo').close(); }); });
+
     // ---------- Sobrecosto (botón de la barra): la integración del precio sobre el costo directo de la obra ----------
     // Las cifras son las del Análisis P.U. (calcularPU, con el motor js/presupuesto-calculo.js); al Guardar se mandan sus
     // componentes y el servidor recalcula el precio y el factor (presupuesto_sobrecosto, migraciones/020)
@@ -3649,6 +3725,7 @@
         'bitacora': verBitacora,
         'fasar': abrirFasar,
         'sobrecosto': abrirSobrecosto,
+        'completo': abrirCompleto,
         'eliminar': function () {
             if (!presupuestoId) {
                 if (confirm('Este presupuesto no se ha guardado. ¿Descartarlo?')) { cambios = false; cerrarVentana(); }

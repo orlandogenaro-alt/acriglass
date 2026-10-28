@@ -331,6 +331,10 @@ $secciones = [
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><circle cx="9" cy="7" r="3.2"/><path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h2"/><path d="M14 21l7-7"/><circle cx="15" cy="15" r="1.3"/><circle cx="20" cy="20" r="1.3"/></svg>
         <span>FASAR</span>
     </button>
+    <button class="tb" data-accion="completo" title="Presupuesto completo: todos los conceptos por partida y subpartida con su costo directo, P.U., importe, % y familia">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/><path d="M3.5 8.5h17M9 8.5v12M12 12h5.5M12 15.5h5.5"/></svg>
+        <span>Presupuesto completo</span>
+    </button>
     <button class="tb peligro" data-accion="eliminar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
         <span>Eliminar</span>
@@ -826,6 +830,32 @@ $secciones = [
     <div class="hs-pie">
         <span class="extra-ayuda" id="puDNota">Los cambios se aplican al momento.</span>
         <button type="button" class="hs-btn principal" data-pu-cerrar>Listo</button>
+    </div>
+</dialog>
+
+<!-- ============ PRESUPUESTO COMPLETO: TODOS LOS CONCEPTOS EN UNA VISTA ============ -->
+<dialog class="hs-dialogo pc-dialogo" id="pcDialogo">
+    <div class="hs-cabecera">
+        <strong>Presupuesto completo</strong>
+        <button type="button" class="hs-cerrar" data-pc-cerrar title="Cerrar">✕</button>
+    </div>
+    <div class="extra-barra pc-barra">
+        <input type="search" id="pcBuscar" class="cc-buscar" placeholder="Buscar partida, código, concepto o familia" autocomplete="off">
+        <button type="button" class="ct-btn" id="pcExportar" title="Descarga el presupuesto completo para abrirlo en Excel">Exportar a Excel</button>
+        <span class="extra-ayuda" id="pcResumen"></span>
+    </div>
+    <div class="extra-caja pc-tabla">
+        <table class="grid mini-grid">
+            <thead><tr><th>Partida</th><th>Subpartida</th><th class="c-id">Código</th><th>Concepto</th><th>Unidad</th><th class="c-num">Cantidad</th>
+                <th class="c-num" title="Costo directo de una unidad">C.D. unitario</th><th class="c-num">C.D. total</th><th class="c-num">P. Unitario</th>
+                <th class="c-num">Importe</th><th class="c-pct">%</th><th>Familia</th></tr></thead>
+            <tbody id="pcCuerpo"></tbody>
+            <tfoot id="pcPie"></tfoot>
+        </table>
+    </div>
+    <div class="hs-pie">
+        <span class="extra-ayuda">Doble clic en un concepto para abrir su análisis.</span>
+        <button type="button" class="hs-btn principal" data-pc-cerrar>Cerrar</button>
     </div>
 </dialog>
 

@@ -35,10 +35,36 @@
         return i.fsr > 0 ? i.fsr : (fsr > 0 ? fsr : 1);
     }
 
-    function costoReal(i, fsr) {
-        i = insumo(i);
-        if (i.tipo !== 'MO') return i.costo;
-        return i.costo * fsrInsumo(i, fsr) + i.viaticos + i.alimentacion + i.hospedaje;
+    // Matriz dentro de matriz (ver includes/presupuesto-calculo.php)
+    var NIVELES = 5;
+    function componentes(i) { return i && Array.isArray(i.componentes) ? i.componentes.filter(function (c) { return c && typeof c === 'object'; }) : []; }
+    function enCompuesto(c) { var r = {}; Object.keys(c).forEach(function (k) { r[k] = c[k]; }); r.base = 'unidad'; return r; }
+
+    function costos(i, fsr, nivel) {
+        nivel = nivel || 0;
+        var comp = componentes(i);
+        if (comp.length && nivel < NIVELES) {
+            var r = { base: 0, real: 0 };
+            comp.forEach(function (c) {
+                var q = cantidad(enCompuesto(c)), k = costos(c, fsr, nivel + 1);
+                r.base += q * k.base;
+                r.real += q * k.real;
+            });
+            return r;
+        }
+        var x = insumo(i);
+        if (x.tipo !== 'MO') return { base: x.costo, real: x.costo };
+        return { base: x.costo, real: x.costo * fsrInsumo(x, fsr) + x.viaticos + x.alimentacion + x.hospedaje };
+    }
+    function costoReal(i, fsr) { return costos(i, fsr).real; }
+
+    function desgloseCompuesto(i, fsr) {
+        return componentes(i).map(function (c) {
+            var q = cantidad(enCompuesto(c)), k = costos(c, fsr, 1), x = insumo(c);
+            var r = { tipo: x.tipo, cantidad: q, base: k.base, costo: k.real, importe: q * k.real, compuesto: componentes(c).length > 0 };
+            if (x.tipo === 'MO' && !r.compuesto) r.fsr = fsrInsumo(x, fsr);
+            return r;
+        });
     }
 
     function concepto(c, a) {
@@ -48,20 +74,59 @@
         lista.forEach(function (raw, n) {
             var i = insumo(raw);
             if (i.base === 'pct_mo') { pctMo.push(n); renglones[n] = null; return; }
-            var q = cantidad(i, cantC), costo = costoReal(i, fsr), imp = q * costo;
-            if (i.tipo === 'MO') { t.mo += q * i.costo; t.moReal += imp; }
+            var q = cantidad(raw, cantC), k = costos(raw, fsr), imp = q * k.real, comp = componentes(raw).length > 0;
+            if (i.tipo === 'MO') { t.mo += q * k.base; t.moReal += imp; }
             else t[i.tipo.toLowerCase()] += imp;
-            renglones[n] = { tipo: i.tipo, cantidad: q, costo: costo, importe: imp };
-            if (i.tipo === 'MO') renglones[n].fsr = fsrInsumo(i, fsr);
+            renglones[n] = { tipo: i.tipo, cantidad: q, base: k.base, costo: k.real, importe: imp, compuesto: comp };
+            if (i.tipo === 'MO') renglones[n].fsr = comp ? (k.base > 0 ? k.real / k.base : 1) : fsrInsumo(i, fsr);
         });
         pctMo.forEach(function (n) {
             var i = insumo(lista[n]), q = cantidad(i, cantC), imp = t.moReal * q / 100;
             t[i.tipo === 'MO' ? 'moReal' : i.tipo.toLowerCase()] += imp;
-            renglones[n] = { tipo: i.tipo, cantidad: q, costo: 0, importe: imp };
+            renglones[n] = { tipo: i.tipo, cantidad: q, base: 0, costo: 0, importe: imp, compuesto: false };
         });
         t.hm = t.moReal * num(a && a.hm) / 100;
         t.cd = t.mat + t.moReal + t.eq + t.maq + t.her + t.otro + t.hm;
         return { insumos: renglones, totales: t };
+    }
+
+    function explosion(a, desglosar) {
+        if (desglosar === undefined) desglosar = true;
+        var fsr = fsrAnalisis(a), grupos = {}, lista = [], tot = { hm: 0 };
+        TIPOS.forEach(function (t) { tot[t] = 0; });
+        function sumar(i, unidad, cant, imp) {
+            var x = insumo(i), desc = String(i.descripcion || '').trim();
+            var k = x.tipo + '|' + desc.toUpperCase() + '|' + unidad.toUpperCase();
+            if (!grupos[k]) { grupos[k] = { tipo: x.tipo, codigo: '', descripcion: desc, unidad: unidad, cantidad: 0, importe: 0 }; lista.push(grupos[k]); }
+            if (!grupos[k].codigo) grupos[k].codigo = String(i.codigo || '').trim();
+            grupos[k].cantidad += cant;
+            grupos[k].importe += imp;
+            tot[x.tipo] += imp;
+        }
+        function hojas(i, cant, nivel) {
+            if (cant <= 0) return;
+            if (desglosar && nivel < NIVELES && componentes(i).length) {
+                componentes(i).forEach(function (c) { hojas(c, cant * cantidad(enCompuesto(c)), nivel + 1); });
+                return;
+            }
+            sumar(i, String(i.unidad || '').trim(), cant, cant * costoReal(i, fsr));
+        }
+        ((a && a.conceptos) || []).forEach(function (c) {
+            var cc = num(c.cantidad);
+            if (cc <= 0) return;
+            var d = concepto(c, a);
+            (c.insumos || []).forEach(function (i, n) {
+                if (i.base === 'pct_mo') { if (d.insumos[n].importe > 0) sumar(i, '%', 0, cc * d.insumos[n].importe); return; }
+                hojas(i, cc * d.insumos[n].cantidad, 0);
+            });
+            tot.hm += cc * d.totales.hm;
+        });
+        lista.sort(function (x, y) {
+            var tx = TIPOS.indexOf(x.tipo), ty = TIPOS.indexOf(y.tipo);
+            return tx !== ty ? tx - ty : x.descripcion < y.descripcion ? -1 : x.descripcion > y.descripcion ? 1 : 0;
+        });
+        tot.total = Object.keys(tot).reduce(function (s, k) { return s + tot[k]; }, 0);
+        return { insumos: lista, totales: tot };
     }
 
     function resumen(t) {
@@ -92,5 +157,6 @@
     }
 
     raiz.AcriCalculoPU = { gastoOperacion: gastoOperacion, TIPOS: TIPOS, insumo: insumo, cantidad: cantidad, fsrInsumo: fsrInsumo, costoReal: costoReal, concepto: concepto,
-                           resumen: resumen, sobrecosto: sobrecosto, precioConcepto: precioConcepto };
+                           resumen: resumen, sobrecosto: sobrecosto, precioConcepto: precioConcepto,
+                           costos: costos, componentes: componentes, desgloseCompuesto: desgloseCompuesto, explosion: explosion };
 })(typeof window !== 'undefined' ? window : global);

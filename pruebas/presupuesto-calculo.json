@@ -82,6 +82,63 @@
             "esperado": { "fin": 0, "util_pct": 26.666667, "util": 266.666667, "pv": 1333.333333, "cargos": 66.666667, "factor": 1.333333 }
         },
         {
+            "nombre": "Cuadrilla compuesta (1 aluminero $500 + 1 ayudante $300) con FSR 1.5: 3.30 jornadas × $1,200 = 3,960",
+            "tipo": "concepto",
+            "analisis": { "fsr": 1.5, "hm": 0 },
+            "concepto": { "cantidad": 1, "insumos": [
+                { "tipo": "MO", "descripcion": "CUADRILLA No.16", "cantidad": 3.30, "costo": 0, "componentes": [
+                    { "tipo": "MO", "descripcion": "Aluminero", "cantidad": 1, "costo": 500 },
+                    { "tipo": "MO", "descripcion": "Ayudante", "cantidad": 1, "costo": 300 }
+                ] }
+            ] },
+            "esperado": {
+                "insumos": [ { "cantidad": 3.30, "base": 800, "costo": 1200, "importe": 3960, "fsr": 1.5 } ],
+                "totales": { "mo": 2640, "moReal": 3960, "cd": 3960 }
+            }
+        },
+        {
+            "nombre": "Explosión: 10 canceles con la cuadrilla que rinde 3 por jornada se desarma en aluminero y ayudante (3.3333 jornadas)",
+            "tipo": "explosion",
+            "desglosar": true,
+            "analisis": { "fsr": 1.5, "hm": 0, "conceptos": [ { "cantidad": 10, "insumos": [
+                { "tipo": "MO", "descripcion": "CUADRILLA No.16", "unidad": "jor", "tipo_calculo": "rendimiento", "rinde": 3, "componentes": [
+                    { "tipo": "MO", "descripcion": "Aluminero", "unidad": "jor", "cantidad": 1, "costo": 500 },
+                    { "tipo": "MO", "descripcion": "Ayudante", "unidad": "jor", "cantidad": 1, "costo": 300 }
+                ] }
+            ] } ] },
+            "esperado": {
+                "insumos": [ { "descripcion": "Aluminero", "cantidad": 3.333333, "importe": 2500 }, { "descripcion": "Ayudante", "cantidad": 3.333333, "importe": 1500 } ],
+                "totales": { "MO": 4000, "total": 4000 }
+            }
+        },
+        {
+            "nombre": "Explosión sin desglosar: la cuadrilla es un solo renglón (3.3333 jornadas, $4,000)",
+            "tipo": "explosion",
+            "desglosar": false,
+            "analisis": { "fsr": 1.5, "hm": 0, "conceptos": [ { "cantidad": 10, "insumos": [
+                { "tipo": "MO", "descripcion": "CUADRILLA No.16", "unidad": "jor", "tipo_calculo": "rendimiento", "rinde": 3, "componentes": [
+                    { "tipo": "MO", "descripcion": "Aluminero", "unidad": "jor", "cantidad": 1, "costo": 500 },
+                    { "tipo": "MO", "descripcion": "Ayudante", "unidad": "jor", "cantidad": 1, "costo": 300 }
+                ] }
+            ] } ] },
+            "esperado": { "insumos": [ { "descripcion": "CUADRILLA No.16", "cantidad": 3.333333, "importe": 4000 } ], "totales": { "total": 4000 } }
+        },
+        {
+            "nombre": "Matriz de dos niveles: 100 m² con 0.05 m³ de mortero (cemento 0.2 t + 10 % de merma, arena 0.5 m³) = cemento 1.1 t y arena 2.5 m³",
+            "tipo": "explosion",
+            "desglosar": true,
+            "analisis": { "conceptos": [ { "cantidad": 100, "insumos": [
+                { "tipo": "MAT", "descripcion": "Mortero", "unidad": "m3", "cantidad": 0.05, "componentes": [
+                    { "tipo": "MAT", "descripcion": "Arena", "unidad": "m3", "cantidad": 0.5, "costo": 400 },
+                    { "tipo": "MAT", "descripcion": "Cemento", "unidad": "t", "cantidad": 0.2, "merma_pct": 10, "costo": 3000 }
+                ] }
+            ] } ] },
+            "esperado": {
+                "insumos": [ { "descripcion": "Arena", "cantidad": 2.5, "importe": 1000 }, { "descripcion": "Cemento", "cantidad": 1.1, "importe": 3300 } ],
+                "totales": { "MAT": 4300, "total": 4300 }
+            }
+        },
+        {
             "nombre": "Gasto de operación por jornada: plataforma 3 jornadas × $1,200 = 3,600",
             "tipo": "gasto",
             "gasto": { "base": "jornada", "cantidad": 3, "costo": 1200 },

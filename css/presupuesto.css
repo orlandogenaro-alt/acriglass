@@ -679,6 +679,20 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .pu-dialogo .pu-mo-campos input, .pu-dialogo .pu-mo-campos select { height: 32px; width: 110px; font-size: 14px; }
 .pu-dialogo .pu-mo-campos select { width: auto; max-width: 280px; }
 .pu-mo-campos b { color: var(--enfasis); font-variant-numeric: tabular-nums; }
+/* Matriz dentro de matriz: ruta y botón de componentes */
+.pu-dlg-ruta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 16px 0; padding: 8px 10px; background: var(--ambar-suave);
+               border: 1px solid var(--ambar-borde); border-radius: 4px; font-size: 13.5px; color: var(--texto); }
+.pu-dlg-ruta[hidden] { display: none; }
+.pu-dlg-ruta .ct-btn { margin: 0; }
+.pu-dlg-ruta span { flex-basis: 100%; color: var(--texto-2); font-size: 12.5px; }
+.pu-dlg-tabla td.pu-c-acc { white-space: nowrap; }
+.pu-dlg-tabla .pu-mini.activo { background: var(--azul-suave); border-color: var(--azul-borde); color: var(--azul-texto); }
+/* Pestaña Explosión */
+.ex-explosion .extra-caja { max-height: none; }
+.ex-explosion .extra-barra label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--texto-2); }
+.ex-explosion #exConcepto { max-width: 360px; }
+.ex-explosion tfoot td { font-weight: 600; }
+.ex-explosion tfoot tr.pu-total td { font-weight: 700; color: var(--enfasis); }
 /* Gastos de Operación: botón ƒx del renglón y su ventana de cálculo */
 .grid td.go-td { white-space: nowrap; }
 .grid td.go-td input { width: calc(100% - 34px); }

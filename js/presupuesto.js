@@ -2,11 +2,12 @@
     // Tasa de IVA del presupuesto (select ivaTasa; las tasas salen de Administrador › Parámetros de presupuesto)
     var PARAMETROS = window.ACRI_PARAMETROS_PRES || { iva_defecto: 16, iva_tasas: [], indirectos: [], financiamiento_pct: 0 };
     var IVA = (PARAMETROS.iva_defecto != null ? Number(PARAMETROS.iva_defecto) : 16) / 100;
-    var NOMBRES = { mp: 'Materia Prima', mo: 'Mano de Obra', go: 'Gastos de Operacion', cc: 'Catálogo de Conceptos', pu: 'Análisis de Precios Unitarios', an: 'Análisis' };
+    var NOMBRES = { mp: 'Materia Prima', mo: 'Mano de Obra', go: 'Gastos de Operacion', cc: 'Catálogo de Conceptos', pu: 'Análisis de Precios Unitarios', ex: 'Explosión de insumos', an: 'Análisis' };
     var AYUDAS = {
         grid: 'Ctrl + I para agregar un nuevo Concepto',
         cc: 'Como Neodata: partidas, subpartidas y conceptos con su P.U. (el análisis de cada uno está en Análisis P.U.)',
         an: 'Como la hoja de Excel: se llena solo con Materia Prima, Mano de Obra y Gastos de Operacion (clic en un renglón para ir a capturarlo)',
+        ex: 'Como Neodata: todo lo que llevan los conceptos, sumado; las matrices dentro de matrices se desarman hasta sus insumos básicos',
         pu: 'Como Neodata, con lo capturado en el presupuesto: no cambia el Subtotal ni el Total'
     };
 
@@ -40,6 +41,7 @@
         if (seccion === 'cc') { renderCc(); return; }
         if (seccion === 'pu') { renderPu(); return; }
         if (seccion === 'an') { renderResumenCc(); return; }
+        if (seccion === 'ex') { renderExplosion(); return; }
         var filas = datos[seccion];
         if (!filas.length) {
             tbody.innerHTML = '<tr class="vacio-fila"><td colspan="10">Sin conceptos. Presiona Ctrl + I para agregar uno.</td></tr>';
@@ -93,6 +95,7 @@
         if (seccion === 'cc') { pintarCc(); return; }
         if (seccion === 'pu') { renderPu(); return; }
         if (seccion === 'an') { renderResumenCc(); return; }
+        if (seccion === 'ex') { renderExplosion(); return; }
         var filas = datos[seccion];
         // Los cálculos agregaron un renglón fijo (mano de obra, comisiones, seguro): se vuelve a pintar
         if (tbody.querySelectorAll('tr[data-i]').length !== filas.length) { render(); return; }
@@ -121,7 +124,7 @@
     function agregarConcepto() {
         if (seccion === 'pu') { agregarConceptoPU(); return; }
         if (seccion === 'cc') { agregarConceptoCc(); return; }
-        if (seccion === 'an') return;
+        if (seccion === 'an' || seccion === 'ex') return;
         if (soloLectura) { avisoSoloLectura(); return; }
         datos[seccion].push({ id: ++consecutivo, concepto: '', presupuesto: 0, importar: false, folio: '' });
         marcarCambio();
@@ -223,10 +226,11 @@
             document.querySelectorAll('.sec-tab').forEach(function (x) { x.classList.remove('activo'); });
             t.classList.add('activo');
             seccion = t.dataset.sec;
-            var cc = seccion === 'cc', pu = seccion === 'pu', an = seccion === 'an';
+            var cc = seccion === 'cc', pu = seccion === 'pu', an = seccion === 'an', ex = seccion === 'ex';
             $('secNombre').textContent = NOMBRES[seccion] + ':';
-            $('secAyuda').textContent = AYUDAS[cc ? 'cc' : pu ? 'pu' : an ? 'an' : 'grid'];
-            document.querySelector('.grid-caja').hidden = cc || pu || an;
+            $('secAyuda').textContent = AYUDAS[cc ? 'cc' : pu ? 'pu' : an ? 'an' : ex ? 'ex' : 'grid'];
+            document.querySelector('.grid-caja').hidden = cc || pu || an || ex;
+            $('exPanel').hidden = !ex;
             $('ccPanel').hidden = !cc;
             $('puPanel').hidden = !pu;
             $('anPanel').hidden = !an;
@@ -507,6 +511,8 @@
             if (v === undefined || v === null || v === '') return;
             r[k] = CAMPOS_INSUMO[k] === 'num' ? num(v) : String(v);
         });
+        // Matriz dentro de matriz: sus componentes (p. ej. la cuadrilla = 1 aluminero + 1 ayudante)
+        if (Array.isArray(i.componentes) && i.componentes.length) r.componentes = i.componentes.map(limpiarInsumo);
         return r;
     }
     function nuevoConcepto(c) {
@@ -575,7 +581,7 @@
         if (c.cantidad <= 0) return 'Falta la cantidad';
         if (esVenta(c)) return '';
         if (!c.insumos.length) return 'Falta el análisis';
-        if (c.insumos.some(function (i) { return !i.descripcion.trim() || cantidadInsumo(i, c) <= 0 || (i.costo <= 0 && i.base !== 'pct_mo'); })) return 'Insumo incompleto';
+        if (c.insumos.some(function (i) { return !i.descripcion.trim() || cantidadInsumo(i, c) <= 0 || (CALC.costoReal(i, factorFsr()) <= 0 && i.base !== 'pct_mo'); })) return 'Insumo incompleto';
         return '';
     }
 
@@ -806,42 +812,75 @@
         pintarExplosion();
     }
 
-    // Explosión de insumos: lo de los análisis (× cantidad del concepto) y los artículos importados, sumados
-    function pintarExplosion() {
-        var insumos = {}, lista = [];
-        function sumar(tipo, descripcion, unidad, cantidad, importe) {
-            var k = tipo + '|' + clave(descripcion) + '|' + clave(unidad);
-            if (!insumos[k]) { insumos[k] = { tipo: tipo, nombre: txt(descripcion), um: txt(unidad), cantidad: 0, importe: 0 }; lista.push(insumos[k]); }
-            insumos[k].cantidad += cantidad;
-            insumos[k].importe += importe;
-        }
-        analisis.conceptos.forEach(function (c) {
-            // La matriz de un precio fijo es informativa (su costo ya está en Materia Prima, Mano de Obra y Gastos de Operacion),
-            // salvo con «La matriz de los precios fijos es el costo»
-            if (!alCosto(c)) return;
-            var imps = importesInsumos(c);
-            c.insumos.forEach(function (i, n) {
-                // Un % de la mano de obra (herramienta 3 %) no tiene cantidad que sumar: solo su importe
-                var pctMo = i.base === 'pct_mo', q = pctMo ? 0 : imps[n].cantidad * c.cantidad, imp = imps[n].importe * c.cantidad;
-                if (q || imp) sumar(TIPOS_INSUMO[i.tipo], i.descripcion, pctMo ? '%' : i.unidad, q, imp);
-            });
-        });
-        ['mp', 'mo', 'go'].forEach(function (sec) {
-            datos[sec].forEach(function (f) {
-                (f.articulos || []).forEach(function (a) {
-                    sumar('Importado (' + SIGLAS[sec] + ')', txt(a.nom_articulo) || txt(a.clave_articulo), a.unid_medida, num(a.unidades), num(a.precio_total));
+    // Explosión de insumos con el motor (js/presupuesto-calculo.js): los conceptos que suman al costo (la matriz de un
+    // precio fijo es informativa, salvo con «La matriz de los precios fijos es el costo») o uno solo, y en toda la obra
+    // los artículos importados de Materia Prima, Mano de Obra y Gastos de Operacion
+    function explosionPU(conceptos, desglosar, importados) {
+        var e = CALC.explosion({ fsr: analisis.fsr, hm: analisis.hm, conceptos: conceptos }, desglosar);
+        var lista = e.insumos.map(function (i) { return { tipo: TIPOS_INSUMO[i.tipo], codigo: i.codigo, nombre: i.descripcion, um: i.unidad, cantidad: i.cantidad, importe: i.importe }; });
+        if (e.totales.hm) lista.push({ tipo: 'Herramienta', codigo: '', nombre: 'HERRAMIENTA MENOR (' + pct(analisis.hm) + ' DE LA MANO DE OBRA)', um: '%', cantidad: 0, importe: e.totales.hm });
+        if (importados) {
+            var porClave = {};
+            ['mp', 'mo', 'go'].forEach(function (sec) {
+                datos[sec].forEach(function (f) {
+                    (f.articulos || []).forEach(function (a) {
+                        var nombre = txt(a.nom_articulo) || txt(a.clave_articulo), k = sec + '|' + clave(nombre) + '|' + clave(a.unid_medida);
+                        if (!porClave[k]) { porClave[k] = { tipo: 'Importado (' + SIGLAS[sec] + ')', codigo: txt(a.clave_articulo), nombre: nombre, um: txt(a.unid_medida), cantidad: 0, importe: 0 }; lista.push(porClave[k]); }
+                        porClave[k].cantidad += num(a.unidades);
+                        porClave[k].importe += num(a.precio_total);
+                    });
                 });
             });
-        });
-        lista.sort(function (a, b) { return b.importe - a.importe; });
-        var total = lista.reduce(function (s, i) { return s + i.importe; }, 0);
-        $('puInsumos').innerHTML = lista.length ? lista.map(function (i) {
-            return '<tr><td class="ro izq">' + escapar(i.nombre) + '</td><td class="ro izq">' + escapar(i.tipo) + '</td>' +
-                '<td class="ro izq">' + escapar(i.um) + '</td><td class="ro">' + cant(Math.round(i.cantidad * 10000) / 10000) + '</td>' +
-                '<td class="ro">' + fmt(i.cantidad ? i.importe / i.cantidad : 0) + '</td><td class="ro">' + fmt(i.importe) + '</td>' +
-                '<td class="ro">' + (total ? pct(i.importe / total * 100) : '') + '</td></tr>';
-        }).join('') : '<tr class="vacio-fila"><td colspan="7">Aquí se suma todo lo que lleva la obra en cuanto analices conceptos o importes documentos.</td></tr>';
+        }
+        return lista;
     }
+    function filasExplosion(lista, codigo) {
+        var total = lista.reduce(function (s, i) { return s + i.importe; }, 0);
+        return lista.map(function (i) {
+            return '<tr>' + (codigo ? '<td class="id">' + escapar(i.codigo) + '</td>' : '') + '<td class="ro izq">' + escapar(i.nombre) + '</td><td class="ro izq">' + escapar(i.tipo) + '</td>' +
+                '<td class="ro izq">' + escapar(i.um) + '</td><td class="ro">' + (i.cantidad ? cant(Math.round(i.cantidad * 10000) / 10000) : '') + '</td>' +
+                '<td class="ro">' + (i.cantidad ? fmt(i.importe / i.cantidad) : '') + '</td><td class="ro">' + fmt(i.importe) + '</td>' +
+                '<td class="ro">' + (total ? pct(i.importe / total * 100) : '') + '</td></tr>';
+        }).join('');
+    }
+    // Panel del Análisis P.U.: toda la obra, ordenada por importe
+    function pintarExplosion() {
+        var lista = explosionPU(analisis.conceptos.filter(alCosto), true, true).sort(function (a, b) { return b.importe - a.importe; });
+        $('puInsumos').innerHTML = lista.length ? filasExplosion(lista, false)
+            : '<tr class="vacio-fila"><td colspan="7">Aquí se suma todo lo que lleva la obra en cuanto analices conceptos o importes documentos.</td></tr>';
+    }
+    // Pestaña Explosión: toda la obra o un concepto, con las matrices dentro de matrices desarmadas o no
+    var exLista = [];
+    function renderExplosion() {
+        var sel = $('exConcepto'), actual = sel.value;
+        sel.innerHTML = '<option value="">Toda la obra</option>' + analisis.conceptos.map(function (c) {
+            return '<option value="' + c.uid + '">' + escapar((c.clave ? c.clave + ' · ' : '') + (c.descripcion || '(sin descripción)')) + '</option>';
+        }).join('');
+        sel.value = conceptoPU(actual) ? actual : '';
+        var c = sel.value ? conceptoPU(sel.value) : null, desglosar = $('exDesglosar').checked;
+        exLista = explosionPU(c ? [c] : analisis.conceptos.filter(alCosto), desglosar, !c);
+        var total = exLista.reduce(function (s, i) { return s + i.importe; }, 0), porTipo = {};
+        exLista.forEach(function (i) { porTipo[i.tipo] = (porTipo[i.tipo] || 0) + i.importe; });
+        $('exNota').textContent = c ? 'Concepto: ' + cant(c.cantidad) + ' ' + (txt(c.unidad) || 'unidad') + (esVenta(c) && !alCosto(c) ? ' · precio fijo: su matriz es informativa' : '')
+                                    : analisis.conceptos.length + ' conceptos analizados';
+        $('exCuerpo').innerHTML = exLista.length ? filasExplosion(exLista, true)
+            : '<tr class="vacio-fila"><td colspan="8">Aún no hay insumos: analiza los conceptos en el Catálogo de Conceptos o en Análisis P.U.</td></tr>';
+        $('exPie').innerHTML = Object.keys(porTipo).map(function (t) {
+            return '<tr class="ex-tipo"><td colspan="6" class="ro">' + escapar(t) + '</td><td class="ro">' + fmt(porTipo[t]) + '</td><td class="ro">' + (total ? pct(porTipo[t] / total * 100) : '') + '</td></tr>';
+        }).join('') + '<tr class="pu-total"><td colspan="6" class="ro">Total' + (c ? ' del concepto (costo directo)' : ' de la obra') + '</td><td class="ro">' + fmt(total) + '</td><td></td></tr>';
+    }
+    $('exConcepto').addEventListener('change', renderExplosion);
+    $('exDesglosar').addEventListener('change', renderExplosion);
+    $('exExportar').addEventListener('click', function () {
+        var filas = [['Código', 'Insumo', 'Tipo', 'Unidad', 'Cantidad', 'Costo prom.', 'Importe'].map(function (t) { return { v: t, e: 'titulo' }; })];
+        exLista.forEach(function (i) {
+            filas.push([i.codigo, { v: i.nombre, e: 'texto' }, i.tipo, i.um, i.cantidad ? { v: Math.round(i.cantidad * 10000) / 10000, e: 'cantidad' } : null,
+                        i.cantidad ? { v: redondear(i.importe / i.cantidad), e: 'dinero' } : null, { v: redondear(i.importe), e: 'dinero' }]);
+        });
+        if (filas.length < 2) { alert('No hay insumos que exportar.'); return; }
+        XlsxSimple.descargar(XlsxSimple.crear({ nombre: 'Explosion', anchos: [16, 50, 18, 9, 12, 14, 14], fijarFila: 1, filas: filas }),
+                             'Explosion ' + (txt($('proyecto').value) || 'presupuesto'));
+    });
 
     function conceptoPU(uid) { return analisis.conceptos.filter(function (c) { return c.uid === +uid; })[0]; }
     // Concepto de un renglón: por su id de la base si ya está guardado (data-id), si no por el de la pantalla
@@ -1073,8 +1112,12 @@
     });
 
     // ----- Ventana de análisis de un concepto -----
+    // Ruta dentro de la matriz: los insumos compuestos abiertos (vacía = la matriz del concepto)
+    var rutaPU = [];
+    function listaPU() { return rutaPU.length ? rutaPU[rutaPU.length - 1].componentes : editandoPU.insumos; }
     function abrirAnalisis(c) {
         editandoPU = c;
+        rutaPU = [];
         var dis = soloLectura;
         $('puDConcepto').value = c.descripcion;
         $('puDUnidad').value = c.unidad;
@@ -1099,9 +1142,19 @@
                   '<button type="button" class="ct-btn" data-matriz-costo="0"' + dis + '>Dejar las matrices como informativas</button>'
                 : '<br><b>Precio fijo para el cliente:</b> esta matriz es informativa; no cambia el P. Unitario ni suma al costo, que ya viene de Materia Prima, Mano de Obra y Gastos de Operacion. ' +
                   '<button type="button" class="ct-btn" data-matriz-costo="1"' + dis + '>Pasar los insumos a Materia Prima y Mano de Obra</button>');
-        $('puDColCant').textContent = 'Cantidad por ' + u;
-        $('puDInsumos').innerHTML = c.insumos.length ? c.insumos.map(function (i, n) {
+        var padre = rutaPU[rutaPU.length - 1], lista = listaPU(), uPadre = padre ? txt(padre.unidad) || 'unidad' : u;
+        // Matriz dentro de matriz: la ruta (Concepto › Cuadrilla › …) y lo que lleva 1 unidad del compuesto
+        $('puDRuta').hidden = !padre;
+        $('puDRuta').innerHTML = padre ? '<button type="button" class="ct-btn" data-ruta="0">' + escapar(c.descripcion || 'Concepto') + '</button>' +
+            rutaPU.map(function (x, k) {
+                return ' › ' + (k < rutaPU.length - 1 ? '<button type="button" class="ct-btn" data-ruta="' + (k + 1) + '">' + escapar(x.descripcion || 'Compuesto') + '</button>'
+                                                    : '<b>' + escapar(x.descripcion || 'Compuesto') + '</b>');
+            }).join('') + '<span>Componentes de <b>1 ' + escapar(uPadre) + '</b>: su costo es la suma de lo que lleva (cada mano de obra con su FSR). ' +
+            'Ej. 1 jornal de cuadrilla = 1 aluminero + 1 ayudante.</span>' : '';
+        $('puDColCant').textContent = 'Cantidad por ' + uPadre;
+        $('puDInsumos').innerHTML = lista.length ? lista.map(function (i, n) {
             var mo = i.tipo === 'MO', modo = modoCalculo(i), rend = modo === 'rendimiento', pctMo = modo === 'pct_mo';
+            var comp = CALC.componentes(i).length;
             function numero(campo, valor, paso, extra) {
                 return '<input type="number" class="num" data-ins="' + campo + '" step="' + paso + '" min="0" value="' + valor + '"' + (extra || '') + dis + '>';
             }
@@ -1117,9 +1170,12 @@
                 }).join('') + '</select></td>' +
                 '<td><input type="text" data-ins="unidad" list="puUnidades" maxlength="20" value="' + escapar(pctMo ? '%' : i.unidad) + '"' + (pctMo ? ' readonly' : '') + dis + '></td>' +
                 '<td><select data-ins="modo" title="Cómo se calcula la cantidad"' + dis + '>' + Object.keys(CALCULOS_INSUMO).map(function (m) {
+                    // Dentro de un compuesto todo es por unidad del compuesto
+                    if (padre && (m === 'fijo' || m === 'pct_mo')) return '';
                     return '<option value="' + m + '"' + (m === modo ? ' selected' : '') + '>' + CALCULOS_INSUMO[m] + '</option>';
                 }).join('') + '</select></td>' +
-                '<td>' + (pctMo ? '<span class="pu-na">—</span>' : numero('costo', i.costo || '', '0.01', mo ? ' title="Mano de obra: salario base por jornada (se le aplica el FSR)"' : '')) + '</td>' +
+                '<td>' + (pctMo ? '<span class="pu-na">—</span>' : comp ? '<input type="number" class="num" data-ins-calc="costo-comp" readonly title="Suma de sus componentes">'
+                    : numero('costo', i.costo || '', '0.01', mo ? ' title="Mano de obra: salario base por jornada (se le aplica el FSR)"' : '')) + '</td>' +
                 '<td>' + numero('cantidad', rend ? (i.rinde > 0 ? Math.round(1 / i.rinde * 10000) / 10000 : '') : (i.cantidad || ''), '0.0001',
                     rend ? ' readonly title="Se calcula con el rendimiento"' : pctMo ? ' title="% sobre la mano de obra de este concepto (ej. 3)"'
                          : modo === 'fijo' ? ' title="Cantidad para todo el concepto: se reparte entre su cantidad"' : '') + '</td>' +
@@ -1132,26 +1188,33 @@
                 '<td class="ro" data-ins-calc="pct"></td>' +
                 '<td><input type="text" data-ins="proveedor" maxlength="150" value="' + escapar(i.proveedor) + '"' + dis + '></td>' +
                 '<td><input type="date" data-ins="fecha_costo" value="' + escapar(i.fecha_costo) + '"' + dis + '></td>' +
-                '<td><button type="button" class="borrar" title="Quitar"' + dis + '>✕</button></td></tr>' +
-                (mo && !pctMo ? detalleManoObra(i, n, dis) : '');
-        }).join('') : '<tr class="vacio-fila"><td colspan="17">Agrega lo que lleva con los botones de arriba: Material, Mano de obra, Equipo u Otro.</td></tr>';
+                '<td class="pu-c-acc">' + (pctMo ? '' : '<button type="button" class="pu-mini' + (comp ? ' activo' : '') + '" data-ins-comp title="Componentes: arma este insumo con lo que lleva (matriz dentro de matriz), p. ej. la cuadrilla = 1 aluminero + 1 ayudante">⊞' + (comp ? ' ' + comp : '') + '</button>') +
+                    '<button type="button" class="borrar" title="Quitar"' + dis + '>✕</button></td></tr>' +
+                (mo && !pctMo && !comp ? detalleManoObra(i, n, dis) : '');
+        }).join('') : '<tr class="vacio-fila"><td colspan="17">' + (padre ? 'Agrega sus componentes con los botones de arriba (p. ej. + Mano de obra: aluminero y ayudante).'
+                                                                           : 'Agrega lo que lleva con los botones de arriba: Material, Mano de obra, Equipo u Otro.') + '</td></tr>';
         pintarDialogo();
     }
 
     function pintarDialogo() {
         var c = editandoPU, fijo = esVenta(c), u = costoUnitario(c, true), r = calcularPU(), unidad = escapar(txt(c.unidad) || 'unidad');
-        var imps = importesInsumos(c);
+        // En un compuesto: sus componentes por 1 unidad de él; el % es sobre su costo
+        var padre = rutaPU[rutaPU.length - 1], lista = listaPU();
+        var imps = padre ? CALC.desgloseCompuesto(padre, factorFsr()) : importesInsumos(c);
+        var base = padre ? CALC.costoReal(padre, factorFsr()) : u.cd;
         $('puDInsumos').querySelectorAll('tr.pu-mo-det').forEach(function (tr) {
-            var i = c.insumos[tr.dataset.n], d = imps[tr.dataset.n];
+            var i = lista[tr.dataset.n], d = imps[tr.dataset.n];
             tr.querySelector('[data-ins-calc="base-fsr"]').textContent = fmt(num(i.costo) * d.fsr);
             tr.querySelector('[data-ins-calc="real"]').textContent = fmt(d.costo);
             if (i.fasar_id || !(num(i.fsr) > 0)) tr.querySelector('[data-ins="fsr"]').value = d.fsr;
         });
         $('puDInsumos').querySelectorAll('tr[data-n]:not(.pu-mo-det)').forEach(function (tr) {
-            var i = c.insumos[tr.dataset.n], d = imps[tr.dataset.n], modo = modoCalculo(i);
+            var i = lista[tr.dataset.n], d = imps[tr.dataset.n], modo = modoCalculo(i);
             tr.querySelector('[data-ins-calc="cantidad"]').textContent = modo === 'pct_mo' ? cant(d.cantidad) + ' %' : cant(Math.round(d.cantidad * 10000) / 10000);
             tr.querySelector('[data-ins-calc="importe"]').textContent = fmt(d.importe);
-            tr.querySelector('[data-ins-calc="pct"]').textContent = u.cd > 0 ? pct(d.importe / u.cd * 100) : '';
+            tr.querySelector('[data-ins-calc="pct"]').textContent = base > 0 ? pct(d.importe / base * 100) : '';
+            var cc = tr.querySelector('[data-ins-calc="costo-comp"]');
+            if (cc) cc.value = Math.round(d.costo * 100) / 100;
             if (modo === 'rendimiento') tr.querySelector('[data-ins="cantidad"]').value = i.rinde > 0 ? Math.round(1 / i.rinde * 10000) / 10000 : '';
         });
         var falta = revisionConcepto(c), res = CALC.resumen(u), p = CALC.precioConcepto(u.cd, r);
@@ -1233,12 +1296,14 @@
             var imps = importesInsumos(c);
             c.insumos.forEach(function (i, n) {
                 if (i.tipo !== 'MO' || i.base === 'pct_mo') return;
-                var d = imps[n], x = CALC.insumo(i), extras = x.viaticos + x.alimentacion + x.hospedaje;
-                var k = [clave(i.codigo), clave(i.descripcion), clave(i.unidad), x.costo, d.fsr, extras, nombreFasar(i)].join('|');
+                // Una cuadrilla compuesta: su salario base y su FSR salen de sus componentes
+                var d = imps[n], x = CALC.insumo(i), extras = d.compuesto ? 0 : x.viaticos + x.alimentacion + x.hospedaje;
+                var fasar = d.compuesto ? 'Según sus componentes' : nombreFasar(i);
+                var k = [clave(i.codigo), clave(i.descripcion), clave(i.unidad), d.base, d.fsr, extras, fasar].join('|');
                 var g = grupos[k];
                 if (!g) {
-                    g = grupos[k] = { codigo: i.codigo, descripcion: txt(i.descripcion) || '(sin descripción)', unidad: i.unidad, base: x.costo, fsr: d.fsr,
-                                      fasar: nombreFasar(i), extras: extras, real: d.costo, jornadas: 0, importe: 0, conceptos: [], fecha: i.fecha_costo || '' };
+                    g = grupos[k] = { codigo: i.codigo, descripcion: txt(i.descripcion) || '(sin descripción)', unidad: i.unidad, base: d.base, fsr: d.fsr,
+                                      fasar: fasar, extras: extras, real: d.costo, jornadas: 0, importe: 0, conceptos: [], fecha: i.fecha_costo || '' };
                     lista.push(g);
                 }
                 g.jornadas += d.cantidad * c.cantidad;
@@ -1360,7 +1425,7 @@
     $('puDialogo').querySelectorAll('[data-pu-insumo]').forEach(function (b) {
         b.addEventListener('click', function () {
             var tipo = b.dataset.puInsumo;
-            editandoPU.insumos.push(limpiarInsumo({ tipo: tipo, unidad: tipo === 'MO' ? 'jornal' : '' }));
+            listaPU().push(limpiarInsumo({ tipo: tipo, unidad: tipo === 'MO' ? 'jornal' : '' }));
             cambioDialogo(true);
             var f = $('puDInsumos').querySelector('tr:last-child [data-ins="descripcion"]');
             if (f) f.focus();
@@ -1369,7 +1434,7 @@
     $('puDInsumos').addEventListener('input', function (e) {
         var campo = e.target.dataset.ins, tr = e.target.closest('tr[data-n]');
         if (!campo || !tr) return;
-        var i = editandoPU.insumos[tr.dataset.n];
+        var i = listaPU()[tr.dataset.n];
         if (campo === 'fasar') {
             // FSR de esta mano de obra: el del presupuesto, el de un FASAR del catálogo o uno capturado
             var f = e.target.value;
@@ -1396,16 +1461,32 @@
     $('puDInsumos').addEventListener('change', function (e) {
         var tr = e.target.closest('tr[data-n]');
         if (!tr || e.target.dataset.ins !== 'descripcion') return;
-        var i = editandoPU.insumos[tr.dataset.n], s = sugerencias[grupoSugerencia(i.tipo)][clave(i.descripcion)];
+        var i = listaPU()[tr.dataset.n], s = sugerencias[grupoSugerencia(i.tipo)][clave(i.descripcion)];
         if (!s) return;
         if (!txt(i.unidad)) i.unidad = s.unidad;
         if (!i.costo) i.costo = s.costo;
         cambioDialogo(true);
     });
     $('puDInsumos').addEventListener('click', function (e) {
+        var comp = e.target.closest('[data-ins-comp]');
+        if (comp) {
+            // Abre los componentes del insumo (uno sin componentes empieza vacío)
+            var x = listaPU()[comp.closest('tr[data-n]').dataset.n];
+            if (!Array.isArray(x.componentes)) { if (soloLectura) return; x.componentes = []; }
+            rutaPU.push(x);
+            renderDialogo();
+            return;
+        }
         if (!e.target.classList.contains('borrar') || soloLectura) return;
-        editandoPU.insumos.splice(e.target.closest('tr[data-n]').dataset.n, 1);
+        listaPU().splice(e.target.closest('tr[data-n]').dataset.n, 1);
         cambioDialogo(true);
+    });
+    // Ruta de la matriz: regresa al concepto o a un compuesto de más arriba
+    $('puDRuta').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-ruta]');
+        if (!b) return;
+        rutaPU = rutaPU.slice(0, +b.dataset.ruta);
+        renderDialogo();
     });
     $('puDialogo').querySelectorAll('[data-pu-cerrar]').forEach(function (b) {
         b.addEventListener('click', function () { $('puDialogo').close(); });
@@ -1415,6 +1496,7 @@
         if (seccion === 'pu') renderPu();
         if (seccion === 'cc') renderCc();
         if (seccion === 'an') renderResumenCc();
+        if (seccion === 'ex') renderExplosion();
     });
 
     Object.keys(CAMPOS_PU).forEach(function (k) {
@@ -1476,7 +1558,7 @@
                 insumos: !detalle || (x.c && esVenta(x.c)) ? [] : x.c ? importesInsumos(x.c).map(function (d, n) {
                     var i = x.c.insumos[n];
                     return { tipo: TIPOS_INSUMO[i.tipo], descripcion: i.descripcion, unidad: i.base === 'pct_mo' ? '%' : i.unidad, cantidad: d.cantidad,
-                             costo: i.costo, importe: d.importe };
+                             costo: d.compuesto ? d.base : i.costo, importe: d.importe };
                 }).concat(u && u.hm ? [{ tipo: 'Herramienta menor', descripcion: pct(analisis.hm) + ' de la mano de obra', unidad: '', cantidad: 0, costo: 0, importe: u.hm }] : [])
                 : (x.articulos || []).map(function (a) {
                     return { tipo: 'Importado', descripcion: txt(a.nom_articulo) || txt(a.clave_articulo), unidad: txt(a.unid_medida),

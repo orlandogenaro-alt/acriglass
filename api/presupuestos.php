@@ -120,29 +120,7 @@ function analisisPUDatos($d): ?array
     if ((int) ($d['fasar_id'] ?? 0) > 0) $r['fasar_id'] = (int) $d['fasar_id'];
     foreach (array_slice((array) ($d['conceptos'] ?? []), 0, 1000) as $c) {
         if (!is_array($c)) continue;
-        $insumos = [];
-        foreach (array_slice((array) ($c['insumos'] ?? []), 0, 200) as $i) {
-            if (!is_array($i)) continue;
-            $ins = [
-                'tipo'        => in_array($i['tipo'] ?? '', PC_TIPOS, true) ? $i['tipo'] : 'MAT',
-                'codigo'      => texto($i['codigo'] ?? '', 30) ?? '',
-                'descripcion' => texto($i['descripcion'] ?? '', 200) ?? '',
-                'unidad'      => texto($i['unidad'] ?? '', 20) ?? '',
-                'cantidad'    => max(0, numero($i['cantidad'] ?? 0, 6)),
-                'rinde'       => max(0, numero($i['rinde'] ?? 0, 4)),
-                'costo'       => max(0, numero($i['costo'] ?? 0, 4)),
-            ];
-            // Campos opcionales del motor (includes/presupuesto-calculo.php): solo si se capturaron
-            if (in_array($i['tipo_calculo'] ?? '', ['cantidad', 'rendimiento'], true)) $ins['tipo_calculo'] = $i['tipo_calculo'];
-            if (in_array($i['base'] ?? '', ['fijo', 'pct_mo'], true)) $ins['base'] = $i['base'];
-            foreach (['factor' => 6, 'merma_pct' => 4, 'fsr' => 4, 'viaticos' => 4, 'alimentacion' => 4, 'hospedaje' => 4] as $k => $dec) {
-                if (isset($i[$k]) && is_numeric($i[$k])) $ins[$k] = max(0, numero($i[$k], $dec));
-            }
-            if ((int) ($i['fasar_id'] ?? 0) > 0) $ins['fasar_id'] = (int) $i['fasar_id'];   // FASAR del que salió su FSR
-            if (($v = texto($i['proveedor'] ?? '', 150)) !== null) $ins['proveedor'] = $v;
-            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($i['fecha_costo'] ?? ''))) $ins['fecha_costo'] = $i['fecha_costo'];
-            $insumos[] = $ins;
-        }
+        $insumos = analisisInsumos($c['insumos'] ?? []);
         $concepto = [
             'clave'       => texto($c['clave'] ?? '', 20) ?? '',
             'partida'     => texto($c['partida'] ?? '', 100) ?? '',
@@ -163,6 +141,40 @@ function analisisPUDatos($d): ?array
     }
     if ($r['fsr'] == 1 && !$r['hm'] && !$r['fin'] && $r['util'] === null && !$r['conceptos']) return null;
     return $r;
+}
+
+// Insumos de una matriz validados; los de un insumo compuesto (matriz dentro de matriz) en «componentes», hasta PC_NIVELES
+function analisisInsumos($lista, int $nivel = 0): array
+{
+    $insumos = [];
+    foreach (array_slice((array) $lista, 0, 200) as $i) {
+        if (!is_array($i)) continue;
+        $ins = [
+            'tipo'        => in_array($i['tipo'] ?? '', PC_TIPOS, true) ? $i['tipo'] : 'MAT',
+            'codigo'      => texto($i['codigo'] ?? '', 30) ?? '',
+            'descripcion' => texto($i['descripcion'] ?? '', 200) ?? '',
+            'unidad'      => texto($i['unidad'] ?? '', 20) ?? '',
+            'cantidad'    => max(0, numero($i['cantidad'] ?? 0, 6)),
+            'rinde'       => max(0, numero($i['rinde'] ?? 0, 4)),
+            'costo'       => max(0, numero($i['costo'] ?? 0, 4)),
+        ];
+        // Campos opcionales del motor (includes/presupuesto-calculo.php): solo si se capturaron
+        if (in_array($i['tipo_calculo'] ?? '', ['cantidad', 'rendimiento'], true)) $ins['tipo_calculo'] = $i['tipo_calculo'];
+        // Dentro de un compuesto todo es por unidad del compuesto: sin costo fijo por concepto ni % de la mano de obra
+        if (!$nivel && in_array($i['base'] ?? '', ['fijo', 'pct_mo'], true)) $ins['base'] = $i['base'];
+        foreach (['factor' => 6, 'merma_pct' => 4, 'fsr' => 4, 'viaticos' => 4, 'alimentacion' => 4, 'hospedaje' => 4] as $k => $dec) {
+            if (isset($i[$k]) && is_numeric($i[$k])) $ins[$k] = max(0, numero($i[$k], $dec));
+        }
+        if ((int) ($i['fasar_id'] ?? 0) > 0) $ins['fasar_id'] = (int) $i['fasar_id'];   // FASAR del que salió su FSR
+        if (($v = texto($i['proveedor'] ?? '', 150)) !== null) $ins['proveedor'] = $v;
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($i['fecha_costo'] ?? ''))) $ins['fecha_costo'] = $i['fecha_costo'];
+        if ($nivel < PC_NIVELES && !empty($i['componentes']) && is_array($i['componentes'])) {
+            $comp = analisisInsumos($i['componentes'], $nivel + 1);
+            if ($comp) $ins['componentes'] = $comp;
+        }
+        $insumos[] = $ins;
+    }
+    return $insumos;
 }
 
 // El análisis validado como JSON (respaldo en doctos_sugerido_obra.analisis_pu), sin los ids

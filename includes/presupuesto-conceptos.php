@@ -34,20 +34,26 @@ function presupuestoConceptosLeer(int $id): ?array
                                    from presupuesto_conceptos where docto_sugerido_obra_id = ?
                                   order by orden, presupuesto_concepto_id', [$id]);
     if (!$conceptos) return null;
-    $insumos = [];
-    // Solo los insumos de primer nivel: los componentes de una matriz dentro de matriz (padre_id) van dentro de su insumo
-    foreach (bd_filas('AW', 'select i.* from presupuesto_concepto_insumos i
+    // Los componentes de una matriz dentro de matriz (padre_id) van dentro de su insumo, en «componentes»
+    $filas = bd_filas('AW', 'select i.* from presupuesto_concepto_insumos i
                                join presupuesto_conceptos c on c.presupuesto_concepto_id = i.presupuesto_concepto_id
-                              where c.docto_sugerido_obra_id = ? and i.padre_id is null
-                              order by i.presupuesto_concepto_id, i.orden, i.presupuesto_concepto_insumo_id', [$id]) as $i) {
+                              where c.docto_sugerido_obra_id = ?
+                              order by i.presupuesto_concepto_id, i.orden, i.presupuesto_concepto_insumo_id', [$id]);
+    $hijos = [];
+    foreach ($filas as $i) $hijos[(int) ($i['padre_id'] ?? 0)][] = $i;
+    $armar = function (array $i, int $nivel) use (&$armar, $hijos): array {
         $r = ['tipo' => trim((string) $i['tipo']), 'codigo' => (string) ($i['codigo'] ?? ''), 'descripcion' => (string) ($i['descripcion'] ?? ''),
               'unidad' => (string) ($i['unidad'] ?? ''), 'cantidad' => (float) $i['cantidad'], 'rinde' => (float) $i['rinde'], 'costo' => (float) $i['costo']];
         foreach (presupuestoInsumoOpcionales() as $k => $esNumero) {
             if ($i[$k] === null || $i[$k] === '') continue;
             $r[$k] = $k === 'fasar_id' ? (int) $i[$k] : ($esNumero ? (float) $i[$k] : trim((string) $i[$k]));
         }
-        $insumos[(int) $i['presupuesto_concepto_id']][] = $r;
-    }
+        $propios = $hijos[(int) $i['presupuesto_concepto_insumo_id']] ?? [];
+        if ($propios && $nivel < PC_NIVELES) $r['componentes'] = array_map(fn($h) => $armar($h, $nivel + 1), $propios);
+        return $r;
+    };
+    $insumos = [];
+    foreach ($hijos[0] ?? [] as $i) $insumos[(int) $i['presupuesto_concepto_id']][] = $armar($i, 0);
     return array_map(function ($c) use ($insumos) {
         $r = ['id' => (int) $c['presupuesto_concepto_id'], 'clave' => (string) ($c['clave'] ?? ''), 'partida' => (string) ($c['partida'] ?? ''),
               'descripcion' => (string) ($c['descripcion'] ?? ''), 'unidad' => (string) ($c['unidad'] ?? ''), 'cantidad' => (float) $c['cantidad'],
@@ -55,6 +61,22 @@ function presupuestoConceptosLeer(int $id): ?array
         if ((float) $c['venta'] > 0) $r['venta'] = (float) $c['venta'];
         return $r;
     }, $conceptos);
+}
+
+// Insumos de un concepto (o los componentes de un insumo compuesto, con su padre_id), con la cantidad resultante y el
+// importe por unidad del concepto (de los componentes: por unidad de su compuesto) que da el motor
+function presupuestoInsumosGuardar(int $cid, ?int $padre, array $insumos, array $calc, float $fsr, int $nivel): void
+{
+    foreach ($insumos as $k => $i) {
+        $fila = ['presupuesto_concepto_id' => $cid, 'padre_id' => $padre, 'tipo' => $i['tipo'], 'codigo' => $i['codigo'], 'descripcion' => $i['descripcion'],
+                 'unidad' => $i['unidad'], 'cantidad' => $i['cantidad'], 'rinde' => $i['rinde'], 'costo' => $i['costo'],
+                 'cantidad_resultante' => round($calc[$k]['cantidad'], 6), 'importe' => round($calc[$k]['importe'], 6), 'orden' => $k + 1];
+        foreach (array_keys(presupuestoInsumoOpcionales()) as $o) $fila[$o] = $i[$o] ?? null;
+        $iid = bd_insertar('AW', 'presupuesto_concepto_insumos', 'presupuesto_concepto_insumo_id', $fila);
+        if (!empty($i['componentes']) && $nivel < PC_NIVELES) {
+            presupuestoInsumosGuardar($cid, $iid, $i['componentes'], pcDesgloseCompuesto($i, $fsr), $fsr, $nivel + 1);
+        }
+    }
 }
 
 // Guarda los conceptos del análisis (ya validados por api/presupuestos.php) dentro de la transacción abierta.
@@ -80,14 +102,7 @@ function presupuestoConceptosGuardar(int $id, array $analisis): array
             $cid = bd_insertar('AW', 'presupuesto_conceptos', 'presupuesto_concepto_id', ['docto_sugerido_obra_id' => $id] + $campos);
         }
         $vistos[$cid] = 1;
-        $calc = pcConcepto($c, $analisis)['insumos'];
-        foreach (array_values($c['insumos'] ?? []) as $k => $i) {
-            $fila = ['presupuesto_concepto_id' => $cid, 'tipo' => $i['tipo'], 'codigo' => $i['codigo'], 'descripcion' => $i['descripcion'],
-                     'unidad' => $i['unidad'], 'cantidad' => $i['cantidad'], 'rinde' => $i['rinde'], 'costo' => $i['costo'],
-                     'cantidad_resultante' => round($calc[$k]['cantidad'], 6), 'importe' => round($calc[$k]['importe'], 6), 'orden' => $k + 1];
-            foreach (array_keys(presupuestoInsumoOpcionales()) as $o) $fila[$o] = $i[$o] ?? null;
-            bd_insertar('AW', 'presupuesto_concepto_insumos', 'presupuesto_concepto_insumo_id', $fila);
-        }
+        presupuestoInsumosGuardar($cid, null, array_values($c['insumos'] ?? []), pcConcepto($c, $analisis)['insumos'], pcFsr($analisis), 0);
         if (isset($c['_uid'])) $ids[(string) $c['_uid']] = $cid;
     }
     foreach (array_keys($existentes) as $eid) {

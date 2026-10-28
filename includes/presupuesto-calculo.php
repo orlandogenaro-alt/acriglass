@@ -72,44 +72,97 @@ function pcFsrInsumo(array $i, float $fsrAnalisis = 1): float
     return $i['fsr'] > 0 ? $i['fsr'] : ($fsrAnalisis > 0 ? $fsrAnalisis : 1.0);
 }
 
-// Costo real de una unidad del insumo (la mano de obra: salario base × FSR + viáticos, alimentación y hospedaje)
-function pcCostoReal(array $i, float $fsrAnalisis = 1): float
+// Matriz dentro de matriz: un insumo puede tener componentes (una cuadrilla = 1 aluminero + 1 ayudante por jornada;
+// un mortero = cemento + arena por m³), y estos a su vez los suyos, hasta PC_NIVELES. Su costo por unidad es la suma
+// de sus componentes (cantidad × costo, cada uno con sus propias reglas y su FSR); a él no se le vuelve a aplicar FSR.
+// Dentro de un compuesto todo es por unidad del compuesto: no hay costo fijo por concepto ni % de la mano de obra.
+const PC_NIVELES = 5;
+
+function pcComponentes(array $i): array
 {
-    $i = pcInsumo($i);
-    if ($i['tipo'] !== 'MO') return $i['costo'];
-    return $i['costo'] * pcFsrInsumo($i, $fsrAnalisis) + $i['viaticos'] + $i['alimentacion'] + $i['hospedaje'];
+    $c = $i['componentes'] ?? [];
+    return is_array($c) ? array_values(array_filter($c, 'is_array')) : [];
 }
 
-// Desglose por UNA unidad del concepto: cada insumo con su cantidad resultante, costo real e importe, y los totales
-// por tipo. mo = salario base (sin FSR), moReal = con FSR y viáticos; hm = herramienta menor del análisis.
+function pcEnCompuesto(array $c): array
+{
+    $c['base'] = 'unidad';
+    return $c;
+}
+
+// Costo de una unidad del insumo: base (la mano de obra con su salario base, sin FSR) y real
+// (la mano de obra: salario base × FSR + viáticos, alimentación y hospedaje)
+function pcCostos(array $i, float $fsrAnalisis = 1, int $nivel = 0): array
+{
+    $comp = pcComponentes($i);
+    if ($comp && $nivel < PC_NIVELES) {
+        $r = ['base' => 0.0, 'real' => 0.0];
+        foreach ($comp as $c) {
+            $q = pcCantidad(pcEnCompuesto($c));
+            $k = pcCostos($c, $fsrAnalisis, $nivel + 1);
+            $r['base'] += $q * $k['base'];
+            $r['real'] += $q * $k['real'];
+        }
+        return $r;
+    }
+    $x = pcInsumo($i);
+    if ($x['tipo'] !== 'MO') return ['base' => $x['costo'], 'real' => $x['costo']];
+    return ['base' => $x['costo'], 'real' => $x['costo'] * pcFsrInsumo($x, $fsrAnalisis) + $x['viaticos'] + $x['alimentacion'] + $x['hospedaje']];
+}
+
+function pcCostoReal(array $i, float $fsrAnalisis = 1): float
+{
+    return pcCostos($i, $fsrAnalisis)['real'];
+}
+
+// Componentes de un insumo compuesto por UNA unidad de él: cantidad, costo base y real, e importe de cada uno
+function pcDesgloseCompuesto(array $i, float $fsrAnalisis = 1): array
+{
+    $r = [];
+    foreach (pcComponentes($i) as $c) {
+        $q = pcCantidad(pcEnCompuesto($c));
+        $k = pcCostos($c, $fsrAnalisis, 1);
+        $x = pcInsumo($c);
+        $r[] = ['tipo' => $x['tipo'], 'cantidad' => $q, 'base' => $k['base'], 'costo' => $k['real'], 'importe' => $q * $k['real'],
+                'compuesto' => (bool) pcComponentes($c)] + ($x['tipo'] === 'MO' && !pcComponentes($c) ? ['fsr' => pcFsrInsumo($x, $fsrAnalisis)] : []);
+    }
+    return $r;
+}
+
+// Desglose por UNA unidad del concepto: cada insumo con su cantidad resultante, costo base y real, e importe, y los
+// totales por tipo. mo = salario base (sin FSR), moReal = con FSR y viáticos; hm = herramienta menor del análisis.
 function pcConcepto(array $c, array $analisis): array
 {
     $fsr = pcFsr($analisis);
     $cantConcepto = pcNum($c['cantidad'] ?? 0);
     $t = ['mat' => 0.0, 'mo' => 0.0, 'moReal' => 0.0, 'eq' => 0.0, 'maq' => 0.0, 'her' => 0.0, 'otro' => 0.0, 'hm' => 0.0, 'cd' => 0.0];
+    $lista = array_values(array_map(fn($x) => (array) $x, $c['insumos'] ?? []));
     $renglones = [];
     $pctMo = [];
-    foreach (array_values($c['insumos'] ?? []) as $n => $raw) {
-        $i = pcInsumo((array) $raw);
+    foreach ($lista as $n => $raw) {
+        $i = pcInsumo($raw);
         if ($i['base'] === 'pct_mo') { $pctMo[] = $n; $renglones[$n] = null; continue; }
-        $q = pcCantidad($i, $cantConcepto);
-        $costo = pcCostoReal($i, $fsr);
-        $imp = $q * $costo;
+        $q = pcCantidad($raw, $cantConcepto);
+        $k = pcCostos($raw, $fsr);
+        $imp = $q * $k['real'];
         if ($i['tipo'] === 'MO') {
-            $t['mo'] += $q * $i['costo'];
+            $t['mo'] += $q * $k['base'];
             $t['moReal'] += $imp;
         } else {
             $t[strtolower($i['tipo'])] += $imp;
         }
-        $renglones[$n] = ['tipo' => $i['tipo'], 'cantidad' => $q, 'costo' => $costo, 'importe' => $imp];
-        if ($i['tipo'] === 'MO') $renglones[$n]['fsr'] = pcFsrInsumo($i, $fsr);
+        $renglones[$n] = ['tipo' => $i['tipo'], 'cantidad' => $q, 'base' => $k['base'], 'costo' => $k['real'], 'importe' => $imp,
+                          'compuesto' => (bool) pcComponentes($raw)];
+        // FSR de la mano de obra; en una cuadrilla compuesta, el que resulta de sus componentes
+        if ($i['tipo'] === 'MO') $renglones[$n]['fsr'] = pcComponentes($raw) ? ($k['base'] > 0 ? $k['real'] / $k['base'] : 1.0) : pcFsrInsumo($i, $fsr);
     }
     // Los porcentajes de la mano de obra van después: su base es la mano de obra real ya sumada
     foreach ($pctMo as $n) {
-        $i = pcInsumo((array) $c['insumos'][$n]);
-        $imp = $t['moReal'] * pcCantidad($i, $cantConcepto) / 100;
+        $i = pcInsumo($lista[$n]);
+        $q = pcCantidad($i, $cantConcepto);
+        $imp = $t['moReal'] * $q / 100;
         $t[$i['tipo'] === 'MO' ? 'moReal' : strtolower($i['tipo'])] += $imp;
-        $renglones[$n] = ['tipo' => $i['tipo'], 'cantidad' => pcCantidad($i, $cantConcepto), 'costo' => 0.0, 'importe' => $imp];
+        $renglones[$n] = ['tipo' => $i['tipo'], 'cantidad' => $q, 'base' => 0.0, 'costo' => 0.0, 'importe' => $imp, 'compuesto' => false];
     }
     ksort($renglones);
     $t['hm'] = $t['moReal'] * pcNum($analisis['hm'] ?? 0) / 100;
@@ -174,4 +227,52 @@ function pcGastoOperacion(array $g, float $manoObra): ?float
     if ($base === '') return null;
     if ($base === 'pct_mo') return $manoObra * max(0, pcNum($g['pct'] ?? 0)) / 100;
     return max(0, pcNum($g['cantidad'] ?? 0)) * max(0, pcNum($g['costo'] ?? 0));
+}
+
+// Explosión de insumos: todo lo que llevan los conceptos (cantidad del concepto × lo que lleva una unidad), sumado por
+// tipo + descripción + unidad. Con $desglosar, los compuestos se desarman hasta sus insumos básicos (la cuadrilla en
+// aluminero y ayudante); sin él, el compuesto es un renglón. Un % de la mano de obra suma solo su importe (unidad «%»).
+// Importe = cantidad × costo real (la mano de obra con su FSR). La herramienta menor del análisis va en totales['hm'].
+// Regresa ['insumos' => [{tipo, codigo, descripcion, unidad, cantidad, importe}] (por tipo y descripción), 'totales' => [tipo…, hm, total]]
+function pcExplosion(array $analisis, bool $desglosar = true): array
+{
+    $fsr = pcFsr($analisis);
+    $grupos = [];
+    $tot = array_fill_keys(PC_TIPOS, 0.0) + ['hm' => 0.0];
+    $sumar = function (array $i, string $unidad, float $cant, float $imp) use (&$grupos, &$tot) {
+        $x = pcInsumo($i);
+        $desc = trim((string) ($i['descripcion'] ?? ''));
+        $k = $x['tipo'] . '|' . mb_strtoupper($desc) . '|' . mb_strtoupper($unidad);
+        if (!isset($grupos[$k])) $grupos[$k] = ['tipo' => $x['tipo'], 'codigo' => '', 'descripcion' => $desc, 'unidad' => $unidad, 'cantidad' => 0.0, 'importe' => 0.0];
+        if ($grupos[$k]['codigo'] === '') $grupos[$k]['codigo'] = trim((string) ($i['codigo'] ?? ''));
+        $grupos[$k]['cantidad'] += $cant;
+        $grupos[$k]['importe'] += $imp;
+        $tot[$x['tipo']] += $imp;
+    };
+    $hojas = function (array $i, float $cant, int $nivel) use (&$hojas, $sumar, $fsr, $desglosar) {
+        if ($cant <= 0) return;
+        if ($desglosar && $nivel < PC_NIVELES && pcComponentes($i)) {
+            foreach (pcComponentes($i) as $c) $hojas($c, $cant * pcCantidad(pcEnCompuesto($c)), $nivel + 1);
+            return;
+        }
+        $sumar($i, trim((string) ($i['unidad'] ?? '')), $cant, $cant * pcCostoReal($i, $fsr));
+    };
+    foreach ($analisis['conceptos'] ?? [] as $c) {
+        $cc = pcNum($c['cantidad'] ?? 0);
+        if ($cc <= 0) continue;
+        $d = pcConcepto($c, $analisis);
+        foreach (array_values($c['insumos'] ?? []) as $n => $i) {
+            $i = (array) $i;
+            if (($i['base'] ?? '') === 'pct_mo') {
+                if ($d['insumos'][$n]['importe'] > 0) $sumar($i, '%', 0.0, $cc * $d['insumos'][$n]['importe']);
+                continue;
+            }
+            $hojas($i, $cc * $d['insumos'][$n]['cantidad'], 0);
+        }
+        $tot['hm'] += $cc * $d['totales']['hm'];
+    }
+    $lista = array_values($grupos);
+    usort($lista, fn($a, $b) => [array_search($a['tipo'], PC_TIPOS), $a['descripcion']] <=> [array_search($b['tipo'], PC_TIPOS), $b['descripcion']]);
+    $tot['total'] = array_sum($tot);
+    return ['insumos' => $lista, 'totales' => $tot];
 }

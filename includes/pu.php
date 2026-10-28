@@ -161,44 +161,16 @@ function puAplanarMatriz(array $matriz, array $insumos, array $componentes, arra
 // Regresa ['insumos' => [{tipo, descripcion, unidad, cantidad, costo, importe}], 'totales' => [MAT, MO, EQ, hm, total]]
 function puExplosion(array $analisis): array
 {
-    // Cantidades e importes por unidad del concepto con el motor del presupuesto (includes/presupuesto-calculo.php):
-    // tipo de cálculo, merma, factor, costos fijos y % de la mano de obra, igual que en la pantalla
-    $orden = PC_TIPOS;
-    $grupos = [];
-    $tot = array_fill_keys($orden, 0.0) + ['hm' => 0.0];
-    foreach ($analisis['conceptos'] ?? [] as $c) {
-        $cantConcepto = (float) ($c['cantidad'] ?? 0);
-        if ($cantConcepto <= 0) continue;
-        $d = pcConcepto($c, $analisis);
-        foreach (array_values($c['insumos'] ?? []) as $n => $i) {
-            $r = $d['insumos'][$n];
-            $pctMo = ($i['base'] ?? '') === 'pct_mo';
-            $cant = $pctMo ? 0.0 : $cantConcepto * $r['cantidad'];
-            $imp = $cantConcepto * $r['importe'];
-            if ($cant <= 0 && $imp <= 0) continue;
-            $tipo = $r['tipo'];
-            $unidad = $pctMo ? '%' : trim((string) ($i['unidad'] ?? ''));
-            $k = $tipo . '|' . mb_strtoupper(trim((string) ($i['descripcion'] ?? ''))) . '|' . mb_strtoupper($unidad);
-            if (!isset($grupos[$k])) {
-                $grupos[$k] = ['tipo' => $tipo, 'descripcion' => trim((string) ($i['descripcion'] ?? '')), 'unidad' => $unidad,
-                               'cantidad' => 0.0, 'importe' => 0.0];
-            }
-            $grupos[$k]['cantidad'] += $cant;
-            $grupos[$k]['importe'] += $imp;
-            $tot[$tipo] += $imp;
-        }
-        $tot['hm'] += $cantConcepto * $d['totales']['hm'];
-    }
-    $lista = array_values(array_map(function ($g) {
+    // El motor del presupuesto (includes/presupuesto-calculo.php) desarma también las matrices dentro de matrices
+    $e = pcExplosion($analisis, true);
+    $lista = array_map(function ($g) {
         $g['cantidad'] = round($g['cantidad'], 4);
         $g['importe'] = round($g['importe'], 2);
         // Costo unitario promedio (el mismo insumo puede venir con costos distintos en varios conceptos)
         $g['costo'] = $g['cantidad'] > 0 ? round($g['importe'] / $g['cantidad'], 6) : 0.0;
         return $g;
-    }, $grupos));
-    usort($lista, fn($a, $b) => [array_search($a['tipo'], $orden), $a['descripcion']] <=> [array_search($b['tipo'], $orden), $b['descripcion']]);
-    $tot = array_map(fn($v) => round($v, 2), $tot);
-    $tot['total'] = round(array_sum($tot), 2);
+    }, $e['insumos']);
+    $tot = array_map(fn($v) => round($v, 2), $e['totales']);
     return ['insumos' => $lista, 'totales' => $tot];
 }
 

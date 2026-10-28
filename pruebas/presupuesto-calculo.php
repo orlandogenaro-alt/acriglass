@@ -12,6 +12,10 @@ function pcComparar(array $esperado, array $obtenido, string $ruta = ''): void
     foreach ($esperado as $k => $v) {
         if (!array_key_exists($k, $obtenido)) throw new RuntimeException("falta $ruta$k");
         if (is_array($v)) { pcComparar($v, (array) $obtenido[$k], "$ruta$k."); continue; }
+        if (is_string($v)) {
+            if ($v !== $obtenido[$k]) throw new RuntimeException("$ruta$k: se esperaba «{$v}» y se obtuvo «{$obtenido[$k]}»");
+            continue;
+        }
         if (abs((float) $v - (float) $obtenido[$k]) >= 0.00005 * max(1, abs((float) $v))) {
             throw new RuntimeException("$ruta$k: se esperaba $v y se obtuvo " . $obtenido[$k]);
         }
@@ -24,6 +28,10 @@ foreach ($casos as $caso) {
         if ($caso['tipo'] === 'sobrecosto') {
             $a = $caso['args'];
             pcComparar($caso['esperado'], pcSobrecosto((float) $a[0], (float) $a[1], (float) $a[2], (float) $a[3], $a[4], (float) $a[5]));
+            return;
+        }
+        if ($caso['tipo'] === 'explosion') {
+            pcComparar($caso['esperado'], pcExplosion($caso['analisis'], $caso['desglosar']));
             return;
         }
         if ($caso['tipo'] === 'gasto') {

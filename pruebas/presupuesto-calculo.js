@@ -11,6 +11,7 @@ function comparar(esperado, obtenido, ruta) {
         var v = esperado[k];
         if (!(k in Object(obtenido))) throw new Error('falta ' + ruta + k);
         if (typeof v === 'object') { comparar(v, obtenido[k], ruta + k + '.'); return; }
+        if (typeof v === 'string') { if (v !== obtenido[k]) throw new Error(ruta + k + ': se esperaba «' + v + '» y se obtuvo «' + obtenido[k] + '»'); return; }
         if (Math.abs(v - obtenido[k]) >= 0.00005 * Math.max(1, Math.abs(v))) throw new Error(ruta + k + ': se esperaba ' + v + ' y se obtuvo ' + obtenido[k]);
     });
 }
@@ -19,6 +20,7 @@ console.log('Motor de P.U. de la pantalla');
 casos.forEach(function (caso) {
     try {
         if (caso.tipo === 'sobrecosto') comparar(caso.esperado, M.sobrecosto.apply(null, caso.args), '');
+        else if (caso.tipo === 'explosion') comparar(caso.esperado, M.explosion(caso.analisis, caso.desglosar), '');
         else if (caso.tipo === 'gasto') {
             var imp = M.gastoOperacion(caso.gasto, caso.mano_obra);
             comparar(caso.esperado, imp === null ? { fijo: 1 } : { importe: imp }, '');

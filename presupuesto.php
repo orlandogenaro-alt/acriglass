@@ -238,6 +238,7 @@ $secciones = [
     'mo' => 'Mano de Obra',
     'go' => 'Gastos de Operacion',
     'pu' => 'Análisis P.U.',
+    'ex' => 'Explosión',
     'an' => 'Análisis',
 ];
 ?>
@@ -478,6 +479,26 @@ $secciones = [
                         <table class="grid mini-grid ccr-grid">
                             <thead><tr><th class="ccr-anexo">Anexos</th><th>Partidas</th><th class="c-num">Presupuesto sugerido</th><th class="c-num">Subtotal</th><th class="c-num">Total</th><th class="c-pct">%</th></tr></thead>
                             <tbody id="ccrCuerpo"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Explosión de insumos (como Neodata): todo lo que llevan los conceptos, de toda la obra o de uno, con las matrices
+                 dentro de matrices desarmadas hasta sus insumos básicos -->
+            <div class="cc-panel" id="exPanel" hidden>
+                <section class="extra ex-explosion">
+                    <div class="extra-barra">
+                        <label>Ver: <select id="exConcepto" class="ct-btn"><option value="">Toda la obra</option></select></label>
+                        <label class="ex-check" title="Las cuadrillas, básicos y demás insumos compuestos se muestran desarmados en lo que llevan"><input type="checkbox" id="exDesglosar" checked> Desarmar las matrices dentro de matrices</label>
+                        <button type="button" class="ct-btn" id="exExportar" title="Descarga la explosión para abrirla en Excel">Exportar a Excel</button>
+                        <span class="extra-ayuda" id="exNota"></span>
+                    </div>
+                    <div class="extra-caja">
+                        <table class="grid mini-grid">
+                            <thead><tr><th class="c-id">Código</th><th>Insumo</th><th>Tipo</th><th>Unidad</th><th class="c-num">Cantidad</th><th class="c-num">Costo prom.</th><th class="c-num">Importe</th><th class="c-pct">%</th></tr></thead>
+                            <tbody id="exCuerpo"></tbody>
+                            <tfoot id="exPie"></tfoot>
                         </table>
                     </div>
                 </section>
@@ -782,6 +803,7 @@ $secciones = [
         <button type="button" class="ct-btn" id="puDImportar" title="Llena la matriz de los conceptos desde el Excel (el mismo formato que Exportar matrices)">Importar matrices de Excel</button>
         <input type="file" id="puDArchivo" accept=".xlsx,.csv,.txt" hidden>
     </div>
+    <div class="pu-dlg-ruta" id="puDRuta" hidden></div>
     <div class="extra-caja pu-dlg-tabla">
         <table class="grid mini-grid">
             <!-- Columnas como la matriz de Neodata -->

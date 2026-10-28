@@ -54,7 +54,8 @@
                 '<td class="sel-col"></td>' +
                 '<td class="id">' + r.id + '</td>' +
                 '<td>' + campoConcepto(r.concepto) + '</td>' +
-                '<td><input type="number" step="0.01" class="num" data-campo="presupuesto" value="' + (r.presupuesto || '') + '"' + dis + '></td>' +
+                '<td' + (seccion === 'go' ? ' class="go-td"' : '') + '><input type="number" step="0.01" class="num" data-campo="presupuesto" value="' + (r.presupuesto || '') + '"' + dis + '>' +
+                    (seccion === 'go' ? '<button type="button" class="go-calc" data-go-calc title="Cómo se calcula este gasto: fijo, por unidad, hora, jornada o % de la mano de obra">ƒx</button>' : '') + '</td>' +
                 '<td class="ro" data-calc="subtotal"></td>' +
                 '<td class="ro" data-calc="total"></td>' +
                 '<td class="ro" data-calc="pct"></td>' +
@@ -103,7 +104,11 @@
             inp.readOnly = !!r.calc;
             inp.title = r.calc === 'auto' ? 'Cálculo automático (porcentaje del catálogo de conceptos)'
                       : r.calc === 'fijo' ? 'Se calcula con los empleados, comisiones o anexo de seguro'
-                      : r.calc === 'pu' ? 'Se calcula con los conceptos de la pestaña Análisis P.U.' : '';
+                      : r.calc === 'pu' ? 'Se calcula con los conceptos de la pestaña Análisis P.U.'
+                      : r.calc === 'gasto' ? 'Se calcula: ' + descripcionGasto(r.gasto) + ' (botón ƒx)' : '';
+            // Solo un gasto capturado o calculado se puede calcular (no los automáticos, los fijos ni los del análisis)
+            var fx = tr.querySelector('[data-go-calc]');
+            if (fx) { fx.hidden = !!r.calc && r.calc !== 'gasto'; fx.classList.toggle('activo', r.calc === 'gasto'); }
             tr.classList.toggle('calc', !!r.calc);
             if (r.calc && document.activeElement !== inp) inp.value = r.presupuesto;
             tr.querySelector('[data-calc="subtotal"]').textContent = fmt(imp);
@@ -154,6 +159,7 @@
     }
 
     tbody.addEventListener('click', function (e) {
+        if (e.target.closest('[data-go-calc]')) { abrirGasto(+e.target.closest('tr').dataset.i); return; }
         if (!e.target.classList.contains('borrar')) return;
         eliminarConcepto(+e.target.closest('tr').dataset.i);
     });
@@ -281,8 +287,14 @@
     // retorna_base_para_calculo_gasto_administrativo_matprima: MP × afecta_gasto_oper + Mano de Obra (sin comisiones)
     // Base de los indirectos: costo directo completo (toda la Materia Prima y la Mano de Obra sin las comisiones)
     function baseCostoDirecto() {
-        var b = 0;
+        var b = baseManoObra();
         datos.mp.forEach(function (r) { b += num(r.presupuesto); });
+        datos.go.forEach(function (r) { if (r.calc === 'pu') b += num(r.presupuesto); });   // maquinaria, herramienta y otros de los análisis
+        return b;
+    }
+    // Mano de obra del presupuesto sin las comisiones: base de los gastos «% de la mano de obra»
+    function baseManoObra() {
+        var b = 0;
         datos.mo.forEach(function (r) { if (clave(r.concepto) !== clave(FIJOS.comisiones)) b += num(r.presupuesto); });
         return b;
     }
@@ -296,6 +308,7 @@
             var i = infoConcepto('mo', r.concepto);
             if (i ? i.base : clave(r.concepto) !== clave(FIJOS.comisiones)) b += num(r.presupuesto);
         });
+        datos.go.forEach(function (r) { if (r.calc === 'pu') b += num(r.presupuesto); });
         return b;
     }
 
@@ -314,6 +327,16 @@
             ponerFijo('mo', FIJOS.comisiones, totCom);
         }
         ponerInsumosPU();
+        // Gastos de Operación calculados (botón ƒx): por unidad / hora / jornada o % de la mano de obra
+        var moBase = null;
+        datos.go.forEach(function (r) {
+            if (!r.gasto || r.calc) return;
+            if (moBase === null) moBase = baseManoObra();
+            var imp = CALC.gastoOperacion(r.gasto, moBase);
+            if (imp === null) return;
+            r.presupuesto = redondear(imp);
+            r.calc = 'gasto';
+        });
         // calcula_conceptos_calc_automatico: % del subtotal; los gastos base_mp, % de la base de MP + MO
         datos.mp.forEach(function (r) {
             var i = infoConcepto('mp', r.concepto);
@@ -341,11 +364,14 @@
     // o de Mano de Obra (sueldos × FSR), sumado en toda la obra como la explosión de insumos de Neodata.
     // Los renglones que ya no lleva ningún análisis se quitan (y el renglón único de antes, «MATERIALES SEGUN ANALISIS P.U.»).
     // Si el presupuesto no trae análisis (p. ej. se guardó sin la columna) sus renglones se respetan como están
-    var filasPU = { mp: {}, mo: {} };
+    var filasPU = { mp: {}, mo: {}, go: {} };
+    // Sección de un insumo del análisis: la mano de obra a Mano de Obra; maquinaria, herramienta y otros (fletes, servicios)
+    // a Gastos de Operación; materiales y equipo a Materia Prima (el equipo ahí, como siempre, para no mover lo ya guardado)
+    function seccionInsumo(tipo) { return tipo === 'MO' ? 'mo' : ['MAQ', 'HER', 'OTRO'].indexOf(tipo) >= 0 ? 'go' : 'mp'; }
     function ponerInsumosPU() {
         if (analisis.conceptos.length) huboAnalisis = true;
         if (!huboAnalisis) return;
-        var nuevos = { mp: {}, mo: {} }, lista = { mp: [], mo: [] }, moReal = 0;
+        var nuevos = { mp: {}, mo: {}, go: {} }, lista = { mp: [], mo: [], go: [] }, moReal = 0;
         function sumar(sec, nombre, importe) {
             var k = clave(nombre);
             if (!nuevos[sec][k]) { nuevos[sec][k] = { nombre: txt(nombre), importe: 0 }; lista[sec].push(nuevos[sec][k]); }
@@ -355,17 +381,17 @@
             if (!alCosto(c)) return;
             var imps = importesInsumos(c);
             c.insumos.forEach(function (i, n) {
-                var sec = i.tipo === 'MO' ? 'mo' : 'mp', imp = imps[n].importe * c.cantidad;
+                var sec = seccionInsumo(i.tipo), imp = imps[n].importe * c.cantidad;
                 if (!imp) return;
                 sumar(sec, txt(i.descripcion) || TIPOS_INSUMO[i.tipo], imp);
                 if (sec === 'mo') moReal += imp;
             });
         });
         if (moReal * analisis.hm) sumar('mp', 'HERRAMIENTA MENOR (% DE LA MANO DE OBRA)', moReal * analisis.hm / 100);
-        ['mp', 'mo'].forEach(function (sec) {
+        ['mp', 'mo', 'go'].forEach(function (sec) {
             for (var n = datos[sec].length - 1; n >= 0; n--) {
                 var k = clave(datos[sec][n].concepto);
-                if (!nuevos[sec][k] && (filasPU[sec][k] || k === clave(FIJOS_PU[sec]))) datos[sec].splice(n, 1);
+                if (!nuevos[sec][k] && (filasPU[sec][k] || (FIJOS_PU[sec] && k === clave(FIJOS_PU[sec])))) datos[sec].splice(n, 1);
             }
             lista[sec].forEach(function (x) { ponerFijo(sec, x.nombre, x.importe, 'pu'); });
         });
@@ -509,7 +535,7 @@
         };
         (a.conceptos || []).forEach(function (c) { analisis.conceptos.push(nuevoConcepto(c)); });
         huboAnalisis = analisis.conceptos.length > 0;
-        filasPU = { mp: {}, mo: {} };
+        filasPU = { mp: {}, mo: {}, go: {} };
         Object.keys(CAMPOS_PU).forEach(function (k) { $(CAMPOS_PU[k]).value = analisis[k]; });
         $('puMatrizCosto').checked = analisis.matrizCosto;
     }
@@ -589,7 +615,7 @@
         r.mo += a.mo;
         r.fsr += a.moReal - a.mo;   // FSR y viáticos de la mano de obra analizada
         r.hm += a.hm;
-        datos.go.forEach(function (f) { if (!seguros[clave(f.concepto)]) r.ind += num(f.presupuesto); });
+        datos.go.forEach(function (f) { if (!seguros[clave(f.concepto)] && f.calc !== 'pu') r.ind += num(f.presupuesto); });
 
         r.cd = r.mp + r.mo + r.fsr + r.hm;
         // Financiamiento, utilidad equivalente a la del presupuesto, cargos adicionales y factor de sobrecosto
@@ -2353,6 +2379,57 @@
         }
     };
 
+    // ---------- Cálculo de un Gasto de Operación (botón ƒx del renglón) ----------
+    var GASTO_POR = { unidad: 'unidad', hora: 'hora', jornada: 'jornada' };
+    var gastoFila = null;
+    function descripcionGasto(g) {
+        if (!g) return '';
+        return g.base === 'pct_mo' ? num(g.pct) + ' % de la mano de obra'
+             : cant(num(g.cantidad)) + ' ' + (txt(g.unidad) || GASTO_POR[g.base]) + ' × $' + fmt(num(g.costo));
+    }
+    function abrirGasto(i) {
+        gastoFila = datos.go[i];
+        var g = gastoFila.gasto || {};
+        $('goConcepto').textContent = gastoFila.concepto || '(sin concepto)';
+        $('goBase').value = g.base || '';
+        $('goCantidad').value = g.cantidad || '';
+        $('goUnidad').value = g.unidad || '';
+        $('goCosto').value = g.costo || '';
+        $('goPct').value = g.pct || '';
+        ['goBase', 'goCantidad', 'goUnidad', 'goCosto', 'goPct', 'goAplicar'].forEach(function (id) { $(id).disabled = soloLectura; });
+        pintarGasto();
+        $('goDialogo').showModal();
+    }
+    function gastoCapturado() {
+        var b = $('goBase').value;
+        if (!b) return null;
+        return b === 'pct_mo' ? { base: b, pct: num($('goPct').value) }
+             : { base: b, cantidad: num($('goCantidad').value), unidad: txt($('goUnidad').value), costo: num($('goCosto').value) };
+    }
+    function pintarGasto() {
+        var g = gastoCapturado(), b = g ? g.base : '', mo = baseManoObra();
+        $('goDialogo').querySelectorAll('[data-go]').forEach(function (el) { el.hidden = !b || (el.dataset.go === 'pct') !== (b === 'pct_mo'); });
+        $('goPor').textContent = txt($('goUnidad').value) || GASTO_POR[b] || 'unidad';
+        $('goBaseMo').textContent = '$' + fmt(mo);
+        var imp = g ? CALC.gastoOperacion(g, mo) : null;
+        $('goImporte').textContent = imp === null ? 'se captura en la pestaña ($' + fmt(num(gastoFila.presupuesto)) + ')' : '$' + fmt(imp);
+    }
+    ['goCantidad', 'goUnidad', 'goCosto', 'goPct'].forEach(function (id) { $(id).addEventListener('input', pintarGasto); });
+    $('goBase').addEventListener('change', function () {
+        // Por hora o jornada: su unidad si aún no tiene
+        if (!txt($('goUnidad').value) && (this.value === 'hora' || this.value === 'jornada')) $('goUnidad').value = this.value === 'hora' ? 'hr' : 'jornal';
+        pintarGasto();
+    });
+    $('goAplicar').addEventListener('click', function () {
+        if (soloLectura || !gastoFila) return;
+        var g = gastoCapturado();
+        if (g) gastoFila.gasto = g; else delete gastoFila.gasto;
+        marcarCambio();
+        $('goDialogo').close();
+        render();
+    });
+    document.querySelectorAll('[data-go-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('goDialogo').close(); }); });
+
     function renderExtras() {
         $('extrasMO').hidden = seccion !== 'mo';
         if (seccion === 'mo') pintarManoObraPU();
@@ -2859,7 +2936,8 @@
                     folio: r.folio || '',
                     tipo_docto: r.tipo_docto || '',
                     notas: r.notas || '',
-                    articulos: r.articulos || []
+                    articulos: r.articulos || [],
+                    gasto: r.gasto || null
                 });
             });
         });
@@ -3470,7 +3548,9 @@
                     folio: c.folio || '',
                     tipo_docto: String(c.tipo_docto || '').trim(),
                     notas: c.notas || '',
-                    articulos: c.articulos || []
+                    articulos: c.articulos || [],
+                    gasto: c.calculo_base ? { base: String(c.calculo_base).trim(), cantidad: num(c.calculo_cantidad), unidad: c.calculo_unidad || '',
+                                              costo: num(c.calculo_costo), pct: num(c.calculo_pct) } : null
                 });
             });
             // Forma de la utilidad con la que se guardó; en los guardados antes de esa columna, la que reproduce su subtotal

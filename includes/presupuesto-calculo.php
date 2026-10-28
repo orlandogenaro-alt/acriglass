@@ -160,3 +160,18 @@ function pcPrecioConcepto(float $cdU, array $s): array
     return ['cd' => $cdU, 'ind' => (float) $s['ind'] * $k, 'fin' => (float) $s['fin'] * $k, 'util' => (float) $s['util'] * $k,
             'cargos' => (float) $s['cargos'] * $k, 'pu' => (float) $s['pv'] * $k];
 }
+
+// Gasto de Operación del presupuesto calculado (pestaña Gastos de Operación):
+//   base 'unidad', 'hora' o 'jornada': cantidad × costo (p. ej. 3 jornadas de plataforma × $1,200)
+//   base 'pct_mo': % × mano de obra del presupuesto (p. ej. herramienta 3 % de la mano de obra)
+//   sin base: importe fijo, se captura (como siempre); regresa null
+// $g: ['base', 'cantidad', 'costo', 'pct']; $manoObra: total de Mano de Obra sin comisiones
+const PC_GASTO_BASES = ['unidad', 'hora', 'jornada', 'pct_mo'];
+
+function pcGastoOperacion(array $g, float $manoObra): ?float
+{
+    $base = in_array($g['base'] ?? '', PC_GASTO_BASES, true) ? $g['base'] : '';
+    if ($base === '') return null;
+    if ($base === 'pct_mo') return $manoObra * max(0, pcNum($g['pct'] ?? 0)) / 100;
+    return max(0, pcNum($g['cantidad'] ?? 0)) * max(0, pcNum($g['costo'] ?? 0));
+}

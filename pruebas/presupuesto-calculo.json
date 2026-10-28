@@ -82,6 +82,27 @@
             "esperado": { "fin": 0, "util_pct": 26.666667, "util": 266.666667, "pv": 1333.333333, "cargos": 66.666667, "factor": 1.333333 }
         },
         {
+            "nombre": "Gasto de operación por jornada: plataforma 3 jornadas × $1,200 = 3,600",
+            "tipo": "gasto",
+            "gasto": { "base": "jornada", "cantidad": 3, "costo": 1200 },
+            "mano_obra": 0,
+            "esperado": { "importe": 3600 }
+        },
+        {
+            "nombre": "Gasto de operación por % de la mano de obra: herramienta 3 % de $2,640 = 79.20",
+            "tipo": "gasto",
+            "gasto": { "base": "pct_mo", "pct": 3, "cantidad": 99, "costo": 99 },
+            "mano_obra": 2640,
+            "esperado": { "importe": 79.2 }
+        },
+        {
+            "nombre": "Gasto de operación sin base: importe fijo capturado (el motor no lo calcula)",
+            "tipo": "gasto",
+            "gasto": { "cantidad": 2, "costo": 500 },
+            "mano_obra": 1000,
+            "esperado": { "fijo": 1 }
+        },
+        {
             "nombre": "Precio de un concepto con CD $100 en esa obra: los cargos en proporción y P.U. = 100 × 1.3464",
             "tipo": "precio",
             "cd": 100,

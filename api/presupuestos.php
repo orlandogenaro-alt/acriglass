@@ -199,6 +199,22 @@ function calcularAnalisis(array $d): array
     return ['conceptos' => $conceptos, 'explosion' => puExplosion($a), 'sobrecosto' => $s];
 }
 
+// Cálculo de un renglón de Gastos de Operación (migraciones/019): por unidad / hora / jornada (cantidad × costo) o
+// % de la mano de obra; el importe lo calcula la pantalla con el motor (includes/presupuesto-calculo.php) y se
+// guarda en «presupuesto». Sin base es importe fijo: no lleva columnas de cálculo.
+function calculoRenglon($g): array
+{
+    if (!is_array($g) || !in_array($g['base'] ?? '', PC_GASTO_BASES, true)) return [];
+    $pct = $g['base'] === 'pct_mo';
+    return [
+        'calculo_base'     => $g['base'],
+        'calculo_cantidad' => $pct ? null : max(0, numero($g['cantidad'] ?? 0, 4)),
+        'calculo_unidad'   => $pct ? null : texto($g['unidad'] ?? '', 20),
+        'calculo_costo'    => $pct ? null : max(0, numero($g['costo'] ?? 0, 4)),
+        'calculo_pct'      => $pct ? max(0, numero($g['pct'] ?? 0, 4)) : null,
+    ];
+}
+
 // Estatus guardado del presupuesto (error si ya no existe)
 function estatusActual(int $id): string
 {
@@ -423,9 +439,10 @@ function guardar(array $d): array
         }
 
         $cache = [];
+        $conCalculo = bd_tiene_columna('AW', 'doctos_sugerido_obra_det', 'calculo_base');
         foreach ($conceptos as $c) {
             $docto = (int) ($c['docto_imp_id'] ?? 0);
-            $detId = bd_insertar('AW', 'doctos_sugerido_obra_det', 'docto_sugerido_obra_det_id', [
+            $detId = bd_insertar('AW', 'doctos_sugerido_obra_det', 'docto_sugerido_obra_det_id', calculoRenglon($conCalculo ? $c['gasto'] ?? null : null) + [
                 'docto_sugerido_obra_id' => $id,
                 'concepto_id'            => conceptoId($c['tipo'], $c['concepto'], $cache),
                 'presupuesto'            => numero($c['presupuesto'] ?? 0),

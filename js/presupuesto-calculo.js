@@ -83,6 +83,14 @@
         return { cd: cdU, ind: s.ind * k, fin: s.fin * k, util: s.util * k, cargos: s.cargos * k, pu: s.pv * k };
     }
 
-    raiz.AcriCalculoPU = { TIPOS: TIPOS, insumo: insumo, cantidad: cantidad, fsrInsumo: fsrInsumo, costoReal: costoReal, concepto: concepto,
+    var GASTO_BASES = ['unidad', 'hora', 'jornada', 'pct_mo'];
+    function gastoOperacion(g, manoObra) {
+        var base = g && GASTO_BASES.indexOf(g.base) >= 0 ? g.base : '';
+        if (!base) return null;
+        if (base === 'pct_mo') return manoObra * Math.max(0, num(g.pct)) / 100;
+        return Math.max(0, num(g.cantidad)) * Math.max(0, num(g.costo));
+    }
+
+    raiz.AcriCalculoPU = { gastoOperacion: gastoOperacion, TIPOS: TIPOS, insumo: insumo, cantidad: cantidad, fsrInsumo: fsrInsumo, costoReal: costoReal, concepto: concepto,
                            resumen: resumen, sobrecosto: sobrecosto, precioConcepto: precioConcepto };
 })(typeof window !== 'undefined' ? window : global);

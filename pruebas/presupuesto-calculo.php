@@ -26,6 +26,11 @@ foreach ($casos as $caso) {
             pcComparar($caso['esperado'], pcSobrecosto((float) $a[0], (float) $a[1], (float) $a[2], (float) $a[3], $a[4], (float) $a[5]));
             return;
         }
+        if ($caso['tipo'] === 'gasto') {
+            $imp = pcGastoOperacion($caso['gasto'], (float) $caso['mano_obra']);
+            pcComparar($caso['esperado'], $imp === null ? ['fijo' => 1] : ['importe' => $imp]);
+            return;
+        }
         if ($caso['tipo'] === 'precio') {
             $a = $caso['args'];
             $s = pcSobrecosto((float) $a[0], (float) $a[1], (float) $a[2], (float) $a[3], $a[4], (float) $a[5]);

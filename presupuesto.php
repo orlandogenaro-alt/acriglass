@@ -835,6 +835,38 @@ $secciones = [
     </div>
 </dialog>
 
+<!-- ============ CÁLCULO DE UN GASTO DE OPERACIÓN (botón ƒx) ============ -->
+<dialog class="hs-dialogo go-dialogo" id="goDialogo">
+    <div class="hs-cabecera">
+        <strong>Cálculo del gasto de operación</strong>
+        <button type="button" class="hs-cerrar" data-go-cerrar title="Cerrar">✕</button>
+    </div>
+    <p class="pu-dlg-ayuda"><b id="goConcepto"></b><br>Maquinaria, herramienta, equipo, fletes, equipo de seguridad, consumibles u otro costo de operación:
+        captura su importe fijo en la pestaña o calcúlalo aquí. Se guarda cómo se calculó, no solo el importe.</p>
+    <div class="go-campos">
+        <label class="ancho">Cómo se calcula
+            <select id="goBase">
+                <option value="">Importe fijo (se captura en la pestaña)</option>
+                <option value="unidad">Por unidad (cantidad × costo)</option>
+                <option value="hora">Por hora (horas × costo por hora)</option>
+                <option value="jornada">Por jornada (jornadas × costo por jornada)</option>
+                <option value="pct_mo">% de la mano de obra</option>
+            </select>
+        </label>
+        <label data-go="cant">Cantidad <input type="number" id="goCantidad" class="num" step="0.0001" min="0"></label>
+        <label data-go="cant">Unidad <input type="text" id="goUnidad" maxlength="20" list="puUnidades"></label>
+        <label data-go="cant">Costo por <span id="goPor">unidad</span> <input type="number" id="goCosto" class="num" step="0.01" min="0"></label>
+        <label data-go="pct">% de la mano de obra <input type="number" id="goPct" class="num" step="0.01" min="0" placeholder="ej. 3"></label>
+        <p data-go="pct" class="go-nota">Mano de obra del presupuesto (sin comisiones): <b id="goBaseMo"></b></p>
+    </div>
+    <p class="go-importe">Importe: <b id="goImporte"></b></p>
+    <div class="hs-pie">
+        <span></span>
+        <button type="button" class="hs-btn" data-go-cerrar>Cancelar</button>
+        <button type="button" class="hs-btn principal" id="goAplicar">Aplicar</button>
+    </div>
+</dialog>
+
 <!-- ============ PRUEBA: DE DÓNDE SALE CADA DATO ============ -->
 <dialog class="hs-dialogo pr-dialogo" id="prDialogo">
     <div class="hs-cabecera">

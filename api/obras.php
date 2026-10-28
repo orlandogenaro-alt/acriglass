@@ -1192,8 +1192,11 @@ try {
                 $p['analisis_pu']['conceptos'] = $tabla;
             }
             // Renglones de Materia Prima / Mano de Obra / Gastos de Operacion con el nombre de su concepto
+            // Gastos de Operación calculados (migraciones/019): sus componentes
+            $calculo = bd_tiene_columna('AW', 'doctos_sugerido_obra_det', 'calculo_base')
+                ? 'd.calculo_base, d.calculo_cantidad, d.calculo_unidad, d.calculo_costo, d.calculo_pct,' : '';
             $p['conceptos'] = bd_filas('AW',
-                "select d.docto_sugerido_obra_det_id, d.tipo_concepto, d.concepto_id, d.presupuesto, d.docto_imp_id, d.folio, d.tipo_docto, d.notas,
+                "select $calculo d.docto_sugerido_obra_det_id, d.tipo_concepto, d.concepto_id, d.presupuesto, d.docto_imp_id, d.folio, d.tipo_docto, d.notas,
                         coalesce(cmp.descripcion, cmo.descripcion, cgo.descripcion) as concepto
                    from doctos_sugerido_obra_det d
                    left join conceptos_mat_prima_obra cmp on trim(d.tipo_concepto) = 'MP' and cmp.concepto_mat_prima_id = d.concepto_id

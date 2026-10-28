@@ -901,27 +901,30 @@ $secciones = [
 <!-- ============ SOBRECOSTO: INTEGRACIÓN DEL PRECIO Y FACTOR DE SOBRECOSTO ============ -->
 <dialog class="hs-dialogo sc-dialogo" id="scDialogo">
     <div class="hs-cabecera">
-        <strong>Sobrecosto · integración del precio</strong>
+        <strong>Factor de sobrecosto (indirectos, financiamiento y utilidad)</strong>
         <button type="button" class="hs-cerrar" data-sc-cerrar title="Cerrar">✕</button>
     </div>
-    <p class="pu-dlg-ayuda"><b>Precio de venta = Costo directo + Indirectos + Financiamiento + Utilidad + Cargos adicionales.</b>
-        Factor de sobrecosto = Precio de venta ÷ Costo directo: el P.U. de cada concepto es su costo directo × este factor.
-        Se guarda con todos sus componentes al Guardar el presupuesto.</p>
     <div class="sc-cuerpo">
-        <div class="extra-caja sc-caja">
-            <table class="grid mini-grid">
-                <thead><tr><th>Concepto</th><th>Base</th><th class="c-num">Importe</th></tr></thead>
-                <tbody id="scCascada"></tbody>
-            </table>
+        <div class="sc-datos">
+            <label>Importe de la obra <output id="scImporte" class="sc-ro"></output></label>
+            <label>Porcentaje de utilidad propuesta <input type="number" id="scUtil" class="num" step="0.01" min="0"></label>
+            <label>Costo directo de la obra <output id="scCD" class="sc-ro"></output></label>
+            <label>Cómo se aplica la utilidad
+                <select id="scModo">
+                    <option value="costo">+ % sobre el costo</option>
+                    <option value="margen">% de margen (Form46)</option>
+                </select>
+            </label>
+            <label>Importe total de la mano de obra gravable <output id="scMOG" class="sc-ro"></output></label>
+            <label>Tasa de interés anual % <input type="number" id="scTasa" class="num" step="0.01" min="0"></label>
+            <label>Indicador económico de referencia <input type="text" id="scIndicador" maxlength="60" placeholder="ej. TIIE 28 días"></label>
+            <label>Porcentaje del primer anticipo <input type="number" id="scAnticipo" class="num" step="0.01" min="0" max="100"></label>
         </div>
-        <div class="sc-param">
+        <div class="sc-cajas">
             <fieldset>
                 <legend>Financiamiento</legend>
-                <label>% de financiamiento (sobre CD + indirectos) <input type="number" id="scFin" class="num" step="0.0001" min="0"></label>
-                <label>Indicador económico <input type="text" id="scIndicador" maxlength="60" placeholder="ej. TIIE 28 días"></label>
-                <label>Tasa de interés anual % <input type="number" id="scTasa" class="num" step="0.01" min="0"></label>
-                <label>Plazo de ejecución (meses) <input type="number" id="scPlazo" class="num" step="0.5" min="0"></label>
-                <label>Anticipo % <input type="number" id="scAnticipo" class="num" step="0.01" min="0" max="100"></label>
+                <label class="sc-linea">% de financiamiento (sobre CD + indirectos) <input type="number" id="scFin" class="num" step="0.0001" min="0"></label>
+                <label class="sc-linea">Plazo de ejecución (meses) <input type="number" id="scPlazo" class="num" step="0.5" min="0"></label>
                 <p class="sc-estimado">Estimado: <b id="scEstimado"></b>
                     <button type="button" class="ct-btn" id="scUsar" title="Pone el estimado como % de financiamiento">Usar este %</button>
                     <small>tasa anual × meses / 12 × (1 − anticipo)</small></p>
@@ -929,20 +932,26 @@ $secciones = [
                     <input type="checkbox" id="scFinSubtotal"> Sumar el financiamiento al Subtotal del presupuesto</label>
             </fieldset>
             <fieldset>
-                <legend>Utilidad</legend>
-                <label>Utilidad Neta % <input type="number" id="scUtil" class="num" step="0.01" min="0"></label>
-                <label>Cómo se aplica
-                    <select id="scModo">
-                        <option value="costo">+ % sobre el costo</option>
-                        <option value="margen">% de margen (Form46)</option>
-                    </select>
-                </label>
+                <legend>Integración del precio</legend>
+                <table class="sc-integra"><tbody id="scCascada"></tbody></table>
             </fieldset>
-            <p class="extra-ayuda">Indirectos de campo y de oficina: renglones de Gastos de Operación (sus % en Administrador › Parámetros de presupuesto).
-                Cargos adicionales: comisiones (Mano de Obra) y anexo de seguro (Gastos de Operación).</p>
         </div>
+        <fieldset class="sc-resultados">
+            <legend>Resultados</legend>
+            <label>Indirecto total <output id="scRIndTot" class="sc-ro"></output></label>
+            <label>Indirecto de campo <output id="scRCampo" class="sc-ro"></output></label>
+            <label>Indirecto de oficina <output id="scROficina" class="sc-ro"></output></label>
+            <label>Otros indirectos <output id="scROtros" class="sc-ro"></output></label>
+            <label>Financiamiento <output id="scRFin" class="sc-ro"></output></label>
+            <label>Utilidad <output id="scRUtil" class="sc-ro"></output></label>
+            <label>Cargos adicionales <output id="scRCargos" class="sc-ro"></output></label>
+        </fieldset>
+        <p class="extra-ayuda sc-nota"><b>Precio de venta = CD + Indirectos + Financiamiento + Utilidad + Cargos adicionales</b>; el P.U. de cada concepto es su costo directo × el factor.
+            Indirectos de campo y de oficina: renglones de Gastos de Operación (sus % en Administrador › Parámetros de presupuesto).
+            Cargos adicionales: comisiones (Mano de Obra) y anexo de seguro (Gastos de Operación). Indirectos en % del CD; financiamiento sobre CD + Ind; utilidad sobre CD + Ind + Fin; cargos sobre el precio.</p>
     </div>
     <div class="hs-pie">
+        <label class="sc-factor">Factor de sobrecosto <output id="scFactor" class="sc-ro"></output></label>
         <span class="extra-ayuda" id="scGuardado"></span>
         <button type="button" class="hs-btn principal" data-sc-cerrar>Listo</button>
     </div>

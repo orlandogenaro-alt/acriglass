@@ -1614,28 +1614,27 @@
     }
     function pintarSobrecosto() {
         var x = datosSobrecosto(), r = x.r, ind = x.ind;
-        function deCd(v) { return r.cd > 0 ? pct(v / r.cd * 100) + ' del CD' : ''; }
+        function deCd(v) { return r.cd > 0 ? v / r.cd * 100 : 0; }
+        function pct4(v) { return (Math.round(v * 10000) / 10000).toFixed(4) + ' %'; }
+        $('scImporte').textContent = '$' + fmt(r.pv);
+        $('scCD').textContent = '$' + fmt(r.cd);
+        $('scMOG').textContent = '$' + fmt(r.mo + r.fsr);
+        $('scFactor').textContent = (Math.round(r.factor * 10000) / 10000).toFixed(4);
+        [['scRIndTot', deCd(r.ind)], ['scRCampo', deCd(ind.campo)], ['scROficina', deCd(ind.oficina)], ['scROtros', deCd(ind.otros)],
+         ['scRFin', analisis.fin], ['scRUtil', r.utilPct], ['scRCargos', r.ca * 100]].forEach(function (p) { $(p[0]).textContent = pct4(p[1]); });
+        var dif = r.pv - r.subtotal;
         var filas = [
-            ['Costo directo de la obra', '', r.cd, 'pu-total'],
-            ['Materiales, equipo, maquinaria y otros', '', r.mp, 'sc-sub'],
-            ['Mano de obra (con FSR)', '', r.mo + r.fsr, 'sc-sub'],
-            r.hm ? ['Herramienta menor', pct(analisis.hm) + ' de la M.O.', r.hm, 'sc-sub'] : null,
-            ['Mano de obra gravable', 'con FSR', r.mo + r.fsr, 'sc-info'],
-            ['Indirectos de campo', deCd(ind.campo), ind.campo],
-            ['Indirectos de oficina', deCd(ind.oficina), ind.oficina],
-            ind.otros ? ['Otros indirectos (Gastos de Operación)', deCd(ind.otros), ind.otros] : null,
-            ['Costo directo + indirectos', '', r.cd + r.ind, 'pu-total'],
-            ['Financiamiento', pct(analisis.fin) + ' de CD + Ind', r.fin],
-            ['Utilidad', pct(r.utilPct) + ' de CD + Ind + Fin', r.util],
-            ['Cargos adicionales (comisiones y seguro)', pct(r.ca * 100) + ' del precio', r.cargos],
-            ['Precio de venta', '', r.pv, 'pu-total'],
-            ['Factor de sobrecosto', 'precio ÷ costo directo', null, 'sc-factor'],
-            ['Subtotal del presupuesto', '', r.subtotal, 'sc-info'],
-            ['Diferencia', Math.abs(r.pv - r.subtotal) >= 0.5 ? (analisis.finSubtotal ? 'por FSR o ajustes avanzados' : 'por financiamiento, FSR o ajustes avanzados') : '', r.pv - r.subtotal, 'sc-info']
+            ['Costo directo', r.cd],
+            ['Indirectos', r.ind],
+            ['Financiamiento', r.fin],
+            ['Utilidad', r.util],
+            ['Cargos adicionales', r.cargos],
+            ['Precio de venta', r.pv, 'pu-total'],
+            ['Subtotal del presupuesto', r.subtotal, 'sc-info'],
+            Math.abs(dif) >= 0.005 ? ['Diferencia', dif, 'sc-info', Math.abs(dif) >= 0.5 ? (analisis.finSubtotal ? 'Por FSR o ajustes avanzados' : 'Por financiamiento, FSR o ajustes avanzados') : 'Redondeo'] : null
         ].filter(Boolean);
         $('scCascada').innerHTML = filas.map(function (f) {
-            var v = f[3] === 'sc-factor' ? cant(Math.round(r.factor * 10000) / 10000) : fmt(f[2]);
-            return '<tr' + (f[3] ? ' class="' + f[3] + '"' : '') + '><td class="ro izq">' + escapar(f[0]) + '</td><td class="ro izq">' + escapar(f[1]) + '</td><td class="ro">' + v + '</td></tr>';
+            return '<tr' + (f[2] ? ' class="' + f[2] + '"' : '') + (f[3] ? ' title="' + escapar(f[3]) + '"' : '') + '><td>' + escapar(f[0]) + '</td><td class="c-num">' + fmt(f[1]) + '</td></tr>';
         }).join('');
         if (document.activeElement !== $('scFin')) $('scFin').value = analisis.fin;
         if (document.activeElement !== $('scUtil')) $('scUtil').value = num($('pctUtilidad').value);

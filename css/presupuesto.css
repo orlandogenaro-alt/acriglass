@@ -740,26 +740,39 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .pc-tabla tr.pc-letra td { font-style: italic; color: var(--texto-2); white-space: normal; }
 .pc-dialogo .hs-pie { margin-top: auto; }
 /* Ventana Sobrecosto */
-.sc-dialogo { width: min(1120px, calc(100vw - 24px)); }
-.sc-cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 340px); gap: 14px; padding: 10px 16px 0; }
-.sc-caja { max-height: 64vh; border: 1px solid var(--borde); border-radius: 4px; }
-.sc-caja .grid { min-width: 0; }
-.sc-caja tr.pu-total td { font-weight: 700; color: var(--enfasis); border-top: 1px solid var(--borde-2); }
-.sc-caja tr.sc-sub td:first-child { padding-left: 24px; }
-.sc-caja tr.sc-sub td, .sc-caja tr.sc-info td { color: var(--texto-2); }
-.sc-caja tr.sc-factor td { font-weight: 800; font-size: 15px; color: var(--azul-texto); }
-.sc-param { display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: var(--texto-2); }
-.sc-param fieldset { margin: 0; padding: 8px 12px 10px; border: 1px solid var(--borde); border-radius: 6px; display: flex; flex-direction: column; gap: 8px; }
-.sc-param legend { padding: 0 4px; font-weight: 700; color: var(--enfasis); }
-.sc-param label { display: flex; flex-direction: column; gap: 3px; }
-.sc-param input, .sc-param select { height: 32px; padding: 0 8px; background: var(--input); color: var(--texto); border: 1px solid var(--borde-2); border-radius: 4px; }
-.sc-param label.sc-check { flex-direction: row; align-items: flex-start; gap: 6px; color: var(--texto); }
-.sc-param label.sc-check input { height: auto; margin-top: 2px; }
+.sc-dialogo { width: min(860px, calc(100vw - 24px)); }
+.sc-cuerpo { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 0; font-size: 13px; color: var(--texto-2); }
+.sc-cuerpo label { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sc-cuerpo input, .sc-cuerpo select { height: 30px; padding: 0 8px; background: var(--input); color: var(--texto); border: 1px solid var(--borde-2); border-radius: 4px; }
+.sc-cuerpo fieldset { margin: 0; padding: 8px 12px 10px; border: 1px solid var(--borde); border-radius: 6px; display: flex; flex-direction: column; gap: 8px; }
+.sc-cuerpo legend { padding: 0 4px; font-weight: 700; color: var(--enfasis); }
+.sc-ro { display: inline-block; min-width: 0; height: 30px; line-height: 28px; padding: 0 8px; text-align: right; font-variant-numeric: tabular-nums;
+         background: var(--sub); color: var(--texto); border: 1px solid var(--borde-2); border-radius: 4px; }
+.sc-datos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 28px; }
+.sc-datos .sc-ro, .sc-datos input, .sc-datos select { width: 150px; flex: none; }
+.sc-datos input[type="text"] { text-align: left; }
+.sc-cajas { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.sc-cajas .sc-linea input { width: 110px; flex: none; }
+.sc-cajas label.sc-check { justify-content: flex-start; align-items: flex-start; gap: 6px; color: var(--texto); }
+.sc-cajas label.sc-check input { height: auto; margin-top: 2px; }
+.sc-integra { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.sc-integra td { padding: 3px 2px; border-bottom: 1px solid var(--linea); }
+.sc-integra tr.pu-total td { font-weight: 700; color: var(--enfasis); border-top: 1px solid var(--borde-2); }
+.sc-integra tr.sc-info td { color: var(--texto-3); }
 .sc-estimado { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .sc-estimado b { color: var(--enfasis); }
 .sc-estimado .ct-btn { margin: 0; }
 .sc-estimado small { flex-basis: 100%; color: var(--texto-3); }
-@media (max-width: 760px) { .sc-cuerpo { grid-template-columns: minmax(0, 1fr); } }
+.sc-resultados { display: grid !important; grid-template-columns: repeat(4, 1fr); gap: 8px 18px !important; }
+.sc-resultados legend { grid-column: 1 / -1; }
+.sc-resultados .sc-ro { width: 100px; flex: none; }
+.sc-nota { margin: 0; font-size: 11.5px; }
+.sc-dialogo .hs-pie label.sc-factor { display: flex; align-items: center; gap: 10px; margin-right: auto; font-weight: 700; color: var(--enfasis); }
+.sc-dialogo .hs-pie .sc-ro { width: 100px; font-size: 15px; font-weight: 800; color: var(--azul-texto); }
+@media (max-width: 760px) {
+    .sc-datos, .sc-cajas { grid-template-columns: minmax(0, 1fr); }
+    .sc-resultados { grid-template-columns: 1fr 1fr; }
+}
 /* Ventana FASAR */
 .fs-dialogo { width: min(1280px, calc(100vw - 24px)); }
 .fs-elegir { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding: 10px 16px 0; font-size: 13px; color: var(--texto-2); }

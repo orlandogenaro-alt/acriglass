@@ -20,6 +20,15 @@ console.log('Motor de P.U. de la pantalla');
 casos.forEach(function (caso) {
     try {
         if (caso.tipo === 'sobrecosto') comparar(caso.esperado, M.sobrecosto.apply(null, caso.args), '');
+        else if (caso.tipo === 'avance') {
+            var av = M.avanceProgramado.apply(null, caso.args);
+            comparar(caso.esperado, av === null ? { sin_programa: 1 } : { avance: av }, '');
+        }
+        else if (caso.tipo === 'periodo') {
+            caso.casos.forEach(function (x) {
+                if (M.enPeriodo.apply(null, x[0]) !== !!x[1]) throw new Error(x[0].join(' / ') + ': se esperaba ' + x[1]);
+            });
+        }
         else if (caso.tipo === 'financiamiento') comparar(caso.esperado, { pct: M.financiamientoEstimado.apply(null, caso.args) }, '');
         else if (caso.tipo === 'explosion') comparar(caso.esperado, M.explosion(caso.analisis, caso.desglosar), '');
         else if (caso.tipo === 'gasto') {

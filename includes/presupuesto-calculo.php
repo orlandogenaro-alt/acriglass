@@ -284,3 +284,28 @@ function pcFinanciamientoEstimado(float $tasaAnualPct, float $plazoMeses, float 
 {
     return max(0, $tasaAnualPct) * max(0, $plazoMeses) / 12 * (1 - min(max($anticipoPct, 0), 100) / 100);
 }
+
+// ---------- Cálculo al periodo de corte (botón Cálculo) ----------
+// Programa de un concepto: inicio y fin (AAAA-MM-DD). Avance programado al corte, por días calendario y parejo entre
+// el inicio y el fin, contando los dos días: 1 al 10 de marzo con corte el 5 = 5 / 10 = 50 %. Antes del inicio 0, después
+// del fin 100 %. Sin programa (o con fin antes del inicio): null, no se sabe.
+function pcDia(string $f): ?int
+{
+    if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $f, $m) || !checkdate((int) $m[2], (int) $m[3], (int) $m[1])) return null;
+    return intdiv(gmmktime(0, 0, 0, (int) $m[2], (int) $m[3], (int) $m[1]), 86400);
+}
+
+function pcAvanceProgramado(string $inicio, string $fin, string $corte): ?float
+{
+    [$i, $f, $c] = [pcDia($inicio), pcDia($fin), pcDia($corte)];
+    if ($i === null || $f === null || $c === null || $f < $i) return null;
+    return max(0.0, min(1.0, ($c - $i + 1) / ($f - $i + 1)));
+}
+
+// ¿El programa del concepto cae (aunque sea un día) en el periodo desde – corte? Sin «desde», todo lo que empieza hasta el corte.
+function pcEnPeriodo(string $inicio, string $fin, string $desde, string $corte): bool
+{
+    [$i, $f, $d, $c] = [pcDia($inicio), pcDia($fin), pcDia($desde), pcDia($corte)];
+    if ($i === null || $f === null || $c === null || $f < $i) return false;
+    return $i <= $c && ($d === null || $f >= $d);
+}

@@ -160,7 +160,26 @@
         return Math.max(0, tasa) * Math.max(0, plazo) / 12 * (1 - Math.min(Math.max(anticipo, 0), 100) / 100);
     }
 
-    raiz.AcriCalculoPU = { gastoOperacion: gastoOperacion, financiamientoEstimado: financiamientoEstimado, TIPOS: TIPOS, insumo: insumo, cantidad: cantidad, fsrInsumo: fsrInsumo, costoReal: costoReal, concepto: concepto,
+    // Cálculo al periodo de corte (ver includes/presupuesto-calculo.php)
+    function dia(f) {
+        var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(f || ''));
+        if (!m) return null;
+        var t = Date.UTC(+m[1], +m[2] - 1, +m[3]), d = new Date(t);
+        if (d.getUTCFullYear() !== +m[1] || d.getUTCMonth() !== +m[2] - 1 || d.getUTCDate() !== +m[3]) return null;
+        return Math.floor(t / 86400000);
+    }
+    function avanceProgramado(inicio, fin, corte) {
+        var i = dia(inicio), f = dia(fin), c = dia(corte);
+        if (i === null || f === null || c === null || f < i) return null;
+        return Math.max(0, Math.min(1, (c - i + 1) / (f - i + 1)));
+    }
+    function enPeriodo(inicio, fin, desde, corte) {
+        var i = dia(inicio), f = dia(fin), d = dia(desde), c = dia(corte);
+        if (i === null || f === null || c === null || f < i) return false;
+        return i <= c && (d === null || f >= d);
+    }
+
+    raiz.AcriCalculoPU = { avanceProgramado: avanceProgramado, enPeriodo: enPeriodo, gastoOperacion: gastoOperacion, financiamientoEstimado: financiamientoEstimado, TIPOS: TIPOS, insumo: insumo, cantidad: cantidad, fsrInsumo: fsrInsumo, costoReal: costoReal, concepto: concepto,
                            resumen: resumen, sobrecosto: sobrecosto, precioConcepto: precioConcepto,
                            costos: costos, componentes: componentes, desgloseCompuesto: desgloseCompuesto, explosion: explosion };
 })(typeof window !== 'undefined' ? window : global);

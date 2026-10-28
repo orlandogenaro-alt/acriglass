@@ -166,6 +166,47 @@
             "esperado": { "pct": 4.2 }
         },
         {
+            "nombre": "Avance programado: del 1 al 10 de marzo, con corte el 5 = 50 %",
+            "tipo": "avance",
+            "args": ["2027-03-01", "2027-03-10", "2027-03-05"],
+            "esperado": { "avance": 0.5 }
+        },
+        {
+            "nombre": "Avance programado cruzando febrero: del 20 de febrero al 1 de marzo (10 días), corte el 28 = 90 %",
+            "tipo": "avance",
+            "args": ["2027-02-20", "2027-03-01", "2027-02-28"],
+            "esperado": { "avance": 0.9 }
+        },
+        {
+            "nombre": "Avance programado: corte antes del inicio = 0 %",
+            "tipo": "avance",
+            "args": ["2027-03-01", "2027-03-10", "2027-02-15"],
+            "esperado": { "avance": 0 }
+        },
+        {
+            "nombre": "Avance programado: corte después del fin = 100 %",
+            "tipo": "avance",
+            "args": ["2027-03-01", "2027-03-10", "2027-05-01"],
+            "esperado": { "avance": 1 }
+        },
+        {
+            "nombre": "Avance programado: sin programa o con fin antes del inicio no se sabe",
+            "tipo": "avance",
+            "args": ["2027-03-10", "2027-03-01", "2027-03-05"],
+            "esperado": { "sin_programa": 1 }
+        },
+        {
+            "nombre": "Actividades en el periodo: del 1 al 15 de marzo; una de abril no entra; una que termina el 28 de febrero tampoco",
+            "tipo": "periodo",
+            "casos": [
+                [["2027-03-10", "2027-04-20", "2027-03-01", "2027-03-15"], 1],
+                [["2027-04-01", "2027-04-20", "2027-03-01", "2027-03-15"], 0],
+                [["2027-02-01", "2027-02-28", "2027-03-01", "2027-03-15"], 0],
+                [["2027-02-01", "2027-02-28", "", "2027-03-15"], 1]
+            ],
+            "esperado": {}
+        },
+        {
             "nombre": "Precio de un concepto con CD $100 en esa obra: los cargos en proporción y P.U. = 100 × 1.3464",
             "tipo": "precio",
             "cd": 100,

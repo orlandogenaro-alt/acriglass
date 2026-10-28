@@ -123,6 +123,13 @@ function analisisPUDatos($d): ?array
         if (isset($d[$k]) && is_numeric($d[$k]) && $d[$k] > 0) $r[$k] = min($max, numero($d[$k], 4));
     }
     if (($v = texto($d['fin_indicador'] ?? '', 60)) !== null) $r['fin_indicador'] = $v;
+    // Botón Cálculo: periodo de corte y opciones
+    if (is_array($d['calculo'] ?? null)) {
+        $k = $d['calculo'];
+        $cal = ['cantidad_corte' => !empty($k['cantidad_corte']), 'marcar' => !empty($k['marcar'])];
+        foreach (['desde', 'corte'] as $f) if (pcDia((string) ($k[$f] ?? '')) !== null) $cal[$f] = $k[$f];
+        if (isset($cal['corte']) || $cal['cantidad_corte'] || $cal['marcar']) $r['calculo'] = $cal;
+    }
     foreach (array_slice((array) ($d['conceptos'] ?? []), 0, 1000) as $c) {
         if (!is_array($c)) continue;
         $insumos = analisisInsumos($c['insumos'] ?? []);
@@ -135,6 +142,8 @@ function analisisPUDatos($d): ?array
             'especificacion' => texto($c['especificacion'] ?? '', 4000) ?? '',
             'insumos'     => $insumos,
         ];
+        // Programa del concepto (botón Cálculo): inicio y fin
+        foreach (['inicio', 'fin'] as $k) if (pcDia((string) ($c[$k] ?? '')) !== null) $concepto[$k] = $c[$k];
         if ((int) ($c['id'] ?? 0) > 0) $concepto['id'] = (int) $c['id'];
         if (isset($c['uid']) && is_numeric($c['uid'])) $concepto['_uid'] = (int) $c['uid'];
         // Precio fijo para el cliente (importado del Catálogo): no suma al costo, el costo viene de MP / MO / GO

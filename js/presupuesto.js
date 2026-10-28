@@ -490,7 +490,8 @@
     var CATALOGO_PU = window.ACRI_CATALOGO_PU || [];   // Catalogos › Insumos (precio vigente; mano de obra sin FSR)
     var CONCEPTOS_PU = window.ACRI_CONCEPTOS_PU || [];  // Catalogos › Conceptos P.U. con su matriz desarmada (mano de obra sin FSR)
     var CAMPOS_PU = { fsr: 'puFsr', hm: 'puHm', fin: 'puFin' };
-    var analisis = { fsr: 1, hm: 0, fin: Number(PARAMETROS.financiamiento_pct) || 0, util: null, conceptos: [] };   // util null = equivalente a la Utilidad Neta
+    var analisis = { fsr: 1, hm: 0, fin: Number(PARAMETROS.financiamiento_pct) || 0, util: null, conceptos: [],
+                     calculo: { desde: '', corte: '', cantidad_corte: false, marcar: false } };   // util null = equivalente a la Utilidad Neta
     var uidPU = 0;
     var huboAnalisis = false;   // el presupuesto tuvo conceptos analizados: si se quitan todos, sus renglones quedan en cero
     var editandoPU = null;   // concepto abierto en la ventana de análisis
@@ -520,7 +521,8 @@
         // id: el renglón del concepto en la base (presupuesto_conceptos, migraciones/017); 0 = aún no se guarda
         return { uid: ++uidPU, id: Math.max(0, parseInt(c.id, 10) || 0), clave: String(c.clave || '') || siguienteClave(), partida: String(c.partida || ''),
                  descripcion: String(c.descripcion || ''), unidad: String(c.unidad || ''), cantidad: num(c.cantidad),
-                 especificacion: String(c.especificacion || ''), venta: Math.max(0, num(c.venta)), insumos: (c.insumos || []).map(limpiarInsumo) };
+                 especificacion: String(c.especificacion || ''), venta: Math.max(0, num(c.venta)), insumos: (c.insumos || []).map(limpiarInsumo),
+                 inicio: String(c.inicio || ''), fin: String(c.fin || '') };   // programa del concepto (botón Cálculo)
     }
     // Precio fijo para el cliente (importado del Catálogo junto con el Análisis): su P.U. es el del archivo y no suma al costo,
     // porque el costo ya está en Materia Prima, Mano de Obra y Gastos de Operacion
@@ -539,7 +541,10 @@
             util: a.util === null || a.util === undefined || a.util === '' ? null : num(a.util),
             matrizCosto: !!a.matriz_costo, fasarId: parseInt(a.fasar_id, 10) || 0, conceptos: [],
             // Con qué se estimó el % de financiamiento (ventana Sobrecosto)
-            finTasa: num(a.fin_tasa), finPlazo: num(a.fin_plazo), finAnticipo: num(a.fin_anticipo), finIndicador: String(a.fin_indicador || '')
+            finTasa: num(a.fin_tasa), finPlazo: num(a.fin_plazo), finAnticipo: num(a.fin_anticipo), finIndicador: String(a.fin_indicador || ''),
+            // Botón Cálculo: periodo de corte y opciones
+            calculo: { desde: String((a.calculo || {}).desde || ''), corte: String((a.calculo || {}).corte || ''),
+                       cantidad_corte: !!(a.calculo || {}).cantidad_corte, marcar: !!(a.calculo || {}).marcar }
         };
         (a.conceptos || []).forEach(function (c) { analisis.conceptos.push(nuevoConcepto(c)); });
         huboAnalisis = analisis.conceptos.length > 0;
@@ -551,9 +556,10 @@
         return {
             fsr: analisis.fsr, hm: analisis.hm, fin: analisis.fin, util: null, matriz_costo: !!analisis.matrizCosto, fasar_id: analisis.fasarId || 0,
             fin_tasa: analisis.finTasa || 0, fin_plazo: analisis.finPlazo || 0, fin_anticipo: analisis.finAnticipo || 0, fin_indicador: analisis.finIndicador || '',
+            calculo: analisis.calculo,
             conceptos: analisis.conceptos.map(function (c) {
                 return { id: c.id || 0, uid: c.uid, clave: c.clave, partida: c.partida, descripcion: c.descripcion, unidad: c.unidad, cantidad: c.cantidad,
-                         especificacion: c.especificacion || '', venta: esVenta(c) ? c.venta : 0,
+                         especificacion: c.especificacion || '', venta: esVenta(c) ? c.venta : 0, inicio: c.inicio || '', fin: c.fin || '',
                          insumos: c.insumos.map(function (i) { return limpiarInsumo(i); }) };
             })
         };
@@ -813,6 +819,7 @@
         });
         $('puTotalCat').textContent = fmt(total);
         pintarExplosion();
+        marcarProgramados();
     }
 
     // Explosión de insumos con el motor (js/presupuesto-calculo.js): los conceptos que suman al costo (la matriz de un
@@ -1342,6 +1349,85 @@
             abrirAnalisis(manoObraLista[tr.dataset.mo].conceptos[0]);
         });
     });
+
+    // ---------- Cálculo (botón de la barra): lo que se requiere hasta un periodo de corte ----------
+    // Cada concepto puede tener su programa (inicio y fin); con la fecha de corte se calcula su avance programado (parejo
+    // por días, js/presupuesto-calculo.js), la cantidad e importe hasta el corte, y los insumos a requerir hasta entonces.
+    // Las actividades que caen en el periodo se marcan también en el Catálogo de Conceptos y en el Análisis P.U.
+    // Queda listo para cuando el programa de obra llene los programas.
+    function enPeriodoCalculo(c) {
+        var k = analisis.calculo;
+        return !!(k.marcar && k.corte && CALC.enPeriodo(c.inicio, c.fin, k.desde, k.corte));
+    }
+    function marcarProgramados() {
+        document.querySelectorAll('#ccCuerpo tr[data-uid], #puConceptos tr[data-uid]').forEach(function (tr) {
+            var c = conceptoPU(tr.dataset.uid);
+            tr.classList.toggle('cal-marcado', !!c && enPeriodoCalculo(c));
+        });
+    }
+    function abrirCalculo() {
+        var k = analisis.calculo;
+        $('calDesde').value = k.desde;
+        $('calCorte').value = k.corte;
+        $('calCantidad').checked = k.cantidad_corte;
+        $('calMarcar').checked = k.marcar;
+        pintarCalculo();
+        $('calDialogo').showModal();
+    }
+    function pintarCalculo() {
+        var k = analisis.calculo, r = calcularPU(), dis = soloLectura ? ' disabled' : '';
+        var lista = catalogoPU(r).filter(function (x) { return !x.otro; }), tot = 0, totCorte = 0, sinPrograma = 0, alCorte = [];
+        var html = lista.map(function (x) {
+            var c = x.c, av = k.corte ? CALC.avanceProgramado(c.inicio, c.fin, k.corte) : null, marcado = enPeriodoCalculo(c);
+            tot += x.importe;
+            if (av === null) sinPrograma++;
+            else {
+                totCorte += x.importe * av;
+                if (alCosto(c) && av > 0) alCorte.push(Object.assign({}, c, { cantidad: c.cantidad * av }));
+            }
+            return '<tr data-uid="' + c.uid + '"' + (marcado ? ' class="cal-marcado"' : '') + '><td class="id">' + escapar(c.clave) + '</td>' +
+                '<td class="ro izq cal-desc">' + escapar(c.descripcion) + '</td><td class="ro izq">' + escapar(c.unidad) + '</td><td class="ro">' + cant(c.cantidad) + '</td>' +
+                '<td><input type="date" data-cal="inicio" value="' + escapar(c.inicio) + '"' + dis + '></td>' +
+                '<td><input type="date" data-cal="fin" value="' + escapar(c.fin) + '"' + dis + '></td>' +
+                '<td class="ro">' + (!k.corte ? '' : av === null ? '<span class="cal-sin">sin programa</span>' : pct(av * 100)) + '</td>' +
+                '<td class="ro">' + (av === null ? '' : cant(Math.round(c.cantidad * av * 10000) / 10000)) + '</td>' +
+                '<td class="ro">' + (av === null ? '' : fmt(x.importe * av)) + '</td>' +
+                '<td class="ro izq">' + (marcado ? '● En el periodo' : '') + '</td></tr>';
+        }).join('');
+        $('calCuerpo').innerHTML = html || '<tr class="vacio-fila"><td colspan="10">El presupuesto aún no tiene conceptos analizados.</td></tr>';
+        $('calPie').innerHTML = '<tr class="pu-total"><td colspan="6" class="ro">Hasta el corte' + (k.corte ? ' (' + (tot ? pct(totCorte / tot * 100) : '0.00 %') + ' del presupuesto)' : '') +
+            '</td><td></td><td></td><td class="ro">' + (k.corte ? fmt(totCorte) : '') + '</td><td></td></tr>' +
+            '<tr><td colspan="8" class="ro">Total del catálogo</td><td class="ro">' + fmt(tot) + '</td><td></td></tr>';
+        $('calNota').textContent = !k.corte ? 'Elige la fecha de corte para calcular.'
+            : sinPrograma ? sinPrograma + ' concepto(s) sin programa: captura su inicio y fin para incluirlos.' : '';
+        // Insumos a requerir hasta el corte: la explosión de lo programado hasta entonces
+        $('calInsumosCaja').hidden = !k.cantidad_corte;
+        if (k.cantidad_corte) {
+            var ins = k.corte ? explosionPU(alCorte, true, false) : [];
+            $('calInsumos').innerHTML = ins.length ? filasExplosion(ins, true)
+                : '<tr class="vacio-fila"><td colspan="8">' + (k.corte ? 'Nada programado hasta el corte.' : 'Elige la fecha de corte.') + '</td></tr>';
+        }
+        marcarProgramados();
+    }
+    function cambioCalculo() {
+        // El periodo y las opciones se guardan con el presupuesto; en solo lectura sirven para consultar
+        if (!soloLectura) marcarCambio();
+        pintarCalculo();
+    }
+    [['calDesde', 'desde'], ['calCorte', 'corte']].forEach(function (p) {
+        $(p[0]).addEventListener('change', function () { analisis.calculo[p[1]] = this.value; cambioCalculo(); });
+    });
+    [['calCantidad', 'cantidad_corte'], ['calMarcar', 'marcar']].forEach(function (p) {
+        $(p[0]).addEventListener('change', function () { analisis.calculo[p[1]] = this.checked; cambioCalculo(); });
+    });
+    $('calCuerpo').addEventListener('change', function (e) {
+        var campo = e.target.dataset.cal, tr = e.target.closest('tr[data-uid]');
+        if (!campo || !tr || soloLectura) return;
+        conceptoPU(tr.dataset.uid)[campo] = e.target.value;
+        marcarCambio();
+        pintarCalculo();
+    });
+    document.querySelectorAll('[data-cal-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('calDialogo').close(); }); });
 
     // ---------- Presupuesto completo (botón de la barra): todos los conceptos en una sola vista ----------
     // Las mismas partidas, subpartidas y precios del Catálogo de Conceptos (arbolCc / catalogoCliente), con su costo directo,
@@ -2118,6 +2204,7 @@
                     ? ': sale de Materia Prima, Mano de Obra y Gastos de Operacion; los conceptos de precio fijo son lo que ve el cliente.'
                     : ': la diferencia viene de los ajustes avanzados del Análisis P.U. o de los conceptos con cálculo automático.') + '</small>' : '') +
             '</td></tr>';
+        marcarProgramados();
     }
 
     // Importe con letra, como en los presupuestos: «(MIL DOSCIENTOS PESOS 50/100 M.N.)»
@@ -3726,6 +3813,7 @@
         'fasar': abrirFasar,
         'sobrecosto': abrirSobrecosto,
         'completo': abrirCompleto,
+        'calculo': abrirCalculo,
         'eliminar': function () {
             if (!presupuestoId) {
                 if (confirm('Este presupuesto no se ha guardado. ¿Descartarlo?')) { cambios = false; cerrarVentana(); }

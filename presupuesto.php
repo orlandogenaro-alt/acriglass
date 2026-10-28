@@ -331,6 +331,10 @@ $secciones = [
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><circle cx="9" cy="7" r="3.2"/><path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h2"/><path d="M14 21l7-7"/><circle cx="15" cy="15" r="1.3"/><circle cx="20" cy="20" r="1.3"/></svg>
         <span>FASAR</span>
     </button>
+    <button class="tb" data-accion="calculo" title="Cálculo al periodo de corte: lo que se requiere hasta una fecha y las actividades programadas en ese periodo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="1.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M13 13.5v4.5M11 15.5l2 2.5 2-2.5"/></svg>
+        <span>Cálculo</span>
+    </button>
     <button class="tb" data-accion="completo" title="Presupuesto completo: todos los conceptos por partida y subpartida con su costo directo, P.U., importe, % y familia">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/><path d="M3.5 8.5h17M9 8.5v12M12 12h5.5M12 15.5h5.5"/></svg>
         <span>Presupuesto completo</span>
@@ -830,6 +834,41 @@ $secciones = [
     <div class="hs-pie">
         <span class="extra-ayuda" id="puDNota">Los cambios se aplican al momento.</span>
         <button type="button" class="hs-btn principal" data-pu-cerrar>Listo</button>
+    </div>
+</dialog>
+
+<!-- ============ CÁLCULO AL PERIODO DE CORTE ============ -->
+<dialog class="hs-dialogo cal-dialogo" id="calDialogo">
+    <div class="hs-cabecera">
+        <strong>Cálculo al periodo de corte</strong>
+        <button type="button" class="hs-cerrar" data-cal-cerrar title="Cerrar">✕</button>
+    </div>
+    <p class="pu-dlg-ayuda">Captura el programa (inicio y fin) de cada concepto y la fecha de corte: el avance programado al corte es parejo por días
+        entre su inicio y su fin. Queda listo para cuando el programa de obra llene estas fechas.</p>
+    <div class="cal-periodo">
+        <label>Periodo desde (opcional) <input type="date" id="calDesde"></label>
+        <label>Periodo de corte <input type="date" id="calCorte"></label>
+        <label class="cal-check"><input type="checkbox" id="calCantidad"> Calcular cantidad a requerir hasta el periodo de corte</label>
+        <label class="cal-check"><input type="checkbox" id="calMarcar"> Marcar actividades programadas en el periodo de corte</label>
+        <span class="extra-ayuda" id="calNota"></span>
+    </div>
+    <div class="extra-caja cal-tabla">
+        <table class="grid mini-grid">
+            <thead><tr><th class="c-id">Clave</th><th>Concepto</th><th>Unidad</th><th class="c-num">Cantidad</th><th>Inicio</th><th>Fin</th>
+                <th class="c-num" title="Avance programado a la fecha de corte">% al corte</th><th class="c-num">Cantidad al corte</th><th class="c-num">Importe al corte</th><th></th></tr></thead>
+            <tbody id="calCuerpo"></tbody>
+            <tfoot id="calPie"></tfoot>
+        </table>
+    </div>
+    <div class="extra-caja cal-tabla" id="calInsumosCaja" hidden>
+        <table class="grid mini-grid">
+            <thead><tr><th class="c-id">Código</th><th>Insumos a requerir hasta el corte</th><th>Tipo</th><th>Unidad</th><th class="c-num">Cantidad</th><th class="c-num">Costo prom.</th><th class="c-num">Importe</th><th class="c-pct">%</th></tr></thead>
+            <tbody id="calInsumos"></tbody>
+        </table>
+    </div>
+    <div class="hs-pie">
+        <span class="extra-ayuda">El periodo y los programas se guardan con el presupuesto.</span>
+        <button type="button" class="hs-btn principal" data-cal-cerrar>Listo</button>
     </div>
 </dialog>
 

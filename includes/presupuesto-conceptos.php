@@ -26,13 +26,21 @@ function presupuestoInsumoOpcionales(): array
     return $r;
 }
 
+// Programa del concepto (botón Cálculo, migraciones/021)
+function presupuestoConceptosConPrograma(): bool
+{
+    static $r = null;
+    return $r ??= bd_tiene_columna('AW', 'presupuesto_conceptos', 'programa_inicio');
+}
+
 // Conceptos con sus insumos, con la forma del JSON del análisis más el id de cada concepto;
 // null si el presupuesto no tiene renglones (uno guardado antes de la migración: se usa su JSON)
 function presupuestoConceptosLeer(int $id): ?array
 {
-    $conceptos = bd_filas('AW', 'select presupuesto_concepto_id, clave, partida, descripcion, unidad, cantidad, venta, especificacion
+    $programa = presupuestoConceptosConPrograma() ? ', programa_inicio, programa_fin' : '';
+    $conceptos = bd_filas('AW', "select presupuesto_concepto_id, clave, partida, descripcion, unidad, cantidad, venta, especificacion $programa
                                    from presupuesto_conceptos where docto_sugerido_obra_id = ?
-                                  order by orden, presupuesto_concepto_id', [$id]);
+                                  order by orden, presupuesto_concepto_id", [$id]);
     if (!$conceptos) return null;
     // Los componentes de una matriz dentro de matriz (padre_id) van dentro de su insumo, en «componentes»
     $filas = bd_filas('AW', 'select i.* from presupuesto_concepto_insumos i
@@ -59,6 +67,7 @@ function presupuestoConceptosLeer(int $id): ?array
               'descripcion' => (string) ($c['descripcion'] ?? ''), 'unidad' => (string) ($c['unidad'] ?? ''), 'cantidad' => (float) $c['cantidad'],
               'especificacion' => (string) ($c['especificacion'] ?? ''), 'insumos' => $insumos[(int) $c['presupuesto_concepto_id']] ?? []];
         if ((float) $c['venta'] > 0) $r['venta'] = (float) $c['venta'];
+        foreach (['inicio' => 'programa_inicio', 'fin' => 'programa_fin'] as $k => $col) if (!empty($c[$col])) $r[$k] = substr((string) $c[$col], 0, 10);
         return $r;
     }, $conceptos);
 }
@@ -93,6 +102,7 @@ function presupuestoConceptosGuardar(int $id, array $analisis): array
         $campos = ['clave' => $c['clave'], 'partida' => $c['partida'], 'descripcion' => $c['descripcion'], 'unidad' => $c['unidad'],
                    'cantidad' => $c['cantidad'], 'venta' => ($c['venta'] ?? 0) > 0 ? $c['venta'] : null,
                    'especificacion' => $c['especificacion'], 'orden' => $n + 1];
+        if (presupuestoConceptosConPrograma()) $campos += ['programa_inicio' => $c['inicio'] ?? null, 'programa_fin' => $c['fin'] ?? null];
         $cid = (int) ($c['id'] ?? 0);
         if ($cid && isset($existentes[$cid]) && !isset($vistos[$cid])) {
             bd_ejecutar('AW', 'update presupuesto_conceptos set ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($campos)))

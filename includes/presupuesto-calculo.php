@@ -276,3 +276,11 @@ function pcExplosion(array $analisis, bool $desglosar = true): array
     $tot['total'] = array_sum($tot);
     return ['insumos' => $lista, 'totales' => $tot];
 }
+
+// % de financiamiento estimado (sugerencia en la ventana Sobrecosto; el % que se usa es el que se captura):
+//   el costo del dinero durante la obra = tasa de interés anual × plazo en meses / 12, sobre la parte que no cubre el anticipo
+//   12 % anual, 6 meses, 30 % de anticipo → 12 × 6 / 12 × (1 − 0.30) = 4.20 %
+function pcFinanciamientoEstimado(float $tasaAnualPct, float $plazoMeses, float $anticipoPct): float
+{
+    return max(0, $tasaAnualPct) * max(0, $plazoMeses) / 12 * (1 - min(max($anticipoPct, 0), 100) / 100);
+}

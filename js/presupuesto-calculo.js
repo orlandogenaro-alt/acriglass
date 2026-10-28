@@ -156,7 +156,11 @@
         return Math.max(0, num(g.cantidad)) * Math.max(0, num(g.costo));
     }
 
-    raiz.AcriCalculoPU = { gastoOperacion: gastoOperacion, TIPOS: TIPOS, insumo: insumo, cantidad: cantidad, fsrInsumo: fsrInsumo, costoReal: costoReal, concepto: concepto,
+    function financiamientoEstimado(tasa, plazo, anticipo) {
+        return Math.max(0, tasa) * Math.max(0, plazo) / 12 * (1 - Math.min(Math.max(anticipo, 0), 100) / 100);
+    }
+
+    raiz.AcriCalculoPU = { gastoOperacion: gastoOperacion, financiamientoEstimado: financiamientoEstimado, TIPOS: TIPOS, insumo: insumo, cantidad: cantidad, fsrInsumo: fsrInsumo, costoReal: costoReal, concepto: concepto,
                            resumen: resumen, sobrecosto: sobrecosto, precioConcepto: precioConcepto,
                            costos: costos, componentes: componentes, desgloseCompuesto: desgloseCompuesto, explosion: explosion };
 })(typeof window !== 'undefined' ? window : global);

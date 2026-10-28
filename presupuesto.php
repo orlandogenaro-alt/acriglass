@@ -323,6 +323,10 @@ $secciones = [
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M5 4a1 1 0 0 1 1-1h12v18H6a1 1 0 0 1-1-1z"/><path d="M5 17.5A1.5 1.5 0 0 1 6.5 16H18"/><path d="M9 7h6M9 10.5h6"/></svg>
         <span>Bitácora</span>
     </button>
+    <button class="tb" data-accion="sobrecosto" title="Sobrecosto: indirectos, financiamiento, utilidad y cargos sobre el costo directo, y el factor de sobrecosto">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4 20h16"/><rect x="5" y="13" width="3.5" height="7"/><rect x="10.25" y="9" width="3.5" height="11"/><rect x="15.5" y="4" width="3.5" height="16"/></svg>
+        <span>Sobrecosto</span>
+    </button>
     <button class="tb" data-accion="fasar" title="FASAR: Factor de Salario Real de la mano de obra (salario base × FSR = salario real)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><circle cx="9" cy="7" r="3.2"/><path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h2"/><path d="M14 21l7-7"/><circle cx="15" cy="15" r="1.3"/><circle cx="20" cy="20" r="1.3"/></svg>
         <span>FASAR</span>
@@ -822,6 +826,54 @@ $secciones = [
     <div class="hs-pie">
         <span class="extra-ayuda" id="puDNota">Los cambios se aplican al momento.</span>
         <button type="button" class="hs-btn principal" data-pu-cerrar>Listo</button>
+    </div>
+</dialog>
+
+<!-- ============ SOBRECOSTO: INTEGRACIÓN DEL PRECIO Y FACTOR DE SOBRECOSTO ============ -->
+<dialog class="hs-dialogo sc-dialogo" id="scDialogo">
+    <div class="hs-cabecera">
+        <strong>Sobrecosto · integración del precio</strong>
+        <button type="button" class="hs-cerrar" data-sc-cerrar title="Cerrar">✕</button>
+    </div>
+    <p class="pu-dlg-ayuda"><b>Precio de venta = Costo directo + Indirectos + Financiamiento + Utilidad + Cargos adicionales.</b>
+        Factor de sobrecosto = Precio de venta ÷ Costo directo: el P.U. de cada concepto es su costo directo × este factor.
+        Se guarda con todos sus componentes al Guardar el presupuesto.</p>
+    <div class="sc-cuerpo">
+        <div class="extra-caja sc-caja">
+            <table class="grid mini-grid">
+                <thead><tr><th>Concepto</th><th>Base</th><th class="c-num">Importe</th></tr></thead>
+                <tbody id="scCascada"></tbody>
+            </table>
+        </div>
+        <div class="sc-param">
+            <fieldset>
+                <legend>Financiamiento</legend>
+                <label>% de financiamiento (sobre CD + indirectos) <input type="number" id="scFin" class="num" step="0.0001" min="0"></label>
+                <label>Indicador económico <input type="text" id="scIndicador" maxlength="60" placeholder="ej. TIIE 28 días"></label>
+                <label>Tasa de interés anual % <input type="number" id="scTasa" class="num" step="0.01" min="0"></label>
+                <label>Plazo de ejecución (meses) <input type="number" id="scPlazo" class="num" step="0.5" min="0"></label>
+                <label>Anticipo % <input type="number" id="scAnticipo" class="num" step="0.01" min="0" max="100"></label>
+                <p class="sc-estimado">Estimado: <b id="scEstimado"></b>
+                    <button type="button" class="ct-btn" id="scUsar" title="Pone el estimado como % de financiamiento">Usar este %</button>
+                    <small>tasa anual × meses / 12 × (1 − anticipo)</small></p>
+            </fieldset>
+            <fieldset>
+                <legend>Utilidad</legend>
+                <label>Utilidad Neta % <input type="number" id="scUtil" class="num" step="0.01" min="0"></label>
+                <label>Cómo se aplica
+                    <select id="scModo">
+                        <option value="costo">+ % sobre el costo</option>
+                        <option value="margen">% de margen (Form46)</option>
+                    </select>
+                </label>
+            </fieldset>
+            <p class="extra-ayuda">Indirectos de campo y de oficina: renglones de Gastos de Operación (sus % en Administrador › Parámetros de presupuesto).
+                Cargos adicionales: comisiones (Mano de Obra) y anexo de seguro (Gastos de Operación).</p>
+        </div>
+    </div>
+    <div class="hs-pie">
+        <span class="extra-ayuda" id="scGuardado"></span>
+        <button type="button" class="hs-btn principal" data-sc-cerrar>Listo</button>
     </div>
 </dialog>
 

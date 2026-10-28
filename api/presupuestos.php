@@ -118,6 +118,11 @@ function analisisPUDatos($d): ?array
     if (!empty($d['matriz_costo'])) $r['matriz_costo'] = true;
     // FASAR del catálogo del que salió el FSR del presupuesto (botón FASAR); el FSR queda guardado aunque el FASAR cambie
     if ((int) ($d['fasar_id'] ?? 0) > 0) $r['fasar_id'] = (int) $d['fasar_id'];
+    // Con qué se estimó el % de financiamiento (ventana Sobrecosto): tasa anual, plazo, anticipo e indicador económico
+    foreach (['fin_tasa' => 100, 'fin_plazo' => 120, 'fin_anticipo' => 100] as $k => $max) {
+        if (isset($d[$k]) && is_numeric($d[$k]) && $d[$k] > 0) $r[$k] = min($max, numero($d[$k], 4));
+    }
+    if (($v = texto($d['fin_indicador'] ?? '', 60)) !== null) $r['fin_indicador'] = $v;
     foreach (array_slice((array) ($d['conceptos'] ?? []), 0, 1000) as $c) {
         if (!is_array($c)) continue;
         $insumos = analisisInsumos($c['insumos'] ?? []);
@@ -225,6 +230,33 @@ function calculoRenglon($g): array
         'calculo_costo'    => $pct ? null : max(0, numero($g['costo'] ?? 0, 4)),
         'calculo_pct'      => $pct ? max(0, numero($g['pct'] ?? 0, 4)) : null,
     ];
+}
+
+// Sobrecosto del presupuesto (botón Sobrecosto, migraciones/020): un renglón por presupuesto con todos sus componentes.
+// La pantalla manda el costo directo, la mano de obra gravable, los indirectos y los cargos adicionales; el financiamiento,
+// la utilidad, el precio de venta y el factor los calcula aquí el motor (pcSobrecosto), con el % de financiamiento del
+// análisis y la Utilidad Neta del presupuesto.
+function guardarSobrecosto(int $id, $s, ?array $analisis, float $utilPct, string $modo, float $subtotal): void
+{
+    bd_ejecutar('AW', 'delete from presupuesto_sobrecosto where docto_sugerido_obra_id = ?', [$id]);
+    if (!is_array($s)) return;
+    $pesos = fn($k) => max(0, numero($s[$k] ?? 0));
+    $ind = ['campo' => $pesos('indirectos_campo'), 'oficina' => $pesos('indirectos_oficina'), 'otros' => $pesos('indirectos_otros')];
+    $ca = min(0.99, max(0, numero($s['cargos_pct'] ?? 0, 6) / 100));
+    $finPct = (float) ($analisis['fin'] ?? 0);
+    $r = pcSobrecosto($pesos('costo_directo'), array_sum($ind), $finPct, $utilPct, $modo, $ca);
+    bd_insertar('AW', 'presupuesto_sobrecosto', 'docto_sugerido_obra_id', [
+        'docto_sugerido_obra_id' => $id,
+        'costo_directo' => round($r['cd'], 2), 'mano_obra_gravable' => $pesos('mano_obra_gravable'),
+        'indirectos_campo' => $ind['campo'], 'indirectos_oficina' => $ind['oficina'], 'indirectos_otros' => $ind['otros'],
+        'financiamiento_pct' => $finPct, 'financiamiento' => round($r['fin'], 2),
+        'tasa_interes_pct' => $analisis['fin_tasa'] ?? null, 'plazo_meses' => $analisis['fin_plazo'] ?? null,
+        'anticipo_pct' => $analisis['fin_anticipo'] ?? null, 'indicador_economico' => $analisis['fin_indicador'] ?? null,
+        'utilidad_pct' => $utilPct, 'utilidad_modo' => $modo, 'utilidad_pct_equivalente' => round($r['util_pct'], 6), 'utilidad' => round($r['util'], 2),
+        'cargos_pct' => round($ca * 100, 4), 'cargos' => round($r['cargos'], 2),
+        'precio_venta' => round($r['pv'], 2), 'factor' => round($r['factor'], 6), 'subtotal_presupuesto' => round($subtotal, 2),
+        'usuario' => mb_substr((string) ($_SESSION['usuario'] ?? ''), 0, 50),
+    ]);
 }
 
 // Estatus guardado del presupuesto (error si ya no existe)
@@ -485,6 +517,8 @@ function guardar(array $d): array
             }
         }
         guardarDetalles($id, $d, $cache);
+        // Sobrecosto con todos sus componentes (migraciones/020)
+        if (bd_tiene_tabla('AW', 'presupuesto_sobrecosto')) guardarSobrecosto($id, $d['sobrecosto'] ?? null, $analisis, $util, $margen ? 'margen' : 'costo', $subtotal);
         // Conceptos del Análisis P.U. en tablas (migraciones/017), con su id; sin la tabla quedan solo en el JSON
         $conceptosPU = presupuestoConceptosDisponible() ? presupuestoConceptosGuardar($id, $analisis ?? ['conceptos' => []]) : [];
         // Conceptos/Tareas (fechas, responsable, avance…); sin la tabla se guarda el resto del presupuesto

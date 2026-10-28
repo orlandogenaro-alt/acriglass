@@ -1191,6 +1191,9 @@ try {
                 $p['analisis_pu'] = (is_array($p['analisis_pu']) ? $p['analisis_pu'] : ['fsr' => 1, 'hm' => 0, 'fin' => 0]) + ['conceptos' => []];
                 $p['analisis_pu']['conceptos'] = $tabla;
             }
+            // Último sobrecosto guardado (migraciones/020): la ventana Sobrecosto dice cuándo y quién
+            $p['sobrecosto'] = bd_tiene_tabla('AW', 'presupuesto_sobrecosto')
+                ? bd_fila('AW', 'select factor, precio_venta, usuario, fecha from presupuesto_sobrecosto where docto_sugerido_obra_id = ?', [$id]) : null;
             // Renglones de Materia Prima / Mano de Obra / Gastos de Operacion con el nombre de su concepto
             // Gastos de Operación calculados (migraciones/019): sus componentes
             $calculo = bd_tiene_columna('AW', 'doctos_sugerido_obra_det', 'calculo_base')

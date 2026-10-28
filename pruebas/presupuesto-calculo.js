@@ -20,6 +20,7 @@ console.log('Motor de P.U. de la pantalla');
 casos.forEach(function (caso) {
     try {
         if (caso.tipo === 'sobrecosto') comparar(caso.esperado, M.sobrecosto.apply(null, caso.args), '');
+        else if (caso.tipo === 'financiamiento') comparar(caso.esperado, { pct: M.financiamientoEstimado.apply(null, caso.args) }, '');
         else if (caso.tipo === 'explosion') comparar(caso.esperado, M.explosion(caso.analisis, caso.desglosar), '');
         else if (caso.tipo === 'gasto') {
             var imp = M.gastoOperacion(caso.gasto, caso.mano_obra);

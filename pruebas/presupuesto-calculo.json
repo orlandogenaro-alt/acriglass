@@ -160,6 +160,12 @@
             "esperado": { "fijo": 1 }
         },
         {
+            "nombre": "Financiamiento estimado: 12 % anual, 6 meses, 30 % de anticipo = 4.20 %",
+            "tipo": "financiamiento",
+            "args": [12, 6, 30],
+            "esperado": { "pct": 4.2 }
+        },
+        {
             "nombre": "Precio de un concepto con CD $100 en esa obra: los cargos en proporción y P.U. = 100 × 1.3464",
             "tipo": "precio",
             "cd": 100,

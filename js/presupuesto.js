@@ -537,7 +537,9 @@
         analisis = {
             fsr: num(a.fsr) > 0 ? num(a.fsr) : 1, hm: num(a.hm), fin: num(a.fin),
             util: a.util === null || a.util === undefined || a.util === '' ? null : num(a.util),
-            matrizCosto: !!a.matriz_costo, fasarId: parseInt(a.fasar_id, 10) || 0, conceptos: []
+            matrizCosto: !!a.matriz_costo, fasarId: parseInt(a.fasar_id, 10) || 0, conceptos: [],
+            // Con qué se estimó el % de financiamiento (ventana Sobrecosto)
+            finTasa: num(a.fin_tasa), finPlazo: num(a.fin_plazo), finAnticipo: num(a.fin_anticipo), finIndicador: String(a.fin_indicador || '')
         };
         (a.conceptos || []).forEach(function (c) { analisis.conceptos.push(nuevoConcepto(c)); });
         huboAnalisis = analisis.conceptos.length > 0;
@@ -548,6 +550,7 @@
     function exportarAnalisis() {
         return {
             fsr: analisis.fsr, hm: analisis.hm, fin: analisis.fin, util: null, matriz_costo: !!analisis.matrizCosto, fasar_id: analisis.fasarId || 0,
+            fin_tasa: analisis.finTasa || 0, fin_plazo: analisis.finPlazo || 0, fin_anticipo: analisis.finAnticipo || 0, fin_indicador: analisis.finIndicador || '',
             conceptos: analisis.conceptos.map(function (c) {
                 return { id: c.id || 0, uid: c.uid, clave: c.clave, partida: c.partida, descripcion: c.descripcion, unidad: c.unidad, cantidad: c.cantidad,
                          especificacion: c.especificacion || '', venta: esVenta(c) ? c.venta : 0,
@@ -1339,6 +1342,107 @@
             abrirAnalisis(manoObraLista[tr.dataset.mo].conceptos[0]);
         });
     });
+
+    // ---------- Sobrecosto (botón de la barra): la integración del precio sobre el costo directo de la obra ----------
+    // Las cifras son las del Análisis P.U. (calcularPU, con el motor js/presupuesto-calculo.js); al Guardar se mandan sus
+    // componentes y el servidor recalcula el precio y el factor (presupuesto_sobrecosto, migraciones/020)
+    var sobrecostoGuardado = null;   // { factor, precio_venta, usuario, fecha } del último Guardar
+    // Indirectos (Gastos de Operación sin el anexo de seguro ni lo que viene de los análisis): de campo, de oficina y otros
+    function partesIndirectos() {
+        var r = { campo: 0, oficina: 0, otros: 0 }, seguros = {};
+        extras.seguros.forEach(function (x) { seguros[clave(x.concepto)] = true; });
+        datos.go.forEach(function (f) {
+            var k = clave(f.concepto), v = num(f.presupuesto);
+            if (seguros[k] || f.calc === 'pu') return;
+            if (/CAMPO/.test(k)) r.campo += v; else if (/OFICINA/.test(k)) r.oficina += v; else r.otros += v;
+        });
+        return r;
+    }
+    function datosSobrecosto() {
+        var r = calcularPU(), ind = partesIndirectos();
+        return { r: r, ind: ind, guardar: {
+            costo_directo: redondear(r.cd), mano_obra_gravable: redondear(r.mo + r.fsr), indirectos_campo: redondear(ind.campo),
+            indirectos_oficina: redondear(ind.oficina), indirectos_otros: redondear(ind.otros), cargos_pct: Math.round(r.ca * 1000000) / 10000
+        } };
+    }
+    function abrirSobrecosto() {
+        ['scFin', 'scIndicador', 'scTasa', 'scPlazo', 'scAnticipo', 'scUsar', 'scModo'].forEach(function (id) { $(id).disabled = soloLectura; });
+        $('scUtil').disabled = soloLectura || subtotalManual;
+        $('scIndicador').value = analisis.finIndicador || '';
+        $('scTasa').value = analisis.finTasa || '';
+        $('scPlazo').value = analisis.finPlazo || '';
+        $('scAnticipo').value = analisis.finAnticipo || '';
+        pintarSobrecosto();
+        $('scDialogo').showModal();
+    }
+    function pintarSobrecosto() {
+        var x = datosSobrecosto(), r = x.r, ind = x.ind;
+        function deCd(v) { return r.cd > 0 ? pct(v / r.cd * 100) + ' del CD' : ''; }
+        var filas = [
+            ['Costo directo de la obra', '', r.cd, 'pu-total'],
+            ['Materiales, equipo, maquinaria y otros', '', r.mp, 'sc-sub'],
+            ['Mano de obra (con FSR)', '', r.mo + r.fsr, 'sc-sub'],
+            r.hm ? ['Herramienta menor', pct(analisis.hm) + ' de la M.O.', r.hm, 'sc-sub'] : null,
+            ['Mano de obra gravable', 'con FSR', r.mo + r.fsr, 'sc-info'],
+            ['Indirectos de campo', deCd(ind.campo), ind.campo],
+            ['Indirectos de oficina', deCd(ind.oficina), ind.oficina],
+            ind.otros ? ['Otros indirectos (Gastos de Operación)', deCd(ind.otros), ind.otros] : null,
+            ['Costo directo + indirectos', '', r.cd + r.ind, 'pu-total'],
+            ['Financiamiento', pct(analisis.fin) + ' de CD + Ind', r.fin],
+            ['Utilidad', pct(r.utilPct) + ' de CD + Ind + Fin', r.util],
+            ['Cargos adicionales (comisiones y seguro)', pct(r.ca * 100) + ' del precio', r.cargos],
+            ['Precio de venta', '', r.pv, 'pu-total'],
+            ['Factor de sobrecosto', 'precio ÷ costo directo', null, 'sc-factor'],
+            ['Subtotal del presupuesto', '', r.subtotal, 'sc-info'],
+            ['Diferencia', Math.abs(r.pv - r.subtotal) >= 0.5 ? 'por financiamiento, FSR o ajustes avanzados' : '', r.pv - r.subtotal, 'sc-info']
+        ].filter(Boolean);
+        $('scCascada').innerHTML = filas.map(function (f) {
+            var v = f[3] === 'sc-factor' ? cant(Math.round(r.factor * 10000) / 10000) : fmt(f[2]);
+            return '<tr' + (f[3] ? ' class="' + f[3] + '"' : '') + '><td class="ro izq">' + escapar(f[0]) + '</td><td class="ro izq">' + escapar(f[1]) + '</td><td class="ro">' + v + '</td></tr>';
+        }).join('');
+        if (document.activeElement !== $('scFin')) $('scFin').value = analisis.fin;
+        if (document.activeElement !== $('scUtil')) $('scUtil').value = num($('pctUtilidad').value);
+        $('scModo').value = modoUtilidad();
+        var est = CALC.financiamientoEstimado(num($('scTasa').value), num($('scPlazo').value), num($('scAnticipo').value));
+        $('scEstimado').textContent = pct(est);
+        $('scUsar').disabled = soloLectura || !(est > 0);
+        var g = sobrecostoGuardado;
+        $('scGuardado').textContent = g ? 'Guardado: factor ' + cant(Math.round(num(g.factor) * 10000) / 10000) + ' · precio $' + fmt(num(g.precio_venta)) +
+            (g.usuario ? ' · ' + g.usuario : '') + (g.fecha ? ' · ' + String(g.fecha).slice(0, 16).replace('T', ' ') : '') : 'Se guarda con el presupuesto (Guardar).';
+    }
+    function cambioSobrecosto() {
+        marcarCambio();
+        refrescarCalculados();
+        pintarSobrecosto();
+    }
+    $('scFin').addEventListener('input', function () {
+        analisis.fin = Math.max(0, num(this.value));
+        $('puFin').value = analisis.fin;
+        cambioSobrecosto();
+    });
+    $('scUtil').addEventListener('input', function () {
+        $('pctUtilidad').value = this.value;
+        $('pctUtilidad').dispatchEvent(new Event('input'));
+        pintarSobrecosto();
+    });
+    $('scModo').addEventListener('change', function () {
+        $('modoUtilidad').value = this.value;
+        $('modoUtilidad').dispatchEvent(new Event('change'));
+        pintarSobrecosto();
+    });
+    [['scTasa', 'finTasa'], ['scPlazo', 'finPlazo'], ['scAnticipo', 'finAnticipo'], ['scIndicador', 'finIndicador']].forEach(function (p) {
+        $(p[0]).addEventListener('input', function () {
+            analisis[p[1]] = p[1] === 'finIndicador' ? this.value : Math.max(0, num(this.value));
+            marcarCambio();
+            pintarSobrecosto();
+        });
+    });
+    $('scUsar').addEventListener('click', function () {
+        analisis.fin = Math.round(CALC.financiamientoEstimado(analisis.finTasa, analisis.finPlazo, analisis.finAnticipo) * 10000) / 10000;
+        $('puFin').value = analisis.fin;
+        cambioSobrecosto();
+    });
+    document.querySelectorAll('[data-sc-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('scDialogo').close(); }); });
 
     // ---------- FASAR (botón de la barra): el FSR del presupuesto y la mano de obra de los análisis ----------
     function abrirFasar() {
@@ -3053,7 +3157,8 @@
             comisiones: extras.comisiones,
             seguros: extras.seguros,
             relacionados: extras.relacionados.map(function (r) { return { sugerido_id: r.sugerido_id }; }),
-            tareas: ct.exportar().tareas
+            tareas: ct.exportar().tareas,
+            sobrecosto: datosSobrecosto().guardar
         };
     }
 
@@ -3543,6 +3648,7 @@
         },
         'bitacora': verBitacora,
         'fasar': abrirFasar,
+        'sobrecosto': abrirSobrecosto,
         'eliminar': function () {
             if (!presupuestoId) {
                 if (confirm('Este presupuesto no se ha guardado. ¿Descartarlo?')) { cambios = false; cerrarVentana(); }
@@ -3655,6 +3761,7 @@
             // Conceptos/Tareas guardados (fechas, responsable, avance…); los conceptos de MP/MO/GO se sincronizan al pintar
             ct.cargar(p.tareas || []);
             creador = String(p.usuario_creador || '').trim();
+            sobrecostoGuardado = p.sobrecosto || null;
             if (enPestana && p.cliente) {
                 window.parent.postMessage({ tipo: 'titulo', texto: 'Presupuesto · ' + p.cliente }, location.origin);
             }

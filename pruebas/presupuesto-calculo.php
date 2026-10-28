@@ -30,6 +30,10 @@ foreach ($casos as $caso) {
             pcComparar($caso['esperado'], pcSobrecosto((float) $a[0], (float) $a[1], (float) $a[2], (float) $a[3], $a[4], (float) $a[5]));
             return;
         }
+        if ($caso['tipo'] === 'financiamiento') {
+            pcComparar($caso['esperado'], ['pct' => pcFinanciamientoEstimado(...array_map('floatval', $caso['args']))]);
+            return;
+        }
         if ($caso['tipo'] === 'explosion') {
             pcComparar($caso['esperado'], pcExplosion($caso['analisis'], $caso['desglosar']));
             return;

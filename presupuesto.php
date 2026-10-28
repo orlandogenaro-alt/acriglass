@@ -171,6 +171,24 @@ if (!modoConfiguracion()) {
     }
 }
 
+// FASAR activos (Catalogos › Parámetros de costos) para el FSR de la mano de obra: botón FASAR y ventana del análisis
+$fasarPU = [];
+if (!modoConfiguracion()) {
+    try {
+        if (bd_tiene_tabla('AW', 'fasar')) {
+            foreach (bd_filas('AW', "select fasar_id, nombre, dias_calendario, dias_pagados, dias_no_laborados, obligaciones, tp, tl, ps, fsr
+                                       from fasar where estatus = 'A' order by nombre") as $f) {
+                foreach (['dias_pagados', 'dias_no_laborados', 'obligaciones'] as $k) $f[$k] = json_decode((string) $f[$k], true) ?: [];
+                foreach (['dias_calendario', 'tp', 'tl', 'ps', 'fsr'] as $k) $f[$k] = (float) $f[$k];
+                $f['fasar_id'] = (int) $f['fasar_id'];
+                $fasarPU[] = $f;
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('AcriGlass presupuesto FASAR: ' . $e->getMessage());
+    }
+}
+
 // Plantillas de presupuesto activas (Catalogos › Plantillas de presupuesto): sus conceptos por código del catálogo
 $plantillasPU = [];
 if (!modoConfiguracion() && $conceptosPU) {
@@ -303,6 +321,10 @@ $secciones = [
     <button class="tb" data-accion="bitacora" title="Bitácora de cambios: quién movió el presupuesto y cuándo (solo consulta)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M5 4a1 1 0 0 1 1-1h12v18H6a1 1 0 0 1-1-1z"/><path d="M5 17.5A1.5 1.5 0 0 1 6.5 16H18"/><path d="M9 7h6M9 10.5h6"/></svg>
         <span>Bitácora</span>
+    </button>
+    <button class="tb" data-accion="fasar" title="FASAR: Factor de Salario Real de la mano de obra (salario base × FSR = salario real)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><circle cx="9" cy="7" r="3.2"/><path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h2"/><path d="M14 21l7-7"/><circle cx="15" cy="15" r="1.3"/><circle cx="20" cy="20" r="1.3"/></svg>
+        <span>FASAR</span>
     </button>
     <button class="tb peligro" data-accion="eliminar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
@@ -558,6 +580,22 @@ $secciones = [
 
             <!-- Mano de Obra: empleados × días y comisiones (grid_man_obra / grid_comisiones del Form46) -->
             <div class="extras" id="extrasMO" hidden>
+                <!-- Mano de obra de las matrices del Análisis P.U.: salario base × FSR (FASAR) = salario real, jornadas e importe -->
+                <section class="extra mo-analisis">
+                    <div class="extra-barra">
+                        <strong>Mano de obra de los análisis</strong>
+                        <button type="button" class="ct-btn" id="moFasar" title="FSR del presupuesto y desglose del FASAR">FASAR…</button>
+                        <span class="extra-ayuda">Trabajadores y cuadrillas de las matrices. Doble clic para abrir el análisis donde se usa.</span>
+                    </div>
+                    <div class="extra-caja">
+                        <table class="grid mini-grid">
+                            <thead><tr><th class="c-id">Código</th><th>Descripción</th><th>Unidad</th><th class="c-num">Salario base</th><th>FASAR</th><th class="c-num">FSR</th>
+                                <th class="c-num" title="Salario base × FSR + viáticos, alimentación y hospedaje">Salario real</th><th class="c-num" title="Viáticos + alimentación + hospedaje por jornada">Viát. / alim. / hosp.</th>
+                                <th class="c-num" title="Cantidad total en la obra (jornadas)">Jornadas</th><th class="c-num">Importe</th><th class="c-num">Conceptos</th></tr></thead>
+                            <tbody id="tbManoObraPU"></tbody>
+                        </table>
+                    </div>
+                </section>
                 <section class="extra">
                     <div class="extra-barra">
                         <strong>Empleados</strong>
@@ -765,6 +803,38 @@ $secciones = [
     </div>
 </dialog>
 
+<!-- ============ FASAR: FACTOR DE SALARIO REAL DE LA MANO DE OBRA ============ -->
+<dialog class="hs-dialogo fs-dialogo" id="fsDialogo">
+    <div class="hs-cabecera">
+        <strong>FASAR · Factor de Salario Real</strong>
+        <button type="button" class="hs-cerrar" data-fs-cerrar title="Cerrar">✕</button>
+    </div>
+    <p class="pu-dlg-ayuda"><b>Salario real = salario base × FSR</b> (+ viáticos, alimentación y hospedaje). El FSR sale del FASAR del catálogo
+        con los días pagados, los no laborados y las obligaciones obrero-patronales. Los FASAR se capturan en
+        <a href="parametros-costos.php" target="_blank" rel="noopener">Catalogos › Parámetros de costos</a>. Cada mano de obra puede tener su propio FASAR
+        (abajo de ella, en la ventana del análisis); si no, toma el del presupuesto.</p>
+    <div class="fs-elegir">
+        <label>FASAR del presupuesto: <select id="fsElegir"></select></label>
+        <label>FSR: <input type="number" id="fsFsr" class="num" step="0.0001" min="0"></label>
+        <span class="extra-ayuda" id="fsNota"></span>
+    </div>
+    <div class="fs-cuerpo">
+        <div class="extra-caja fs-caja"><table class="grid mini-grid"><tbody id="fsDesglose"></tbody></table></div>
+        <div class="extra-caja fs-caja">
+            <table class="grid mini-grid">
+                <thead><tr><th class="c-id">Código</th><th>Descripción</th><th>Unidad</th><th class="c-num">Salario base</th><th>FASAR</th><th class="c-num">FSR</th>
+                    <th class="c-num">Salario real</th><th class="c-num">Viát. / alim. / hosp.</th><th class="c-num">Jornadas</th><th class="c-num">Importe</th><th class="c-num">Conceptos</th></tr></thead>
+                <tbody id="fsManoObra"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="hs-pie">
+        <span class="extra-ayuda">Los cambios se aplican al momento.</span>
+        <button type="button" class="hs-btn" id="fsTodos" title="Quita los FASAR y FSR propios de cada mano de obra">Toda la mano de obra con el FASAR del presupuesto</button>
+        <button type="button" class="hs-btn principal" data-fs-cerrar>Listo</button>
+    </div>
+</dialog>
+
 <!-- ============ PRUEBA: DE DÓNDE SALE CADA DATO ============ -->
 <dialog class="hs-dialogo pr-dialogo" id="prDialogo">
     <div class="hs-cabecera">
@@ -918,6 +988,7 @@ $secciones = [
     window.ACRI_PARAMETROS_PRES = <?= json_encode($paramsJs, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_PLANTILLAS_PU = <?= json_encode($plantillasPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_CONCEPTOS_PU = <?= json_encode($conceptosPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.ACRI_FASAR = <?= json_encode($fasarPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <script src="<?= recurso('js/presupuesto-calculo.js') ?>"></script>
 <script src="<?= recurso('js/formato-presupuesto.js') ?>"></script>

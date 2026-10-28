@@ -15,6 +15,17 @@ function presupuestoConceptosDisponible(): bool
     return bd_tiene_tabla('AW', 'presupuesto_conceptos');
 }
 
+// Campos opcionales con los que tiene la tabla (fasar_id llega con migraciones/018)
+function presupuestoInsumoOpcionales(): array
+{
+    static $r = null;
+    if ($r === null) {
+        $r = PRESUPUESTO_INSUMO_OPCIONALES;
+        if (bd_tiene_columna('AW', 'presupuesto_concepto_insumos', 'fasar_id')) $r['fasar_id'] = true;
+    }
+    return $r;
+}
+
 // Conceptos con sus insumos, con la forma del JSON del análisis más el id de cada concepto;
 // null si el presupuesto no tiene renglones (uno guardado antes de la migración: se usa su JSON)
 function presupuestoConceptosLeer(int $id): ?array
@@ -31,9 +42,9 @@ function presupuestoConceptosLeer(int $id): ?array
                               order by i.presupuesto_concepto_id, i.orden, i.presupuesto_concepto_insumo_id', [$id]) as $i) {
         $r = ['tipo' => trim((string) $i['tipo']), 'codigo' => (string) ($i['codigo'] ?? ''), 'descripcion' => (string) ($i['descripcion'] ?? ''),
               'unidad' => (string) ($i['unidad'] ?? ''), 'cantidad' => (float) $i['cantidad'], 'rinde' => (float) $i['rinde'], 'costo' => (float) $i['costo']];
-        foreach (PRESUPUESTO_INSUMO_OPCIONALES as $k => $esNumero) {
+        foreach (presupuestoInsumoOpcionales() as $k => $esNumero) {
             if ($i[$k] === null || $i[$k] === '') continue;
-            $r[$k] = $esNumero ? (float) $i[$k] : trim((string) $i[$k]);
+            $r[$k] = $k === 'fasar_id' ? (int) $i[$k] : ($esNumero ? (float) $i[$k] : trim((string) $i[$k]));
         }
         $insumos[(int) $i['presupuesto_concepto_id']][] = $r;
     }
@@ -74,7 +85,7 @@ function presupuestoConceptosGuardar(int $id, array $analisis): array
             $fila = ['presupuesto_concepto_id' => $cid, 'tipo' => $i['tipo'], 'codigo' => $i['codigo'], 'descripcion' => $i['descripcion'],
                      'unidad' => $i['unidad'], 'cantidad' => $i['cantidad'], 'rinde' => $i['rinde'], 'costo' => $i['costo'],
                      'cantidad_resultante' => round($calc[$k]['cantidad'], 6), 'importe' => round($calc[$k]['importe'], 6), 'orden' => $k + 1];
-            foreach (array_keys(PRESUPUESTO_INSUMO_OPCIONALES) as $o) $fila[$o] = $i[$o] ?? null;
+            foreach (array_keys(presupuestoInsumoOpcionales()) as $o) $fila[$o] = $i[$o] ?? null;
             bd_insertar('AW', 'presupuesto_concepto_insumos', 'presupuesto_concepto_insumo_id', $fila);
         }
         if (isset($c['_uid'])) $ids[(string) $c['_uid']] = $cid;

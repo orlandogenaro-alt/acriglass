@@ -116,6 +116,8 @@ function analisisPUDatos($d): ?array
     ];
     // La matriz de los conceptos de precio fijo es el costo (presupuestos traídos de Neodata)
     if (!empty($d['matriz_costo'])) $r['matriz_costo'] = true;
+    // FASAR del catálogo del que salió el FSR del presupuesto (botón FASAR); el FSR queda guardado aunque el FASAR cambie
+    if ((int) ($d['fasar_id'] ?? 0) > 0) $r['fasar_id'] = (int) $d['fasar_id'];
     foreach (array_slice((array) ($d['conceptos'] ?? []), 0, 1000) as $c) {
         if (!is_array($c)) continue;
         $insumos = [];
@@ -136,6 +138,7 @@ function analisisPUDatos($d): ?array
             foreach (['factor' => 6, 'merma_pct' => 4, 'fsr' => 4, 'viaticos' => 4, 'alimentacion' => 4, 'hospedaje' => 4] as $k => $dec) {
                 if (isset($i[$k]) && is_numeric($i[$k])) $ins[$k] = max(0, numero($i[$k], $dec));
             }
+            if ((int) ($i['fasar_id'] ?? 0) > 0) $ins['fasar_id'] = (int) $i['fasar_id'];   // FASAR del que salió su FSR
             if (($v = texto($i['proveedor'] ?? '', 150)) !== null) $ins['proveedor'] = $v;
             if (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($i['fecha_costo'] ?? ''))) $ins['fecha_costo'] = $i['fecha_costo'];
             $insumos[] = $ins;

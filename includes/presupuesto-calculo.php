@@ -65,13 +65,19 @@ function pcCantidad(array $i, float $cantConcepto = 0): float
     return $q * $i['factor'] * (1 + $i['merma_pct'] / 100);
 }
 
-// Costo real de una unidad del insumo (la mano de obra con su FSR y viáticos)
+// FSR que se aplica a una mano de obra: el suyo (de un FASAR o capturado) o, sin él, el del análisis
+function pcFsrInsumo(array $i, float $fsrAnalisis = 1): float
+{
+    $i = pcInsumo($i);
+    return $i['fsr'] > 0 ? $i['fsr'] : ($fsrAnalisis > 0 ? $fsrAnalisis : 1.0);
+}
+
+// Costo real de una unidad del insumo (la mano de obra: salario base × FSR + viáticos, alimentación y hospedaje)
 function pcCostoReal(array $i, float $fsrAnalisis = 1): float
 {
     $i = pcInsumo($i);
     if ($i['tipo'] !== 'MO') return $i['costo'];
-    $fsr = $i['fsr'] > 0 ? $i['fsr'] : ($fsrAnalisis > 0 ? $fsrAnalisis : 1.0);
-    return $i['costo'] * $fsr + $i['viaticos'] + $i['alimentacion'] + $i['hospedaje'];
+    return $i['costo'] * pcFsrInsumo($i, $fsrAnalisis) + $i['viaticos'] + $i['alimentacion'] + $i['hospedaje'];
 }
 
 // Desglose por UNA unidad del concepto: cada insumo con su cantidad resultante, costo real e importe, y los totales
@@ -96,6 +102,7 @@ function pcConcepto(array $c, array $analisis): array
             $t[strtolower($i['tipo'])] += $imp;
         }
         $renglones[$n] = ['tipo' => $i['tipo'], 'cantidad' => $q, 'costo' => $costo, 'importe' => $imp];
+        if ($i['tipo'] === 'MO') $renglones[$n]['fsr'] = pcFsrInsumo($i, $fsr);
     }
     // Los porcentajes de la mano de obra van después: su base es la mano de obra real ya sumada
     foreach ($pctMo as $n) {

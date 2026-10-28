@@ -58,7 +58,7 @@
                 { "tipo": "MO", "cantidad": 1, "costo": 500, "fsr": 1.2, "viaticos": 100 }
             ] },
             "esperado": {
-                "insumos": [ { "costo": 750, "importe": 1500 }, { "costo": 700, "importe": 700 } ],
+                "insumos": [ { "fsr": 1.5, "costo": 750, "importe": 1500 }, { "fsr": 1.2, "costo": 700, "importe": 700 } ],
                 "totales": { "mo": 1500, "moReal": 2200, "hm": 66, "cd": 2266 }
             }
         },

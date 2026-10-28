@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presupuesto de Obra · AcriGlass</title>
+    <meta name="acri-token" content="x">
+    <link rel="icon" href="uploads/sistema/favicon-20260923205337-4be0d6.png">
+    <link rel="stylesheet" href="css/presupuesto.css?v=1793207337">
+    <link rel="stylesheet" href="css/formato-presupuesto.css?v=1792612192">
+    <link rel="stylesheet" href="css/recorrido.css?v=1792528575">
+    <script src="js/tema.js?v=1791242193"></script>
+</head>
+<body data-presupuesto="0">
+
+<!-- Barra de herramientas -->
+<header class="toolbar">
+    <button class="tb" data-accion="guardar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h8V3"/><path d="M8 21v-7h8v7"/></svg>
+        <span>Guardar</span>
+    </button>
+    <button class="tb" data-accion="guardar-cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M12 21H5V3h11l3 3v6"/><path d="M8 3v5h8V3"/><path d="M14 18l2.5 2.5L21 16"/></svg>
+        <span>Guardar y Cerrar</span>
+    </button>
+    <span class="sep"></span>
+    <div class="tb-drop">
+        <button class="tb" data-accion="imprimir">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>
+            <span>Imprimir <small>▾</small></span>
+        </button>
+        <div class="menu">
+            <button data-imprimir="normal">Imprimir</button>
+            <button data-imprimir="detalle">Imprimir Detalle</button>
+            <button data-imprimir="propuesta">Propuesta para el cliente (PDF)</button>
+            <button data-imprimir="pu">Imprimir Precios Unitarios</button>
+            <button data-imprimir="pu-detalle">Imprimir Análisis de P.U.</button>
+            <button data-imprimir="analisis">Análisis de Cancelería</button>
+            <button data-imprimir="catalogo">Catálogo de Conceptos</button>
+            <button data-versiones>Versiones aprobadas…</button>
+        </div>
+    </div>
+    <button class="tb" data-accion="modificar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg>
+        <span>Modificar</span>
+    </button>
+    <button class="tb" data-accion="duplicar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>
+        <span>Duplicar</span>
+    </button>
+    <button class="tb" data-accion="prueba" title="Llena un presupuesto nuevo con datos de PRUEBA en todos los apartados y explica de dónde sale cada dato. No guarda nada.">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M9 3h6M10 3v6L4.5 18.5A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.5-2.5L14 9V3"/><path d="M7 15h10"/></svg>
+        <span>Prueba</span>
+    </button>
+    <span class="sep"></span>
+    <div class="tb-drop">
+        <button class="tb" data-accion="estatus">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 0 1-14.3 4.9M4 12a8 8 0 0 1 14.3-4.9"/><path d="M18.5 3v4h-4M5.5 21v-4h4"/></svg>
+            <span>Actualizar Estatus <small>▾</small></span>
+        </button>
+        <div class="menu menu-estatus">
+                        <button data-estatus="Pendiente" class="c-ambar" title="Presupuesto recién capturado">
+                <i></i>Presupuesto recién capturado            </button>
+                        <button data-estatus="Seguimiento" class="c-azul" title="Presupuesto en seguimiento">
+                <i></i>Presupuesto en seguimiento            </button>
+                        <button data-estatus="Aceptado" class="c-verde" title="Presupuesto aceptado">
+                <i></i>Presupuesto aceptado            </button>
+                        <button data-estatus="Rechazado" class="c-rojo" title="Presupuesto rechazado">
+                <i></i>Presupuesto rechazado            </button>
+                        <button data-estatus="Cancelado" class="c-gris" title="Presupuesto cancelado">
+                <i></i>Presupuesto cancelado            </button>
+                    </div>
+    </div>
+    <button class="tb" data-accion="registrar-obra">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 21h18M5 21V8l7-5 7 5v13"/><path d="M9.5 21v-6h5v6M9 10.5h.01M15 10.5h.01"/></svg>
+        <span>Registrar Obra</span>
+    </button>
+    <span class="sep"></span>
+    <button class="tb peligro" data-accion="cancelar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>
+        <span>Cancelar</span>
+    </button>
+    <button class="tb" data-accion="bitacora" title="Bitácora de cambios: quién movió el presupuesto y cuándo (solo consulta)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M5 4a1 1 0 0 1 1-1h12v18H6a1 1 0 0 1-1-1z"/><path d="M5 17.5A1.5 1.5 0 0 1 6.5 16H18"/><path d="M9 7h6M9 10.5h6"/></svg>
+        <span>Bitácora</span>
+    </button>
+    <button class="tb" data-accion="fasar" title="FASAR: Factor de Salario Real de la mano de obra (salario base × FSR = salario real)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><circle cx="9" cy="7" r="3.2"/><path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h2"/><path d="M14 21l7-7"/><circle cx="15" cy="15" r="1.3"/><circle cx="20" cy="20" r="1.3"/></svg>
+        <span>FASAR</span>
+    </button>
+    <button class="tb peligro" data-accion="eliminar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+        <span>Eliminar</span>
+    </button>
+    <span class="sep"></span>
+    <button class="tb" data-accion="cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        <span>Cerrar</span>
+    </button>
+    <span class="sep"></span>
+    <button class="tb" id="btnTour" title="Recorrido guiado del presupuesto">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8.5l5 3.5-5 3.5z"/></svg>
+        <span>Tour</span>
+    </button>
+
+    <span class="modo" id="modo" hidden title="Presiona «Modificar» para cambiar el presupuesto">🔒 Solo lectura</span>
+    <div class="estatus c-ambar" id="estatus">Pendiente</div>
+</header>
+
+<!-- Pestañas del documento -->
+<nav class="doc-tabs">
+    <button class="doc-tab activo" data-vista="documento">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="1.5" width="10" height="13" rx="1"/><path d="M5.5 5h5M5.5 8h5M5.5 11h3"/></svg>
+        Documento
+    </button>
+    <button class="doc-tab" data-vista="sugeridos">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.5" y="2.5" width="13" height="10" rx="1"/><path d="M4 6h8M4 9h4"/><circle cx="12.5" cy="12.5" r="2.5" fill="#22c55e" stroke="none"/></svg>
+        Sugeridos relacionados
+    </button>
+</nav>
+
+<!-- ============ VISTA: DOCUMENTO ============ -->
+<section class="vista visible" data-vista="documento">
+
+    <!-- Encabezado -->
+    <div class="encabezado">
+        <div class="enc-izq">
+            <label>Cliente:   <input type="text" id="cliente"></label>
+            <label>Email:
+                <span class="con-boton">
+                    <input type="email" id="email">
+                    <button type="button" class="mini" id="buscarHubspot" title="Buscar el contacto en HubSpot">
+                        <svg viewBox="0 0 16 16"><circle cx="10" cy="9" r="3" fill="none" stroke="#f26b3a" stroke-width="2"/><path d="M3 3l5 4M3 14l5-3M10 3v3" stroke="#f26b3a" stroke-width="2"/></svg>
+                    </button>
+                </span>
+            </label>
+            <label>Proyecto:  <input type="text" id="proyecto"></label>
+            <label>Ubicacion: <input type="text" id="ubicacion"></label>
+        </div>
+
+        <!-- Datos de la obra (ventana Nueva obra): se usan al «Registrar Obra» -->
+        <div class="enc-obra">
+            <label>Nombre: <input type="text" id="obraNombre" maxlength="200" placeholder="Nombre de la obra"></label>
+            <label>Teléfono: <input type="text" id="obraTelefono" maxlength="30"></label>
+            <label>Mail: <input type="email" id="obraMail" maxlength="150"></label>
+            <label>Dirección: <input type="text" id="obraDireccion" maxlength="200"></label>
+            <label>Colonia: <input type="text" id="obraColonia" maxlength="100"></label>
+            <label>C. P.: <input type="text" id="obraCp" maxlength="10"></label>
+            <label>Ciudad: <input type="text" id="obraCiudad" maxlength="100" value="Ciudad de México"></label>
+            <label>Estado: <input type="text" id="obraEstado" maxlength="100" value="Ciudad de México"></label>
+            <div class="obra-checks">
+                <label><input type="checkbox" id="obraBloqueada"> Obra bloqueada</label>
+                <label><input type="checkbox" id="obraMaestra"> Obra maestra</label>
+            </div>
+            <label class="ancho">Descripción: <input type="text" id="obraDescripcion" maxlength="500"></label>
+            <label class="ancho">Observaciones: <input type="text" id="obraObservaciones" maxlength="500"></label>
+        </div>
+
+        <div class="enc-der">
+            <div class="negocio">Id de Negocio: <a href="#" id="idNegocio" title="Abrir el negocio en HubSpot">0</a></div>
+            <div class="fila">
+                <label class="corto">Folio <input type="text" id="folio" value="0" readonly class="num"></label>
+                <label class="corto">Fecha: <input type="date" id="fecha" value="2026-10-28"></label>
+            </div>
+            <label class="vendedor">Vendedor:
+                <select id="vendedor">
+                                    </select>
+            </label>
+            <div class="obra"><strong>OBRA:</strong> <span id="obra"></span></div>
+        </div>
+
+        <!-- Como la cinta de Excel: oculta o muestra el encabezado -->
+        <button type="button" class="enc-plegar" id="encPlegar" title="Ocultar el encabezado" aria-expanded="true">
+            <svg viewBox="0 0 12 12"><path d="M2 8.5L6 4l4 4.5z" fill="currentColor"/></svg>
+        </button>
+    </div>
+
+    <!-- Conceptos -->
+    <div class="conceptos">
+        <nav class="sec-tabs">
+                        <button class="sec-tab" data-sec="cc"><span>Catálogo de Conceptos</span></button>
+                        <button class="sec-tab activo" data-sec="mp"><span>Materia Prima</span></button>
+                        <button class="sec-tab" data-sec="mo"><span>Mano de Obra</span></button>
+                        <button class="sec-tab" data-sec="go"><span>Gastos de Operacion</span></button>
+                        <button class="sec-tab" data-sec="pu"><span>Análisis P.U.</span></button>
+                        <button class="sec-tab" data-sec="an"><span>Análisis</span></button>
+                    </nav>
+
+        <div class="sec-cuerpo">
+            <div class="sec-titulo">
+                <strong id="secNombre">Materia Prima:</strong>
+                <span id="secAyuda">Ctrl + I para agregar un nuevo Concepto</span>
+            </div>
+
+            <!-- Conceptos/Tareas: se generan solos con lo capturado en MP / MO / GO; ya no tienen pestaña en el presupuesto,
+                 pero se siguen guardando con él para el programa de la Obra (13-Conceptos/Tareas) -->
+            <div class="ct-panel" id="ctPanel" hidden>
+    <div class="ct-barra">
+        <nav class="ct-tabs">
+            <button type="button" class="ct-tab activo" data-ct="lista">☰ Conceptos/Tareas</button>
+            <button type="button" class="ct-tab" data-ct="gantt">▤ Previsualización De Gantt</button>
+        </nav>
+        <span class="ct-resumen" id="ctResumen"></span>
+        <button type="button" class="ct-btn" id="ctImportar" title="Vuelve a traer todos los conceptos de Materia Prima, Mano de Obra y Gastos de Operacion (incluso los que se quitaron de esta lista)">⤒ Importar Conceptos</button>
+        <button type="button" class="ct-btn" id="ctAgregar">+ Agregar Concepto/Tarea</button>
+    </div>
+    <div class="ct-cuerpo">
+        <div class="ct-lista" id="ctLista"></div>
+        <div class="ct-gantt" id="ctGantt" hidden></div>
+    </div>
+</div>
+
+            <!-- Catálogo de Conceptos (como Neodata): los conceptos del Análisis P.U. por partida y subpartida,
+                 con clave, unidad, cantidad, P.U., importe y % de cada partida; el total con letra -->
+            <div class="cc-panel" id="ccPanel" hidden>
+                <section class="extra cc-catalogo">
+                    <div class="extra-barra">
+                        <button type="button" class="ct-btn" id="ccPartida" title="Nueva partida (agrupa conceptos, ej. «Cancelería»)">+ Partida</button>
+                        <button type="button" class="ct-btn" id="ccSubpartida" title="Nueva subpartida dentro de la partida seleccionada">+ Subpartida</button>
+                        <button type="button" class="ct-btn" id="ccConcepto" title="Nuevo concepto en la partida seleccionada (Ctrl + I)">+ Concepto</button>
+                                                <button type="button" class="ct-btn" id="ccRenumerar" title="Vuelve a poner las claves en orden por partida: 01-001, 01.01-001…">Renumerar claves</button>
+                        <button type="button" class="ct-btn" id="ccImportar" title="Agrega conceptos copiados de Excel o de un archivo CSV (Código, Concepto, Unidad, Cantidad, P. Unitario…)">Importar de Excel</button>
+                        <button type="button" class="ct-btn" id="ccExportar" title="Descarga el catálogo para abrirlo en Excel">Exportar a Excel</button>
+                        <input type="search" id="ccBuscar" class="cc-buscar" placeholder="Buscar clave o descripción" autocomplete="off">
+                    </div>
+                    <div class="extra-caja">
+                        <table class="grid mini-grid cc-grid">
+                            <thead><tr><th class="c-id cc-clave">Código</th><th>Concepto</th><th class="cc-unidad">Unidad</th><th class="c-num">Cantidad</th><th class="c-num">P. Unitario</th><th class="c-num">Importe</th><th class="c-pct">%</th><th class="cc-acc"></th></tr></thead>
+                            <tbody id="ccCuerpo"></tbody>
+                            <tfoot id="ccPie"></tfoot>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Análisis (como la hoja de Excel): se llena solo con lo capturado en MP / MO / GO, con Costo Primo,
+                 márgenes, Gastos de Operacion y Utilidad Neta -->
+            <div class="cc-panel" id="anPanel" hidden>
+                <section class="extra ccr-resumen">
+                    <div class="extra-barra">
+                        <button type="button" class="ct-btn" id="anImportar" title="Pone los importes de Materia Prima, Mano de Obra y Gastos de Operacion desde la hoja de Excel del Análisis">Importar de Excel</button>
+                        <button type="button" class="ct-btn" id="anExportar" title="Descarga el Análisis para abrirlo en Excel">Exportar a Excel</button>
+                        <span class="extra-ayuda">Clic en un renglón para ir a capturarlo</span>
+                    </div>
+                    <div class="extra-caja">
+                        <table class="grid mini-grid ccr-grid">
+                            <thead><tr><th class="ccr-anexo">Anexos</th><th>Partidas</th><th class="c-num">Presupuesto sugerido</th><th class="c-num">Subtotal</th><th class="c-num">Total</th><th class="c-pct">%</th></tr></thead>
+                            <tbody id="ccrCuerpo"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Análisis de Precios Unitarios (como Neodata): conceptos con cantidad × P.U. y su análisis de insumos.
+                 Lo que se captura aquí pasa solo a Materia Prima y Mano de Obra; lo capturado por importe se respeta. -->
+            <div class="pu-panel" id="puPanel" hidden>
+                <ol class="pu-pasos">
+                    <li><b>1</b> Agrega cada trabajo de la obra con su <em>unidad</em> y <em>cantidad</em> (ej. «Cancel de baño», m², 12).</li>
+                    <li><b>2</b> Presiona <em>Analizar</em> y anota lo que lleva <em>una</em> unidad: materiales, mano de obra y equipo.</li>
+                    <li><b>3</b> El precio unitario y el total salen solos y pasan a Materia Prima y Mano de Obra.</li>
+                </ol>
+                <div class="pu-cuerpo">
+                    <section class="extra pu-conceptos">
+                        <div class="extra-barra">
+                            <strong>Catálogo de conceptos</strong>
+                            <button type="button" class="ct-btn" id="puAgregar">+ Agregar concepto</button>
+                                                        <span class="extra-ayuda">Si el concepto ya se hizo en otro presupuesto, elígelo de la lista al escribirlo y se copia su análisis.</span>
+                        </div>
+                        <div class="extra-caja">
+                            <table class="grid mini-grid">
+                                <thead><tr><th class="c-id">Clave</th><th>Partida</th><th>Concepto</th><th>Unidad</th><th class="c-num">Cantidad</th><th class="c-num">P.U.</th><th class="c-num">Importe</th><th>Revisión</th><th></th></tr></thead>
+                                <tbody id="puConceptos"></tbody>
+                                <tfoot><tr class="pu-total"><td colspan="6" class="ro">Total del catálogo (precio de venta sin IVA)</td><td class="ro" id="puTotalCat">0.00</td><td colspan="2"></td></tr></tfoot>
+                            </table>
+                        </div>
+                    </section>
+                    <section class="extra pu-resumen">
+                        <div class="extra-barra"><strong>Integración del precio</strong></div>
+                        <div class="pu-utilidad">
+                            <label>Utilidad <input type="number" id="puUtilVis" class="num" step="0.01" min="0"> %</label>
+                            <select id="puModoVis" title="Cómo se aplica el % de utilidad">
+                                <option value="costo">+ sobre el costo</option>
+                                <option value="margen">margen (Form46)</option>
+                            </select>
+                            <small>Es la misma Utilidad Neta del presupuesto.</small>
+                        </div>
+                        <div class="extra-caja">
+                            <table class="grid mini-grid"><tbody id="puResumen"></tbody></table>
+                        </div>
+                        <details class="pu-avanzado">
+                            <summary>Ajustes avanzados (solo si sabes qué son)</summary>
+                            <label title="Factor de Salario Real: multiplica los sueldos por prestaciones, IMSS y días no trabajados. 1 = sin cambio; lo usual es entre 1.3 y 1.7">Factor de salario real (FSR)
+                                <input type="number" id="puFsr" class="num" step="0.0001" min="0" value="1"></label>
+                            <label title="Desgaste de herramienta pequeña: % sobre la mano de obra. Lo usual es 3 %">Herramienta menor %
+                                <input type="number" id="puHm" class="num" step="0.01" min="0" value="0"></label>
+                            <label title="Costo del dinero mientras se cobra la obra: % sobre costo directo + indirectos">Financiamiento %
+                                <input type="number" id="puFin" class="num" step="0.01" min="0" value="0"></label>
+                            <label class="check" title="Para presupuestos traídos de Neodata: el Catálogo da el precio al cliente y la matriz de cada concepto su costo. Se marca sola al importar las matrices si Materia Prima y Mano de Obra no tienen importes capturados a mano">
+                                <input type="checkbox" id="puMatrizCosto"> La matriz de los conceptos de precio fijo es el costo (sus insumos van a Materia Prima y Mano de Obra)</label>
+                            <p>Indirectos = Gastos de Operacion: <b id="puInd">0.00 %</b> del costo directo · Cargos adicionales = comisiones y seguro: <b id="puCa">0.00 %</b> del precio.</p>
+                        </details>
+                    </section>
+                    <section class="extra pu-insumos">
+                        <div class="extra-barra"><strong>Explosión de insumos</strong><span class="extra-ayuda">Todo lo que lleva la obra, sumado: insumos de los análisis y artículos importados</span></div>
+                        <div class="extra-caja">
+                            <table class="grid mini-grid">
+                                <thead><tr><th>Insumo</th><th>Tipo</th><th>Unidad</th><th class="c-num">Cantidad</th><th class="c-num">Costo prom.</th><th class="c-num">Importe</th><th class="c-pct">%</th></tr></thead>
+                                <tbody id="puInsumos"></tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+                <datalist id="puUnidades"><option>m²</option><option>m</option><option>ml</option><option>pza</option><option>jgo</option><option>lote</option><option>kg</option><option>m³</option><option>lt</option><option>hr</option><option>jornal</option><option>día</option><option>servicio</option><option>viaje</option></datalist>
+                <datalist id="puPartidas"></datalist>
+                <datalist id="puSugConceptos"></datalist>
+                <datalist id="puSugMAT"></datalist>
+                <datalist id="puSugMO"></datalist>
+                <datalist id="puSugEQ"></datalist>
+            </div>
+
+            <div class="grid-caja">
+                <table class="grid" id="grid">
+                    <thead>
+                        <tr>
+                            <th class="sel-col"></th>
+                            <th class="c-id">ID</th>
+                            <th class="c-concepto">Concepto</th>
+                            <th class="c-num">Presupuesto</th>
+                            <th class="c-num">Subtotal</th>
+                            <th class="c-num">Total</th>
+                            <th class="c-pct">%</th>
+                            <th class="c-imp">Importar</th>
+                            <th class="c-folio">Folio.Doc.</th>
+                            <th class="c-del"></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- Mano de Obra: empleados × días y comisiones (grid_man_obra / grid_comisiones del Form46) -->
+            <div class="extras" id="extrasMO" hidden>
+                <!-- Mano de obra de las matrices del Análisis P.U.: salario base × FSR (FASAR) = salario real, jornadas e importe -->
+                <section class="extra mo-analisis">
+                    <div class="extra-barra">
+                        <strong>Mano de obra de los análisis</strong>
+                        <button type="button" class="ct-btn" id="moFasar" title="FSR del presupuesto y desglose del FASAR">FASAR…</button>
+                        <span class="extra-ayuda">Trabajadores y cuadrillas de las matrices. Doble clic para abrir el análisis donde se usa.</span>
+                    </div>
+                    <div class="extra-caja">
+                        <table class="grid mini-grid">
+                            <thead><tr><th class="c-id">Código</th><th>Descripción</th><th>Unidad</th><th class="c-num">Salario base</th><th>FASAR</th><th class="c-num">FSR</th>
+                                <th class="c-num" title="Salario base × FSR + viáticos, alimentación y hospedaje">Salario real</th><th class="c-num" title="Viáticos + alimentación + hospedaje por jornada">Viát. / alim. / hosp.</th>
+                                <th class="c-num" title="Cantidad total en la obra (jornadas)">Jornadas</th><th class="c-num">Importe</th><th class="c-num">Conceptos</th></tr></thead>
+                            <tbody id="tbManoObraPU"></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="extra">
+                    <div class="extra-barra">
+                        <strong>Empleados</strong>
+                        <select id="selEmpleado">
+                                                    </select>
+                        <button type="button" class="ct-btn" id="addEmpleado">+ Agregar</button>
+                        <span class="extra-total">Total: <output id="totEmpleados">0.00</output> → <em id="fijoMO"></em></span>
+                    </div>
+                    <div class="extra-caja">
+                        <table class="grid mini-grid">
+                            <thead><tr><th>No.</th><th>Empleado</th><th class="c-num">Sueldo diario</th><th class="c-num">Días</th><th class="c-num">Total</th><th class="c-del"></th></tr></thead>
+                            <tbody id="tbEmpleados"></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="extra">
+                    <div class="extra-barra">
+                        <strong>Comisiones</strong>
+                        <select id="selTipoComision">
+                                                    </select>
+                        <button type="button" class="ct-btn" id="addComision">+ Agregar</button>
+                        <span class="extra-total">Total: <output id="totComisiones">0.00</output> → <em id="fijoCOM"></em></span>
+                    </div>
+                    <div class="extra-caja">
+                        <table class="grid mini-grid">
+                            <thead><tr><th>Tipo de empleado</th><th class="c-num">% sobre subtotal</th><th class="c-num">Total</th><th class="c-del"></th></tr></thead>
+                            <tbody id="tbComisiones"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Gastos de Operacion: anexo de seguro (grid_anexo7 del Form46) -->
+            <div class="extras" id="extrasGO" hidden>
+                <section class="extra">
+                    <div class="extra-barra">
+                        <strong>Anexo de seguro</strong>
+                        <select id="selSeguro"></select>
+                        <button type="button" class="ct-btn" id="addSeguro">+ Agregar</button>
+                        <span class="extra-ayuda">Total = Subtotal × %1 × %2 · pasa al concepto de Gastos de Operacion</span>
+                    </div>
+                    <div class="extra-caja">
+                        <table class="grid mini-grid">
+                            <thead><tr><th>Concepto</th><th class="c-num">% 1</th><th class="c-num">% 2</th><th class="c-num">Total</th><th class="c-del"></th></tr></thead>
+                            <tbody id="tbSeguros"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- Totales -->
+    <div class="pie">
+        <div class="t-fila t-primo">
+            <span>Materia Prima:</span> <output id="tMP">0</output>
+            <b>+</b>
+            <span>Mano de Obra:</span> <output id="tMO">0</output>
+            <b>=</b>
+            <span>Costo Primo:</span> <output id="tCP">0</output>
+        </div>
+
+        <div class="pie-izq">
+            <label class="desc">Descripcion:
+                <textarea id="descripcion"></textarea>
+            </label>
+        </div>
+
+        <div class="totales">
+            <div class="t-fila"><b>+</b><span>Gastos de Operacion:</span> <output id="tGO">0</output></div>
+            <div class="t-fila">
+                <b>+</b><span class="t-util">Utilidad Neta
+                    <select id="modoUtilidad" title="Cómo se aplica el % de utilidad">
+                        <option value="costo">+ % sobre el costo</option>
+                        <option value="margen" selected>% de margen (Form46)</option>
+                    </select>:</span>
+                <input type="number" id="pctUtilidad" value="40" min="0" max="1000" step="0.01" class="num pct" title="% de utilidad">
+                <output id="tUT">0</output>
+            </div>
+            <div class="t-fila">
+                <b>=</b><span>Subtotal:</span>
+                <input type="text" id="tSUB" class="num" value="0" readonly>
+                <button type="button" class="mini" id="editarSubtotal" title="Capturar subtotal manualmente">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg>
+                </button>
+            </div>
+            <div class="t-fila"><b>+</b><span class="t-util">IVA
+                    <select id="ivaTasa" title="Tasa de IVA (Administrador › Parámetros de presupuesto)">
+                                                <option value="16" selected>IVA 16 %</option>
+                                                <option value="8">IVA frontera 8 %</option>
+                                                <option value="0">Exento</option>
+                                            </select> (<span id="pctIvaTxt">16</span>%):</span> <output id="tIVA">0</output></div>
+            <div class="t-fila"><b>=</b><span>Total:</span> <output id="tTOT" class="fuerte">0</output></div>
+        </div>
+    </div>
+</section>
+
+<!-- ============ VISTA: SUGERIDOS ============ -->
+<section class="vista" data-vista="sugeridos">
+    <div class="extra sug-panel">
+        <div class="extra-barra">
+            <strong>Sugeridos relacionados</strong>
+            <span class="extra-ayuda">Otros presupuestos de obra ligados a este (se guardan con el presupuesto)</span>
+            <button type="button" class="ct-btn" id="addRelacionado">+ Relacionar por folio</button>
+        </div>
+        <div class="extra-caja">
+            <table class="grid mini-grid">
+                <thead><tr><th>Folio</th><th>Cliente</th><th>Proyecto</th><th>Estatus</th><th class="c-num">Total</th><th class="c-del"></th></tr></thead>
+                <tbody id="tbRelacionados"></tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- ============ BUSCAR EN HUBSPOT ============ -->
+<dialog class="hs-dialogo" id="hsDialogo">
+    <div class="hs-cabecera">
+        <svg viewBox="0 0 16 16"><circle cx="10" cy="9" r="3" fill="none" stroke="#f26b3a" stroke-width="2"/><path d="M3 3l5 4M3 14l5-3M10 3v3" stroke="#f26b3a" stroke-width="2"/></svg>
+        <strong>Buscar en HubSpot</strong>
+        <button type="button" class="hs-cerrar" id="hsCerrar" title="Cerrar">✕</button>
+    </div>
+    <form class="hs-buscar" id="hsForm">
+        <input type="search" id="hsTexto" placeholder="Correo, nombre, teléfono o empresa" autocomplete="off">
+        <button type="submit" class="hs-btn">🔎 Buscar</button>
+    </form>
+    <p class="hs-estado" id="hsEstado"></p>
+
+    <div class="hs-seccion">1. Contacto</div>
+    <div class="hs-tabla">
+        <table class="hs-grid">
+            <thead><tr><th>Nombre</th><th>Correo</th><th>Teléfono</th><th>Empresa</th><th></th></tr></thead>
+            <tbody id="hsContactos"><tr><td colspan="5" class="hs-vacio">Escribe el correo y presiona Buscar.</td></tr></tbody>
+        </table>
+    </div>
+
+    <div class="hs-seccion">2. Negocio (deal) del contacto</div>
+    <div class="hs-tabla">
+        <table class="hs-grid">
+            <thead><tr><th>Id</th><th>Negocio</th><th>Etapa</th><th class="num">Monto</th><th>Creado</th><th>Cierre</th><th></th></tr></thead>
+            <tbody id="hsNegocios"><tr><td colspan="7" class="hs-vacio">Selecciona un contacto.</td></tr></tbody>
+        </table>
+    </div>
+
+    <div class="hs-pie">
+        <span id="hsSeleccion"></span>
+        <button type="button" class="hs-btn" id="hsCancelar">Cancelar</button>
+        <button type="button" class="hs-btn principal" id="hsUsar" disabled>Usar</button>
+    </div>
+</dialog>
+
+<!-- ============ AGREGAR / VER / MODIFICAR CONCEPTO-TAREA ============ -->
+<dialog class="ct-dialogo" id="ctDialogo">
+    <form id="ctForm">
+        <div class="hs-cabecera">
+            <strong id="ctDlgTitulo">Agregar Concepto/Tarea</strong>
+            <button type="button" class="hs-cerrar" data-ct-cerrar title="Cerrar">✕</button>
+        </div>
+        <div class="ct-barra">
+            <button type="button" class="hs-btn" id="ctModificar" hidden>Modificar</button>
+            <button type="submit" class="hs-btn principal" id="ctGuardar">Guardar Concepto/Tarea</button>
+        </div>
+        <fieldset class="ct-campos" id="ctCampos">
+            <section class="ct-grupo">
+                <h3>Datos del Concepto/Tarea</h3>
+                <div class="ct-rejilla">
+                    <label><span class="req">Se Agregará:</span>
+                        <select id="ctTipo" required>
+                            <option value="">Elije una opción</option>
+                            <option>Concepto</option>
+                            <option>Tarea</option>
+                            <option>Hito</option>
+                        </select>
+                    </label>
+                    <label>Agrupador: <input id="ctAgrupador" list="ctAgrupadores" placeholder="Elije un agrupador" autocomplete="off"></label>
+                    <label>Responsable: <input id="ctResponsable" list="ctUsuarios" placeholder="Buscar Usuarios" autocomplete="off"></label>
+                    <label class="ancho"><span class="req">Nombre:</span> <input id="ctNombre" list="ctCatalogo" placeholder="Concepto o tarea" required autocomplete="off"></label>
+                    <label>Cantidad: <input type="number" id="ctCantidad" min="0" step="any" class="num"></label>
+                    <label>Unidad: <input id="ctUnidad" list="ctUnidades" placeholder="Pieza, Lote, m²…" autocomplete="off"></label>
+                    <label>Clave: <input id="ctClave" readonly tabindex="-1"></label>
+                    <label class="ancho ct-desc">Descripción:
+                        <textarea id="ctDescripcion" rows="4" placeholder="Se genera en automático con el concepto y los artículos del documento importado"></textarea>
+                    </label>
+                </div>
+            </section>
+
+            <section class="ct-grupo">
+                <h3>Fechas de Inicio/Fin, Empleados y Costo</h3>
+                <div class="ct-rejilla">
+                    <label><span class="req">Inicio (Real):</span> <input type="datetime-local" id="ctIniReal" required></label>
+                    <label><span class="req">Fin (Real):</span> <input type="datetime-local" id="ctFinReal" required></label>
+                    <label>Duración (Real): <input id="ctDurReal" readonly tabindex="-1"></label>
+                    <label><span class="req">Inicio (Cliente):</span> <input type="datetime-local" id="ctIniCli" required></label>
+                    <label><span class="req">Fin (Cliente):</span> <input type="datetime-local" id="ctFinCli" required></label>
+                    <label>Duración (Cliente): <input id="ctDurCli" readonly tabindex="-1"></label>
+                    <label class="ancho2">Jornada/Turno propio (opcional):
+                        <select id="ctJornada">
+                            <option value="">Heredar jornada del elemento padre</option>
+                            <option>L-V 08:00 a 18:00</option>
+                            <option>L-S 08:00 a 14:00</option>
+                            <option>L-S 07:00 a 17:00</option>
+                        </select>
+                    </label>
+                    <label>Costo: <input id="ctMonto" class="num" inputmode="decimal" autocomplete="off"></label>
+                    <label class="ancho">Predecesoras (claves que deben terminar antes, separadas por coma):
+                        <input id="ctPredecesoras" placeholder="p. ej. MP-10-001, TA-10-002" autocomplete="off"></label>
+                    <label class="ancho">Empleados: <input id="ctEmpleados" placeholder="Elije uno o más empleados (separados por coma)" autocomplete="off"></label>
+                </div>
+                <p class="ct-nota">ⓘ La duración laboral, horas laborables, horas-hombre y días-hombre se calcularán al guardar el proyecto (dependen de la jornada resuelta, las fechas y los empleados asignados).</p>
+            </section>
+
+            <section class="ct-grupo">
+                <h3>Avance</h3>
+                <div class="ct-rejilla">
+                    <label>Avance (%): <input type="number" id="ctAvance" min="0" max="100" step="5" class="num"></label>
+                    <label>Estatus: <input id="ctEstatus" readonly tabindex="-1" title="Se calcula con el avance y la fecha de Fin (Real)"></label>
+                </div>
+                <p class="ct-nota">ⓘ El avance de la obra se calcula con el avance de sus conceptos/tareas, ponderado por su costo. Una tarea con Fin (Real) vencido y sin terminar queda Atrasada.</p>
+            </section>
+
+            <section class="ct-grupo">
+                <h3>Diagrama de Gantt</h3>
+                <div class="ct-color-fila">
+                    <label>Color Para Diagrama De Gantt: <input type="color" id="ctColor" value="#a7d7c5"></label>
+                    <div class="ct-muestra" id="ctMuestra"></div>
+                </div>
+            </section>
+        </fieldset>
+        <div class="hs-pie">
+            <span></span>
+            <button type="button" class="hs-btn" data-ct-cerrar>Cancelar</button>
+        </div>
+    </form>
+    <datalist id="ctAgrupadores"></datalist>
+    <datalist id="ctCatalogo"></datalist>
+    <datalist id="ctUnidades">
+        <option value="Pieza"><option value="Lote"><option value="Servicio"><option value="Jornada">
+        <option value="m²"><option value="ml"><option value="kg">
+    </datalist>
+    <datalist id="ctUsuarios">
+            </datalist>
+</dialog>
+
+<!-- ============ ADJUNTAR ARCHIVOS A UN CONCEPTO-TAREA ============ -->
+<dialog class="ct-dialogo adj-dialogo" id="adjDialogo">
+    <div class="hs-cabecera">
+        <strong>Adjuntar Archivos · <span id="adjTitulo"></span></strong>
+        <button type="button" class="hs-cerrar" data-adj-cerrar title="Cerrar">✕</button>
+    </div>
+    <div class="ct-campos">
+        <section class="ct-grupo">
+            <h3>Agregar archivos</h3>
+            <label class="adj-zona" id="adjZona">
+                <input type="file" id="adjArchivos" multiple hidden>
+                <span>📂 Arrastra aquí los archivos o <u>haz clic para elegirlos</u></span>
+                <small>Planos, fotos, PDF, Excel, Word… hasta 25 MB por archivo.</small>
+            </label>
+            <p class="adj-estado" id="adjEstado"></p>
+        </section>
+        <section class="ct-grupo">
+            <h3>Archivos del Concepto/Tarea</h3>
+            <ul class="adj-lista" id="adjLista"></ul>
+        </section>
+    </div>
+    <div class="hs-pie">
+        <span></span>
+        <button type="button" class="hs-btn" data-adj-cerrar>Cerrar</button>
+    </div>
+</dialog>
+
+<!-- ============ ANÁLISIS DEL PRECIO UNITARIO DE UN CONCEPTO ============ -->
+<dialog class="hs-dialogo pu-dialogo" id="puDialogo">
+    <div class="hs-cabecera">
+        <strong>Análisis del precio unitario</strong>
+        <button type="button" class="hs-cerrar" data-pu-cerrar title="Cerrar">✕</button>
+    </div>
+    <div class="pu-dlg-concepto">
+        <label class="ancho">Concepto: <input type="text" id="puDConcepto" maxlength="300" list="puSugConceptos"></label>
+        <label>Unidad: <input type="text" id="puDUnidad" maxlength="20" list="puUnidades"></label>
+        <label>Cantidad: <input type="number" id="puDCantidad" class="num" step="0.01" min="0"></label>
+        <label>Partida: <input type="text" id="puDPartida" maxlength="100" list="puPartidas" placeholder="ej. Cancelería / Planta baja"
+               title="Para una subpartida escribe «Partida / Subpartida»"></label>
+    </div>
+    <div class="pu-dlg-espec">
+        <label>Especificación técnica (va en la propuesta para el cliente):
+            <textarea id="puDEspecificacion" rows="2" maxlength="4000" placeholder="Materiales, acabados, medidas, herrajes, sellado…"></textarea></label>
+    </div>
+    <p class="pu-dlg-ayuda" id="puDAyuda"></p>
+    <div class="pu-dlg-botones">
+        <button type="button" class="ct-btn" data-pu-insumo="MAT">+ Material</button>
+        <button type="button" class="ct-btn" data-pu-insumo="MO">+ Mano de obra</button>
+        <button type="button" class="ct-btn" data-pu-insumo="EQ">+ Equipo / herramienta</button>
+        <button type="button" class="ct-btn" data-pu-insumo="OTRO" title="Flete, servicio u otro costo (el tipo se puede cambiar en el renglón: maquinaria, herramienta…)">+ Otro</button>
+        <!-- Las matrices de TODOS los conceptos en un Excel (un renglón por insumo); al importarlo se reemplaza la matriz de cada concepto -->
+        <button type="button" class="ct-btn pu-dlg-excel" id="puDExportar" title="Descarga en Excel la matriz de todos los conceptos del catálogo, un renglón por insumo">Exportar matrices a Excel</button>
+        <button type="button" class="ct-btn" id="puDImportar" title="Llena la matriz de los conceptos desde el Excel (el mismo formato que Exportar matrices)">Importar matrices de Excel</button>
+        <input type="file" id="puDArchivo" accept=".xlsx,.csv,.txt" hidden>
+    </div>
+    <div class="extra-caja pu-dlg-tabla">
+        <table class="grid mini-grid">
+            <!-- Columnas como la matriz de Neodata -->
+            <thead><tr><th class="pu-c-ren">Renglón</th><th class="pu-c-cod">Código</th><th class="pu-c-desc">Descripción</th><th class="pu-c-tipo">Tipo</th><th class="pu-c-uni">Unidad</th>
+                <th class="pu-c-calc" title="Cantidad: lo que lleva una unidad (3.30 m² de vidrio). Rendimiento: cuántas unidades del concepto rinde una unidad del insumo (una cuadrilla instala 3 canceles por jornada). Fijo por concepto: para todo el concepto (un flete). % de la M.O.: porcentaje de la mano de obra (herramienta 3 %)">Cálculo</th>
+                <th class="c-num pu-c-n">Costo</th><th class="c-num pu-c-n" id="puDColCant">Cantidad</th>
+                <th class="c-num pu-c-n" title="Solo con cálculo por Rendimiento: cuántas unidades del concepto rinde una unidad del insumo (ej. 3 canceles por jornada)">Rendimiento</th>
+                <th class="c-num pu-c-n" title="Multiplica la cantidad (vacío = 1)">Factor</th><th class="c-num pu-c-n" title="Desperdicio en % (vacío = 0)">Merma %</th>
+                <th class="c-num pu-c-n" title="Cantidad por unidad del concepto ya con rendimiento, factor y merma">Cant. resultante</th>
+                <th class="c-num pu-c-n">Importe</th><th class="c-pct" title="% del costo directo del concepto">%</th>
+                <th class="pu-c-prov">Proveedor</th><th class="pu-c-fecha">Fecha de costo</th><th class="c-del"></th></tr></thead>
+            <tbody id="puDInsumos"></tbody>
+        </table>
+    </div>
+    <div class="pu-dlg-totales" id="puDTotales"></div>
+    <div class="hs-pie">
+        <span class="extra-ayuda" id="puDNota">Los cambios se aplican al momento.</span>
+        <button type="button" class="hs-btn principal" data-pu-cerrar>Listo</button>
+    </div>
+</dialog>
+
+<!-- ============ FASAR: FACTOR DE SALARIO REAL DE LA MANO DE OBRA ============ -->
+<dialog class="hs-dialogo fs-dialogo" id="fsDialogo">
+    <div class="hs-cabecera">
+        <strong>FASAR · Factor de Salario Real</strong>
+        <button type="button" class="hs-cerrar" data-fs-cerrar title="Cerrar">✕</button>
+    </div>
+    <p class="pu-dlg-ayuda"><b>Salario real = salario base × FSR</b> (+ viáticos, alimentación y hospedaje). El FSR sale del FASAR del catálogo
+        con los días pagados, los no laborados y las obligaciones obrero-patronales. Los FASAR se capturan en
+        <a href="parametros-costos.php" target="_blank" rel="noopener">Catalogos › Parámetros de costos</a>. Cada mano de obra puede tener su propio FASAR
+        (abajo de ella, en la ventana del análisis); si no, toma el del presupuesto.</p>
+    <div class="fs-elegir">
+        <label>FASAR del presupuesto: <select id="fsElegir"></select></label>
+        <label>FSR: <input type="number" id="fsFsr" class="num" step="0.0001" min="0"></label>
+        <span class="extra-ayuda" id="fsNota"></span>
+    </div>
+    <div class="fs-cuerpo">
+        <div class="extra-caja fs-caja"><table class="grid mini-grid"><tbody id="fsDesglose"></tbody></table></div>
+        <div class="extra-caja fs-caja">
+            <table class="grid mini-grid">
+                <thead><tr><th class="c-id">Código</th><th>Descripción</th><th>Unidad</th><th class="c-num">Salario base</th><th>FASAR</th><th class="c-num">FSR</th>
+                    <th class="c-num">Salario real</th><th class="c-num">Viát. / alim. / hosp.</th><th class="c-num">Jornadas</th><th class="c-num">Importe</th><th class="c-num">Conceptos</th></tr></thead>
+                <tbody id="fsManoObra"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="hs-pie">
+        <span class="extra-ayuda">Los cambios se aplican al momento.</span>
+        <button type="button" class="hs-btn" id="fsTodos" title="Quita los FASAR y FSR propios de cada mano de obra">Toda la mano de obra con el FASAR del presupuesto</button>
+        <button type="button" class="hs-btn principal" data-fs-cerrar>Listo</button>
+    </div>
+</dialog>
+
+<!-- ============ PRUEBA: DE DÓNDE SALE CADA DATO ============ -->
+<dialog class="hs-dialogo pr-dialogo" id="prDialogo">
+    <div class="hs-cabecera">
+        <strong>Prueba cargada: de dónde sale cada dato</strong>
+        <button type="button" class="hs-cerrar" data-pr-cerrar title="Cerrar">✕</button>
+    </div>
+    <p class="pu-dlg-ayuda">Se llenaron todos los apartados con datos de <b>PRUEBA</b>. Recorre las pestañas de la izquierda (Materia Prima, Mano de Obra, Gastos de Operacion, Catálogo de Conceptos y Análisis P.U.) para verlos. <b>No se guardó nada</b>: si presionas Guardar se crea un presupuesto PRUEBA normal, que después puedes Cancelar y Eliminar.</p>
+    <div class="extra-caja pr-tabla">
+        <table class="grid mini-grid">
+            <thead><tr><th>Apartado</th><th>Qué se cargó</th><th>De dónde sale la información</th></tr></thead>
+            <tbody id="prGuia"></tbody>
+        </table>
+    </div>
+    <div class="hs-pie">
+        <span></span>
+        <button type="button" class="hs-btn principal" data-pr-cerrar>Entendido</button>
+    </div>
+</dialog>
+
+<!-- ============ IMPORTAR CONCEPTOS DE EXCEL AL CATÁLOGO ============ -->
+<dialog class="hs-dialogo pr-dialogo" id="ccImpDialogo">
+    <div class="hs-cabecera">
+        <strong>Importar conceptos de Excel</strong>
+        <button type="button" class="hs-cerrar" data-cci-cerrar title="Cerrar">✕</button>
+    </div>
+    <p class="pu-dlg-ayuda">En Excel selecciona las columnas <b>con su encabezado</b> (Código, Concepto, Unidad, Cantidad, P. Unitario; opcionales Partida y Especificación)
+        y pégalas aquí, o elige el archivo de Excel (.xlsx) o .csv. Si el código está en <b>Catalogos › Conceptos P.U.</b> se toma su análisis con los precios vigentes (automático);
+        si no, el concepto entra con el P. Unitario del archivo. Lo que ya está en el presupuesto (mismo código) no se vuelve a sumar: solo se actualiza si cambió.</p>
+    <div class="cci-entrada">
+        <textarea id="cciPegar" rows="6" placeholder="Pega aquí las celdas copiadas de Excel"></textarea>
+        <div class="cci-opciones">
+            <label>Archivo de Excel (.xlsx) o CSV (opcional): <input type="file" id="cciArchivo" accept=".xlsx,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+            <label><input type="checkbox" id="cciVenta"> Precio fijo para el cliente: el P. Unitario del archivo no suma al costo, porque el costo ya viene del Análisis (Materia Prima, Mano de Obra y Gastos de Operacion)</label>
+            <label><input type="checkbox" id="cciCatalogo" checked> Usar el análisis del catálogo cuando el código exista</label>
+            <button type="button" class="ct-btn" id="cciLeer">Revisar</button>
+        </div>
+    </div>
+    <div class="extra-caja pr-tabla">
+        <table class="grid mini-grid">
+            <thead><tr><th>Código</th><th>Concepto</th><th>Partida</th><th>Unidad</th><th class="num">Cantidad</th><th class="num">P. Unitario</th><th>Qué se hace</th></tr></thead>
+            <tbody id="cciVista"><tr class="vacio-fila"><td colspan="7">Pega las celdas y presiona Revisar.</td></tr></tbody>
+        </table>
+    </div>
+    <div class="hs-pie">
+        <span id="cciResumen"></span>
+        <button type="button" class="hs-btn" data-cci-cerrar>Cancelar</button>
+        <button type="button" class="hs-btn principal" id="cciAgregar" disabled>Agregar al catálogo</button>
+    </div>
+</dialog>
+
+<!-- ============ IMPORTAR EL ANÁLISIS DE EXCEL (importes de MP / MO / GO) ============ -->
+<dialog class="hs-dialogo pr-dialogo" id="anImpDialogo">
+    <div class="hs-cabecera">
+        <strong>Importar el Análisis de Excel</strong>
+        <button type="button" class="hs-cerrar" data-ani-cerrar title="Cerrar">✕</button>
+    </div>
+    <p class="pu-dlg-ayuda">En la hoja de Excel del Análisis selecciona desde el encabezado (<b>Anexos, Partidas, Presupuesto sugerido, Subtotal…</b>) hasta el Total de Gastos de Operacion
+        y pégalo aquí, o elige el archivo de Excel (el que descarga Exportar a Excel). Los renglones bajo <b>Materia Prima</b>, <b>Mano de Obra</b> y <b>Gastos de Operacion</b>
+        actualizan el importe del concepto con el mismo nombre o se agregan como nuevos; los renglones automáticos (calculados) no se cambian.</p>
+    <div class="cci-entrada">
+        <textarea id="aniPegar" rows="6" placeholder="Pega aquí las celdas copiadas de Excel"></textarea>
+        <div class="cci-opciones">
+            <label>Archivo de Excel (.xlsx) o CSV (opcional): <input type="file" id="aniArchivo" accept=".xlsx,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+            <label><input type="checkbox" id="aniQuitar"> Quitar los conceptos que no vengan en el archivo (de las secciones que sí vienen)</label>
+            <label id="aniSubtotalCaja" hidden><input type="checkbox" id="aniSubtotal" checked> <span id="aniSubtotalTxt"></span></label>
+            <label id="aniVentaCaja" hidden><input type="checkbox" id="aniVenta" checked> Los conceptos del Catálogo de Conceptos quedan con su P. Unitario como precio fijo para el cliente (ya no suman al costo)</label>
+            <button type="button" class="ct-btn" id="aniLeer">Revisar</button>
+        </div>
+    </div>
+    <div class="extra-caja pr-tabla">
+        <table class="grid mini-grid">
+            <thead><tr><th>Sección</th><th>Anexo</th><th>Partida</th><th class="num">Importe actual</th><th class="num">Importe nuevo</th><th>Qué se hace</th></tr></thead>
+            <tbody id="aniVista"><tr class="vacio-fila"><td colspan="6">Pega las celdas y presiona Revisar.</td></tr></tbody>
+        </table>
+    </div>
+    <div class="hs-pie">
+        <span id="aniResumen"></span>
+        <button type="button" class="hs-btn" data-ani-cerrar>Cancelar</button>
+        <button type="button" class="hs-btn principal" id="aniAplicar" disabled>Aplicar al presupuesto</button>
+    </div>
+</dialog>
+
+<!-- ============ VERSIONES CONGELADAS (al aceptar o registrar la obra) ============ -->
+<dialog class="hs-dialogo pr-dialogo" id="verDialogo">
+    <div class="hs-cabecera">
+        <strong>Versiones aprobadas del presupuesto</strong>
+        <button type="button" class="hs-cerrar" data-ver-cerrar title="Cerrar">✕</button>
+    </div>
+    <p class="pu-dlg-ayuda">Copias que se guardaron al <b>aceptar</b> el presupuesto o al <b>registrar su obra</b>. No se pueden modificar ni borrar;
+        «Íntegra» indica que la copia sigue idéntica a como se guardó.</p>
+    <div class="extra-caja pr-tabla">
+        <table class="grid mini-grid">
+            <thead><tr><th>Versión</th><th>Motivo</th><th>Fecha</th><th>Usuario</th><th class="num">Total</th><th>Íntegra</th><th></th></tr></thead>
+            <tbody id="verLista"></tbody>
+        </table>
+    </div>
+    <div class="hs-pie"><span></span><button type="button" class="hs-btn principal" data-ver-cerrar>Cerrar</button></div>
+</dialog>
+
+<!-- ============ BITÁCORA DE CAMBIOS (solo consulta) ============ -->
+<dialog class="hs-dialogo bit-dialogo" id="bitDialogo">
+    <div class="hs-cabecera">
+        <strong>Bitácora de cambios</strong>
+        <button type="button" class="hs-cerrar" data-bit-cerrar title="Cerrar">✕</button>
+    </div>
+    <div class="bit-total"><span class="bit-signo">$</span> <b>Total del Presupuesto</b> <output id="bitTotal"></output> <small>· como está hoy el documento</small></div>
+    <div class="bit-tabla">
+        <table class="grid mini-grid">
+            <thead><tr><th>Fecha</th><th>Usuario</th><th>Dónde</th><th>Movimiento</th></tr></thead>
+            <tbody id="bitLista"></tbody>
+        </table>
+    </div>
+    <div class="hs-pie"><span></span><button type="button" class="hs-btn" data-bit-cerrar>Cerrar</button></div>
+</dialog>
+
+<!-- ============ AUTORIZACIÓN DE OTRO USUARIO (Dialog225) ============ -->
+<dialog class="hs-dialogo au-dialogo" id="auDialogo">
+    <form id="auForm">
+        <div class="hs-cabecera">
+            <strong>Autorización</strong>
+            <button type="button" class="hs-cerrar" data-au-cerrar title="Cerrar">✕</button>
+        </div>
+        <div class="au-campos">
+            <p id="auMensaje"></p>
+            <label>Usuario que autoriza: <input id="auUsuario" autocomplete="off" required></label>
+            <label>Contraseña: <input type="password" id="auContrasena" autocomplete="off" required></label>
+        </div>
+        <div class="hs-pie">
+            <span></span>
+            <button type="button" class="hs-btn" data-au-cerrar>Cancelar</button>
+            <button type="submit" class="hs-btn principal">Autorizar</button>
+        </div>
+    </form>
+</dialog>
+
+<!-- Formato impreso (Imprimir / Imprimir Detalle): solo se ve al imprimir -->
+<div id="formatoImpresion"></div>
+
+<script>
+    window.ACRI_MEMBRETE = {"empresa":"","datos":"","titulo":"PRESUPUESTO POR PROYECTO","titulo_detalle":"PRESUPUESTO POR PROYECTO DETALLE","codigo":"CT-REG-13","revision":"00","firmas":["ELABORO","REVISO","REVISO","AUTORIZO"],"leyenda_firma":"Nombre y Firma","pie":"","color":"#000000","mostrar_notas":true,"an_titulo":"COSTOS ACRISTALA","an_subtitulo":"ANALISIS CANCELERIA","an_codigo":"CT-REG-13","an_revision":"00","an_fecha_emision":"08-07-2020","an_etiqueta_cliente":"ARQUITECTO","an_nota":"COMIDAS ESTAN AUTORIZADAS SIEMPRE Y CUANDO SEAN EN HORARIOS EXTRAORDINARIOS QUE ENTREN ALAS 7AM O REGRESEN DESPUES DE LAS 8PM TRABAJOS NOCTURNOS","an_autorizo":"Autorizó","an_puesto":"Dirección General","an_nombre":"LIC. FERNANDO LOVERA COLÍN","an_color":"#daeef3","an_color_titulo":"#95b3d7","an_dolares":true,"cc_empresa":"GRUPO KAFER Lt De MEXICO S De R.L De CV.","cc_subtitulo":"Acristala Arquitectura Transparente","cc_titulo":"PRESUPUESTO DE OBRA","cc_condiciones_titulo":"CONDICIONES COMERCIALES","cc_condiciones":"Para dar inicio a los trabajos se requiere un anticipo mínimo del *70%* del total.\nEl *30%* restante será sobre estimaciones y deberá quedar cubierto al 100% antes de concluir los trabajos.\nPlazo para iniciar obra: *5 días hábiles* después del pago o anticipo.\nEsta cotización tiene una vigencia de *8 días* a partir de la fecha de emisión.","cc_pie":"GERENTE GENERAL: LIC. FERNANDO LOVERA COLIN","cc_color":"#000000","logo":"uploads\/sistema\/logo-20260923210011-cb66ea.png","logo_propio":false};
+    window.ACRI_USUARIO = "PRUEBA";
+    window.ACRI_PUEDE_MODIFICAR = true;
+    window.ACRI_PUEDE_REGISTRAR_OBRA = true;
+    window.ACRI_ESTATUS = {"Pendiente":"ambar","Seguimiento":"azul","Aceptado":"verde","Rechazado":"rojo","Cancelado":"gris"};
+    window.ACRI_CONCEPTOS = {"mp":[],"mo":[],"go":[]};
+    window.ACRI_FIJOS = {"mano_obra":"MANO DE OBRA INTERNA","comisiones":"COMISIONES"};
+    window.ACRI_EMPLEADOS = [];
+    window.ACRI_TIPOS_COMISION = [];
+    window.ACRI_BIBLIOTECA_PU = {"conceptos":[],"insumos":[]};
+    window.ACRI_CATALOGO_PU = [];
+    window.ACRI_PARAMETROS_PRES = {"utilidad_modo":"margen","financiamiento_pct":0,"indirectos":[],"iva_tasas":[{"nombre":"IVA 16 %","pct":16},{"nombre":"IVA frontera 8 %","pct":8},{"nombre":"Exento","pct":0}],"iva_defecto":16,"tipo_cambio_usd":0};
+    window.ACRI_PLANTILLAS_PU = [];
+    window.ACRI_CONCEPTOS_PU = [];
+    window.ACRI_FASAR = [];
+</script>
+<script src="js/presupuesto-calculo.js?v=1793207176"></script>
+<script src="js/formato-presupuesto.js?v=1792091909"></script>
+<script src="js/formato-analisis.js?v=1792603340"></script>
+<script src="js/xlsx-simple.js?v=1792619625"></script>
+<script src="js/formato-catalogo.js?v=1792612178"></script>
+<script src="js/ruta-critica.js?v=1792093088"></script>
+<script src="js/conceptos-tareas.js?v=1792093152"></script>
+<script src="js/presupuesto.js?v=1793207337"></script>
+<script>window.ACRI_PRIMER_INGRESO = false;</script>
+<script src="js/recorrido-presupuesto.js?v=1792536016"></script>
+<script src="js/recorrido.js?v=1792530020"></script>
+</body>
+</html>

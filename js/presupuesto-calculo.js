@@ -30,11 +30,15 @@
         return q * i.factor * (1 + i.merma_pct / 100);
     }
 
+    function fsrInsumo(i, fsr) {
+        i = insumo(i);
+        return i.fsr > 0 ? i.fsr : (fsr > 0 ? fsr : 1);
+    }
+
     function costoReal(i, fsr) {
         i = insumo(i);
         if (i.tipo !== 'MO') return i.costo;
-        var f = i.fsr > 0 ? i.fsr : (fsr > 0 ? fsr : 1);
-        return i.costo * f + i.viaticos + i.alimentacion + i.hospedaje;
+        return i.costo * fsrInsumo(i, fsr) + i.viaticos + i.alimentacion + i.hospedaje;
     }
 
     function concepto(c, a) {
@@ -48,6 +52,7 @@
             if (i.tipo === 'MO') { t.mo += q * i.costo; t.moReal += imp; }
             else t[i.tipo.toLowerCase()] += imp;
             renglones[n] = { tipo: i.tipo, cantidad: q, costo: costo, importe: imp };
+            if (i.tipo === 'MO') renglones[n].fsr = fsrInsumo(i, fsr);
         });
         pctMo.forEach(function (n) {
             var i = insumo(lista[n]), q = cantidad(i, cantC), imp = t.moReal * q / 100;
@@ -78,6 +83,6 @@
         return { cd: cdU, ind: s.ind * k, fin: s.fin * k, util: s.util * k, cargos: s.cargos * k, pu: s.pv * k };
     }
 
-    raiz.AcriCalculoPU = { TIPOS: TIPOS, insumo: insumo, cantidad: cantidad, costoReal: costoReal, concepto: concepto,
+    raiz.AcriCalculoPU = { TIPOS: TIPOS, insumo: insumo, cantidad: cantidad, fsrInsumo: fsrInsumo, costoReal: costoReal, concepto: concepto,
                            resumen: resumen, sobrecosto: sobrecosto, precioConcepto: precioConcepto };
 })(typeof window !== 'undefined' ? window : global);

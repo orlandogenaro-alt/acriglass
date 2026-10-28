@@ -452,7 +452,10 @@
     var CALC = window.AcriCalculoPU;
     // Campos opcionales del insumo (tipo de cálculo, merma, FSR propio, viáticos, proveedor…): se guardan solo si se capturan
     var CAMPOS_INSUMO = { tipo_calculo: 'texto', base: 'texto', factor: 'num', merma_pct: 'num', fsr: 'num', viaticos: 'num',
-                          alimentacion: 'num', hospedaje: 'num', proveedor: 'texto', fecha_costo: 'texto' };
+                          alimentacion: 'num', hospedaje: 'num', proveedor: 'texto', fecha_costo: 'texto', fasar_id: 'num' };
+    // FASAR activos del catálogo (Catalogos › Parámetros de costos): { fasar_id, nombre, dias_calendario, dias_pagados, … fsr }
+    var FASAR = window.ACRI_FASAR || [];
+    function fasarPorId(id) { return FASAR.filter(function (f) { return f.fasar_id === +id; })[0] || null; }
     var BIBLIOTECA = window.ACRI_BIBLIOTECA_PU || { conceptos: [], insumos: [] };
     var CATALOGO_PU = window.ACRI_CATALOGO_PU || [];   // Catalogos › Insumos (precio vigente; mano de obra sin FSR)
     var CONCEPTOS_PU = window.ACRI_CONCEPTOS_PU || [];  // Catalogos › Conceptos P.U. con su matriz desarmada (mano de obra sin FSR)
@@ -502,7 +505,7 @@
         analisis = {
             fsr: num(a.fsr) > 0 ? num(a.fsr) : 1, hm: num(a.hm), fin: num(a.fin),
             util: a.util === null || a.util === undefined || a.util === '' ? null : num(a.util),
-            matrizCosto: !!a.matriz_costo, conceptos: []
+            matrizCosto: !!a.matriz_costo, fasarId: parseInt(a.fasar_id, 10) || 0, conceptos: []
         };
         (a.conceptos || []).forEach(function (c) { analisis.conceptos.push(nuevoConcepto(c)); });
         huboAnalisis = analisis.conceptos.length > 0;
@@ -512,7 +515,7 @@
     }
     function exportarAnalisis() {
         return {
-            fsr: analisis.fsr, hm: analisis.hm, fin: analisis.fin, util: null, matriz_costo: !!analisis.matrizCosto,
+            fsr: analisis.fsr, hm: analisis.hm, fin: analisis.fin, util: null, matriz_costo: !!analisis.matrizCosto, fasar_id: analisis.fasarId || 0,
             conceptos: analisis.conceptos.map(function (c) {
                 return { id: c.id || 0, uid: c.uid, clave: c.clave, partida: c.partida, descripcion: c.descripcion, unidad: c.unidad, cantidad: c.cantidad,
                          especificacion: c.especificacion || '', venta: esVenta(c) ? c.venta : 0,
@@ -1103,7 +1106,8 @@
                 '<td class="ro" data-ins-calc="pct"></td>' +
                 '<td><input type="text" data-ins="proveedor" maxlength="150" value="' + escapar(i.proveedor) + '"' + dis + '></td>' +
                 '<td><input type="date" data-ins="fecha_costo" value="' + escapar(i.fecha_costo) + '"' + dis + '></td>' +
-                '<td><button type="button" class="borrar" title="Quitar"' + dis + '>✕</button></td></tr>';
+                '<td><button type="button" class="borrar" title="Quitar"' + dis + '>✕</button></td></tr>' +
+                (mo && !pctMo ? detalleManoObra(i, n, dis) : '');
         }).join('') : '<tr class="vacio-fila"><td colspan="17">Agrega lo que lleva con los botones de arriba: Material, Mano de obra, Equipo u Otro.</td></tr>';
         pintarDialogo();
     }
@@ -1111,7 +1115,13 @@
     function pintarDialogo() {
         var c = editandoPU, fijo = esVenta(c), u = costoUnitario(c, true), r = calcularPU(), unidad = escapar(txt(c.unidad) || 'unidad');
         var imps = importesInsumos(c);
-        $('puDInsumos').querySelectorAll('tr[data-n]').forEach(function (tr) {
+        $('puDInsumos').querySelectorAll('tr.pu-mo-det').forEach(function (tr) {
+            var i = c.insumos[tr.dataset.n], d = imps[tr.dataset.n];
+            tr.querySelector('[data-ins-calc="base-fsr"]').textContent = fmt(num(i.costo) * d.fsr);
+            tr.querySelector('[data-ins-calc="real"]').textContent = fmt(d.costo);
+            if (i.fasar_id || !(num(i.fsr) > 0)) tr.querySelector('[data-ins="fsr"]').value = d.fsr;
+        });
+        $('puDInsumos').querySelectorAll('tr[data-n]:not(.pu-mo-det)').forEach(function (tr) {
             var i = c.insumos[tr.dataset.n], d = imps[tr.dataset.n], modo = modoCalculo(i);
             tr.querySelector('[data-ins-calc="cantidad"]').textContent = modo === 'pct_mo' ? cant(d.cantidad) + ' %' : cant(Math.round(d.cantidad * 10000) / 10000);
             tr.querySelector('[data-ins-calc="importe"]').textContent = fmt(d.importe);
@@ -1151,6 +1161,154 @@
     // Cómo se calcula la cantidad del insumo (sin capturarlo: mano de obra con rinde = rendimiento, lo demás cantidad)
     function modoCalculo(i) { var x = CALC.insumo(i); return x.base === 'unidad' ? x.tipo_calculo : x.base; }
 
+    // FSR de una mano de obra: 'f<id>' de un FASAR del catálogo, 'manual' capturado, '' el del presupuesto
+    function eleccionFsr(i) { return i.fasar_id ? 'f' + i.fasar_id : num(i.fsr) > 0 ? 'manual' : ''; }
+    function opcionesFasar(actual, delPresupuesto) {
+        var hay = false, html = (delPresupuesto ? '<option value="">' + escapar(delPresupuesto) + '</option>' : '') +
+            FASAR.map(function (f) {
+                var v = 'f' + f.fasar_id;
+                if (v === actual) hay = true;
+                return '<option value="' + v + '"' + (v === actual ? ' selected' : '') + '>' + escapar(f.nombre) + ' (× ' + cant(f.fsr) + ')</option>';
+            }).join('');
+        // Un FASAR que ya no está activo se conserva con el FSR guardado
+        if (/^f/.test(actual) && !hay) html += '<option value="' + actual + '" selected>FASAR ' + actual.slice(1) + ' (ya no está activo)</option>';
+        return html;
+    }
+    function nombreFasar(i) {
+        var f = i.fasar_id && fasarPorId(i.fasar_id);
+        if (i.fasar_id) return f ? f.nombre : 'FASAR ' + i.fasar_id;
+        if (num(i.fsr) > 0) return 'Capturado';
+        f = analisis.fasarId && fasarPorId(analisis.fasarId);
+        return f ? f.nombre + ' (del presupuesto)' : 'Del presupuesto';
+    }
+    // Debajo de cada mano de obra: su FASAR, salario real y viáticos, alimentación y hospedaje por jornada
+    function detalleManoObra(i, n, dis) {
+        var el = eleccionFsr(i), x = CALC.insumo(i);
+        function dinero(campo, titulo) {
+            return '<label title="' + titulo + '">' + titulo.split(' ')[0] + ' <input type="number" class="num" data-ins="' + campo + '" step="0.01" min="0" value="' +
+                (x[campo] || '') + '" placeholder="0"' + dis + '></label>';
+        }
+        return '<tr class="pu-mo-det" data-n="' + n + '"><td></td><td colspan="16"><div class="pu-mo-campos">' +
+            '<label>FSR <select data-ins="fasar"' + dis + '>' + opcionesFasar(el, 'Del presupuesto (× ' + cant(factorFsr()) + ')') +
+                '<option value="manual"' + (el === 'manual' ? ' selected' : '') + '>Otro FSR (capturado)</option></select></label>' +
+            '<label>× <input type="number" class="num" data-ins="fsr" step="0.0001" min="0" value="' + CALC.fsrInsumo(i, factorFsr()) + '"' +
+                (el === 'manual' ? '' : ' readonly title="Sale del FASAR"') + dis + '></label>' +
+            '<span>Salario base × FSR <b data-ins-calc="base-fsr"></b></span>' +
+            dinero('viaticos', 'Viáticos por jornada') + dinero('alimentacion', 'Alimentación por jornada') + dinero('hospedaje', 'Hospedaje por jornada') +
+            '<span>= Salario real <b data-ins-calc="real"></b> por jornada</span></div></td></tr>';
+    }
+
+    // Mano de obra de todos los análisis, junta por trabajador o cuadrilla con el mismo salario, FSR y viáticos:
+    // jornadas (cantidad total en la obra) e importe. La usan la pestaña Mano de Obra y la ventana FASAR.
+    function manoObraAnalisis() {
+        var grupos = {}, lista = [];
+        analisis.conceptos.forEach(function (c) {
+            if (!alCosto(c)) return;
+            var imps = importesInsumos(c);
+            c.insumos.forEach(function (i, n) {
+                if (i.tipo !== 'MO' || i.base === 'pct_mo') return;
+                var d = imps[n], x = CALC.insumo(i), extras = x.viaticos + x.alimentacion + x.hospedaje;
+                var k = [clave(i.codigo), clave(i.descripcion), clave(i.unidad), x.costo, d.fsr, extras, nombreFasar(i)].join('|');
+                var g = grupos[k];
+                if (!g) {
+                    g = grupos[k] = { codigo: i.codigo, descripcion: txt(i.descripcion) || '(sin descripción)', unidad: i.unidad, base: x.costo, fsr: d.fsr,
+                                      fasar: nombreFasar(i), extras: extras, real: d.costo, jornadas: 0, importe: 0, conceptos: [], fecha: i.fecha_costo || '' };
+                    lista.push(g);
+                }
+                g.jornadas += d.cantidad * c.cantidad;
+                g.importe += d.importe * c.cantidad;
+                if (g.conceptos.indexOf(c) < 0) g.conceptos.push(c);
+            });
+        });
+        return lista;
+    }
+    function htmlManoObra(lista, vacio) {
+        if (!lista.length) return '<tr class="vacio-fila"><td colspan="11">' + vacio + '</td></tr>';
+        var total = 0;
+        return lista.map(function (g, n) {
+            total += g.importe;
+            return '<tr data-mo="' + n + '" title="Doble clic: abrir el análisis de ' + escapar(g.conceptos.map(function (c) { return c.descripcion || c.clave; }).join(', ')) + '">' +
+                '<td class="id">' + escapar(g.codigo) + '</td><td class="ro izq">' + escapar(g.descripcion) + '</td><td class="ro izq">' + escapar(g.unidad) + '</td>' +
+                '<td class="ro">' + fmt(g.base) + '</td><td class="ro izq">' + escapar(g.fasar) + '</td><td class="ro">' + cant(g.fsr) + '</td>' +
+                '<td class="ro">' + fmt(g.real) + '</td><td class="ro">' + (g.extras ? fmt(g.extras) : '') + '</td>' +
+                '<td class="ro">' + cant(Math.round(g.jornadas * 10000) / 10000) + '</td><td class="ro">' + fmt(g.importe) + '</td>' +
+                '<td class="ro">' + g.conceptos.length + '</td></tr>';
+        }).join('') + '<tr class="pu-total"><td colspan="9" class="ro">Total de la mano de obra analizada</td><td class="ro">' + fmt(total) + '</td><td></td></tr>';
+    }
+    var manoObraLista = [];
+    function pintarManoObraPU() {
+        manoObraLista = manoObraAnalisis();
+        $('tbManoObraPU').innerHTML = htmlManoObra(manoObraLista, 'Aquí aparece la mano de obra en cuanto la agregues al análisis de un concepto (Análisis P.U. o doble clic en el Catálogo).');
+    }
+    ['tbManoObraPU', 'fsManoObra'].forEach(function (id) {
+        $(id).addEventListener('dblclick', function (e) {
+            var tr = e.target.closest('tr[data-mo]');
+            if (!tr) return;
+            if ($('fsDialogo').open) $('fsDialogo').close();
+            abrirAnalisis(manoObraLista[tr.dataset.mo].conceptos[0]);
+        });
+    });
+
+    // ---------- FASAR (botón de la barra): el FSR del presupuesto y la mano de obra de los análisis ----------
+    function abrirFasar() {
+        pintarFasar();
+        $('fsDialogo').showModal();
+    }
+    function pintarFasar() {
+        var f = analisis.fasarId && fasarPorId(analisis.fasarId);
+        $('fsElegir').innerHTML = '<option value="">FSR capturado a mano</option>' + opcionesFasar(analisis.fasarId ? 'f' + analisis.fasarId : '', '');
+        $('fsElegir').disabled = soloLectura;
+        $('fsFsr').value = factorFsr();
+        $('fsFsr').readOnly = !!analisis.fasarId;
+        $('fsFsr').disabled = soloLectura;
+        $('fsTodos').disabled = soloLectura;
+        $('fsNota').textContent = FASAR.length ? '' : 'Aún no hay FASAR en el catálogo: captúralos en Parámetros de costos.';
+        var filas = [];
+        function fila(clase, nombre, valor) { filas.push('<tr' + (clase ? ' class="' + clase + '"' : '') + '><td class="ro izq">' + nombre + '</td><td class="ro">' + valor + '</td></tr>'); }
+        if (f) {
+            // Fsr = Ps × (Tp / Tl) + Tp / Tl (Reglamento de la LOPSRM; includes/pu.php puFsr)
+            fila('', 'Días calendario', cant(f.dias_calendario));
+            f.dias_pagados.forEach(function (d) { fila('', '+ ' + escapar(d.concepto) + ' (días pagados)', cant(num(d.dias))); });
+            fila('pu-total', 'Tp = días pagados', cant(f.tp));
+            fila('', 'Días calendario', cant(f.dias_calendario));
+            f.dias_no_laborados.forEach(function (d) { fila('', '− ' + escapar(d.concepto) + ' (no laborados)', cant(num(d.dias))); });
+            fila('pu-total', 'Tl = días laborados', cant(f.tl));
+            f.obligaciones.forEach(function (o) { fila('', escapar(o.concepto), pct(num(o.pct))); });
+            fila('pu-total', 'Ps = obligaciones obrero-patronales', cant(f.ps));
+            fila('pu-total', 'FSR = Ps × (Tp / Tl) + Tp / Tl', cant(f.fsr));
+        } else {
+            fila('', 'El FSR del presupuesto está capturado a mano.<br>Elige un FASAR del catálogo para ver su desglose: días pagados (aguinaldo, prima vacacional…), no laborados (domingos, festivos, vacaciones…) y obligaciones (IMSS, INFONAVIT…).', '');
+        }
+        $('fsDesglose').innerHTML = filas.join('');
+        manoObraLista = manoObraAnalisis();
+        $('fsManoObra').innerHTML = htmlManoObra(manoObraLista, 'Ningún concepto analizado lleva mano de obra todavía.');
+    }
+    function cambioFasar() {
+        $('puFsr').value = analisis.fsr;
+        marcarCambio();
+        calcularTotales();
+        pintarFasar();
+        render();
+    }
+    $('fsElegir').addEventListener('change', function () {
+        var f = this.value && fasarPorId(this.value.slice(1));
+        analisis.fasarId = f ? f.fasar_id : 0;
+        if (f) analisis.fsr = f.fsr;
+        cambioFasar();
+    });
+    $('fsFsr').addEventListener('change', function () {
+        if (analisis.fasarId) return;
+        analisis.fsr = num(this.value) > 0 ? num(this.value) : 1;
+        cambioFasar();
+    });
+    $('fsTodos').addEventListener('click', function () {
+        if (!confirm('¿Que toda la mano de obra de los análisis tome el FSR del presupuesto (× ' + cant(factorFsr()) + ')? Se quitan los FASAR y FSR propios de cada una.')) return;
+        analisis.conceptos.forEach(function (c) { c.insumos.forEach(function (i) { if (i.tipo === 'MO') { delete i.fsr; delete i.fasar_id; } }); });
+        cambioFasar();
+    });
+    document.querySelectorAll('[data-fs-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('fsDialogo').close(); }); });
+    $('moFasar').addEventListener('click', abrirFasar);
+
     function cambioDialogo(repintar) {
         marcarCambio();
         calcularTotales();
@@ -1186,6 +1344,15 @@
         var campo = e.target.dataset.ins, tr = e.target.closest('tr[data-n]');
         if (!campo || !tr) return;
         var i = editandoPU.insumos[tr.dataset.n];
+        if (campo === 'fasar') {
+            // FSR de esta mano de obra: el del presupuesto, el de un FASAR del catálogo o uno capturado
+            var f = e.target.value;
+            if (f === 'manual') { i.fsr = CALC.fsrInsumo(i, factorFsr()); delete i.fasar_id; }
+            else if (f) { var fa = fasarPorId(f.slice(1)); i.fasar_id = fa.fasar_id; i.fsr = fa.fsr; }
+            else { delete i.fsr; delete i.fasar_id; }
+            cambioDialogo(true);
+            return;
+        }
         if (campo === 'modo') {
             // Cantidad directa / rendimiento; o costo fijo por concepto / % de la mano de obra (con cantidad directa)
             var v = e.target.value;
@@ -1194,7 +1361,8 @@
             return;
         }
         if (CAMPOS_INSUMO[campo] && e.target.value.trim() === '') delete i[campo];   // vacío = su valor por omisión (factor 1, merma 0…)
-        else i[campo] = ['cantidad', 'rinde', 'costo', 'factor', 'merma_pct'].indexOf(campo) >= 0 ? Math.max(0, num(e.target.value)) : e.target.value;
+        else i[campo] = ['cantidad', 'rinde', 'costo', 'factor', 'merma_pct', 'fsr', 'viaticos', 'alimentacion', 'hospedaje'].indexOf(campo) >= 0
+            ? Math.max(0, num(e.target.value)) : e.target.value;
         if (campo === 'tipo') { cambioDialogo(true); return; }
         cambioDialogo(false);
     });
@@ -1228,6 +1396,7 @@
             var v = this.value.trim();
             analisis[k] = Math.max(0, num(v));
             if (k === 'fsr' && analisis.fsr <= 0) analisis.fsr = 1;
+            if (k === 'fsr') analisis.fasarId = 0;
             marcarCambio();
             calcularTotales();
             pintarPu();
@@ -2186,6 +2355,7 @@
 
     function renderExtras() {
         $('extrasMO').hidden = seccion !== 'mo';
+        if (seccion === 'mo') pintarManoObraPU();
         $('extrasGO').hidden = seccion !== 'go';
         var dis = soloLectura ? ' disabled' : '';
         Object.keys(EXTRAS).forEach(function (k) {
@@ -3212,6 +3382,7 @@
             ponerEstatus('Cancelado');
         },
         'bitacora': verBitacora,
+        'fasar': abrirFasar,
         'eliminar': function () {
             if (!presupuestoId) {
                 if (confirm('Este presupuesto no se ha guardado. ¿Descartarlo?')) { cambios = false; cerrarVentana(); }

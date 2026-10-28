@@ -482,7 +482,8 @@
     }
     function nuevoConcepto(c) {
         c = c || {};
-        return { uid: ++uidPU, clave: String(c.clave || '') || siguienteClave(), partida: String(c.partida || ''),
+        // id: el renglón del concepto en la base (presupuesto_conceptos, migraciones/017); 0 = aún no se guarda
+        return { uid: ++uidPU, id: Math.max(0, parseInt(c.id, 10) || 0), clave: String(c.clave || '') || siguienteClave(), partida: String(c.partida || ''),
                  descripcion: String(c.descripcion || ''), unidad: String(c.unidad || ''), cantidad: num(c.cantidad),
                  especificacion: String(c.especificacion || ''), venta: Math.max(0, num(c.venta)), insumos: (c.insumos || []).map(limpiarInsumo) };
     }
@@ -513,7 +514,7 @@
         return {
             fsr: analisis.fsr, hm: analisis.hm, fin: analisis.fin, util: null, matriz_costo: !!analisis.matrizCosto,
             conceptos: analisis.conceptos.map(function (c) {
-                return { clave: c.clave, partida: c.partida, descripcion: c.descripcion, unidad: c.unidad, cantidad: c.cantidad,
+                return { id: c.id || 0, uid: c.uid, clave: c.clave, partida: c.partida, descripcion: c.descripcion, unidad: c.unidad, cantidad: c.cantidad,
                          especificacion: c.especificacion || '', venta: esVenta(c) ? c.venta : 0,
                          insumos: c.insumos.map(function (i) { return limpiarInsumo(i); }) };
             })
@@ -710,7 +711,7 @@
                 return;
             }
             var c = x.c, falta = revisionConcepto(c);
-            html += '<tr data-uid="' + c.uid + '"><td class="id">' + escapar(c.clave) + '</td>' +
+            html += '<tr data-uid="' + c.uid + '"' + (c.id ? ' data-id="' + c.id + '"' : '') + ' title="Doble clic: abrir su análisis"><td class="id">' + escapar(c.clave) + '</td>' +
                 '<td><input type="text" data-pu="partida" list="puPartidas" maxlength="100" value="' + escapar(c.partida) + '" placeholder="Partida"' + dis + '></td>' +
                 '<td><input type="text" data-pu="descripcion" list="puSugConceptos" maxlength="300" value="' + escapar(c.descripcion) + '" placeholder="¿Qué trabajo es?"' + dis + '></td>' +
                 '<td><input type="text" data-pu="unidad" list="puUnidades" maxlength="20" value="' + escapar(c.unidad) + '" placeholder="m², pza…"' + dis + '></td>' +
@@ -814,6 +815,11 @@
     }
 
     function conceptoPU(uid) { return analisis.conceptos.filter(function (c) { return c.uid === +uid; })[0]; }
+    // Concepto de un renglón: por su id de la base si ya está guardado (data-id), si no por el de la pantalla
+    function conceptoDeFila(tr) {
+        var id = parseInt(tr.dataset.id, 10) || 0;
+        return (id && analisis.conceptos.filter(function (c) { return c.id === id; })[0]) || conceptoPU(tr.dataset.uid);
+    }
 
     function agregarConceptoPU() {
         if (soloLectura) { avisoSoloLectura(); return; }
@@ -825,6 +831,12 @@
         if (f) f.focus();
     }
     $('puAgregar').addEventListener('click', agregarConceptoPU);
+    // Doble clic en un concepto del Análisis P.U. (fuera de sus campos): abre su análisis, por su id de la base
+    $('puConceptos').addEventListener('dblclick', function (e) {
+        if (e.target.closest('button, input, select')) return;
+        var tr = e.target.closest('tr[data-uid]');
+        if (tr) abrirAnalisis(conceptoDeFila(tr));
+    });
 
     // Plantilla de presupuesto: agrega sus conceptos con la matriz y los precios vigentes del catálogo
     function agregarPlantilla(sel, partida) {
@@ -1537,7 +1549,7 @@
                     ' title="Capturado por importe en ' + escapar(NOMBRES[x.sec]) + ': pasarlo al análisis con lo que ya tiene"' + dis + '>Analizar</button>') + '</td></tr>';
             }
             var c = x.c, falta = revisionConcepto(c);
-            return '<tr data-uid="' + c.uid + '" data-buscar="' + escapar(clave(c.clave + ' ' + c.descripcion)) + '">' +
+            return '<tr data-uid="' + c.uid + '"' + (c.id ? ' data-id="' + c.id + '"' : '') + ' data-buscar="' + escapar(clave(c.clave + ' ' + c.descripcion)) + '">' +
                 '<td><input type="text" data-cc="clave" maxlength="20" value="' + escapar(c.clave) + '"' + dis + '></td>' +
                 '<td><textarea class="cc-desc" data-cc="descripcion" maxlength="4300" rows="1" placeholder="¿Qué trabajo es? Materiales, acabados, dimensiones, lo que incluye…"' + dis + '>' +
                     escapar(descripcionCompleta(c)) + '</textarea></td>' +
@@ -2065,7 +2077,7 @@
         var tr = e.target.closest('tr[data-uid], tr[data-ir-sec]');
         if (!tr) return;
         if (tr.dataset.irSec) irARenglon(tr.dataset.irSec, num(tr.dataset.irId));
-        else abrirAnalisis(conceptoPU(tr.dataset.uid));
+        else abrirAnalisis(conceptoDeFila(tr));
     });
     $('ccCuerpo').addEventListener('click', function (e) {
         var b = e.target.closest('[data-cc-accion]');
@@ -2728,6 +2740,8 @@
             var nuevo = !presupuestoId;
             presupuestoId = j.id;
             document.body.dataset.presupuesto = j.id;
+            // Ids que la base dio a los conceptos del Análisis P.U. (uid de la pantalla → id)
+            analisis.conceptos.forEach(function (c) { if (j.conceptos_pu && j.conceptos_pu[c.uid]) c.id = +j.conceptos_pu[c.uid]; });
             $('folio').value = j.folio;
             cambios = false;
             autorizaModificar = null;

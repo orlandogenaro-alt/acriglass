@@ -17,7 +17,8 @@ require __DIR__ . '/../includes/estatus.php';
 require __DIR__ . '/../includes/tareas.php';
 require __DIR__ . '/../includes/presupuesto-obra.php';
 require __DIR__ . '/../includes/calculo.php';
-require_once __DIR__ . '/../includes/pu.php';   // y el motor de P.U. (includes/presupuesto-calculo.php)
+require_once __DIR__ . '/../includes/pu.php';
+require __DIR__ . '/../includes/presupuesto-conceptos.php';   // y el motor de P.U. (includes/presupuesto-calculo.php)
 require __DIR__ . '/../includes/parametros-presupuesto.php';
 require __DIR__ . '/../includes/hubspot-presupuesto.php';
 require __DIR__ . '/../includes/respuesta.php';
@@ -100,8 +101,9 @@ function datosObra($d): ?string
 
 // Análisis de Precios Unitarios (como Neodata) como JSON; null si no hay conceptos y los factores son los de por omisión.
 // fsr: factor de salario real · hm: % herramienta menor · fin: % financiamiento · util: % utilidad (null = equivalente al Form46)
-// conceptos: [{ clave, partida, descripcion, unidad, cantidad, insumos: [{ tipo MAT|MO|EQ, descripcion, unidad, cantidad, rinde, costo }] }]
-function analisisPU($d): ?string
+// conceptos: [{ clave, partida, descripcion, unidad, cantidad, insumos: [{ tipo MAT|MO|EQ…, descripcion, unidad, cantidad, rinde, costo }] }]
+// Cada concepto trae además su id (renglón de presupuesto_conceptos) y _uid (el de la pantalla), que no van al JSON.
+function analisisPUDatos($d): ?array
 {
     $d = is_array($d) ? $d : [];
     $fsr = numero($d['fsr'] ?? 1, 4);
@@ -147,6 +149,8 @@ function analisisPU($d): ?string
             'especificacion' => texto($c['especificacion'] ?? '', 4000) ?? '',
             'insumos'     => $insumos,
         ];
+        if ((int) ($c['id'] ?? 0) > 0) $concepto['id'] = (int) $c['id'];
+        if (isset($c['uid']) && is_numeric($c['uid'])) $concepto['_uid'] = (int) $c['uid'];
         // Precio fijo para el cliente (importado del Catálogo): no suma al costo, el costo viene de MP / MO / GO
         $venta = max(0, numero($c['venta'] ?? 0, 4));
         if ($venta > 0) $concepto['venta'] = $venta;
@@ -155,7 +159,15 @@ function analisisPU($d): ?string
         $r['conceptos'][] = $concepto;
     }
     if ($r['fsr'] == 1 && !$r['hm'] && !$r['fin'] && $r['util'] === null && !$r['conceptos']) return null;
-    return json_encode($r, JSON_UNESCAPED_UNICODE);
+    return $r;
+}
+
+// El análisis validado como JSON (respaldo en doctos_sugerido_obra.analisis_pu), sin los ids
+function analisisPU(?array $a): ?string
+{
+    if ($a === null) return null;
+    $a['conceptos'] = array_map(fn($c) => array_diff_key($c, ['id' => 1, '_uid' => 1]), $a['conceptos']);
+    return json_encode($a, JSON_UNESCAPED_UNICODE);
 }
 
 // Análisis P.U. con el motor central (includes/presupuesto-calculo.php): por concepto el desglose de UNA unidad (cada
@@ -164,7 +176,7 @@ function analisisPU($d): ?string
 // sobrecosto: { cd, ind (pesos), fin_pct, util_pct (Utilidad Neta del presupuesto), modo 'costo'|'margen', ca (fracción) }
 function calcularAnalisis(array $d): array
 {
-    $a = json_decode((string) analisisPU($d['analisis'] ?? []), true) ?: ['fsr' => 1, 'hm' => 0, 'fin' => 0, 'conceptos' => []];
+    $a = analisisPUDatos($d['analisis'] ?? []) ?? ['fsr' => 1, 'hm' => 0, 'fin' => 0, 'conceptos' => []];
     $s = null;
     if (is_array($d['sobrecosto'] ?? null)) {
         $x = $d['sobrecosto'];
@@ -176,7 +188,7 @@ function calcularAnalisis(array $d): array
         $r = pcConcepto($c, $a);
         // Precio fijo para el cliente: su P.U. es el del Catálogo
         $pu = !empty($c['venta']) ? (float) $c['venta'] : ($s ? $r['totales']['cd'] * $s['factor'] : null);
-        $conceptos[] = ['clave' => $c['clave'], 'descripcion' => $c['descripcion'], 'unidad' => $c['unidad'], 'cantidad' => $c['cantidad'],
+        $conceptos[] = ['id' => $c['id'] ?? null, 'clave' => $c['clave'], 'descripcion' => $c['descripcion'], 'unidad' => $c['unidad'], 'cantidad' => $c['cantidad'],
                         'insumos' => $r['insumos'], 'totales' => $r['totales'], 'resumen' => pcResumen($r['totales']),
                         'pu' => $pu, 'importe' => $pu === null ? null : $pu * $c['cantidad']];
     }
@@ -358,8 +370,9 @@ function guardar(array $d): array
     // Cada Guardar deja su renglón en la bitácora de cambios aunque no cambie el encabezado (migraciones/015)
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'modificado_en')) $enc['modificado_en'] = date('c');
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'datos_obra')) $enc['datos_obra'] = datosObra($d['obra_datos'] ?? []);
+    $analisis = analisisPUDatos($d['analisis_pu'] ?? []);
     if (bd_tiene_columna('AW', 'doctos_sugerido_obra', 'analisis_pu')) {
-        $enc['analisis_pu'] = analisisPU($d['analisis_pu'] ?? []);
+        $enc['analisis_pu'] = analisisPU($analisis);
     } elseif (!empty($d['analisis_pu']['conceptos'])) {
         // Sin la columna se perderían los conceptos analizados (y sus importes en MP / MO al volver a abrirlo)
         error('Para guardar el Análisis P.U. falta preparar la base: corre Consultas/aw_presupuesto_analisis_pu.sql (AW-Management) '
@@ -439,6 +452,8 @@ function guardar(array $d): array
             }
         }
         guardarDetalles($id, $d, $cache);
+        // Conceptos del Análisis P.U. en tablas (migraciones/017), con su id; sin la tabla quedan solo en el JSON
+        $conceptosPU = presupuestoConceptosDisponible() ? presupuestoConceptosGuardar($id, $analisis ?? ['conceptos' => []]) : [];
         // Conceptos/Tareas (fechas, responsable, avance…); sin la tabla se guarda el resto del presupuesto
         if (isset($d['tareas']) && tareasDisponibles()) guardarTareas($id, (array) $d['tareas']);
         $pdo->commit();
@@ -451,7 +466,7 @@ function guardar(array $d): array
 
     // El negocio de HubSpot lo crea o actualiza ?accion=hubspot, que la pantalla llama enseguida con el formato
     // impreso del presupuesto ya con su folio (guarda_o_actualiza_sugerido_hs)
-    return ['id' => $id, 'folio' => $folio, 'hubspot' => (bool) $hsContactos, 'avisos' => $hsAvisos];
+    return ['id' => $id, 'folio' => $folio, 'hubspot' => (bool) $hsContactos, 'avisos' => $hsAvisos, 'conceptos_pu' => (object) $conceptosPU];
 }
 
 // guarda_o_actualiza_sugerido_hs, después de guardar: { id, email, formato_html? } → { id_hs, avisos }

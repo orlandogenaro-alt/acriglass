@@ -26,6 +26,7 @@ require __DIR__ . '/../includes/sesion.php';
 require __DIR__ . '/../includes/servicios.php';
 require __DIR__ . '/../includes/tareas.php';
 require_once __DIR__ . '/../includes/permisos.php';
+require_once __DIR__ . '/../includes/presupuesto-conceptos.php';
 
 if (modoConfiguracion()) {
     require __DIR__ . '/../includes/respuesta.php';
@@ -1185,6 +1186,11 @@ try {
             // Factores del Análisis de Precios Unitarios (Neodata), guardados como JSON
             $p['analisis_pu'] = bd_tiene_columna('AW', 'doctos_sugerido_obra', 'analisis_pu')
                 ? json_decode((string) bd_valor('AW', 'select analisis_pu from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]), true) : null;
+            // Los conceptos con su id salen de sus tablas (migraciones/017); uno guardado antes de la migración, de su JSON
+            if (presupuestoConceptosDisponible() && ($tabla = presupuestoConceptosLeer($id)) !== null) {
+                $p['analisis_pu'] = (is_array($p['analisis_pu']) ? $p['analisis_pu'] : ['fsr' => 1, 'hm' => 0, 'fin' => 0]) + ['conceptos' => []];
+                $p['analisis_pu']['conceptos'] = $tabla;
+            }
             // Renglones de Materia Prima / Mano de Obra / Gastos de Operacion con el nombre de su concepto
             $p['conceptos'] = bd_filas('AW',
                 "select d.docto_sugerido_obra_det_id, d.tipo_concepto, d.concepto_id, d.presupuesto, d.docto_imp_id, d.folio, d.tipo_docto, d.notas,

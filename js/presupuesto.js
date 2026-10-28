@@ -108,7 +108,8 @@
             inp.title = r.calc === 'auto' ? 'Cálculo automático (porcentaje del catálogo de conceptos)'
                       : r.calc === 'fijo' ? 'Se calcula con los empleados, comisiones o anexo de seguro'
                       : r.calc === 'pu' ? 'Se calcula con los conceptos de la pestaña Análisis P.U.'
-                      : r.calc === 'gasto' ? 'Se calcula: ' + descripcionGasto(r.gasto) + ' (botón ƒx)' : '';
+                      : r.calc === 'gasto' ? 'Se calcula: ' + descripcionGasto(r.gasto) + ' (botón ƒx)'
+                      : r.calc === 'fin' ? 'Financiamiento sumado al Subtotal (ventana Sobrecosto)' : '';
             // Solo un gasto capturado o calculado se puede calcular (no los automáticos, los fijos ni los del análisis)
             var fx = tr.querySelector('[data-go-calc]');
             if (fx) { fx.hidden = !!r.calc && r.calc !== 'gasto'; fx.classList.toggle('activo', r.calc === 'gasto'); }
@@ -357,6 +358,7 @@
             r.presupuesto = redondear((i.indirecto ? baseCd : i.base_mp ? base : subtotal) * num(i.pct) / 100);
             r.calc = 'auto';
         });
+        ponerFinanciamiento();
         // calcula_conceptos_anexo7: subtotal × %1 × %2 al concepto de Gastos de Operacion
         extras.seguros.forEach(function (s) {
             s.total = redondear(subtotal * num(s.porcentaje_1) * 0.01 * num(s.porcentaje_2) * 0.01);
@@ -400,6 +402,26 @@
             lista[sec].forEach(function (x) { ponerFijo(sec, x.nombre, x.importe, 'pu'); });
         });
         filasPU = nuevos;
+    }
+
+    // Financiamiento sumado al Subtotal (casilla de la ventana Sobrecosto): un renglón FINANCIAMIENTO en Gastos de Operacion
+    // con el % de financiamiento sobre el costo directo + indirectos (Materia Prima, Mano de Obra sin comisiones y Gastos
+    // de Operacion sin el anexo de seguro). Como es un renglón más, entra a la utilidad, al Subtotal y al Total. Sin la
+    // casilla se quita el renglón que se puso así (uno capturado a mano con ese nombre no se toca).
+    var FILA_FIN = 'FINANCIAMIENTO', filaFin = null;
+    function ponerFinanciamiento() {
+        if (analisis.finSubtotal && analisis.fin > 0) {
+            var seguros = {}, base = baseManoObra();
+            extras.seguros.forEach(function (x) { seguros[clave(x.concepto)] = true; });
+            datos.mp.forEach(function (r) { base += num(r.presupuesto); });
+            datos.go.forEach(function (r) { var k = clave(r.concepto); if (!seguros[k] && k !== FILA_FIN) base += num(r.presupuesto); });
+            ponerFijo('go', FILA_FIN, base * analisis.fin / 100, 'fin');
+            filaFin = filaDe('go', FILA_FIN);
+        } else if (filaFin) {
+            var n = datos.go.indexOf(filaFin);
+            if (n >= 0) datos.go.splice(n, 1);
+            filaFin = null;
+        }
     }
 
     function firma() {
@@ -543,12 +565,14 @@
             // Con qué se estimó el % de financiamiento (ventana Sobrecosto)
             finTasa: num(a.fin_tasa), finPlazo: num(a.fin_plazo), finAnticipo: num(a.fin_anticipo), finIndicador: String(a.fin_indicador || ''),
             // Botón Cálculo: periodo de corte y opciones
+            finSubtotal: !!a.fin_subtotal,   // el financiamiento se suma al Subtotal (renglón FINANCIAMIENTO de Gastos de Operacion)
             calculo: { desde: String((a.calculo || {}).desde || ''), corte: String((a.calculo || {}).corte || ''),
                        cantidad_corte: !!(a.calculo || {}).cantidad_corte, marcar: !!(a.calculo || {}).marcar }
         };
         (a.conceptos || []).forEach(function (c) { analisis.conceptos.push(nuevoConcepto(c)); });
         huboAnalisis = analisis.conceptos.length > 0;
         filasPU = { mp: {}, mo: {}, go: {} };
+        filaFin = null;   // el renglón FINANCIAMIENTO del presupuesto anterior ya no es de este
         Object.keys(CAMPOS_PU).forEach(function (k) { $(CAMPOS_PU[k]).value = analisis[k]; });
         $('puMatrizCosto').checked = analisis.matrizCosto;
     }
@@ -556,7 +580,7 @@
         return {
             fsr: analisis.fsr, hm: analisis.hm, fin: analisis.fin, util: null, matriz_costo: !!analisis.matrizCosto, fasar_id: analisis.fasarId || 0,
             fin_tasa: analisis.finTasa || 0, fin_plazo: analisis.finPlazo || 0, fin_anticipo: analisis.finAnticipo || 0, fin_indicador: analisis.finIndicador || '',
-            calculo: analisis.calculo,
+            calculo: analisis.calculo, fin_subtotal: !!analisis.finSubtotal,
             conceptos: analisis.conceptos.map(function (c) {
                 return { id: c.id || 0, uid: c.uid, clave: c.clave, partida: c.partida, descripcion: c.descripcion, unidad: c.unidad, cantidad: c.cantidad,
                          especificacion: c.especificacion || '', venta: esVenta(c) ? c.venta : 0, inicio: c.inicio || '', fin: c.fin || '',
@@ -630,7 +654,7 @@
         r.mo += a.mo;
         r.fsr += a.moReal - a.mo;   // FSR y viáticos de la mano de obra analizada
         r.hm += a.hm;
-        datos.go.forEach(function (f) { if (!seguros[clave(f.concepto)] && f.calc !== 'pu') r.ind += num(f.presupuesto); });
+        datos.go.forEach(function (f) { if (!seguros[clave(f.concepto)] && f.calc !== 'pu' && f.calc !== 'fin') r.ind += num(f.presupuesto); });
 
         r.cd = r.mp + r.mo + r.fsr + r.hm;
         // Financiamiento, utilidad equivalente a la del presupuesto, cargos adicionales y factor de sobrecosto
@@ -1024,25 +1048,62 @@
         ['insumo', /^(insumo|descripci[oó]n)/i],
         ['unidad', /^(unidad|u\.?m\.?$|um$)/i],
         ['cantidad', /^(cantidad|cant)/i],
-        ['rinde', /^rinde/i],
-        ['costo', /^(costo|precio|p\.?\s*unit)/i]
+        ['rinde', /^(rinde|rendimiento)/i],
+        ['costo', /^(costo|precio|p\.?\s*unit)/i],
+        // Columnas del motor (Exportar matrices las escribe; todas son opcionales al importar)
+        ['renglon', /^rengl[oó]n/i],
+        ['calculo', /^c[aá]lculo/i],
+        ['factor', /^factor/i],
+        ['merma_pct', /^merma/i],
+        ['fsr', /^fsr$/i],
+        ['viaticos', /^vi[aá]ticos/i],
+        ['alimentacion', /^alimentaci/i],
+        ['hospedaje', /^hospedaje/i],
+        ['proveedor', /^proveedor/i],
+        ['fecha_costo', /^fecha/i]
     ];
+    // Una fila por insumo; los componentes de un insumo compuesto (matriz dentro de matriz) van debajo de él con su
+    // renglón numerado (2.1, 2.2…), así Importar matrices los vuelve a armar
+    var TITULOS_MATRIZ = ['Código', 'Concepto', 'Renglón', 'Código insumo', 'Tipo', 'Insumo', 'Unidad', 'Cálculo', 'Cantidad', 'Rendimiento',
+                          'Factor', 'Merma %', 'Costo unitario', 'Importe', 'FSR', 'Viáticos', 'Alimentación', 'Hospedaje', 'Proveedor', 'Fecha de costo'];
     function exportarMatrices() {
-        var filas = [['Código', 'Concepto', 'Código insumo', 'Tipo', 'Insumo', 'Unidad', 'Cantidad', 'Rinde por jornada', 'Costo unitario', 'Importe']
-            .map(function (t) { return { v: t, e: 'titulo' }; })];
+        var filas = [TITULOS_MATRIZ.map(function (t) { return { v: t, e: 'titulo' }; })];
+        function numero(v, e) { return v === undefined || v === null || v === '' ? null : { v: num(v), e: e || 'cantidad' }; }
+        function renglones(c, concepto, lista, imps, prefijo) {
+            lista.forEach(function (i, n) {
+                var ren = prefijo + (n + 1), modo = modoCalculo(i);
+                filas.push([c.clave, concepto, ren, i.codigo, TIPOS_INSUMO[i.tipo], { v: i.descripcion, e: 'texto' }, i.unidad, CALCULOS_INSUMO[modo],
+                            numero(i.cantidad), modo === 'rendimiento' && i.rinde > 0 ? numero(i.rinde) : null, numero(i.factor), numero(i.merma_pct),
+                            CALC.componentes(i).length ? null : numero(i.costo, 'dinero'), { v: redondear(imps[n].importe), e: 'dinero' },
+                            numero(i.fsr), numero(i.viaticos, 'dinero'), numero(i.alimentacion, 'dinero'), numero(i.hospedaje, 'dinero'),
+                            i.proveedor ? { v: i.proveedor, e: 'texto' } : null, i.fecha_costo || null]);
+                if (CALC.componentes(i).length) renglones(c, concepto, i.componentes, CALC.desgloseCompuesto(i, factorFsr()), ren + '.');
+            });
+        }
         analisis.conceptos.forEach(function (c) {
             var concepto = { v: c.descripcion, e: 'texto' };
             if (!c.insumos.length) { filas.push([c.clave, concepto]); return; }
-            var imps = importesInsumos(c);
-            c.insumos.forEach(function (i, n) {
-                filas.push([c.clave, concepto, i.codigo, TIPOS_INSUMO[i.tipo], { v: i.descripcion, e: 'texto' }, i.unidad, { v: num(i.cantidad), e: 'cantidad' },
-                            i.tipo === 'MO' && i.rinde > 0 ? { v: i.rinde, e: 'cantidad' } : null, { v: num(i.costo), e: 'dinero' },
-                            { v: redondear(imps[n].importe), e: 'dinero' }]);
-            });
+            renglones(c, concepto, c.insumos, importesInsumos(c), '');
         });
         if (filas.length < 2) { alert('El catálogo está vacío: no hay matrices que exportar.'); return; }
-        XlsxSimple.descargar(XlsxSimple.crear({ nombre: 'Matrices', anchos: [10, 45, 16, 18, 40, 9, 11, 11, 14, 14], fijarFila: 1, filas: filas }),
+        XlsxSimple.descargar(XlsxSimple.crear({ nombre: 'Matrices', fijarFila: 1, filas: filas,
+                                                anchos: [10, 45, 9, 16, 18, 40, 9, 16, 11, 12, 9, 9, 14, 14, 8, 11, 12, 11, 22, 13] }),
                              'Matrices ' + (txt($('proyecto').value) || 'presupuesto'));
+    }
+    // Cálculo escrito en el Excel (el texto de la columna Cálculo) → tipo_calculo / base del insumo
+    function calculoDeTexto(t) {
+        t = clave(t);
+        if (!t) return null;
+        return /^REND/.test(t) ? { tipo_calculo: 'rendimiento' } : /^FIJ/.test(t) ? { tipo_calculo: 'cantidad', base: 'fijo' }
+             : /^%|M\.?\s*O\.?$/.test(t) ? { tipo_calculo: 'cantidad', base: 'pct_mo' } : { tipo_calculo: 'cantidad' };
+    }
+    // Fecha de costo del Excel: AAAA-MM-DD, DD/MM/AAAA o número de serie de Excel
+    function fechaDeCelda(v) {
+        var t = txt(v), m;
+        if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+        if ((m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(t))) return m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+        if (/^\d{5}(\.\d+)?$/.test(t)) return new Date(Date.UTC(1899, 11, 30) + Math.floor(+t) * 86400000).toISOString().slice(0, 10);
+        return '';
     }
     function tipoInsumo(t) {
         t = clave(t);
@@ -1067,6 +1128,8 @@
         var v = function (f, campo) { return col[campo] === undefined ? '' : f[col[campo]]; };
         // El código y el concepto se repiten en cada insumo; si vienen vacíos se toma el del renglón de arriba
         var matrices = [], porLlave = {}, ultClave = '', ultConcepto = '';
+        // Columna opcional: vacía queda sin capturar (factor 1, merma 0…)
+        var opcional = function (f, campo) { var x = txt(v(f, campo)); return x === '' ? undefined : numeroCelda(x); };
         celdas.slice(inicio).forEach(function (f) {
             var cve = txt(v(f, 'clave')), con = txt(v(f, 'concepto'));
             if (cve || con) { ultClave = cve; ultConcepto = con; }
@@ -1074,9 +1137,20 @@
             if (!porLlave[llave]) { porLlave[llave] = { clave: ultClave, concepto: ultConcepto, insumos: [] }; matrices.push(porLlave[llave]); }
             // Se sube tal cual, sin revisar (para ir juntando datos): basta con que el renglón traiga algo del insumo
             var ins = { tipo: tipoInsumo(v(f, 'tipo')), codigo: txt(v(f, 'codigo')), descripcion: txt(v(f, 'insumo')), unidad: txt(v(f, 'unidad')),
-                        cantidad: numeroCelda(v(f, 'cantidad')), rinde: numeroCelda(v(f, 'rinde')), costo: numeroCelda(v(f, 'costo')) };
+                        cantidad: numeroCelda(v(f, 'cantidad')), rinde: numeroCelda(v(f, 'rinde')), costo: numeroCelda(v(f, 'costo')),
+                        factor: opcional(f, 'factor'), merma_pct: opcional(f, 'merma_pct'), fsr: opcional(f, 'fsr'), viaticos: opcional(f, 'viaticos'),
+                        alimentacion: opcional(f, 'alimentacion'), hospedaje: opcional(f, 'hospedaje'), proveedor: txt(v(f, 'proveedor')),
+                        fecha_costo: fechaDeCelda(v(f, 'fecha_costo')) };
+            var calc = calculoDeTexto(v(f, 'calculo'));
+            // «Cantidad» solo se anota si no es lo de siempre (la mano de obra con rinde se calcula por rendimiento)
+            if (calc && calc.tipo_calculo === 'cantidad' && !calc.base && !(ins.tipo === 'MO' && ins.rinde > 0)) calc = null;
+            if (calc) Object.keys(calc).forEach(function (k) { ins[k] = calc[k]; });
             if (!ins.codigo && !ins.descripcion && !ins.unidad && !ins.cantidad && !ins.costo) return;
-            porLlave[llave].insumos.push(limpiarInsumo(ins));
+            // Renglón 2.1 = componente del insumo del renglón 2 (matriz dentro de matriz)
+            var m = porLlave[llave], ren = txt(v(f, 'renglon')), padre = ren.indexOf('.') > 0 && m.renglones && m.renglones[ren.replace(/\.[^.]*$/, '')];
+            var nuevo = limpiarInsumo(ins);
+            if (padre) (padre.componentes = padre.componentes || []).push(nuevo); else m.insumos.push(nuevo);
+            if (ren) (m.renglones = m.renglones || {})[ren] = nuevo;
         });
         var aplicar = [], sinConcepto = [];
         matrices.forEach(function (m) {
@@ -1515,7 +1589,7 @@
         extras.seguros.forEach(function (x) { seguros[clave(x.concepto)] = true; });
         datos.go.forEach(function (f) {
             var k = clave(f.concepto), v = num(f.presupuesto);
-            if (seguros[k] || f.calc === 'pu') return;
+            if (seguros[k] || f.calc === 'pu' || f.calc === 'fin') return;
             if (/CAMPO/.test(k)) r.campo += v; else if (/OFICINA/.test(k)) r.oficina += v; else r.otros += v;
         });
         return r;
@@ -1528,7 +1602,8 @@
         } };
     }
     function abrirSobrecosto() {
-        ['scFin', 'scIndicador', 'scTasa', 'scPlazo', 'scAnticipo', 'scUsar', 'scModo'].forEach(function (id) { $(id).disabled = soloLectura; });
+        ['scFin', 'scIndicador', 'scTasa', 'scPlazo', 'scAnticipo', 'scUsar', 'scModo', 'scFinSubtotal'].forEach(function (id) { $(id).disabled = soloLectura; });
+        $('scFinSubtotal').checked = !!analisis.finSubtotal;
         $('scUtil').disabled = soloLectura || subtotalManual;
         $('scIndicador').value = analisis.finIndicador || '';
         $('scTasa').value = analisis.finTasa || '';
@@ -1556,7 +1631,7 @@
             ['Precio de venta', '', r.pv, 'pu-total'],
             ['Factor de sobrecosto', 'precio ÷ costo directo', null, 'sc-factor'],
             ['Subtotal del presupuesto', '', r.subtotal, 'sc-info'],
-            ['Diferencia', Math.abs(r.pv - r.subtotal) >= 0.5 ? 'por financiamiento, FSR o ajustes avanzados' : '', r.pv - r.subtotal, 'sc-info']
+            ['Diferencia', Math.abs(r.pv - r.subtotal) >= 0.5 ? (analisis.finSubtotal ? 'por FSR o ajustes avanzados' : 'por financiamiento, FSR o ajustes avanzados') : '', r.pv - r.subtotal, 'sc-info']
         ].filter(Boolean);
         $('scCascada').innerHTML = filas.map(function (f) {
             var v = f[3] === 'sc-factor' ? cant(Math.round(r.factor * 10000) / 10000) : fmt(f[2]);
@@ -1598,6 +1673,10 @@
             marcarCambio();
             pintarSobrecosto();
         });
+    });
+    $('scFinSubtotal').addEventListener('change', function () {
+        analisis.finSubtotal = this.checked;
+        cambioSobrecosto();
     });
     $('scUsar').addEventListener('click', function () {
         analisis.fin = Math.round(CALC.financiamientoEstimado(analisis.finTasa, analisis.finPlazo, analisis.finAnticipo) * 10000) / 10000;

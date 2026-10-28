@@ -36,6 +36,17 @@ Una migración se corre primero en pruebas y, después de revisar el sistema, en
 
 En XAMPP sin `php.ini` propio, agrega `-d extension=pdo_pgsql -d extension=mbstring` después de `php`.
 
+## Revisar los presupuestos después de las migraciones 017 a 021
+
+Solo lectura: no cambia nada en la base. Revisa que estén las migraciones, que los conceptos de cada presupuesto en las
+tablas nuevas coincidan con su análisis guardado (JSON), que no haya conceptos repetidos y que el Subtotal guardado siga
+cuadrando con sus renglones.
+
+```
+php herramientas/revisar-presupuestos.php --env .env.pruebas
+php herramientas/revisar-presupuestos.php --env .env.pruebas --id 123
+```
+
 ## Pruebas automáticas
 
 ```

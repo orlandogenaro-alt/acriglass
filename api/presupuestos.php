@@ -54,20 +54,44 @@ function numero($v, int $decimales = 2): float
     return round(is_numeric($v) ? (float) $v : 0.0, $decimales);
 }
 
-// Renglones que el presupuesto llena solo (empleados, comisiones y Análisis P.U.): se dan de alta si faltan
-const CONCEPTOS_DEL_SISTEMA = ['MANO DE OBRA INTERNA', 'COMISIONES', 'MATERIALES SEGUN ANALISIS P.U.', 'MANO DE OBRA SEGUN ANALISIS P.U.'];
+// Renglones que el presupuesto llena solo (empleados, comisiones, Análisis P.U. y el financiamiento sumado al Subtotal):
+// se dan de alta si faltan
+const CONCEPTOS_DEL_SISTEMA = ['MANO DE OBRA INTERNA', 'COMISIONES', 'MATERIALES SEGUN ANALISIS P.U.', 'MANO DE OBRA SEGUN ANALISIS P.U.',
+                               'HERRAMIENTA MENOR (% DE LA MANO DE OBRA)', 'FINANCIAMIENTO'];
 
-// Id del concepto por su descripción. Uno que no está en el catálogo solo se da de alta si es del sistema,
-// si el catálogo de la sección está vacío (se captura como texto libre) o si lo guarda un administrador;
-// los demás se dan de alta en Administrador › Conceptos.
-function conceptoId(string $tipo, string $descripcion, array &$cache): int
+// Nombre del renglón como lo compara el catálogo: espacios juntos, mayúsculas y a 80 letras (el largo del concepto)
+function nombreRenglon(string $s): string
+{
+    return mb_strtoupper(mb_substr(trim(preg_replace('/\s+/u', ' ', $s)), 0, 80));
+}
+
+// Renglones que llena el Análisis P.U.: un renglón de Materia Prima, Mano de Obra o Gastos de Operacion por cada insumo
+// de las matrices (sin descripción, con el nombre de su tipo, como js/presupuesto.js). Salen del análisis que se guarda,
+// no de lo que diga la pantalla, así que solo se aceptan sin catálogo los nombres que de verdad vienen de las matrices.
+function nombresDelAnalisis(?array $a): array
+{
+    $tipos = ['MAT' => 'Material', 'MO' => 'Mano de obra', 'EQ' => 'Equipo', 'MAQ' => 'Maquinaria', 'HER' => 'Herramienta', 'OTRO' => 'Otro (flete, servicio)'];
+    $r = [];
+    foreach ($a['conceptos'] ?? [] as $c) {
+        foreach ($c['insumos'] ?? [] as $i) {
+            $n = nombreRenglon($i['descripcion'] !== '' ? $i['descripcion'] : $tipos[$i['tipo']] ?? '');
+            if ($n !== '') $r[$n] = true;
+        }
+    }
+    return $r;
+}
+
+// Id del concepto por su descripción. Uno que no está en el catálogo solo se da de alta si es del sistema, si viene de
+// las matrices del Análisis P.U. ($delAnalisis), si el catálogo de la sección está vacío (se captura como texto libre)
+// o si lo guarda un administrador; los demás se dan de alta en Administrador › Conceptos.
+function conceptoId(string $tipo, string $descripcion, array &$cache, bool $delAnalisis = false): int
 {
     $k = $tipo . '|' . mb_strtoupper($descripcion);
     if (isset($cache[$k])) return $cache[$k];
     [$tabla, $col] = CATALOGOS[$tipo];
     $id = (int) bd_valor('AW', "select min($col) from $tabla where upper(trim(descripcion)) = ?", [mb_strtoupper($descripcion)]);
     if (!$id) {
-        $libre = in_array(mb_strtoupper($descripcion), CONCEPTOS_DEL_SISTEMA, true) || tienePermiso('ADMIN_USER')
+        $libre = in_array(mb_strtoupper($descripcion), CONCEPTOS_DEL_SISTEMA, true) || $delAnalisis || tienePermiso('ADMIN_USER')
             || !(int) bd_valor('AW', "select count(*) from $tabla");
         if (!$libre) error("El concepto «{$descripcion}» no está en el catálogo de " . ['MP' => 'Materia Prima', 'MO' => 'Mano de Obra', 'GO' => 'Gastos de Operacion'][$tipo]
             . '. Pide a un administrador que lo dé de alta en Administrador › Conceptos.');
@@ -123,6 +147,8 @@ function analisisPUDatos($d): ?array
         if (isset($d[$k]) && is_numeric($d[$k]) && $d[$k] > 0) $r[$k] = min($max, numero($d[$k], 4));
     }
     if (($v = texto($d['fin_indicador'] ?? '', 60)) !== null) $r['fin_indicador'] = $v;
+    // El financiamiento se suma al Subtotal (renglón FINANCIAMIENTO de Gastos de Operacion, ventana Sobrecosto)
+    if (!empty($d['fin_subtotal'])) $r['fin_subtotal'] = true;
     // Botón Cálculo: periodo de corte y opciones
     if (is_array($d['calculo'] ?? null)) {
         $k = $d['calculo'];
@@ -493,11 +519,12 @@ function guardar(array $d): array
 
         $cache = [];
         $conCalculo = bd_tiene_columna('AW', 'doctos_sugerido_obra_det', 'calculo_base');
+        $delAnalisis = nombresDelAnalisis($analisis);
         foreach ($conceptos as $c) {
             $docto = (int) ($c['docto_imp_id'] ?? 0);
             $detId = bd_insertar('AW', 'doctos_sugerido_obra_det', 'docto_sugerido_obra_det_id', calculoRenglon($conCalculo ? $c['gasto'] ?? null : null) + [
                 'docto_sugerido_obra_id' => $id,
-                'concepto_id'            => conceptoId($c['tipo'], $c['concepto'], $cache),
+                'concepto_id'            => conceptoId($c['tipo'], $c['concepto'], $cache, isset($delAnalisis[nombreRenglon($c['concepto'])])),
                 'presupuesto'            => numero($c['presupuesto'] ?? 0),
                 'subtotal'               => numero($c['presupuesto'] ?? 0),
                 'total'                  => numero($c['presupuesto'] ?? 0),

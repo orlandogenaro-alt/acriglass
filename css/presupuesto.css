@@ -753,6 +753,8 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .sc-param legend { padding: 0 4px; font-weight: 700; color: var(--enfasis); }
 .sc-param label { display: flex; flex-direction: column; gap: 3px; }
 .sc-param input, .sc-param select { height: 32px; padding: 0 8px; background: var(--input); color: var(--texto); border: 1px solid var(--borde-2); border-radius: 4px; }
+.sc-param label.sc-check { flex-direction: row; align-items: flex-start; gap: 6px; color: var(--texto); }
+.sc-param label.sc-check input { height: auto; margin-top: 2px; }
 .sc-estimado { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .sc-estimado b { color: var(--enfasis); }
 .sc-estimado .ct-btn { margin: 0; }

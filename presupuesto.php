@@ -925,6 +925,8 @@ $secciones = [
                 <p class="sc-estimado">Estimado: <b id="scEstimado"></b>
                     <button type="button" class="ct-btn" id="scUsar" title="Pone el estimado como % de financiamiento">Usar este %</button>
                     <small>tasa anual × meses / 12 × (1 − anticipo)</small></p>
+                <label class="sc-check" title="Agrega el renglón FINANCIAMIENTO en Gastos de Operación: entra a la utilidad, al Subtotal y al Total del presupuesto">
+                    <input type="checkbox" id="scFinSubtotal"> Sumar el financiamiento al Subtotal del presupuesto</label>
             </fieldset>
             <fieldset>
                 <legend>Utilidad</legend>

@@ -49,4 +49,5 @@ El formato impreso (partidas, subpartidas y propuesta) y la ruta crítica del pr
 ```
 node pruebas/formato-presupuesto.js
 node pruebas/ruta-critica.js
+node pruebas/presupuesto-calculo.js
 ```

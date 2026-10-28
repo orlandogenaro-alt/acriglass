@@ -345,7 +345,7 @@
     function ponerInsumosPU() {
         if (analisis.conceptos.length) huboAnalisis = true;
         if (!huboAnalisis) return;
-        var fsr = factorFsr(), nuevos = { mp: {}, mo: {} }, lista = { mp: [], mo: [] }, moReal = 0;
+        var nuevos = { mp: {}, mo: {} }, lista = { mp: [], mo: [] }, moReal = 0;
         function sumar(sec, nombre, importe) {
             var k = clave(nombre);
             if (!nuevos[sec][k]) { nuevos[sec][k] = { nombre: txt(nombre), importe: 0 }; lista[sec].push(nuevos[sec][k]); }
@@ -353,8 +353,9 @@
         }
         analisis.conceptos.forEach(function (c) {
             if (!alCosto(c)) return;
-            c.insumos.forEach(function (i) {
-                var sec = i.tipo === 'MO' ? 'mo' : 'mp', imp = cantidadInsumo(i) * i.costo * c.cantidad * (sec === 'mo' ? fsr : 1);
+            var imps = importesInsumos(c);
+            c.insumos.forEach(function (i, n) {
+                var sec = i.tipo === 'MO' ? 'mo' : 'mp', imp = imps[n].importe * c.cantidad;
                 if (!imp) return;
                 sumar(sec, txt(i.descripcion) || TIPOS_INSUMO[i.tipo], imp);
                 if (sec === 'mo') moReal += imp;
@@ -446,7 +447,12 @@
     //   + Cargos adicionales: % del precio de venta (comisiones y anexo de seguro, que el Form46 cobra sobre el subtotal)
     //   = Precio de venta; factor de sobrecosto = Precio de venta / CD; P.U. = CD por unidad × factor
     var FIJOS_PU = { mp: 'MATERIALES SEGUN ANALISIS P.U.', mo: 'MANO DE OBRA SEGUN ANALISIS P.U.' };
-    var TIPOS_INSUMO = { MAT: 'Material', MO: 'Mano de obra', EQ: 'Equipo / herramienta' };
+    var TIPOS_INSUMO = { MAT: 'Material', MO: 'Mano de obra', EQ: 'Equipo', MAQ: 'Maquinaria', HER: 'Herramienta', OTRO: 'Otro (flete, servicio)' };
+    // Fórmulas por insumo y por concepto, y el sobrecosto: js/presupuesto-calculo.js (gemelo de includes/presupuesto-calculo.php)
+    var CALC = window.AcriCalculoPU;
+    // Campos opcionales del insumo (tipo de cálculo, merma, FSR propio, viáticos, proveedor…): se guardan solo si se capturan
+    var CAMPOS_INSUMO = { tipo_calculo: 'texto', base: 'texto', factor: 'num', merma_pct: 'num', fsr: 'num', viaticos: 'num',
+                          alimentacion: 'num', hospedaje: 'num', proveedor: 'texto', fecha_costo: 'texto' };
     var BIBLIOTECA = window.ACRI_BIBLIOTECA_PU || { conceptos: [], insumos: [] };
     var CATALOGO_PU = window.ACRI_CATALOGO_PU || [];   // Catalogos › Insumos (precio vigente; mano de obra sin FSR)
     var CONCEPTOS_PU = window.ACRI_CONCEPTOS_PU || [];  // Catalogos › Conceptos P.U. con su matriz desarmada (mano de obra sin FSR)
@@ -465,8 +471,14 @@
         return 'C-' + pad3(n + 1);
     }
     function limpiarInsumo(i) {
-        return { tipo: TIPOS_INSUMO[i.tipo] ? i.tipo : 'MAT', codigo: String(i.codigo || ''), descripcion: String(i.descripcion || ''), unidad: String(i.unidad || ''),
-                 cantidad: num(i.cantidad), rinde: num(i.rinde), costo: num(i.costo) };
+        var r = { tipo: TIPOS_INSUMO[i.tipo] ? i.tipo : 'MAT', codigo: String(i.codigo || ''), descripcion: String(i.descripcion || ''), unidad: String(i.unidad || ''),
+                  cantidad: num(i.cantidad), rinde: num(i.rinde), costo: num(i.costo) };
+        Object.keys(CAMPOS_INSUMO).forEach(function (k) {
+            var v = i[k];
+            if (v === undefined || v === null || v === '') return;
+            r[k] = CAMPOS_INSUMO[k] === 'num' ? num(v) : String(v);
+        });
+        return r;
     }
     function nuevoConcepto(c) {
         c = c || {};
@@ -508,20 +520,18 @@
         };
     }
 
-    // Mano de obra: si se captura lo que rinde por jornada, la cantidad es 1 / rendimiento
-    function cantidadInsumo(i) { return i.tipo === 'MO' && i.rinde > 0 ? 1 / i.rinde : i.cantidad; }
+    // Cantidad del insumo por unidad del concepto: cantidad directa o 1 / rendimiento, con factor y merma (en pct_mo es el %)
+    function cantidadInsumo(i, c) { return CALC.cantidad(i, c ? c.cantidad : 0); }
+    // Importe del insumo por unidad del concepto (mano de obra con FSR y viáticos; pct_mo sobre la mano de obra)
+    function importesInsumos(c) { return CALC.concepto(c, analisis).insumos; }
+    var SIN_COSTO = { mat: 0, mo: 0, moReal: 0, eq: 0, maq: 0, her: 0, otro: 0, hm: 0, cd: 0 };
     // Costo de UNA unidad del concepto. Uno de precio fijo no suma al costo: su matriz es informativa, salvo con «La matriz
     // de los precios fijos es el costo» (informativa = true la calcula igual, para mostrarla en la ventana del análisis)
     function costoUnitario(c, informativa) {
-        var r = { mat: 0, mo: 0, eq: 0 };
-        if (informativa || alCosto(c)) c.insumos.forEach(function (i) { r[i.tipo.toLowerCase()] += cantidadInsumo(i) * i.costo; });
-        r.moReal = r.mo * factorFsr();
-        r.hm = r.moReal * analisis.hm / 100;
-        r.cd = r.mat + r.eq + r.moReal + r.hm;
-        return r;
+        return informativa || alCosto(c) ? CALC.concepto(c, analisis).totales : Object.assign({}, SIN_COSTO);
     }
     function totalesAnalisis() {
-        var t = { mat: 0, mo: 0, eq: 0, moReal: 0, hm: 0, cd: 0 };
+        var t = Object.assign({}, SIN_COSTO);
         analisis.conceptos.forEach(function (c) {
             var u = costoUnitario(c);
             Object.keys(t).forEach(function (k) { t[k] += u[k] * c.cantidad; });
@@ -535,13 +545,13 @@
         if (c.cantidad <= 0) return 'Falta la cantidad';
         if (esVenta(c)) return '';
         if (!c.insumos.length) return 'Falta el análisis';
-        if (c.insumos.some(function (i) { return !i.descripcion.trim() || cantidadInsumo(i) <= 0 || i.costo <= 0; })) return 'Insumo incompleto';
+        if (c.insumos.some(function (i) { return !i.descripcion.trim() || cantidadInsumo(i, c) <= 0 || (i.costo <= 0 && i.base !== 'pct_mo'); })) return 'Insumo incompleto';
         return '';
     }
 
     function calcularPU() {
         var t = recalcular();
-        var fsr = factorFsr(), hm = analisis.hm / 100, fin = analisis.fin / 100;
+        var fsr = factorFsr(), hm = analisis.hm / 100;
         var seguros = {};
         extras.seguros.forEach(function (s) { seguros[clave(s.concepto)] = true; });
         // Cargos adicionales como % del precio: los mismos porcentajes que el Form46 aplica al subtotal
@@ -571,24 +581,21 @@
             });
         });
         var a = totalesAnalisis();
-        r.mp += a.mat + a.eq;
+        r.mp += a.mat + a.eq + a.maq + a.her + a.otro;
         r.mo += a.mo;
-        r.fsr += a.moReal - a.mo;
+        r.fsr += a.moReal - a.mo;   // FSR y viáticos de la mano de obra analizada
         r.hm += a.hm;
         datos.go.forEach(function (f) { if (!seguros[clave(f.concepto)]) r.ind += num(f.presupuesto); });
 
         r.cd = r.mp + r.mo + r.fsr + r.hm;
-        r.fin = (r.cd + r.ind) * fin;
-        // Utilidad equivalente: con FSR 1, sin herramienta ni financiamiento, da el mismo subtotal que el Form46
-        // Utilidad equivalente a la del presupuesto (con FSR 1, sin herramienta ni financiamiento da el mismo subtotal).
-        // Las comisiones y el seguro se cobran sobre el subtotal, por eso entran en la equivalencia.
-        var m = num($('pctUtilidad').value) / 100;
-        if (modoUtilidad() === 'costo') r.utilPct = 1 - ca * (1 + m) > 0 ? ((1 + m) * (1 - ca) / (1 - ca * (1 + m)) - 1) * 100 : 0;
-        else r.utilPct = 1 - m - ca > 0 ? m / (1 - m - ca) * 100 : 0;
-        r.util = (r.cd + r.ind + r.fin) * r.utilPct / 100;
-        r.pv = (r.cd + r.ind + r.fin + r.util) / (1 - ca);
-        r.cargos = r.pv * ca;
-        r.factor = r.cd > 0 ? r.pv / r.cd : 0;
+        // Financiamiento, utilidad equivalente a la del presupuesto, cargos adicionales y factor de sobrecosto
+        var s = CALC.sobrecosto(r.cd, r.ind, analisis.fin, num($('pctUtilidad').value), modoUtilidad(), ca);
+        r.fin = s.fin;
+        r.utilPct = s.util_pct;
+        r.util = s.util;
+        r.pv = s.pv;
+        r.cargos = s.cargos;
+        r.factor = s.factor;
         r.subtotal = t.subtotal;
         return r;
     }
@@ -598,10 +605,13 @@
 
     // Sugerencias para no teclear precios: lo ya capturado en este presupuesto, el catálogo de insumos,
     // los artículos importados, los empleados (sueldo diario por jornal) y lo usado en otros presupuestos. Gana lo primero.
+    // Maquinaria, herramienta y otros comparten las sugerencias del equipo
+    function grupoSugerencia(tipo) { return tipo === 'MAT' || tipo === 'MO' ? tipo : 'EQ'; }
     function construirSugerencias() {
         sugerencias = { MAT: {}, MO: {}, EQ: {} };
         function poner(tipo, descripcion, unidad, costo) {
             var k = clave(descripcion);
+            tipo = grupoSugerencia(tipo);
             if (!k || sugerencias[tipo][k] || !(num(costo) > 0)) return;
             sugerencias[tipo][k] = { descripcion: txt(descripcion), unidad: txt(unidad), costo: num(costo) };
         }
@@ -779,9 +789,11 @@
             // La matriz de un precio fijo es informativa (su costo ya está en Materia Prima, Mano de Obra y Gastos de Operacion),
             // salvo con «La matriz de los precios fijos es el costo»
             if (!alCosto(c)) return;
-            c.insumos.forEach(function (i) {
-                var q = cantidadInsumo(i) * c.cantidad;
-                if (q) sumar(TIPOS_INSUMO[i.tipo], i.descripcion, i.unidad, q, q * i.costo);
+            var imps = importesInsumos(c);
+            c.insumos.forEach(function (i, n) {
+                // Un % de la mano de obra (herramienta 3 %) no tiene cantidad que sumar: solo su importe
+                var pctMo = i.base === 'pct_mo', q = pctMo ? 0 : imps[n].cantidad * c.cantidad, imp = imps[n].importe * c.cantidad;
+                if (q || imp) sumar(TIPOS_INSUMO[i.tipo], i.descripcion, pctMo ? '%' : i.unidad, q, imp);
             });
         });
         ['mp', 'mo', 'go'].forEach(function (sec) {
@@ -931,10 +943,11 @@
         analisis.conceptos.forEach(function (c) {
             var concepto = { v: c.descripcion, e: 'texto' };
             if (!c.insumos.length) { filas.push([c.clave, concepto]); return; }
-            c.insumos.forEach(function (i) {
+            var imps = importesInsumos(c);
+            c.insumos.forEach(function (i, n) {
                 filas.push([c.clave, concepto, i.codigo, TIPOS_INSUMO[i.tipo], { v: i.descripcion, e: 'texto' }, i.unidad, { v: num(i.cantidad), e: 'cantidad' },
                             i.tipo === 'MO' && i.rinde > 0 ? { v: i.rinde, e: 'cantidad' } : null, { v: num(i.costo), e: 'dinero' },
-                            { v: redondear(cantidadInsumo(i) * i.costo), e: 'dinero' }]);
+                            { v: redondear(imps[n].importe), e: 'dinero' }]);
             });
         });
         if (filas.length < 2) { alert('El catálogo está vacío: no hay matrices que exportar.'); return; }
@@ -944,7 +957,8 @@
     function tipoInsumo(t) {
         t = clave(t);
         // También el Tipo de Neodata: 1 material, 2 mano de obra, 3 equipo / herramienta (%)
-        return /^(MO|MANO|2$)/.test(t) ? 'MO' : /^(EQ|HERR|3$)/.test(t) ? 'EQ' : 'MAT';
+        return /^(MO|MANO|2$)/.test(t) ? 'MO' : /^MAQ/.test(t) ? 'MAQ' : /^HER/.test(t) ? 'HER' : /^(OTRO|FLETE|SERV)/.test(t) ? 'OTRO'
+             : /^(EQ|3$)/.test(t) ? 'EQ' : 'MAT';
     }
     function importarMatrices(celdas) {
         var col = null, inicio = 0;
@@ -1051,7 +1065,7 @@
             return '<tr data-n="' + n + '">' +
                 '<td class="ro">' + (n + 1) + '</td>' +
                 '<td><input type="text" data-ins="codigo" maxlength="30" value="' + escapar(i.codigo) + '" placeholder="Clave"' + dis + '></td>' +
-                '<td><input type="text" data-ins="descripcion" list="puSug' + i.tipo + '" maxlength="200" value="' + escapar(i.descripcion) + '" placeholder="' +
+                '<td><input type="text" data-ins="descripcion" list="puSug' + grupoSugerencia(i.tipo) + '" maxlength="200" value="' + escapar(i.descripcion) + '" placeholder="' +
                     (mo ? 'ej. Instalador + ayudante' : i.tipo === 'EQ' ? 'ej. Andamio, taladro' : 'ej. Vidrio claro 6 mm') + '"' + dis + '></td>' +
                 '<td><select data-ins="tipo"' + dis + '>' + Object.keys(TIPOS_INSUMO).map(function (t) {
                     return '<option value="' + t + '"' + (t === i.tipo ? ' selected' : '') + '>' + TIPOS_INSUMO[t] + '</option>';
@@ -1061,7 +1075,7 @@
                 '<td><input type="number" class="num" data-ins="cantidad" step="0.0001" min="0" value="' + (calc ? (Math.round(1 / i.rinde * 10000) / 10000) : (i.cantidad || '')) + '"' +
                     (calc ? ' readonly title="Se calcula con lo que rinde por jornada"' : '') + dis + '></td>' +
                 '<td>' + (mo ? '<input type="number" class="num" data-ins="rinde" step="0.01" min="0" value="' + (i.rinde || '') + '" placeholder="' + escapar(u) + '/día"' + dis + '>' : '<span class="pu-na">—</span>') + '</td>' +
-                '<td class="ro" data-ins-calc>' + fmt(cantidadInsumo(i) * i.costo) + '</td>' +
+                '<td class="ro" data-ins-calc></td>' +
                 '<td><button type="button" class="borrar" title="Quitar"' + dis + '>✕</button></td></tr>';
         }).join('') : '<tr class="vacio-fila"><td colspan="10">Agrega lo que lleva con los botones de arriba: Material, Mano de obra o Equipo.</td></tr>';
         pintarDialogo();
@@ -1069,9 +1083,10 @@
 
     function pintarDialogo() {
         var c = editandoPU, fijo = esVenta(c), u = costoUnitario(c, true), r = calcularPU(), unidad = escapar(txt(c.unidad) || 'unidad');
+        var imps = importesInsumos(c);
         $('puDInsumos').querySelectorAll('tr[data-n]').forEach(function (tr) {
             var i = c.insumos[tr.dataset.n];
-            tr.querySelector('[data-ins-calc]').textContent = fmt(cantidadInsumo(i) * i.costo);
+            tr.querySelector('[data-ins-calc]').textContent = fmt(imps[tr.dataset.n].importe);
             if (i.tipo === 'MO' && i.rinde > 0) tr.querySelector('[data-ins="cantidad"]').value = Math.round(1 / i.rinde * 10000) / 10000;
         });
         var falta = revisionConcepto(c);
@@ -1080,6 +1095,9 @@
             '<span>Mano de obra' + (factorFsr() !== 1 ? ' (× FSR ' + cant(factorFsr()) + ')' : '') + ' <b>' + fmt(u.moReal) + '</b></span>' +
             (u.hm ? '<span>Herramienta menor <b>' + fmt(u.hm) + '</b></span>' : '') +
             '<span>Equipo <b>' + fmt(u.eq) + '</b></span>' +
+            (u.maq ? '<span>Maquinaria <b>' + fmt(u.maq) + '</b></span>' : '') +
+            (u.her ? '<span>Herramienta <b>' + fmt(u.her) + '</b></span>' : '') +
+            (u.otro ? '<span>Otros <b>' + fmt(u.otro) + '</b></span>' : '') +
             '<span>= Costo directo por ' + unidad + ' <b>' + fmt(u.cd) + '</b></span>' +
             (fijo
                 ? '<span class="pu-pu">Precio fijo para el cliente <b>$' + fmt(c.venta) + '</b> por ' + unidad + '</span>' +
@@ -1133,7 +1151,7 @@
     $('puDInsumos').addEventListener('change', function (e) {
         var tr = e.target.closest('tr[data-n]');
         if (!tr || e.target.dataset.ins !== 'descripcion') return;
-        var i = editandoPU.insumos[tr.dataset.n], s = sugerencias[i.tipo][clave(i.descripcion)];
+        var i = editandoPU.insumos[tr.dataset.n], s = sugerencias[grupoSugerencia(i.tipo)][clave(i.descripcion)];
         if (!s) return;
         if (!txt(i.unidad)) i.unidad = s.unidad;
         if (!i.costo) i.costo = s.costo;
@@ -1209,10 +1227,10 @@
             destino.conceptos.push({
                 clave: x.clave, descripcion: x.descripcion, unidad: x.unidad, cantidad: x.cantidad, pu: x.pu, importe: x.importe,
                 cd: x.cdU, especificacion: x.c ? x.c.especificacion || '' : '',
-                insumos: !detalle || (x.c && esVenta(x.c)) ? [] : x.c ? x.c.insumos.map(function (i) {
-                    var q = cantidadInsumo(i);
-                    return { tipo: TIPOS_INSUMO[i.tipo], descripcion: i.descripcion, unidad: i.unidad, cantidad: q, costo: i.costo,
-                             importe: q * i.costo * (i.tipo === 'MO' ? factorFsr() : 1) };
+                insumos: !detalle || (x.c && esVenta(x.c)) ? [] : x.c ? importesInsumos(x.c).map(function (d, n) {
+                    var i = x.c.insumos[n];
+                    return { tipo: TIPOS_INSUMO[i.tipo], descripcion: i.descripcion, unidad: i.base === 'pct_mo' ? '%' : i.unidad, cantidad: d.cantidad,
+                             costo: i.costo, importe: d.importe };
                 }).concat(u && u.hm ? [{ tipo: 'Herramienta menor', descripcion: pct(analisis.hm) + ' de la mano de obra', unidad: '', cantidad: 0, costo: 0, importe: u.hm }] : [])
                 : (x.articulos || []).map(function (a) {
                     return { tipo: 'Importado', descripcion: txt(a.nom_articulo) || txt(a.clave_articulo), unidad: txt(a.unid_medida),

@@ -4,6 +4,13 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-10-28',
+        'cambios' => [
+            ['mejora', 'Presupuesto: un solo motor de cálculo para el Análisis P.U.', 'Las fórmulas del análisis de precios unitarios (cantidad de cada insumo, mano de obra con FSR, herramienta menor, costo directo, financiamiento, utilidad, cargos adicionales y factor de sobrecosto) ahora están en un solo lugar del servidor, con un gemelo en la pantalla que se prueba con los mismos casos para que siempre den lo mismo. Los presupuestos guardados dan exactamente las mismas cifras que antes. La explosión de insumos del Análisis P.U. ahora muestra la mano de obra con su FSR, igual que Mano de Obra y la explosión de la obra.'],
+            ['nuevo', 'Presupuesto: más tipos de insumo en la matriz: maquinaria, herramienta y otro (flete, servicio)', 'En la ventana del análisis de un concepto el Tipo de cada insumo ahora puede ser Material, Mano de obra, Equipo, Maquinaria, Herramienta u Otro (flete, servicio), y hay un botón «+ Otro». Así el flete o la herramienta ya no se confunden con los materiales. Al importar matrices de Excel, un tipo «Herramienta», «Maquinaria», «Flete» u «Otro» se reconoce solo. Todos siguen sumando al costo como hasta hoy.'],
+        ],
+    ],
+    [
         'fecha' => '2026-10-27',
         'cambios' => [
             ['mejora', 'Presupuesto: ventana del análisis más grande y fácil de leer', 'La ventana del análisis del precio unitario (doble clic en un concepto del Catálogo) ahora ocupa casi toda la pantalla, con letra más grande en los campos, la tabla de insumos y los totales; la tabla de insumos usa todo el alto disponible, así que se ven más renglones sin desplazarse.'],

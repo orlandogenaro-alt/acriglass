@@ -738,6 +738,7 @@ $secciones = [
         <button type="button" class="ct-btn" data-pu-insumo="MAT">+ Material</button>
         <button type="button" class="ct-btn" data-pu-insumo="MO">+ Mano de obra</button>
         <button type="button" class="ct-btn" data-pu-insumo="EQ">+ Equipo / herramienta</button>
+        <button type="button" class="ct-btn" data-pu-insumo="OTRO" title="Flete, servicio u otro costo (el tipo se puede cambiar en el renglón: maquinaria, herramienta…)">+ Otro</button>
         <!-- Las matrices de TODOS los conceptos en un Excel (un renglón por insumo); al importarlo se reemplaza la matriz de cada concepto -->
         <button type="button" class="ct-btn pu-dlg-excel" id="puDExportar" title="Descarga en Excel la matriz de todos los conceptos del catálogo, un renglón por insumo">Exportar matrices a Excel</button>
         <button type="button" class="ct-btn" id="puDImportar" title="Llena la matriz de los conceptos desde el Excel (el mismo formato que Exportar matrices)">Importar matrices de Excel</button>
@@ -911,6 +912,7 @@ $secciones = [
     window.ACRI_PLANTILLAS_PU = <?= json_encode($plantillasPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.ACRI_CONCEPTOS_PU = <?= json_encode($conceptosPU, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
+<script src="<?= recurso('js/presupuesto-calculo.js') ?>"></script>
 <script src="<?= recurso('js/formato-presupuesto.js') ?>"></script>
 <script src="<?= recurso('js/formato-analisis.js') ?>"></script>
 <script src="<?= recurso('js/xlsx-simple.js') ?>"></script>

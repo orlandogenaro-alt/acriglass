@@ -1,0 +1,85 @@
+{
+    "_nota": "Casos del motor de P.U. Los corren pruebas/presupuesto-calculo.php (PHP) y pruebas/presupuesto-calculo.js (Node): los dos motores deben dar lo mismo. Esperados calculados a mano.",
+    "casos": [
+        {
+            "nombre": "Análisis de antes (MAT / MO / EQ sin campos nuevos): mismo resultado que siempre",
+            "tipo": "concepto",
+            "analisis": { "fsr": 1, "hm": 0 },
+            "concepto": { "cantidad": 2, "insumos": [
+                { "tipo": "MAT", "cantidad": 1.05, "costo": 400 },
+                { "tipo": "MO", "cantidad": 0, "rinde": 8, "costo": 800 },
+                { "tipo": "EQ", "cantidad": 0.1, "costo": 150 }
+            ] },
+            "esperado": {
+                "insumos": [ { "cantidad": 1.05, "importe": 420 }, { "cantidad": 0.125, "importe": 100 }, { "cantidad": 0.1, "importe": 15 } ],
+                "totales": { "mat": 420, "mo": 100, "moReal": 100, "eq": 15, "hm": 0, "cd": 535 }
+            }
+        },
+        {
+            "nombre": "Concepto BR1: vidrio, conectores, MDF, cuadrilla 3.30 jornadas, flete fijo, herramienta 3 % de la M.O. y equipo de seguridad",
+            "tipo": "concepto",
+            "analisis": { "fsr": 1, "hm": 0 },
+            "concepto": { "cantidad": 1, "insumos": [
+                { "tipo": "MAT", "cantidad": 3.30, "costo": 1526.27 },
+                { "tipo": "MAT", "cantidad": 24, "costo": 236 },
+                { "tipo": "MAT", "cantidad": 2, "costo": 250 },
+                { "tipo": "MO", "tipo_calculo": "cantidad", "cantidad": 3.30, "costo": 800 },
+                { "tipo": "OTRO", "base": "fijo", "cantidad": 1, "costo": 2000 },
+                { "tipo": "HER", "base": "pct_mo", "cantidad": 3 },
+                { "tipo": "EQ", "cantidad": 1, "costo": 523.59 }
+            ] },
+            "esperado": {
+                "insumos": [ { "importe": 5036.691 }, { "importe": 5664 }, { "importe": 500 }, { "cantidad": 3.30, "importe": 2640 },
+                             { "importe": 2000 }, { "cantidad": 3, "importe": 79.2 }, { "importe": 523.59 } ],
+                "totales": { "mat": 11200.691, "moReal": 2640, "otro": 2000, "her": 79.2, "eq": 523.59, "cd": 16443.481 },
+                "resumen": { "materiales": 11200.691, "mano_obra": 2640, "maquinaria_equipo": 523.59, "gastos_operacion": 79.2, "otros": 2000, "costo_directo": 16443.481 }
+            }
+        },
+        {
+            "nombre": "Rendimiento (tipo B): una cuadrilla instala 3 canceles por jornada; 10 canceles = 3.333 jornadas",
+            "tipo": "concepto",
+            "analisis": { "fsr": 1, "hm": 0 },
+            "concepto": { "cantidad": 10, "insumos": [ { "tipo": "MO", "tipo_calculo": "rendimiento", "rinde": 3, "costo": 800 } ] },
+            "esperado": { "insumos": [ { "cantidad": 0.333333, "importe": 266.666667 } ], "totales": { "moReal": 266.666667, "cd": 266.666667 } }
+        },
+        {
+            "nombre": "Merma y factor: 1 m² con 10 % de merma y factor 1.05 a $100 = 115.50",
+            "tipo": "concepto",
+            "analisis": {},
+            "concepto": { "cantidad": 1, "insumos": [ { "tipo": "MAT", "cantidad": 1, "factor": 1.05, "merma_pct": 10, "costo": 100 } ] },
+            "esperado": { "insumos": [ { "cantidad": 1.155, "importe": 115.5 } ], "totales": { "mat": 115.5, "cd": 115.5 } }
+        },
+        {
+            "nombre": "FSR del análisis 1.5 y herramienta menor 3 %; un insumo con su propio FSR 1.2 y viáticos $100",
+            "tipo": "concepto",
+            "analisis": { "fsr": 1.5, "hm": 3 },
+            "concepto": { "cantidad": 1, "insumos": [
+                { "tipo": "MO", "cantidad": 2, "costo": 500 },
+                { "tipo": "MO", "cantidad": 1, "costo": 500, "fsr": 1.2, "viaticos": 100 }
+            ] },
+            "esperado": {
+                "insumos": [ { "costo": 750, "importe": 1500 }, { "costo": 700, "importe": 700 } ],
+                "totales": { "mo": 1500, "moReal": 2200, "hm": 66, "cd": 2266 }
+            }
+        },
+        {
+            "nombre": "Costo fijo por concepto: un flete de $2,000 para 4 piezas son $500 por pieza",
+            "tipo": "concepto",
+            "analisis": {},
+            "concepto": { "cantidad": 4, "insumos": [ { "tipo": "OTRO", "base": "fijo", "cantidad": 1, "costo": 2000 } ] },
+            "esperado": { "insumos": [ { "cantidad": 0.25, "importe": 500 } ], "totales": { "otro": 500, "cd": 500 } }
+        },
+        {
+            "nombre": "Sobrecosto: CD 1,000 + Ind 100, financiamiento 2 %, utilidad 20 % sobre el costo, sin cargos",
+            "tipo": "sobrecosto",
+            "args": [1000, 100, 2, 20, "costo", 0],
+            "esperado": { "fin": 22, "util_pct": 20, "util": 224.4, "pv": 1346.4, "cargos": 0, "factor": 1.3464 }
+        },
+        {
+            "nombre": "Sobrecosto: margen 20 % con 5 % de comisiones da el mismo subtotal que el Form46 (1,333.33)",
+            "tipo": "sobrecosto",
+            "args": [1000, 0, 0, 20, "margen", 0.05],
+            "esperado": { "fin": 0, "util_pct": 26.666667, "util": 266.666667, "pv": 1333.333333, "cargos": 66.666667, "factor": 1.333333 }
+        }
+    ]
+}

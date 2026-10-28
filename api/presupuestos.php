@@ -5,6 +5,7 @@
 // POST ?accion=registrar_obra { id, nom_obra }  crea la obra del presupuesto; regresa { obra_id, nom_obra, nueva }
 // POST ?accion=eliminar    { id, autoriza? }  solo un presupuesto Cancelado
 // POST ?accion=hubspot     { id, email, formato_html? }  crea o actualiza su negocio en HubSpot (después de guardar)
+// POST ?accion=calcular    { analisis, sobrecosto? }  Análisis P.U. con el motor central; no guarda nada
 // Los ids nuevos salen de GEN_ID(ID_CATALOGOS) en Firebird (igual que los triggers de AW)
 // y de las columnas identity en Supabase. El folio lo asigna la base (trigger / secuencia).
 define('ACRI_API', true);
@@ -16,6 +17,7 @@ require __DIR__ . '/../includes/estatus.php';
 require __DIR__ . '/../includes/tareas.php';
 require __DIR__ . '/../includes/presupuesto-obra.php';
 require __DIR__ . '/../includes/calculo.php';
+require_once __DIR__ . '/../includes/pu.php';   // y el motor de P.U. (includes/presupuesto-calculo.php)
 require __DIR__ . '/../includes/parametros-presupuesto.php';
 require __DIR__ . '/../includes/hubspot-presupuesto.php';
 require __DIR__ . '/../includes/respuesta.php';
@@ -23,6 +25,12 @@ require __DIR__ . '/../includes/respuesta.php';
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') error('Método no permitido.', 405);
 if (modoConfiguracion()) error('Modo configuración: aún no hay conexión a AW-Management.', 503);
 exigirCsrf();
+// El cálculo no toca la base: lo puede pedir quien puede ver el presupuesto
+if (($_GET['accion'] ?? '') === 'calcular') {
+    exigirPermiso('MODULO_SUGERIDOS_OBRA', 'NUEVO_SUGERIDO_OBRA', 'MODIFICAR_SUGERIDO_OBRA', 'NUEVO_OBRA', 'MODIFICAR_OBRA', 'CERRAR_OBRA', 'ADMIN_USER');
+    session_write_close();
+    responder(['ok' => true] + calcularAnalisis(entrada()));
+}
 exigirPermiso('NUEVO_SUGERIDO_OBRA', 'MODIFICAR_SUGERIDO_OBRA', 'NUEVO_OBRA', 'MODIFICAR_OBRA', 'ADMIN_USER');
 session_write_close();
 
@@ -111,8 +119,8 @@ function analisisPU($d): ?string
         $insumos = [];
         foreach (array_slice((array) ($c['insumos'] ?? []), 0, 200) as $i) {
             if (!is_array($i)) continue;
-            $insumos[] = [
-                'tipo'        => in_array($i['tipo'] ?? '', ['MAT', 'MO', 'EQ'], true) ? $i['tipo'] : 'MAT',
+            $ins = [
+                'tipo'        => in_array($i['tipo'] ?? '', PC_TIPOS, true) ? $i['tipo'] : 'MAT',
                 'codigo'      => texto($i['codigo'] ?? '', 30) ?? '',
                 'descripcion' => texto($i['descripcion'] ?? '', 200) ?? '',
                 'unidad'      => texto($i['unidad'] ?? '', 20) ?? '',
@@ -120,6 +128,15 @@ function analisisPU($d): ?string
                 'rinde'       => max(0, numero($i['rinde'] ?? 0, 4)),
                 'costo'       => max(0, numero($i['costo'] ?? 0, 4)),
             ];
+            // Campos opcionales del motor (includes/presupuesto-calculo.php): solo si se capturaron
+            if (in_array($i['tipo_calculo'] ?? '', ['cantidad', 'rendimiento'], true)) $ins['tipo_calculo'] = $i['tipo_calculo'];
+            if (in_array($i['base'] ?? '', ['fijo', 'pct_mo'], true)) $ins['base'] = $i['base'];
+            foreach (['factor' => 6, 'merma_pct' => 4, 'fsr' => 4, 'viaticos' => 4, 'alimentacion' => 4, 'hospedaje' => 4] as $k => $dec) {
+                if (isset($i[$k]) && is_numeric($i[$k])) $ins[$k] = max(0, numero($i[$k], $dec));
+            }
+            if (($v = texto($i['proveedor'] ?? '', 150)) !== null) $ins['proveedor'] = $v;
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($i['fecha_costo'] ?? ''))) $ins['fecha_costo'] = $i['fecha_costo'];
+            $insumos[] = $ins;
         }
         $concepto = [
             'clave'       => texto($c['clave'] ?? '', 20) ?? '',
@@ -139,6 +156,31 @@ function analisisPU($d): ?string
     }
     if ($r['fsr'] == 1 && !$r['hm'] && !$r['fin'] && $r['util'] === null && !$r['conceptos']) return null;
     return json_encode($r, JSON_UNESCAPED_UNICODE);
+}
+
+// Análisis P.U. con el motor central (includes/presupuesto-calculo.php): por concepto el desglose de UNA unidad (cada
+// insumo con su cantidad resultante, costo real e importe) y el resumen como Neodata; con el sobrecosto, su P.U. e
+// importe. También la explosión de insumos de toda la obra.
+// sobrecosto: { cd, ind (pesos), fin_pct, util_pct (Utilidad Neta del presupuesto), modo 'costo'|'margen', ca (fracción) }
+function calcularAnalisis(array $d): array
+{
+    $a = json_decode((string) analisisPU($d['analisis'] ?? []), true) ?: ['fsr' => 1, 'hm' => 0, 'fin' => 0, 'conceptos' => []];
+    $s = null;
+    if (is_array($d['sobrecosto'] ?? null)) {
+        $x = $d['sobrecosto'];
+        $s = pcSobrecosto(numero($x['cd'] ?? 0, 6), numero($x['ind'] ?? 0, 6), numero($x['fin_pct'] ?? $a['fin'], 4),
+                          numero($x['util_pct'] ?? 0, 4), ($x['modo'] ?? '') === 'margen' ? 'margen' : 'costo', numero($x['ca'] ?? 0, 6));
+    }
+    $conceptos = [];
+    foreach ($a['conceptos'] as $c) {
+        $r = pcConcepto($c, $a);
+        // Precio fijo para el cliente: su P.U. es el del Catálogo
+        $pu = !empty($c['venta']) ? (float) $c['venta'] : ($s ? $r['totales']['cd'] * $s['factor'] : null);
+        $conceptos[] = ['clave' => $c['clave'], 'descripcion' => $c['descripcion'], 'unidad' => $c['unidad'], 'cantidad' => $c['cantidad'],
+                        'insumos' => $r['insumos'], 'totales' => $r['totales'], 'resumen' => pcResumen($r['totales']),
+                        'pu' => $pu, 'importe' => $pu === null ? null : $pu * $c['cantidad']];
+    }
+    return ['conceptos' => $conceptos, 'explosion' => puExplosion($a), 'sobrecosto' => $s];
 }
 
 // Estatus guardado del presupuesto (error si ya no existe)

@@ -1698,23 +1698,25 @@
         $('fsFsr').disabled = soloLectura;
         $('fsTodos').disabled = soloLectura;
         $('fsNota').textContent = FASAR.length ? '' : 'Aún no hay FASAR en el catálogo: captúralos en Parámetros de costos.';
-        var filas = [];
-        function fila(clase, nombre, valor) { filas.push('<tr' + (clase ? ' class="' + clase + '"' : '') + '><td class="ro izq">' + nombre + '</td><td class="ro">' + valor + '</td></tr>'); }
-        if (f) {
-            // Fsr = Ps × (Tp / Tl) + Tp / Tl (Reglamento de la LOPSRM; includes/pu.php puFsr)
-            fila('', 'Días calendario', cant(f.dias_calendario));
-            f.dias_pagados.forEach(function (d) { fila('', '+ ' + escapar(d.concepto) + ' (días pagados)', cant(num(d.dias))); });
-            fila('pu-total', 'Tp = días pagados', cant(f.tp));
-            fila('', 'Días calendario', cant(f.dias_calendario));
-            f.dias_no_laborados.forEach(function (d) { fila('', '− ' + escapar(d.concepto) + ' (no laborados)', cant(num(d.dias))); });
-            fila('pu-total', 'Tl = días laborados', cant(f.tl));
-            f.obligaciones.forEach(function (o) { fila('', escapar(o.concepto), pct(num(o.pct))); });
-            fila('pu-total', 'Ps = obligaciones obrero-patronales', cant(f.ps));
-            fila('pu-total', 'FSR = Ps × (Tp / Tl) + Tp / Tl', cant(f.fsr));
-        } else {
-            fila('', 'El FSR del presupuesto está capturado a mano.<br>Elige un FASAR del catálogo para ver su desglose: días pagados (aguinaldo, prima vacacional…), no laborados (domingos, festivos, vacaciones…) y obligaciones (IMSS, INFONAVIT…).', '');
+        // Fsr = Ps × (Tp / Tl) + Tp / Tl (Reglamento de la LOPSRM; includes/pu.php puFsr)
+        $('fsDias').textContent = f ? cant(f.dias_calendario) : '';
+        $('fsTp').textContent = f ? cant(f.tp) : '';
+        $('fsTl').textContent = f ? cant(f.tl) : '';
+        $('fsPs').textContent = f ? (Math.round(f.ps * 1000000) / 10000).toFixed(4) + ' %' : '';
+        $('fsFsrCalc').textContent = (Math.round(factorFsr() * 10000) / 10000).toFixed(4);
+        function grupo(titulo, lista, campo, total, formato) {
+            return '<fieldset><legend>' + titulo + '</legend>' + (lista.length ? lista.map(function (d) {
+                return '<label>' + escapar(d.concepto) + ' <output class="sc-ro">' + formato(num(d[campo])) + '</output></label>';
+            }).join('') : '<span class="extra-ayuda">Ninguno.</span>') + '<label class="fs-total">' + total[0] + ' <output class="sc-ro">' + total[1] + '</output></label></fieldset>';
         }
-        $('fsDesglose').innerHTML = filas.join('');
+        function dias(v) { return cant(v); }
+        function por(v) { return (Math.round(v * 10000) / 10000).toFixed(4) + ' %'; }
+        $('fsDesglose').innerHTML = f
+            ? grupo('Días pagados (se suman a los calendario)', f.dias_pagados, 'dias', ['Tp', cant(f.tp)], dias) +
+              grupo('Días no laborados (se restan a los calendario)', f.dias_no_laborados, 'dias', ['Tl', cant(f.tl)], dias) +
+              grupo('Obligaciones obrero-patronales', f.obligaciones, 'pct', ['Ps', por(f.ps * 100)], por)
+            : '<p class="extra-ayuda fs-vacio">El FSR del presupuesto está capturado a mano. Elige un FASAR del catálogo para ver su desglose: días pagados (aguinaldo, prima vacacional…), ' +
+              'no laborados (domingos, festivos, vacaciones…) y obligaciones (IMSS, INFONAVIT…).</p>';
         manoObraLista = manoObraAnalisis();
         $('fsManoObra').innerHTML = htmlManoObra(manoObraLista, 'Ningún concepto analizado lleva mano de obra todavía.');
     }

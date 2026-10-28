@@ -963,24 +963,39 @@ $secciones = [
         <strong>FASAR · Factor de Salario Real</strong>
         <button type="button" class="hs-cerrar" data-fs-cerrar title="Cerrar">✕</button>
     </div>
-    <p class="pu-dlg-ayuda"><b>Salario real = salario base × FSR</b> (+ viáticos, alimentación y hospedaje). El FSR sale del FASAR del catálogo
-        con los días pagados, los no laborados y las obligaciones obrero-patronales. Los FASAR se capturan en
-        <a href="parametros-costos.php" target="_blank" rel="noopener">Catalogos › Parámetros de costos</a>. Cada mano de obra puede tener su propio FASAR
-        (abajo de ella, en la ventana del análisis); si no, toma el del presupuesto.</p>
-    <div class="fs-elegir">
-        <label>FASAR del presupuesto: <select id="fsElegir"></select></label>
-        <label>FSR: <input type="number" id="fsFsr" class="num" step="0.0001" min="0"></label>
-        <span class="extra-ayuda" id="fsNota"></span>
-    </div>
     <div class="fs-cuerpo">
-        <div class="extra-caja fs-caja"><table class="grid mini-grid"><tbody id="fsDesglose"></tbody></table></div>
-        <div class="extra-caja fs-caja">
-            <table class="grid mini-grid">
-                <thead><tr><th class="c-id">Código</th><th>Descripción</th><th>Unidad</th><th class="c-num">Salario base</th><th>FASAR</th><th class="c-num">FSR</th>
-                    <th class="c-num">Salario real</th><th class="c-num">Viát. / alim. / hosp.</th><th class="c-num">Jornadas</th><th class="c-num">Importe</th><th class="c-num">Conceptos</th></tr></thead>
-                <tbody id="fsManoObra"></tbody>
-            </table>
+        <div class="fs-arriba">
+            <div class="fs-datos">
+                <label>FASAR del presupuesto <select id="fsElegir"></select></label>
+                <label>FSR del presupuesto <input type="number" id="fsFsr" class="num" step="0.0001" min="0"></label>
+                <label>Días calendario <output id="fsDias" class="sc-ro"></output></label>
+                <span class="extra-ayuda" id="fsNota"></span>
+            </div>
+            <fieldset class="fs-resultado">
+                <legend>Resultado</legend>
+                <label>Tp · días pagados <output id="fsTp" class="sc-ro"></output></label>
+                <label>Tl · días laborados <output id="fsTl" class="sc-ro"></output></label>
+                <label>Ps · obligaciones <output id="fsPs" class="sc-ro"></output></label>
+                <label class="fs-fsr">FSR = Ps × (Tp / Tl) + Tp / Tl <output id="fsFsrCalc" class="sc-ro"></output></label>
+            </fieldset>
         </div>
+        <fieldset>
+            <legend>Días y porcentajes del FASAR elegido</legend>
+            <div class="fs-grupos" id="fsDesglose"></div>
+        </fieldset>
+        <fieldset class="fs-mo">
+            <legend>Mano de obra de los análisis</legend>
+            <div class="extra-caja fs-caja">
+                <table class="grid mini-grid">
+                    <thead><tr><th class="c-id">Código</th><th>Descripción</th><th>Unidad</th><th class="c-num">Salario base</th><th>FASAR</th><th class="c-num">FSR</th>
+                        <th class="c-num">Salario real</th><th class="c-num">Viát. / alim. / hosp.</th><th class="c-num">Jornadas</th><th class="c-num">Importe</th><th class="c-num">Conceptos</th></tr></thead>
+                    <tbody id="fsManoObra"></tbody>
+                </table>
+            </div>
+        </fieldset>
+        <p class="extra-ayuda sc-nota"><b>Salario real = salario base × FSR</b> (+ viáticos, alimentación y hospedaje). Los FASAR se capturan en
+            <a href="parametros-costos.php" target="_blank" rel="noopener">Catalogos › Parámetros de costos</a>. Cada mano de obra puede tener su propio FASAR
+            (abajo de ella, en la ventana del análisis); si no, toma el del presupuesto. Doble clic en una mano de obra abre el análisis donde se usa.</p>
     </div>
     <div class="hs-pie">
         <span class="extra-ayuda">Los cambios se aplican al momento.</span>

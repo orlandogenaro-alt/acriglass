@@ -1472,6 +1472,11 @@
         $('calPie').innerHTML = '<tr class="pu-total"><td colspan="6" class="ro">Hasta el corte' + (k.corte ? ' (' + (tot ? pct(totCorte / tot * 100) : '0.00 %') + ' del presupuesto)' : '') +
             '</td><td></td><td></td><td class="ro">' + (k.corte ? fmt(totCorte) : '') + '</td><td></td></tr>' +
             '<tr><td colspan="8" class="ro">Total del catálogo</td><td class="ro">' + fmt(tot) + '</td><td></td></tr>';
+        $('calObra').textContent = txt($('proyecto').value) || 'Sin nombre de proyecto';
+        $('calRProg').textContent = (lista.length - sinPrograma) + ' de ' + lista.length;
+        $('calRImporte').textContent = k.corte ? '$' + fmt(totCorte) : '';
+        $('calRPct').textContent = k.corte ? (tot ? pct(totCorte / tot * 100) : '0.00 %') : '';
+        $('calRTotal').textContent = '$' + fmt(tot);
         $('calNota').textContent = !k.corte ? 'Elige la fecha de corte para calcular.'
             : sinPrograma ? sinPrograma + ' concepto(s) sin programa: captura su inicio y fin para incluirlos.' : '';
         // Insumos a requerir hasta el corte: la explosión de lo programado hasta entonces

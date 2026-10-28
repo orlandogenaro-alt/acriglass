@@ -711,15 +711,22 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .go-importe b { color: var(--enfasis); font-variant-numeric: tabular-nums; }
 /* Cálculo al periodo de corte */
 .cal-dialogo { width: min(1240px, calc(100vw - 24px)); }
-.cal-periodo { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 18px; padding: 10px 16px 0; font-size: 13px; color: var(--texto-2); }
-.cal-periodo label { display: flex; flex-direction: column; gap: 3px; }
-.cal-periodo label.cal-check { flex-direction: row; align-items: center; gap: 6px; }
-.cal-periodo input[type=date] { height: 32px; padding: 0 8px; background: var(--input); color: var(--texto); border: 1px solid var(--borde-2); border-radius: 4px; }
-.cal-tabla { margin: 8px 16px 0; max-height: 40vh; border: 1px solid var(--borde); border-radius: 4px; }
-.cal-tabla[hidden] { display: none; }
+.cal-cuerpo { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 0; font-size: 13px; color: var(--texto-2); }
+.cal-cuerpo fieldset { margin: 0; padding: 8px 12px 10px; border: 1px solid var(--borde); border-radius: 6px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.cal-cuerpo fieldset[hidden] { display: none; }
+.cal-cuerpo legend { padding: 0 4px; font-weight: 700; color: var(--enfasis); }
+.cal-cuerpo label { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.cal-cuerpo label.cal-check { justify-content: flex-start; gap: 6px; color: var(--texto); }
+.cal-cuerpo .sc-ro { width: 140px; flex: none; }
+.cal-cuerpo .sc-ro.cal-texto { width: 260px; max-width: 60%; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-cuerpo label > input[type=date] { width: 160px; height: 30px; padding: 0 8px; background: var(--input); color: var(--texto); border: 1px solid var(--borde-2); border-radius: 4px; }
+.cal-arriba { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.cal-col { display: flex; flex-direction: column; gap: 12px; }
+.cal-tabla { max-height: 36vh; border: 1px solid var(--borde); border-radius: 4px; }
 .cal-tabla td.cal-desc { white-space: normal; min-width: 240px; }
 .cal-tabla input[type=date] { width: 140px; }
 .cal-tabla tfoot tr.pu-total td { font-weight: 700; color: var(--enfasis); }
+@media (max-width: 760px) { .cal-arriba { grid-template-columns: minmax(0, 1fr); } }
 .cal-sin { color: var(--texto-3); font-style: italic; }
 /* Actividades programadas en el periodo de corte (Cálculo): también en el Catálogo de Conceptos y el Análisis P.U. */
 .grid tr.cal-marcado td { background: var(--ambar-suave); }

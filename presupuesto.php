@@ -843,28 +843,57 @@ $secciones = [
         <strong>Cálculo al periodo de corte</strong>
         <button type="button" class="hs-cerrar" data-cal-cerrar title="Cerrar">✕</button>
     </div>
-    <p class="pu-dlg-ayuda">Captura el programa (inicio y fin) de cada concepto y la fecha de corte: el avance programado al corte es parejo por días
-        entre su inicio y su fin. Queda listo para cuando el programa de obra llene estas fechas.</p>
-    <div class="cal-periodo">
-        <label>Periodo desde (opcional) <input type="date" id="calDesde"></label>
-        <label>Periodo de corte <input type="date" id="calCorte"></label>
-        <label class="cal-check"><input type="checkbox" id="calCantidad"> Calcular cantidad a requerir hasta el periodo de corte</label>
-        <label class="cal-check"><input type="checkbox" id="calMarcar"> Marcar actividades programadas en el periodo de corte</label>
+    <div class="cal-cuerpo">
+        <div class="cal-arriba">
+            <div class="cal-col">
+                <fieldset>
+                    <legend>Obra</legend>
+                    <label>Obra <output id="calObra" class="sc-ro cal-texto"></output></label>
+                    <label>Programa <output class="sc-ro cal-texto">Inicio y fin de cada concepto</output></label>
+                </fieldset>
+                <fieldset>
+                    <legend>Periodo de cálculo</legend>
+                    <label>Periodo desde (opcional) <input type="date" id="calDesde"></label>
+                    <label>Periodo de corte <input type="date" id="calCorte"></label>
+                </fieldset>
+            </div>
+            <div class="cal-col">
+                <fieldset>
+                    <legend>Opciones de cálculo</legend>
+                    <label class="cal-check"><input type="checkbox" id="calCantidad"> Calcular cantidad a requerir hasta el periodo de corte</label>
+                    <label class="cal-check"><input type="checkbox" id="calMarcar"> Marcar actividades programadas en el periodo de corte</label>
+                </fieldset>
+                <fieldset>
+                    <legend>Resumen al corte</legend>
+                    <label>Conceptos con programa <output id="calRProg" class="sc-ro"></output></label>
+                    <label>Importe hasta el corte <output id="calRImporte" class="sc-ro"></output></label>
+                    <label>Avance del presupuesto <output id="calRPct" class="sc-ro"></output></label>
+                    <label>Total del catálogo <output id="calRTotal" class="sc-ro"></output></label>
+                </fieldset>
+            </div>
+        </div>
         <span class="extra-ayuda" id="calNota"></span>
-    </div>
-    <div class="extra-caja cal-tabla">
-        <table class="grid mini-grid">
-            <thead><tr><th class="c-id">Clave</th><th>Concepto</th><th>Unidad</th><th class="c-num">Cantidad</th><th>Inicio</th><th>Fin</th>
-                <th class="c-num" title="Avance programado a la fecha de corte">% al corte</th><th class="c-num">Cantidad al corte</th><th class="c-num">Importe al corte</th><th></th></tr></thead>
-            <tbody id="calCuerpo"></tbody>
-            <tfoot id="calPie"></tfoot>
-        </table>
-    </div>
-    <div class="extra-caja cal-tabla" id="calInsumosCaja" hidden>
-        <table class="grid mini-grid">
-            <thead><tr><th class="c-id">Código</th><th>Insumos a requerir hasta el corte</th><th>Tipo</th><th>Unidad</th><th class="c-num">Cantidad</th><th class="c-num">Costo prom.</th><th class="c-num">Importe</th><th class="c-pct">%</th></tr></thead>
-            <tbody id="calInsumos"></tbody>
-        </table>
+        <fieldset>
+            <legend>Programa de los conceptos</legend>
+            <div class="extra-caja cal-tabla">
+                <table class="grid mini-grid">
+                    <thead><tr><th class="c-id">Clave</th><th>Concepto</th><th>Unidad</th><th class="c-num">Cantidad</th><th>Inicio</th><th>Fin</th>
+                        <th class="c-num" title="Avance programado a la fecha de corte">% al corte</th><th class="c-num">Cantidad al corte</th><th class="c-num">Importe al corte</th><th></th></tr></thead>
+                    <tbody id="calCuerpo"></tbody>
+                    <tfoot id="calPie"></tfoot>
+                </table>
+            </div>
+        </fieldset>
+        <fieldset id="calInsumosCaja" hidden>
+            <legend>Insumos a requerir hasta el corte</legend>
+            <div class="extra-caja cal-tabla">
+                <table class="grid mini-grid">
+                    <thead><tr><th class="c-id">Código</th><th>Insumo</th><th>Tipo</th><th>Unidad</th><th class="c-num">Cantidad</th><th class="c-num">Costo prom.</th><th class="c-num">Importe</th><th class="c-pct">%</th></tr></thead>
+                    <tbody id="calInsumos"></tbody>
+                </table>
+            </div>
+        </fieldset>
+        <p class="extra-ayuda sc-nota">El avance programado al corte es parejo por días entre el inicio y el fin de cada concepto. Queda listo para cuando el programa de obra llene estas fechas.</p>
     </div>
     <div class="hs-pie">
         <span class="extra-ayuda">El periodo y los programas se guardan con el presupuesto.</span>

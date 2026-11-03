@@ -2,7 +2,7 @@
     // Tasa de IVA del presupuesto (select ivaTasa; las tasas salen de Administrador › Parámetros de presupuesto)
     var PARAMETROS = window.ACRI_PARAMETROS_PRES || { iva_defecto: 16, iva_tasas: [], indirectos: [], financiamiento_pct: 0 };
     var IVA = (PARAMETROS.iva_defecto != null ? Number(PARAMETROS.iva_defecto) : 16) / 100;
-    var NOMBRES = { mp: 'Materia Prima', mo: 'Mano de Obra', go: 'Gastos de Operacion', cc: 'Catálogo de Conceptos', pu: 'Análisis de Precios Unitarios', ex: 'Explosión de insumos', an: 'Análisis' };
+    var NOMBRES = { mp: 'Materiales', mo: 'Mano de Obra', go: 'Gastos de Operacion', cc: 'Catálogo de Conceptos', pu: 'Análisis de Precios Unitarios', ex: 'Explosión de insumos', an: 'Análisis' };
     var AYUDAS = {
         grid: 'Ctrl + I para agregar un nuevo Concepto',
         cc: 'Como Neodata: partidas, subpartidas y conceptos con su P.U. (el análisis de cada uno está en Análisis P.U.)',

@@ -234,7 +234,7 @@ $puedeRegistrarObra = tienePermiso('NUEVO_OBRA', 'ADMIN_USER');
 // Secciones del presupuesto (pestañas verticales)
 $secciones = [
     'cc' => 'Catálogo de Conceptos',
-    'mp' => 'Materia Prima',
+    'mp' => 'Materiales',
     'mo' => 'Mano de Obra',
     'go' => 'Gastos de Operacion',
     'pu' => 'Análisis P.U.',
@@ -439,7 +439,7 @@ $secciones = [
 
         <div class="sec-cuerpo">
             <div class="sec-titulo">
-                <strong id="secNombre">Materia Prima:</strong>
+                <strong id="secNombre">Materiales:</strong>
                 <span id="secAyuda">Ctrl + I para agregar un nuevo Concepto</span>
             </div>
 
@@ -690,7 +690,7 @@ $secciones = [
     <!-- Totales -->
     <div class="pie">
         <div class="t-fila t-primo">
-            <span>Materia Prima:</span> <output id="tMP">0</output>
+            <span>Materiales:</span> <output id="tMP">0</output>
             <b>+</b>
             <span>Mano de Obra:</span> <output id="tMO">0</output>
             <b>=</b>

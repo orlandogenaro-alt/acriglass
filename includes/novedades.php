@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-11-03',
+        'cambios' => [
+            ['mejora', 'Presupuesto: la pestaña Materia Prima ahora se llama Materiales', 'En la barra de la izquierda del presupuesto, en el título de la sección y en los totales de abajo, Materia Prima ahora dice Materiales.'],
+        ],
+    ],
+    [
         'fecha' => '2026-10-28',
         'cambios' => [
             ['mejora', 'Presupuesto: la ventana Cálculo ordenada como la de Neodata', 'La ventana Cálculo al periodo de corte ahora va por cuadros, como la de Neodata: a la izquierda Obra (el proyecto y el programa) y Periodo de cálculo (desde y corte); a la derecha Opciones de cálculo (calcular la cantidad a requerir y marcar las actividades programadas) y un Resumen al corte con los conceptos que tienen programa, el importe hasta el corte, el avance del presupuesto y el total del catálogo; abajo, en su cuadro, el programa de los conceptos y, si se pide, los insumos a requerir hasta el corte. Las cifras y lo que se guarda no cambian.'],

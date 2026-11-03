@@ -617,9 +617,15 @@ $secciones = [
             </div>
 
             <!-- Mano de Obra: empleados × días y comisiones (grid_man_obra / grid_comisiones del Form46) -->
-            <div class="extras" id="extrasMO" hidden>
+            <!-- Una pestaña a la vez, a lo ancho, con su total en la pestaña (antes eran tres cuadros apretados) -->
+            <div class="extras extras-pestanas" id="extrasMO" hidden>
+                <nav class="extra-pestanas">
+                    <button type="button" class="extra-pestana activo" data-extra="moAnalisis">Mano de obra de los análisis <b id="pesManoObraPU">0.00</b></button>
+                    <button type="button" class="extra-pestana" data-extra="moEmpleados">Empleados <b id="pesEmpleados">0.00</b></button>
+                    <button type="button" class="extra-pestana" data-extra="moComisiones">Comisiones <b id="pesComisiones">0.00</b></button>
+                </nav>
                 <!-- Mano de obra de las matrices del Análisis P.U.: salario base × FSR (FASAR) = salario real, jornadas e importe -->
-                <section class="extra mo-analisis">
+                <section class="extra mo-analisis activo" id="moAnalisis">
                     <div class="extra-barra">
                         <strong>Mano de obra de los análisis</strong>
                         <button type="button" class="ct-btn" id="moFasar" title="FSR del presupuesto y desglose del FASAR">FASAR…</button>
@@ -634,7 +640,7 @@ $secciones = [
                         </table>
                     </div>
                 </section>
-                <section class="extra">
+                <section class="extra" id="moEmpleados">
                     <div class="extra-barra">
                         <strong>Empleados</strong>
                         <select id="selEmpleado">
@@ -652,7 +658,7 @@ $secciones = [
                         </table>
                     </div>
                 </section>
-                <section class="extra">
+                <section class="extra" id="moComisiones">
                     <div class="extra-barra">
                         <strong>Comisiones</strong>
                         <select id="selTipoComision">

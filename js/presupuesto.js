@@ -1414,7 +1414,15 @@
     function pintarManoObraPU() {
         manoObraLista = manoObraAnalisis();
         $('tbManoObraPU').innerHTML = htmlManoObra(manoObraLista, 'Aquí aparece la mano de obra en cuanto la agregues al análisis de un concepto (Análisis P.U. o doble clic en el Catálogo).');
+        $('pesManoObraPU').textContent = fmt(manoObraLista.reduce(function (t, g) { return t + g.importe; }, 0));
     }
+    // Mano de Obra: pestañas Mano de obra de los análisis / Empleados / Comisiones (una a la vez)
+    document.querySelectorAll('.extra-pestana').forEach(function (b) {
+        b.addEventListener('click', function () {
+            b.parentNode.querySelectorAll('.extra-pestana').forEach(function (x) { x.classList.toggle('activo', x === b); });
+            b.closest('.extras').querySelectorAll(':scope > .extra').forEach(function (sec) { sec.classList.toggle('activo', sec.id === b.dataset.extra); });
+        });
+    });
     ['tbManoObraPU', 'fsManoObra'].forEach(function (id) {
         $(id).addEventListener('dblclick', function (e) {
             var tr = e.target.closest('tr[data-mo]');
@@ -2897,6 +2905,8 @@
         });
         $('totEmpleados').textContent = fmt(tot.empleados);
         $('totComisiones').textContent = fmt(tot.comisiones);
+        $('pesEmpleados').textContent = fmt(tot.empleados);
+        $('pesComisiones').textContent = fmt(tot.comisiones);
     }
 
     // Conceptos de Gastos de Operacion marcados como seguro (retorna_conceptos_seguro)

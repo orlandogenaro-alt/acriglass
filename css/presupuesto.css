@@ -530,6 +530,18 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .extra-total em { font-style: normal; color: var(--texto-3); }
 .extra-ayuda { color: var(--texto-3); font-size: 11.5px; }
 .extra-caja { max-height: 170px; overflow: auto; }
+/* Mano de Obra: análisis, empleados y comisiones como pestañas, una a la vez y a lo ancho */
+.extras.extras-pestanas { display: flex; flex-direction: column; gap: 0; }
+.extras-pestanas > .extra { border-top-left-radius: 0; }
+.extras-pestanas > .extra:not(.activo) { display: none; }
+.extras-pestanas .extra-caja { max-height: 240px; }
+.extras-pestanas .extra-barra > strong { display: none; }
+.extra-pestanas { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: -1px; }
+.extra-pestana { display: flex; align-items: center; gap: 8px; padding: 7px 14px; font-size: 12.5px; font-weight: 600; color: var(--texto-2); background: var(--sub); border: 1px solid var(--borde); border-radius: 4px 4px 0 0; }
+.extra-pestana:hover { color: var(--enfasis); }
+.extra-pestana b { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--texto-3); }
+.extra-pestana.activo { background: var(--tarjeta); color: var(--enfasis); border-bottom-color: var(--tarjeta); box-shadow: inset 0 3px 0 var(--azul); position: relative; }
+.extra-pestana.activo b { color: var(--enfasis); }
 .grid.mini-grid { min-width: 0; }
 .grid.mini-grid tr.vacio-fila td { padding: 14px; }
 .sug-panel { flex: 1; }

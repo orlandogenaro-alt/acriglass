@@ -6,6 +6,7 @@ return [
     [
         'fecha' => '2026-11-03',
         'cambios' => [
+            ['mejora', 'Presupuesto: Análisis P.U., Explosión y Análisis en una segunda columna de pestañas', 'Las pestañas Análisis P.U., Explosión y Análisis ahora están a un lado de Catálogo de Conceptos, Materiales, Mano de Obra y Gastos de Operación, en una segunda columna de la barra izquierda, para no tener que bajar hasta abajo para verlas.'],
             ['mejora', 'Presupuesto: la pestaña Materia Prima ahora se llama Materiales', 'En la barra de la izquierda del presupuesto, en el título de la sección y en los totales de abajo, Materia Prima ahora dice Materiales.'],
         ],
     ],

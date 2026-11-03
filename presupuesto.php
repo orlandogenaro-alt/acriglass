@@ -431,9 +431,14 @@ $secciones = [
 
     <!-- Conceptos -->
     <div class="conceptos">
+        <!-- Dos columnas de pestañas: las de captura y, a un lado, Análisis P.U., Explosión y Análisis (sin bajar hasta abajo) -->
         <nav class="sec-tabs">
-            <?php foreach ($secciones as $clave => $nombre): ?>
-            <button class="sec-tab<?= $clave === 'mp' ? ' activo' : '' ?>" data-sec="<?= $clave ?>"><span><?= $nombre ?></span></button>
+            <?php foreach (array_chunk($secciones, 4, true) as $columna): ?>
+            <div class="sec-col">
+                <?php foreach ($columna as $clave => $nombre): ?>
+                <button class="sec-tab<?= $clave === 'mp' ? ' activo' : '' ?>" data-sec="<?= $clave ?>"><span><?= $nombre ?></span></button>
+                <?php endforeach; ?>
+            </div>
             <?php endforeach; ?>
         </nav>
 

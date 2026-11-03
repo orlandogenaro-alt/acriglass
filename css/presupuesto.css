@@ -536,6 +536,10 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .extras-pestanas > .extra:not(.activo) { display: none; }
 .extras-pestanas .extra-caja { max-height: 240px; }
 .extras-pestanas .extra-barra > strong { display: none; }
+.extras-pestanas.con-alto .extra-caja { height: var(--alto); max-height: none; }
+.extra-redim { height: 10px; margin-top: -1px; cursor: ns-resize; touch-action: none; display: flex; align-items: center; justify-content: center; border-radius: 0 0 4px 4px; }
+.extra-redim::before { content: ''; width: 48px; height: 4px; border-radius: 2px; background: var(--borde-2); transition: background .15s, width .15s; }
+.extra-redim:hover::before, .extra-redim.arrastrando::before { width: 80px; background: var(--azul); }
 .extra-pestanas { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: -1px; }
 .extra-pestana { display: flex; align-items: center; gap: 8px; padding: 7px 14px; font-size: 12.5px; font-weight: 600; color: var(--texto-2); background: var(--sub); border: 1px solid var(--borde); border-radius: 4px 4px 0 0; }
 .extra-pestana:hover { color: var(--enfasis); }

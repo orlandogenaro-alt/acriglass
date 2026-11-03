@@ -1416,6 +1416,38 @@
         $('tbManoObraPU').innerHTML = htmlManoObra(manoObraLista, 'Aquí aparece la mano de obra en cuanto la agregues al análisis de un concepto (Análisis P.U. o doble clic en el Catálogo).');
         $('pesManoObraPU').textContent = fmt(manoObraLista.reduce(function (t, g) { return t + g.importe; }, 0));
     }
+    // Mano de Obra: la raya de abajo se arrastra para cambiar el alto del cuadro (se recuerda en este navegador)
+    (function () {
+        var caja = $('extrasMO'), raya = $('moRedim'), CLAVE = 'acri.presupuesto.altoMO';
+        function poner(alto) {
+            caja.classList.toggle('con-alto', !!alto);
+            if (alto) caja.style.setProperty('--alto', alto + 'px'); else caja.style.removeProperty('--alto');
+        }
+        try { poner(Number(localStorage.getItem(CLAVE)) || 0); } catch (e) {}
+        raya.addEventListener('pointerdown', function (e) {
+            var activa = caja.querySelector(':scope > .extra.activo .extra-caja');
+            if (!activa) return;
+            e.preventDefault();
+            var y0 = e.clientY, h0 = activa.offsetHeight, alto = h0;
+            raya.setPointerCapture(e.pointerId);
+            raya.classList.add('arrastrando');
+            function mover(ev) { alto = Math.max(80, Math.round(h0 + ev.clientY - y0)); poner(alto); }
+            function soltar() {
+                raya.removeEventListener('pointermove', mover);
+                raya.removeEventListener('pointerup', soltar);
+                raya.removeEventListener('pointercancel', soltar);
+                raya.classList.remove('arrastrando');
+                try { localStorage.setItem(CLAVE, String(alto)); } catch (e2) {}
+            }
+            raya.addEventListener('pointermove', mover);
+            raya.addEventListener('pointerup', soltar);
+            raya.addEventListener('pointercancel', soltar);
+        });
+        raya.addEventListener('dblclick', function () {
+            poner(0);
+            try { localStorage.removeItem(CLAVE); } catch (e) {}
+        });
+    })();
     // Mano de Obra: pestañas Mano de obra de los análisis / Empleados / Comisiones (una a la vez)
     document.querySelectorAll('.extra-pestana').forEach(function (b) {
         b.addEventListener('click', function () {

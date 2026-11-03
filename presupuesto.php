@@ -676,6 +676,8 @@ $secciones = [
                         </table>
                     </div>
                 </section>
+                <!-- Raya para arrastrar: el usuario hace más alto o más bajo el cuadro -->
+                <div class="extra-redim" id="moRedim" title="Arrastra hacia abajo o hacia arriba para cambiar el alto del cuadro (doble clic: alto normal)"></div>
             </div>
 
             <!-- Gastos de Operacion: anexo de seguro (grid_anexo7 del Form46) -->

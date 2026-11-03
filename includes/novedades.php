@@ -6,6 +6,7 @@ return [
     [
         'fecha' => '2026-11-03',
         'cambios' => [
+            ['mejora', 'Presupuesto: el cuadro de abajo de Mano de Obra se puede hacer más alto', 'La raya de abajo del cuadro de Mano de obra de los análisis, Empleados y Comisiones se arrastra hacia abajo o hacia arriba para cambiar su alto. El alto se recuerda en ese navegador; doble clic en la raya lo regresa al normal.'],
             ['mejora', 'Presupuesto: Mano de Obra con pestañas para análisis, empleados y comisiones', 'Abajo de la tabla de Mano de Obra, Mano de obra de los análisis, Empleados y Comisiones ya no están en tres cuadros apretados: ahora son pestañas, se ve una a la vez a lo ancho de la pantalla y cada pestaña muestra su total.'],
             ['mejora', 'Presupuesto: Análisis P.U., Explosión y Análisis en una segunda columna de pestañas', 'Las pestañas Análisis P.U., Explosión y Análisis ahora están a un lado de Catálogo de Conceptos, Materiales, Mano de Obra y Gastos de Operación, en una segunda columna de la barra izquierda, para no tener que bajar hasta abajo para verlas.'],
             ['mejora', 'Presupuesto: la pestaña Materia Prima ahora se llama Materiales', 'En la barra de la izquierda del presupuesto, en el título de la sección y en los totales de abajo, Materia Prima ahora dice Materiales.'],

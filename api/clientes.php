@@ -12,7 +12,9 @@
 // GET  ?accion=buscar&q=T                   clientes del catálogo para el campo Cliente del presupuesto (con su Microsip y HubSpot)
 // GET  ?accion=microsip_buscar&q=T          cuentas de Microsip (API de Easy-Glass /clientes) y si ya están en el catálogo
 // POST ?accion=microsip_importar            {cliente_id, clave, nombre, contacto, telefono}  cliente con cuenta en Microsip
-// POST ?accion=alta_hubspot                 {id_hubspot, empresa, contacto, correo, telefono}  cliente nuevo desde su contacto de HubSpot
+// POST ?accion=microsip_ligar               {id, cliente_id, clave, mover}  pestaña Microsip de la ficha (mover: quitarla de otro cliente)
+// POST ?accion=microsip_quitar              {id}
+// POST ?accion=alta_hubspot                {id_hubspot, empresa, contacto, correo, telefono}  cliente nuevo desde su contacto de HubSpot
 define('ACRI_API', true);
 require __DIR__ . '/../includes/sesion.php';
 require __DIR__ . '/../includes/bd.php';
@@ -363,6 +365,27 @@ try {
                     'telefono' => texto($d['telefono'] ?? '', 35), 'microsip_cliente_id' => $msId, 'microsip_clave' => $clave], $usuario);
             }
             responder(['ok' => true, 'cliente' => filaBuscador(bd_fila('AW', selectBuscador($conMicrosip) . 'where a.cliente_id = ?', [$id]))]);
+
+        case 'microsip_ligar':   // pestaña Microsip de la ficha: relaciona la cuenta con un cliente que ya existe
+            if (!$conMicrosip) error('Falta ligar el catálogo con Microsip: aplica la migración 022_clientes_microsip.sql.', 503);
+            $d = entrada();
+            $id = (int) ($d['id'] ?? 0);
+            existeCliente($id);
+            $msId = (int) ($d['cliente_id'] ?? 0);
+            if (!$msId) error('Selecciona la cuenta de Microsip.');
+            $otro = bd_fila('AW', 'select cliente_id, nombre from clientes where microsip_cliente_id = ? and cliente_id <> ?', [$msId, $id]);
+            if ($otro && empty($d['mover'])) error("Esa cuenta de Microsip ya es del cliente «{$otro['nombre']}».");
+            if ($otro) bd_ejecutar('AW', 'update clientes set microsip_cliente_id = null, microsip_clave = null where cliente_id = ?', [(int) $otro['cliente_id']]);
+            $clave = texto($d['clave'] ?? '', 30);
+            bd_ejecutar('AW', 'update clientes set microsip_cliente_id = ?, microsip_clave = ? where cliente_id = ?', [$msId, $clave, $id]);
+            responder(['ok' => true, 'microsip' => ['clave' => (string) $clave, 'id' => $msId]]);
+
+        case 'microsip_quitar':
+            if (!$conMicrosip) error('Falta ligar el catálogo con Microsip: aplica la migración 022_clientes_microsip.sql.', 503);
+            $id = (int) (entrada()['id'] ?? 0);
+            existeCliente($id);
+            bd_ejecutar('AW', 'update clientes set microsip_cliente_id = null, microsip_clave = null where cliente_id = ?', [$id]);
+            responder(['ok' => true, 'microsip' => null]);
 
         case 'alta_hubspot':   // cliente nuevo: se da de alta con su contacto de HubSpot y queda relacionado
             $d = entrada();

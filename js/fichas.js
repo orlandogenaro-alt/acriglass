@@ -168,10 +168,7 @@ window.Fichas = (function () {
                     { id: 'sistema_dim_id', etiqueta: 'Sis. de Dimensiones', tipo: 'select', lista: 'sistemas_dim', defecto: /METRIC/i },
                     { id: 'vendedor_id', etiqueta: 'Vendedor', tipo: 'select', lista: 'vendedores' },
                     { id: 'vendedor_campo_id', etiqueta: 'Vendedor en Campo', tipo: 'select', lista: 'vendedores', vacio: '— Sin asignar —',
-                      si: function (cat) { return cat.vendedor_campo; } },
-                    // Cuenta de Microsip (migración 022): se llena con «Traer de Microsip» en el presupuesto de obra
-                    { id: 'microsip_clave', etiqueta: 'Cuenta Microsip (clave)', mayus: true, si: function (cat) { return cat.microsip; } },
-                    { id: 'microsip_cliente_id', etiqueta: 'Id Microsip', auto: true, si: function (cat) { return cat.microsip; } }
+                      si: function (cat) { return cat.vendedor_campo; } }
                 ] },
                 { titulo: 'Direcciones', campos: [
                     { id: 'direccion', etiqueta: '(x)Dirección', tipo: 'textarea', completo: true },
@@ -181,7 +178,8 @@ window.Fichas = (function () {
                 ] },
                 { titulo: 'Condiciones Comerciales', render: pestanaCondiciones },
                 { titulo: 'Historial', render: pestanaHistorial },
-                { titulo: 'Hubspot', render: pestanaHubspot }
+                { titulo: 'Hubspot', render: pestanaHubspot },
+                { titulo: 'Microsip', render: pestanaMicrosip }
             ]
         }
     };
@@ -901,6 +899,92 @@ window.Fichas = (function () {
                 if (!confirm('¿Eliminar la relación con «' + relaciones[selRel].hs_nombre + '»?')) return;
                 trabajar(c.pedir(c.url(api, 'hs_quitar'), { id: id, id_rel: relaciones[selRel].id_rel_clientes }),
                     function () { return 'Relación eliminada.'; });
+            }
+        });
+    }
+
+    // Cuenta de Microsip del cliente (migración 022): se busca por la API de Easy-Glass y se relaciona una sola
+    function pestanaMicrosip(sec, c) {
+        var encontrados = [], sel = null;
+        var reg = c.st.registro || {};
+        var cuenta = reg.microsip_clave || +reg.microsip_cliente_id ? { clave: reg.microsip_clave || '', id: reg.microsip_cliente_id } : null;
+        sec.innerHTML =
+            '<div class="fi-campos tres">' +
+                '<label class="fi-campo"><span>Cuenta relacionada (clave)</span><input type="text" data-ms="clave" readonly></label>' +
+                '<label class="fi-campo"><span>Id Microsip</span><input type="text" data-ms="id" readonly></label>' +
+                '<div class="fi-fila" style="align-self:end"><button type="button" class="fi-btn" data-msb="quitar">✕ Quitar relación</button></div>' +
+            '</div>' +
+            '<div class="fi-campos tres">' +
+                '<label class="fi-campo completo"><span>Buscar en Microsip (clave o nombre)</span><input type="text" data-ms="q"></label>' +
+            '</div>' +
+            '<div class="fi-fila"><button type="button" class="fi-btn azul" data-msb="buscar">Buscar</button></div>' +
+            '<div><b>Cuentas de Microsip</b><div class="fi-tabla"><table><thead><tr><th>Clave</th><th>Nombre</th><th>Contacto</th><th>Vendedor</th><th>En catálogo</th></tr></thead>' +
+                '<tbody data-t="ms"></tbody></table></div></div>' +
+            '<div class="fi-fila"><button type="button" class="fi-btn azul" data-msb="ligar">✔ Relacionar cuenta</button></div>' +
+            '<p class="fi-nota" data-ms-nota></p>';
+
+        var inp = function (n) { return sec.querySelector('[data-ms="' + n + '"]'); };
+        var nota = sec.querySelector('[data-ms-nota]');
+        var guardado = !!c.st.id, disponible = !!c.st.cat.microsip;
+        nota.textContent = !disponible ? 'Falta ligar el catálogo con Microsip: aplica la migración 022_clientes_microsip.sql.'
+            : guardado ? 'Busca la cuenta del cliente en Microsip, selecciónala y presiona «Relacionar cuenta».'
+            : 'La relación con Microsip se habilita al guardar primero el cliente.';
+        inp('q').value = reg.nombre || '';
+
+        function pintar() {
+            inp('clave').value = cuenta ? cuenta.clave : '';
+            inp('id').value = cuenta && cuenta.id ? cuenta.id : '';
+            sec.querySelector('[data-t="ms"]').innerHTML = encontrados.map(function (r, i) {
+                return '<tr data-i="' + i + '"' + (i === sel ? ' class="sel"' : '') + '><td>' + c.esc(r.clave) + '</td><td>' + c.esc(r.nombre) + '</td><td>' +
+                    c.esc(r.contacto) + '</td><td>' + c.esc(r.vendedor) + '</td><td>' + c.esc(r.en_catalogo || '') + '</td></tr>';
+            }).join('');
+            var activo = guardado && disponible && c.st.cat.puede_modificar !== false;
+            sec.querySelector('[data-msb="buscar"]').disabled = !activo;
+            sec.querySelector('[data-msb="ligar"]').disabled = !activo || sel === null;
+            sec.querySelector('[data-msb="quitar"]').disabled = !activo || !cuenta;
+        }
+        pintar();
+
+        sec.querySelector('[data-t="ms"]').addEventListener('click', function (e) {
+            var tr = e.target.closest('tr[data-i]');
+            if (tr) { sel = +tr.dataset.i; pintar(); }
+        });
+        inp('q').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); sec.querySelector('[data-msb="buscar"]').click(); }
+        });
+
+        function trabajar(promesa, aviso) {
+            nota.textContent = 'Consultando Microsip…';
+            return promesa.then(function (j) {
+                if ('microsip' in j) cuenta = j.microsip;
+                nota.textContent = aviso(j);
+                pintar();
+            }).catch(function (err) { nota.textContent = '⚠ ' + err.message; });
+        }
+
+        sec.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-msb]');
+            if (!b || b.disabled) return;
+            var api = c.st.def.api, id = c.st.id;
+            if (b.dataset.msb === 'buscar') {
+                var q = inp('q').value.trim();
+                if (q.length < 2) { nota.textContent = 'Escribe al menos 2 letras de la clave o el nombre.'; return; }
+                trabajar(c.pedir(c.url(api, 'microsip_buscar', '&q=' + encodeURIComponent(q))), function (j) {
+                    encontrados = j.filas;
+                    sel = encontrados.length === 1 ? 0 : null;
+                    return encontrados.length ? encontrados.length + ' cuenta(s) encontradas: selecciona una y presiona «Relacionar cuenta».'
+                        : 'No se encontró «' + q + '» en Microsip.';
+                });
+            } else if (b.dataset.msb === 'ligar') {
+                var x = encontrados[sel];
+                if (x.en_catalogo && !confirm('La cuenta ' + x.clave + ' está relacionada con «' + x.en_catalogo + '». ¿Pasarla a este cliente?')) return;
+                trabajar(c.pedir(c.url(api, 'microsip_ligar'), { id: id, cliente_id: x.cliente_id, clave: x.clave, mover: !!x.en_catalogo }), function () {
+                    x.en_catalogo = reg.nombre || 'Este cliente';
+                    return 'Cuenta ' + x.clave + ' de Microsip relacionada con el cliente.';
+                });
+            } else if (b.dataset.msb === 'quitar') {
+                if (!confirm('¿Quitar la relación con la cuenta ' + cuenta.clave + ' de Microsip?')) return;
+                trabajar(c.pedir(c.url(api, 'microsip_quitar'), { id: id }), function () { return 'Relación con Microsip quitada.'; });
             }
         });
     }

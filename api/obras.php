@@ -1165,13 +1165,19 @@ try {
         case 'presupuesto':
             $id = (int) ($_GET['id'] ?? 0);
             $p = bd_fila('AW',
-                'select a.docto_sugerido_obra_id, a.folio, a.fecha, a.cliente, a.proyecto, a.ubicacion, a.estatus, a.id_hs,
+                'select a.docto_sugerido_obra_id, a.folio, a.fecha, a.cliente_id, a.cliente, a.proyecto, a.ubicacion, a.estatus, a.id_hs,
                         a.utilidad_neta_por, a.subtotal, a.notas, a.obra_id, a.usuario_creador, v.nombre as vendedor, o.nom_obra
                    from doctos_sugerido_obra a
                    left join vendedores_obras v on v.vendedor_obra_id = a.vendedor_obra_id
                    left join reg_obras o on o.obra_id = a.obra_id
                   where a.docto_sugerido_obra_id = ?', [$id]);
             if (!$p) error('El presupuesto no existe.', 404);
+            // Cliente del Catálogo de Clientes, con su cuenta de Microsip y sus contactos de HubSpot (migraciones 016 y 022)
+            $p['cliente_cat'] = $p['cliente_id'] && bd_tiene_tabla('AW', 'clientes')
+                ? bd_fila('AW', 'select a.cliente_id as id, a.clave_cliente, a.nombre'
+                    . (bd_tiene_columna('AW', 'clientes', 'microsip_clave') ? ', a.microsip_clave' : ', null as microsip_clave') . ',
+                           (select count(*) from hs_clientes h where h.estatus = 1 and h.id_easy = a.cliente_id) as hubspot
+                      from clientes a where a.cliente_id = ?', [(int) $p['cliente_id']]) : null;
             $p['correo'] = bd_tiene_columna('AW', 'doctos_sugerido_obra', 'correo_electronico')
                 ? bd_valor('AW', 'select correo_electronico from doctos_sugerido_obra where docto_sugerido_obra_id = ?', [$id]) : null;
             // Datos de la obra del encabezado (ventana Nueva obra), guardados como JSON

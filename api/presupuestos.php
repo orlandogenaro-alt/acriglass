@@ -378,6 +378,14 @@ function guardarDetalles(int $id, array $d, array &$cache): void
     }
 }
 
+// Cliente del Catálogo de Clientes elegido en el presupuesto (null = capturado a mano o ya no existe)
+function clienteCatalogo($v): ?int
+{
+    $id = (int) ($v ?? 0);
+    if (!$id || !bd_tiene_tabla('AW', 'clientes')) return null;
+    return bd_valor('AW', 'select count(*) from clientes where cliente_id = ?', [$id]) ? $id : null;
+}
+
 function guardar(array $d): array
 {
     $id = (int) ($d['id'] ?? 0);
@@ -448,6 +456,7 @@ function guardar(array $d): array
     $enc = [
         'fecha'             => $fecha,
         'cliente'           => $cliente,
+        'cliente_id'        => clienteCatalogo($d['cliente_id'] ?? 0),
         'proyecto'          => texto($d['proyecto'] ?? '', 200),
         'ubicacion'         => texto($d['ubicacion'] ?? '', 150),
         'vendedor_obra_id'  => null,

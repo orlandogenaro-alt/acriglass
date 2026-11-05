@@ -9,6 +9,10 @@
 // POST ?accion=hs_asociar                   {id, id_hubspot, nombre, correo, telefono}  liga el contacto (HS_CLIENTES)
 // POST ?accion=hs_quitar                    {id, id_rel}  quita la relación (estatus 0, como Easy-Glass)
 // POST ?accion=hs_registrar                 {id, nombre, correo, telefono}  crea el contacto en HubSpot y lo liga
+// GET  ?accion=buscar&q=T                   clientes del catálogo para el campo Cliente del presupuesto (con su Microsip y HubSpot)
+// GET  ?accion=microsip_buscar&q=T          cuentas de Microsip (API de Easy-Glass /clientes) y si ya están en el catálogo
+// POST ?accion=microsip_importar            {cliente_id, clave, nombre, contacto, telefono}  cliente con cuenta en Microsip
+// POST ?accion=alta_hubspot                 {id_hubspot, empresa, contacto, correo, telefono}  cliente nuevo desde su contacto de HubSpot
 define('ACRI_API', true);
 require __DIR__ . '/../includes/sesion.php';
 require __DIR__ . '/../includes/bd.php';
@@ -22,7 +26,7 @@ const PERMISOS_CLIENTES = ['NUEVO_SUGERIDO_OBRA', 'MODIFICAR_SUGERIDO_OBRA', 'AD
 exigirPermiso('MODULO_SUGERIDOS_OBRA', 'NUEVO_OBRA', 'MODIFICAR_OBRA', ...PERMISOS_CLIENTES);
 
 $accion = $_GET['accion'] ?? 'listar';
-if (!in_array($accion, ['listar', 'ficha', 'historial'], true)) {
+if (!in_array($accion, ['listar', 'ficha', 'historial', 'buscar', 'microsip_buscar'], true)) {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') error('Método no permitido.', 405);
     exigirCsrf();
     exigirPermiso(...PERMISOS_CLIENTES);
@@ -30,6 +34,8 @@ if (!in_array($accion, ['listar', 'ficha', 'historial'], true)) {
 $puedeModificar = tienePermiso(...PERMISOS_CLIENTES);
 $usuario = mb_substr((string) ($_SESSION['usuario'] ?? ''), 0, 50);
 session_write_close();
+// Cuenta de Microsip del cliente (migración 022)
+$conMicrosip = bd_tiene_columna('AW', 'clientes', 'microsip_cliente_id');
 
 function texto($v, int $largo, bool $multilinea = false): ?string
 {
@@ -74,7 +80,7 @@ function ligarHs(int $id, string $idHs, ?string $nombre, ?string $correo, ?strin
          $tel === null ? null : mb_substr($tel, 0, 50)]);
 }
 
-function guardar(array $d, string $usuario): array
+function guardar(array $d, string $usuario, bool $conMicrosip): array
 {
     $id = (int) ($d['id'] ?? 0);
     if ($id) existeCliente($id);
@@ -122,6 +128,18 @@ function guardar(array $d, string $usuario): array
         'codigo_postal'   => texto($d['codigo_postal'] ?? '', 10),
         'condiciones_com' => texto($d['condiciones_com'] ?? '', 32000, true),
     ];
+    // Cuenta de Microsip: solo si la ficha la manda (sin la clave, la cuenta se quita)
+    if ($conMicrosip && array_key_exists('microsip_clave', $d)) {
+        $campos['microsip_clave'] = texto($d['microsip_clave'], 30);
+        // Si cambian la clave a mano, el Id de Microsip anterior ya no corresponde
+        $antes = $id ? bd_valor('AW', 'select microsip_clave from clientes where cliente_id = ?', [$id]) : null;
+        $campos['microsip_cliente_id'] = $campos['microsip_clave'] === null || $campos['microsip_clave'] !== $antes
+            ? null : ((int) ($d['microsip_cliente_id'] ?? 0) ?: null);
+        if ($campos['microsip_cliente_id'] &&($otro = bd_valor('AW', 'select nombre from clientes where microsip_cliente_id = ? and cliente_id <> ?',
+                [$campos['microsip_cliente_id'], $id]))) {
+            error("Esa cuenta de Microsip ya es del cliente «{$otro}».");
+        }
+    }
 
     if ($id) {
         bd_ejecutar('AW', 'update clientes set ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($campos)))
@@ -145,11 +163,45 @@ function guardar(array $d, string $usuario): array
     return ['id' => $id, 'clave' => (string) bd_valor('AW', 'select clave_cliente from clientes where cliente_id = ?', [$id])];
 }
 
+// Alta desde el presupuesto: solo con lo que trae Microsip o HubSpot (la ficha se completa después en Catalogos › Clientes)
+function altaRapida(array $campos, string $usuario): int
+{
+    $pdo = bd_pdo('AW');
+    $pdo->beginTransaction();
+    try {
+        $campos['clave_cliente']   = (string) bd_folio('AW', 'clave_clientes_consec');
+        $campos['fecha_creacion']  = date('Y-m-d H:i:s');
+        $campos['usuario_creador'] = $usuario;
+        $campos['estatus']         = 'A';
+        $id = bd_insertar('AW', 'clientes', 'cliente_id', $campos);
+        $pdo->commit();
+        return $id;
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+}
+
+// Columnas del buscador del presupuesto: el cliente con su cuenta de Microsip y cuántos contactos de HubSpot tiene
+function selectBuscador(bool $conMicrosip): string
+{
+    return 'select a.cliente_id, a.clave_cliente, a.nombre, a.contacto, a.telefono, a.email'
+        . ($conMicrosip ? ', a.microsip_clave, a.microsip_cliente_id' : ', null as microsip_clave, null as microsip_cliente_id') . ',
+               (select count(*) from hs_clientes h where h.estatus = 1 and h.id_easy = a.cliente_id) as hubspot
+          from clientes a ';
+}
+
+function filaBuscador(array $f): array
+{
+    return ['id' => (int) $f['cliente_id'], 'hubspot' => (int) $f['hubspot']] + $f;
+}
+
 try {
     switch ($accion) {
         case 'listar':
             responder(['ok' => true, 'puede_modificar' => $puedeModificar, 'filas' => array_map(fn($f) => ['id' => (int) $f['cliente_id']] + $f,
-                bd_filas('AW', 'select a.cliente_id, a.clave_cliente, a.nombre, a.contacto, a.telefono, a.email, c.nombre as ciudad, v.nombre as vendedor
+                bd_filas('AW', 'select a.cliente_id, a.clave_cliente, a.nombre, a.contacto, a.telefono, a.email, c.nombre as ciudad, v.nombre as vendedor'
+                                . ($conMicrosip ? ', a.microsip_clave' : '') . '
                                   from clientes a
                                   left join ciudades c on c.ciudad_id = a.ciudad_id
                                   left join vendedores_obras v on v.vendedor_obra_id = a.vendedor_id
@@ -161,6 +213,7 @@ try {
                 'ok' => true,
                 'puede_modificar' => $puedeModificar,
                 'vendedor_campo'  => true,
+                'microsip'        => $conMicrosip,
                 'registro' => null,
                 'relaciones_hs' => relacionesHs($id),
                 'condiciones_pago' => bd_filas('AW', 'select cond_pago_id as id, nombre from condiciones_pago order by nombre'),
@@ -176,7 +229,7 @@ try {
                                                        moneda_id, zona_cliente_id, sistema_dim_id, vendedor_id, direccion, referencia, ciudad_id,
                                                        codigo_postal, condiciones_com, coalesce(impuesto, 0) as impuesto,
                                                        coalesce(total_impuesto, 0) as total_impuesto, fecha_creacion, usuario_creador,
-                                                       vendedor_campo_id
+                                                       vendedor_campo_id' . ($conMicrosip ? ', microsip_clave, microsip_cliente_id' : '') . '
                                                   from clientes where cliente_id = ?', [$id]);
                 if (!$r['registro']) error('El cliente ya no existe (¿lo eliminaron?).', 404);
             } else {
@@ -200,7 +253,7 @@ try {
                 [$id, $empresa, fechaParam('ini', date('Y-m-d', strtotime('-1 year'))), fechaParam('fin', date('Y-m-d'))])]);
 
         case 'guardar':
-            responder(['ok' => true] + guardar(entrada(), $usuario));
+            responder(['ok' => true] + guardar(entrada(), $usuario, $conMicrosip));
 
         case 'impuesto':
             $d = entrada();
@@ -259,6 +312,78 @@ try {
             }
             ligarHs($id, (string) $hs['datos']['id'], $nombre, $correo, $tel);
             responder(['ok' => true, 'relaciones_hs' => relacionesHs($id)]);
+        case 'buscar':
+            $q = mb_strtoupper(trim((string) ($_GET['q'] ?? '')));
+            $filtro = '';
+            $params = [];
+            if ($q !== '') {
+                $like = '%' . addcslashes($q, '\\%_') . '%';
+                $cols = ['a.nombre', 'a.contacto', 'a.email', 'a.clave_cliente'];
+                if ($conMicrosip) $cols[] = 'a.microsip_clave';
+                $filtro = 'where ' . implode(' or ', array_map(fn($c) => "upper(coalesce($c, '')) like ?", $cols));
+                $params = array_fill(0, count($cols), $like);
+            }
+            responder(['ok' => true, 'microsip' => $conMicrosip, 'puede_modificar' => $puedeModificar,
+                'filas' => array_map('filaBuscador', bd_filas('AW', selectBuscador($conMicrosip) . $filtro . ' order by a.nombre limit 20', $params))]);
+
+        case 'microsip_buscar':   // la clave de Easy-Glass es la cuenta del cliente en Microsip
+            if (!$conMicrosip) error('Falta ligar el catálogo con Microsip: aplica la migración 022_clientes_microsip.sql.', 503);
+            $q = trim((string) ($_GET['q'] ?? ''));
+            if (mb_strlen($q) < 2) error('Escribe al menos 2 letras de la clave o el nombre.');
+            $r = api_http('EASYGLASS', 'GET', '/clientes?activos=1&q=' . rawurlencode($q));
+            if (!$r['ok']) error('No se pudo consultar Microsip en la API de Easy-Glass: ' . ($r['error'] ?: 'sin respuesta'), 502);
+            $filas = array_slice((array) ($r['datos']['datos'] ?? []), 0, 30);
+            $ids = array_values(array_filter(array_map(fn($c) => (int) ($c['cliente_id'] ?? 0), $filas)));
+            $ligados = $ids ? array_column(bd_filas('AW', 'select microsip_cliente_id, nombre from clientes where microsip_cliente_id in ('
+                . implode(',', array_fill(0, count($ids), '?')) . ')', $ids), 'nombre', 'microsip_cliente_id') : [];
+            responder(['ok' => true, 'filas' => array_map(fn($c) => [
+                'cliente_id' => (int) ($c['cliente_id'] ?? 0), 'clave' => (string) ($c['clave_cliente'] ?? ''), 'nombre' => $c['nombre'] ?? '',
+                'contacto' => $c['contacto'] ?? '', 'telefono' => $c['telefono'] ?? '', 'vendedor' => $c['vendedor'] ?? '',
+                'en_catalogo' => $ligados[(int) ($c['cliente_id'] ?? 0)] ?? null,
+            ], $filas)]);
+
+        case 'microsip_importar':
+            if (!$conMicrosip) error('Falta ligar el catálogo con Microsip: aplica la migración 022_clientes_microsip.sql.', 503);
+            $d = entrada();
+            $msId = (int) ($d['cliente_id'] ?? 0);
+            $nombre = texto($d['nombre'] ?? '', 200);
+            if (!$msId || $nombre === null) error('Selecciona la cuenta de Microsip.');
+            $nombre = mb_strtoupper($nombre);
+            $clave = texto($d['clave'] ?? '', 30);
+            // Ya en el catálogo por su cuenta de Microsip, o con el mismo nombre y sin cuenta todavía: se liga
+            $id = (int) bd_valor('AW', 'select cliente_id from clientes where microsip_cliente_id = ?', [$msId]);
+            if (!$id && ($f = bd_fila('AW', 'select cliente_id, microsip_cliente_id from clientes where upper(trim(nombre)) = ?', [$nombre]))) {
+                if ($f['microsip_cliente_id']) error("El cliente «{$nombre}» ya está ligado a otra cuenta de Microsip.");
+                $id = (int) $f['cliente_id'];
+                bd_ejecutar('AW', 'update clientes set microsip_cliente_id = ?, microsip_clave = ? where cliente_id = ?', [$msId, $clave, $id]);
+            }
+            if (!$id) {
+                $contacto = texto($d['contacto'] ?? '', 200);
+                $id = altaRapida(['nombre' => $nombre, 'contacto' => $contacto === null ? null : mb_strtoupper($contacto),
+                    'telefono' => texto($d['telefono'] ?? '', 35), 'microsip_cliente_id' => $msId, 'microsip_clave' => $clave], $usuario);
+            }
+            responder(['ok' => true, 'cliente' => filaBuscador(bd_fila('AW', selectBuscador($conMicrosip) . 'where a.cliente_id = ?', [$id]))]);
+
+        case 'alta_hubspot':   // cliente nuevo: se da de alta con su contacto de HubSpot y queda relacionado
+            $d = entrada();
+            $idHs = preg_replace('/\D/', '', (string) ($d['id_hubspot'] ?? ''));
+            $contacto = texto($d['contacto'] ?? '', 200);
+            $nombre = texto($d['empresa'] ?? '', 200) ?? $contacto;
+            if ($idHs === '' || $nombre === null) error('Selecciona el contacto de HubSpot.');
+            $nombre = mb_strtoupper($nombre);
+            $correo = texto($d['correo'] ?? '', 200);
+            $tel = texto($d['telefono'] ?? '', 35);
+            // Si el contacto ya está relacionado, o hay un cliente con ese nombre, se usa ese
+            $id = (int) bd_valor('AW', 'select id_easy from hs_clientes where estatus = 1 and id_hubspot = ? order by id_rel_clientes limit 1', [$idHs])
+               ?: (int) bd_valor('AW', 'select cliente_id from clientes where upper(trim(nombre)) = ?', [$nombre]);
+            if (!$id) {
+                $id = altaRapida(['nombre' => $nombre, 'contacto' => $contacto === null ? null : mb_strtoupper($contacto),
+                    'telefono' => $tel, 'email' => $correo], $usuario);
+            }
+            if (!bd_valor('AW', 'select count(*) from hs_clientes where estatus = 1 and id_easy = ? and id_hubspot = ?', [$id, $idHs])) {
+                ligarHs($id, $idHs, $contacto, $correo, $tel);
+            }
+            responder(['ok' => true, 'cliente' => filaBuscador(bd_fila('AW', selectBuscador($conMicrosip) . 'where a.cliente_id = ?', [$id]))]);
     }
     error('Acción no válida.');
 } catch (Throwable $e) {

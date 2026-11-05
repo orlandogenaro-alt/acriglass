@@ -368,6 +368,42 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .con-boton { display: flex; gap: 6px; }
 .con-boton input { flex: 1; }
 
+/* Cliente: buscador del Catálogo de Clientes (Microsip / HubSpot) */
+.cli-buscador { position: relative; display: block; min-width: 0; }
+.cli-buscador > .cli-marcas { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.cli-marcas { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.cli-marca {
+    font-size: 10px; font-weight: 700; line-height: 1; padding: 3px 6px; border-radius: 9px; border: 1px solid; white-space: nowrap;
+}
+.cli-marca.cat { color: var(--azul-texto); background: var(--azul-suave); border-color: var(--azul-borde); }
+.cli-marca.ms  { color: var(--verde); background: var(--verde-suave); border-color: var(--verde-borde); }
+.cli-marca.hs  { color: #f26b3a; background: rgba(242, 107, 58, .12); border-color: rgba(242, 107, 58, .45); }
+.cli-marca.sin { color: var(--ambar); background: var(--ambar-suave); border-color: var(--ambar-borde); }
+.cli-lista {
+    position: absolute; left: 0; top: calc(100% + 4px); z-index: 60;
+    width: max(100%, 420px); max-height: 340px; overflow-y: auto;
+    background: var(--tarjeta); border: 1px solid var(--borde-2); border-radius: var(--radio); box-shadow: var(--sombra-flot);
+    font-weight: 400;
+}
+.cli-op {
+    display: grid; grid-template-columns: 1fr auto; column-gap: 8px; align-items: center;
+    padding: 7px 10px; cursor: pointer; border-bottom: 1px solid var(--linea);
+}
+.cli-op b { color: var(--texto); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cli-op small { grid-column: 1; color: var(--texto-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cli-op .cli-marcas { grid-column: 2; grid-row: 1 / span 2; }
+.cli-op:hover, .cli-op.sel { background: var(--fila-hover); }
+.cli-titulo { padding: 6px 10px; font-size: 11px; font-weight: 700; color: var(--texto-3); text-transform: uppercase; border-bottom: 1px solid var(--linea); }
+.cli-vacio { padding: 10px; color: var(--texto-3); font-style: italic; }
+.cli-vacio.error { color: var(--rojo); font-style: normal; }
+.cli-acciones { position: sticky; bottom: 0; display: flex; gap: 6px; padding: 6px; background: var(--tarjeta); border-top: 1px solid var(--borde); }
+.cli-acciones button {
+    flex: 1; height: 28px; border: 1px solid var(--borde-2); background: var(--input); border-radius: 4px; color: var(--texto-2); cursor: pointer;
+}
+.cli-acciones button:hover { background: var(--azul-suave); border-color: var(--azul-borde); color: var(--azul-texto); }
+.cli-acciones button[data-cli="microsip"] { color: var(--verde); }
+.cli-acciones button[data-cli="hubspot"] { color: #f26b3a; }
+
 .mini {
     width: 32px; height: 32px;
     display: inline-flex; align-items: center; justify-content: center;

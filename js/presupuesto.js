@@ -3168,6 +3168,160 @@
         if (e.target.closest('tr[data-i]')) $('hsUsar').click();
     });
 
+    // ---------- Cliente: Catálogo de Clientes (api/clientes.php) ----------
+    // Al escribir se buscan los clientes del catálogo con su cuenta de Microsip y sus contactos de HubSpot.
+    // Si no está: «Traer de Microsip» (ya tiene cuenta) o «Nuevo desde HubSpot» (cliente nuevo); los dos lo agregan al catálogo.
+    var cli = { id: 0, filas: [], sel: -1, modo: 'catalogo', pedido: 0, espera: null, puede: true, microsip: false };
+
+    function cliPedir(accion, q, cuerpo) {
+        return fetch('api/clientes.php?accion=' + accion + (q != null ? '&q=' + encodeURIComponent(q) : ''), cuerpo ? {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Acri-Token': token },
+            body: JSON.stringify(cuerpo)
+        } : undefined).then(function (r) {
+            if (r.status === 401) { (window.top || window).location.href = 'index.php'; throw new Error('Sesión expirada'); }
+            return r.json().catch(function () { throw new Error('Respuesta no válida del servidor (HTTP ' + r.status + ').'); });
+        }).then(function (j) {
+            if (!j.ok) throw new Error(j.error);
+            return j;
+        });
+    }
+
+    function cliMarcas(c) {
+        var m = '<span class="cli-marca cat" title="Clave en el Catálogo de Clientes">#' + escapar(c.clave_cliente) + '</span>';
+        if (c.microsip_clave || +c.microsip_cliente_id) m += '<span class="cli-marca ms" title="Cuenta en Microsip">Microsip ' + escapar(c.microsip_clave || '') + '</span>';
+        if (+c.hubspot) m += '<span class="cli-marca hs" title="Contactos de HubSpot relacionados">HubSpot</span>';
+        return m;
+    }
+
+    // Cliente del catálogo ligado al presupuesto (null = capturado a mano)
+    function ponerCliente(c) {
+        cli.id = c ? +c.id : 0;
+        $('clienteMarcas').innerHTML = c ? cliMarcas(c)
+            : $('cliente').value.trim() ? '<span class="cli-marca sin" title="Escribe y elige un cliente de la lista para ligarlo al Catálogo de Clientes">Fuera del catálogo</span>' : '';
+        $('cliente').style.paddingRight = $('clienteMarcas').offsetWidth ? ($('clienteMarcas').offsetWidth + 14) + 'px' : '';
+    }
+
+    function elegirCliente(c) {
+        cliCerrar();
+        $('cliente').value = c.nombre || '';
+        if (!$('email').value.trim() && c.email) $('email').value = String(c.email).split(/[;,\s]+/)[0];
+        ponerCliente(c);
+        $('cliente').dispatchEvent(new Event('change'));
+        marcarCambio();
+    }
+
+    function cliPintar(html) {
+        $('clienteLista').innerHTML = html;
+        $('clienteLista').hidden = false;
+    }
+    function cliCerrar() {
+        cli.pedido++;
+        $('clienteLista').hidden = true;
+    }
+    function cliAcciones(catalogo) {
+        if (!cli.puede) return '';
+        return '<div class="cli-acciones">' +
+            (catalogo ? (cli.microsip ? '<button type="button" data-cli="microsip" title="Cliente que ya tiene cuenta en Microsip">Traer de Microsip</button>' : '')
+                      : '<button type="button" data-cli="catalogo">← Catálogo</button>') +
+            '<button type="button" data-cli="hubspot" title="Cliente nuevo: se busca su contacto en HubSpot">Nuevo desde HubSpot</button></div>';
+    }
+
+    function cliBuscar() {
+        var q = $('cliente').value.trim(), n = ++cli.pedido;
+        cli.modo = 'catalogo';
+        cliPedir('buscar', q).then(function (j) {
+            if (n !== cli.pedido) return;
+            cli.filas = j.filas;
+            cli.sel = -1;
+            cli.puede = j.puede_modificar !== false;
+            cli.microsip = !!j.microsip;
+            cliPintar(j.filas.map(function (c, i) {
+                return '<div class="cli-op" data-i="' + i + '"><b>' + escapar(c.nombre) + '</b>' +
+                    '<small>' + escapar([c.contacto, c.email].filter(Boolean).join(' · ')) + '</small>' +
+                    '<span class="cli-marcas">' + cliMarcas(c) + '</span></div>';
+            }).join('') + (j.filas.length ? '' : '<div class="cli-vacio">' + (q ? '«' + escapar(q) + '» no está en el Catálogo de Clientes.' : 'El catálogo no tiene clientes.') + '</div>') +
+                cliAcciones(true));
+        }).catch(function (err) {
+            if (n === cli.pedido) cliPintar('<div class="cli-vacio error">' + escapar(err.message) + '</div>');
+        });
+    }
+
+    function cliMicrosip() {
+        var q = $('cliente').value.trim(), n = ++cli.pedido;
+        cli.modo = 'microsip';
+        cli.filas = [];
+        cli.sel = -1;
+        if (q.length < 2) { cliPintar('<div class="cli-vacio">Escribe al menos 2 letras de la clave o el nombre del cliente en Microsip.</div>' + cliAcciones(false)); return; }
+        cliPintar('<div class="cli-vacio">Buscando «' + escapar(q) + '» en Microsip…</div>');
+        cliPedir('microsip_buscar', q).then(function (j) {
+            if (n !== cli.pedido) return;
+            cli.filas = j.filas;
+            cliPintar('<div class="cli-titulo">Cuentas de Microsip</div>' + j.filas.map(function (c, i) {
+                return '<div class="cli-op" data-i="' + i + '"><b>' + escapar(c.nombre) + '</b>' +
+                    '<small>' + escapar([c.contacto, c.vendedor].filter(Boolean).join(' · ')) + '</small>' +
+                    '<span class="cli-marcas"><span class="cli-marca ms">Microsip ' + escapar(c.clave) + '</span>' +
+                    (c.en_catalogo ? '<span class="cli-marca cat" title="Ya está en el Catálogo de Clientes">En catálogo</span>' : '') + '</span></div>';
+            }).join('') + (j.filas.length ? '' : '<div class="cli-vacio">No se encontró «' + escapar(q) + '» en Microsip.</div>') + cliAcciones(false));
+        }).catch(function (err) {
+            if (n === cli.pedido) cliPintar('<div class="cli-vacio error">' + escapar(err.message) + '</div>' + cliAcciones(false));
+        });
+    }
+
+    function cliElegir(i) {
+        var c = cli.filas[i];
+        if (!c) return;
+        if (cli.modo === 'catalogo') { elegirCliente(c); return; }
+        // Cuenta de Microsip: queda en el catálogo (o se liga al cliente con el mismo nombre)
+        var n = ++cli.pedido;
+        cliPintar('<div class="cli-vacio">Agregando «' + escapar(c.nombre) + '» al Catálogo de Clientes…</div>');
+        cliPedir('microsip_importar', null, { cliente_id: c.cliente_id, clave: c.clave, nombre: c.nombre, contacto: c.contacto, telefono: c.telefono })
+            .then(function (j) { if (n === cli.pedido) elegirCliente(j.cliente); })
+            .catch(function (err) { if (n === cli.pedido) cliPintar('<div class="cli-vacio error">' + escapar(err.message) + '</div>' + cliAcciones(false)); });
+    }
+
+    function cliMarcar(paso) {
+        var ops = $('clienteLista').querySelectorAll('.cli-op');
+        if (!ops.length) return;
+        cli.sel = (cli.sel + paso + ops.length) % ops.length;
+        ops.forEach(function (o, k) { o.classList.toggle('sel', k === cli.sel); });
+        ops[cli.sel].scrollIntoView({ block: 'nearest' });
+    }
+
+    $('cliente').addEventListener('input', function () {
+        ponerCliente(null);
+        clearTimeout(cli.espera);
+        cli.espera = setTimeout(cliBuscar, 250);
+    });
+    $('cliente').addEventListener('keydown', function (e) {
+        var abierta = !$('clienteLista').hidden;
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (!abierta) { cliBuscar(); return; }
+            cliMarcar(e.key === 'ArrowDown' ? 1 : -1);
+        } else if (e.key === 'Enter' && abierta && cli.sel >= 0) {
+            e.preventDefault();
+            cliElegir(cli.sel);
+        } else if (e.key === 'Escape' && abierta) {
+            e.preventDefault();
+            cliCerrar();
+        }
+    });
+    $('cliente').addEventListener('blur', function () { setTimeout(function () { if (document.activeElement !== $('cliente')) cliCerrar(); }, 150); });
+    // Clic en la lista sin perder el foco del campo
+    $('clienteLista').addEventListener('mousedown', function (e) { e.preventDefault(); });
+    $('clienteLista').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-cli]');
+        if (b) {
+            if (b.dataset.cli === 'microsip') cliMicrosip();
+            else if (b.dataset.cli === 'catalogo') cliBuscar();
+            else { cliCerrar(); $('buscarHubspot').click(); }
+            return;
+        }
+        var op = e.target.closest('.cli-op');
+        if (op) cliElegir(+op.dataset.i);
+    });
+
     $('buscarHubspot').addEventListener('click', function () {
         // Busca con el correo capturado; si no hay, con el cliente
         $('hsTexto').value = $('email').value.trim() || $('cliente').value.trim();
@@ -3186,7 +3340,13 @@
         var cliente = c.empresa || c.nombre;
         if (cliente && (!$('cliente').value.trim() || confirm('¿Reemplazar el cliente "' + $('cliente').value + '" por "' + cliente + '"?'))) {
             $('cliente').value = cliente;
+            ponerCliente(null);
             $('cliente').dispatchEvent(new Event('change'));
+            // Cliente nuevo: queda en el Catálogo de Clientes relacionado con su contacto de HubSpot
+            // (si el contacto ya está relacionado o el nombre ya existe, se usa ese cliente)
+            cliPedir('alta_hubspot', null, { id_hubspot: c.id, empresa: c.empresa, contacto: c.nombre, correo: c.correo, telefono: c.telefono })
+                .then(function (j) { if ($('cliente').value === cliente) elegirCliente(j.cliente); })
+                .catch(function (err) { alert('El cliente quedó en el presupuesto, pero no se pudo agregar al Catálogo de Clientes: ' + err.message); });
         }
         if (n) {
             if (!$('proyecto').value.trim() && n.nombre) $('proyecto').value = n.nombre;
@@ -3421,6 +3581,7 @@
             id: presupuestoId,
             fecha: $('fecha').value,
             cliente: $('cliente').value,
+            cliente_id: cli.id,
             email: $('email').value,
             proyecto: $('proyecto').value,
             ubicacion: $('ubicacion').value,
@@ -3993,6 +4154,7 @@
             if (!j.ok) throw new Error(j.error);
             var p = j.presupuesto;
             $('cliente').value = p.cliente || '';
+            ponerCliente(p.cliente_cat || null);
             $('proyecto').value = p.proyecto || '';
             $('ubicacion').value = p.ubicacion || '';
             if (p.correo) $('email').value = p.correo;

@@ -168,7 +168,10 @@ window.Fichas = (function () {
                     { id: 'sistema_dim_id', etiqueta: 'Sis. de Dimensiones', tipo: 'select', lista: 'sistemas_dim', defecto: /METRIC/i },
                     { id: 'vendedor_id', etiqueta: 'Vendedor', tipo: 'select', lista: 'vendedores' },
                     { id: 'vendedor_campo_id', etiqueta: 'Vendedor en Campo', tipo: 'select', lista: 'vendedores', vacio: '— Sin asignar —',
-                      si: function (cat) { return cat.vendedor_campo; } }
+                      si: function (cat) { return cat.vendedor_campo; } },
+                    // Cuenta de Microsip (migración 022): se llena con «Traer de Microsip» en el presupuesto de obra
+                    { id: 'microsip_clave', etiqueta: 'Cuenta Microsip (clave)', mayus: true, si: function (cat) { return cat.microsip; } },
+                    { id: 'microsip_cliente_id', etiqueta: 'Id Microsip', auto: true, si: function (cat) { return cat.microsip; } }
                 ] },
                 { titulo: 'Direcciones', campos: [
                     { id: 'direccion', etiqueta: '(x)Dirección', tipo: 'textarea', completo: true },

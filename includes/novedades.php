@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-11-05',
+        'cambios' => [
+            ['nuevo', 'Presupuesto: el Cliente se elige del Catálogo de Clientes, ligado a Microsip y a HubSpot', 'Al escribir en Cliente sale la lista del Catálogo de Clientes (Catalogos › Clientes) con la clave de cada uno, su cuenta de Microsip y si tiene contactos de HubSpot; se elige con el ratón o con ↓ y Enter, y el presupuesto queda ligado a ese cliente (también aparece en su Historial). Si el cliente no está: «Traer de Microsip» busca la cuenta en Microsip (por la API de Easy-Glass) y lo agrega al catálogo con su clave, y «Nuevo desde HubSpot» busca su contacto en HubSpot y lo da de alta en el catálogo relacionado con ese contacto. Lo mismo pasa al usar un contacto con el botón naranja de HubSpot. Un cliente escrito a mano se sigue pudiendo guardar y se marca «Fuera del catálogo». La ficha del cliente muestra su Cuenta Microsip. Requiere la migración 022.'],
+        ],
+    ],
+    [
         'fecha' => '2026-11-03',
         'cambios' => [
             ['mejora', 'Presupuesto: el cuadro de abajo de Mano de Obra se puede hacer más alto', 'La raya de abajo del cuadro de Mano de obra de los análisis, Empleados y Comisiones se arrastra hacia abajo o hacia arriba para cambiar su alto. El alto se recuerda en ese navegador; doble clic en la raya lo regresa al normal.'],

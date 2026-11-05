@@ -1548,6 +1548,155 @@
     });
     document.querySelectorAll('[data-cal-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('calDialogo').close(); }); });
 
+    // ---------- Programas de erogaciones (botón de la barra), como los reportes de Neodata ----------
+    // Con el programa de cada concepto (inicio y fin del botón Cálculo) se reparte parejo por días lo que se ejerce en cada
+    // mes, quincena o semana de la obra (CALC.periodos / CALC.avancePeriodo): la ejecución general por concepto a precio de
+    // venta, y la explosión de insumos a costo directo, separada en materiales y equipo, y mano de obra. Solo consulta.
+    var ERO_NOMBRES = { mensual: 'Mes', quincenal: 'Quincena', semanal: 'Semana' };
+    var eroDatos = null;
+    function fechaCorta(f) { return f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(2, 4); }
+    function conPrograma(c) { return CALC.avanceProgramado(c.inicio, c.fin, c.fin) !== null; }
+    function datosErogaciones() {
+        var vista = $('eroVista').value, per = $('eroPeriodo').value;
+        var lista = catalogoPU(calcularPU()).filter(function (x) { return !x.otro; });
+        var con = lista.filter(function (x) { return conPrograma(x.c); });
+        var ini = '', fin = '';
+        con.forEach(function (x) {
+            if (!ini || x.c.inicio < ini) ini = x.c.inicio;
+            if (!fin || x.c.fin > fin) fin = x.c.fin;
+        });
+        var periodos = CALC.periodos(ini, fin, per);
+        function reparto(c) { return periodos.map(function (p) { return CALC.avancePeriodo(c.inicio, c.fin, p.desde, p.hasta); }); }
+        var filas = [];
+        if (vista === 'general') {
+            filas = lista.map(function (x) {
+                var f = conPrograma(x.c) ? reparto(x.c) : null;
+                return { grupo: x.partida, codigo: x.clave, nombre: x.descripcion, um: x.unidad, cantidad: x.cantidad, importe: x.importe,
+                         celdas: f && f.map(function (k) { return { cantidad: x.cantidad * k, importe: x.importe * k }; }) };
+            });
+        } else {
+            var grupos = {};
+            var sumar = function (tipo, codigo, nombre, um, cantTotal, impTotal, f) {
+                var k = tipo + '|' + clave(nombre) + '|' + clave(um);
+                if (!grupos[k]) {
+                    grupos[k] = { tipo: tipo, codigo: '', nombre: nombre, um: um, cantidad: 0, importe: 0,
+                                  celdas: periodos.map(function () { return { cantidad: 0, importe: 0 }; }) };
+                    filas.push(grupos[k]);
+                }
+                var g = grupos[k];
+                if (!g.codigo) g.codigo = codigo;
+                g.cantidad += cantTotal;
+                g.importe += impTotal;
+                f.forEach(function (p, n) { g.celdas[n].cantidad += cantTotal * p; g.celdas[n].importe += impTotal * p; });
+            };
+            con.filter(function (x) { return alCosto(x.c); }).forEach(function (x) {
+                var f = reparto(x.c), e = CALC.explosion({ fsr: analisis.fsr, hm: analisis.hm, conceptos: [x.c] }, true);
+                e.insumos.forEach(function (i) {
+                    if ((i.tipo === 'MO') !== (vista === 'mo')) return;
+                    sumar(i.tipo, i.codigo, i.descripcion, i.unidad, i.cantidad, i.importe, f);
+                });
+                if (vista === 'mat' && e.totales.hm) sumar('HER', '', 'HERRAMIENTA MENOR (' + pct(analisis.hm) + ' DE LA MANO DE OBRA)', '%', 0, e.totales.hm, f);
+            });
+            filas.sort(function (a, b) {
+                var ta = CALC.TIPOS.indexOf(a.tipo), tb = CALC.TIPOS.indexOf(b.tipo);
+                return ta !== tb ? ta - tb : a.nombre < b.nombre ? -1 : a.nombre > b.nombre ? 1 : 0;
+            });
+            filas.forEach(function (g) { g.grupo = TIPOS_INSUMO[g.tipo]; });
+        }
+        var tot = periodos.map(function (p, n) { return filas.reduce(function (s, g) { return s + (g.celdas ? g.celdas[n].importe : 0); }, 0); });
+        return { vista: vista, per: per, periodos: periodos, filas: filas, totales: tot,
+                 conceptos: lista.length, sinPrograma: lista.length - con.length };
+    }
+    function etiquetaPeriodo(d, p, n) { return ERO_NOMBRES[d.per] + ' ' + (n + 1); }
+    function pintarErogaciones() {
+        var d = eroDatos = datosErogaciones(), general = d.vista === 'general', np = d.periodos.length;
+        $('eroCabeza').innerHTML = '<tr><th class="c-id">' + (general ? 'Clave' : 'Código') + '</th><th>' + (general ? 'Concepto' : 'Insumo') + '</th>' +
+            '<th>Unidad</th><th class="c-num">Cantidad</th>' +
+            d.periodos.map(function (p, n) {
+                return '<th class="c-num ero-per">' + etiquetaPeriodo(d, p, n) + '<small>' + fechaCorta(p.desde) + ' – ' + fechaCorta(p.hasta) + '</small></th>';
+            }).join('') + '<th class="c-num">Total</th></tr>';
+        var columnas = 5 + np, grupo = null, html = '';
+        d.filas.forEach(function (g) {
+            if (g.grupo !== grupo) { grupo = g.grupo; html += '<tr class="ero-grupo"><td colspan="' + columnas + '">' + escapar(grupo) + '</td></tr>'; }
+            html += '<tr><td class="id">' + escapar(g.codigo) + '</td><td class="ro izq ero-desc">' + escapar(g.nombre) + '</td>' +
+                '<td class="ro izq">' + escapar(g.um) + '</td><td class="ro">' + (g.cantidad ? cant(Math.round(g.cantidad * 10000) / 10000) : '') + '</td>' +
+                (g.celdas ? g.celdas.map(function (c) {
+                    if (c.importe < 0.005 && c.cantidad < 0.00005) return '<td class="ro"></td>';
+                    return '<td class="ro ero-celda">' + fmt(c.importe) + (!general && c.cantidad ? '<small>' + cant(Math.round(c.cantidad * 100) / 100) + ' ' + escapar(g.um) + '</small>' : '') + '</td>';
+                }).join('') : '<td class="ro izq" colspan="' + np + '"><span class="cal-sin">sin programa</span></td>') +
+                '<td class="ro">' + fmt(g.importe) + '</td></tr>';
+        });
+        $('eroCuerpo').innerHTML = html || '<tr class="vacio-fila"><td colspan="' + columnas + '">' +
+            (!d.conceptos ? 'El presupuesto aún no tiene conceptos analizados.'
+             : !np ? 'Ningún concepto tiene programa: captura su inicio y fin con «Capturar programas…».'
+             : 'Los conceptos con programa no llevan ' + (d.vista === 'mo' ? 'mano de obra.' : 'materiales ni equipo.')) + '</td></tr>';
+        var total = d.totales.reduce(function (s, x) { return s + x; }, 0), acum = 0;
+        $('eroPie').innerHTML = !np ? '' :
+            '<tr class="pu-total"><td colspan="4" class="ro">Total del periodo</td>' + d.totales.map(function (x) { return '<td class="ro">' + fmt(x) + '</td>'; }).join('') +
+            '<td class="ro">' + fmt(total) + '</td></tr>' +
+            '<tr><td colspan="4" class="ro">Acumulado</td>' + d.totales.map(function (x) {
+                acum += x;
+                return '<td class="ro">' + fmt(acum) + '<small>' + (total ? pct(acum / total * 100) : '') + '</small></td>';
+            }).join('') + '<td></td></tr>';
+        $('eroNota').textContent = !np ? '' : 'Del ' + fechaCorta(d.periodos[0].desde) + ' al ' + fechaCorta(d.periodos[np - 1].hasta) + ', ' + np + ' periodo(s).' +
+            (d.sinPrograma ? ' ' + d.sinPrograma + ' concepto(s) sin programa' + (general ? '.' : ' no entran.') : '');
+    }
+    function abrirErogaciones() {
+        pintarErogaciones();
+        $('eroDialogo').showModal();
+    }
+    $('eroVista').addEventListener('change', pintarErogaciones);
+    $('eroPeriodo').addEventListener('change', pintarErogaciones);
+    $('eroProgramas').addEventListener('click', function () {
+        $('eroDialogo').close();
+        abrirCalculo();
+        // Al cerrar el Cálculo se vuelve a las erogaciones con los programas nuevos
+        $('calDialogo').addEventListener('close', function volver() {
+            $('calDialogo').removeEventListener('close', volver);
+            abrirErogaciones();
+        });
+    });
+    $('eroExportar').addEventListener('click', function () {
+        var d = eroDatos, general = d.vista === 'general';
+        if (!d || !d.periodos.length || !d.filas.length) { alert('No hay nada programado que exportar.'); return; }
+        var titulo = function (t) { return { v: t, e: 'titulo' }; };
+        var cab = [general ? 'Clave' : 'Código', general ? 'Concepto' : 'Insumo', 'Unidad', 'Cantidad'];
+        d.periodos.forEach(function (p, n) {
+            var e = etiquetaPeriodo(d, p, n) + ' (' + fechaCorta(p.desde) + ' – ' + fechaCorta(p.hasta) + ')';
+            if (!general) cab.push(e + ' cantidad');
+            cab.push(e + (general ? '' : ' importe'));
+        });
+        cab.push('Total');
+        var filas = [cab.map(titulo)], grupo = null;
+        d.filas.forEach(function (g) {
+            if (g.grupo !== grupo) { grupo = g.grupo; filas.push([null, { v: grupo, e: 'titulo' }]); }
+            var f = [g.codigo, { v: g.nombre, e: 'texto' }, g.um, g.cantidad ? { v: Math.round(g.cantidad * 10000) / 10000, e: 'cantidad' } : null];
+            d.periodos.forEach(function (p, n) {
+                var c = g.celdas && g.celdas[n];
+                if (!general) f.push(c && c.cantidad ? { v: Math.round(c.cantidad * 10000) / 10000, e: 'cantidad' } : null);
+                f.push(c && c.importe >= 0.005 ? { v: redondear(c.importe), e: 'dinero' } : (g.celdas ? null : { v: 'sin programa', e: 'texto' }));
+            });
+            f.push({ v: redondear(g.importe), e: 'dinero' });
+            filas.push(f);
+        });
+        var pie = [null, titulo('Total del periodo'), null, null], acum = [null, titulo('Acumulado'), null, null], s = 0;
+        d.totales.forEach(function (x) {
+            s += x;
+            if (!general) { pie.push(null); acum.push(null); }
+            pie.push({ v: redondear(x), e: 'dinero' });
+            acum.push({ v: redondear(s), e: 'dinero' });
+        });
+        pie.push({ v: redondear(s), e: 'dinero' });
+        filas.push(pie, acum);
+        var anchos = [16, 50, 9, 12];
+        d.periodos.forEach(function () { if (!general) anchos.push(14); anchos.push(16); });
+        anchos.push(16);
+        var nombre = { general: 'Erogaciones general', mat: 'Erogaciones materiales', mo: 'Erogaciones mano de obra' }[d.vista];
+        XlsxSimple.descargar(XlsxSimple.crear({ nombre: 'Erogaciones', anchos: anchos, fijarFila: 1, filas: filas }),
+                             nombre + ' ' + (txt($('proyecto').value) || 'presupuesto'));
+    });
+    document.querySelectorAll('[data-ero-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('eroDialogo').close(); }); });
+
     // ---------- Presupuesto completo (botón de la barra): todos los conceptos en una sola vista ----------
     // Las mismas partidas, subpartidas y precios del Catálogo de Conceptos (arbolCc / catalogoCliente), con su costo directo,
     // P.U., importe, % y familia. La familia sale del catálogo Conceptos P.U. por código; lo capturado por importe, su sección.
@@ -4109,6 +4258,7 @@
         'sobrecosto': abrirSobrecosto,
         'completo': abrirCompleto,
         'calculo': abrirCalculo,
+        'erogaciones': abrirErogaciones,
         'eliminar': function () {
             if (!presupuestoId) {
                 if (confirm('Este presupuesto no se ha guardado. ¿Descartarlo?')) { cambios = false; cerrarVentana(); }

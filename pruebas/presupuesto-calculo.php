@@ -35,6 +35,16 @@ foreach ($casos as $caso) {
             pcComparar($caso['esperado'], $a === null ? ['sin_programa' => 1] : ['avance' => $a]);
             return;
         }
+        if ($caso['tipo'] === 'avance_periodo') {
+            $a = pcAvancePeriodo(...$caso['args']);
+            pcComparar($caso['esperado'], $a === null ? ['sin_programa' => 1] : ['avance' => $a]);
+            return;
+        }
+        if ($caso['tipo'] === 'periodos') {
+            $l = pcPeriodos(...$caso['args']);
+            pcComparar($caso['esperado'], ['n' => count($l), 'lista' => $l]);
+            return;
+        }
         if ($caso['tipo'] === 'periodo') {
             foreach ($caso['casos'] as [$args, $esperado]) {
                 if (pcEnPeriodo(...$args) !== (bool) $esperado) throw new RuntimeException(implode(' / ', $args) . ': se esperaba ' . $esperado);

@@ -207,6 +207,60 @@
             "esperado": {}
         },
         {
+            "nombre": "Erogación en un periodo: del 1 al 10 de marzo, en el periodo del 6 al 31 = 50 %",
+            "tipo": "avance_periodo",
+            "args": ["2027-03-01", "2027-03-10", "2027-03-06", "2027-03-31"],
+            "esperado": { "avance": 0.5 }
+        },
+        {
+            "nombre": "Erogación en un periodo: del 25 de febrero al 6 de marzo (10 días), en febrero = 40 %",
+            "tipo": "avance_periodo",
+            "args": ["2027-02-25", "2027-03-06", "2027-02-01", "2027-02-28"],
+            "esperado": { "avance": 0.4 }
+        },
+        {
+            "nombre": "Erogación en un periodo que no toca el programa = 0 %",
+            "tipo": "avance_periodo",
+            "args": ["2027-03-01", "2027-03-10", "2027-04-01", "2027-04-30"],
+            "esperado": { "avance": 0 }
+        },
+        {
+            "nombre": "Erogación de un concepto sin programa no se sabe",
+            "tipo": "avance_periodo",
+            "args": ["", "2027-03-10", "2027-03-01", "2027-03-31"],
+            "esperado": { "sin_programa": 1 }
+        },
+        {
+            "nombre": "Periodos mensuales del 15 de agosto al 11 de noviembre de 2022: 4 meses de calendario",
+            "tipo": "periodos",
+            "args": ["2022-08-15", "2022-11-11", "mensual"],
+            "esperado": { "n": 4, "lista": [
+                { "desde": "2022-08-15", "hasta": "2022-08-31" }, { "desde": "2022-09-01", "hasta": "2022-09-30" },
+                { "desde": "2022-10-01", "hasta": "2022-10-31" }, { "desde": "2022-11-01", "hasta": "2022-11-11" } ] }
+        },
+        {
+            "nombre": "Periodos quincenales del 10 de febrero al 20 de marzo de 2028 (bisiesto)",
+            "tipo": "periodos",
+            "args": ["2028-02-10", "2028-03-20", "quincenal"],
+            "esperado": { "n": 4, "lista": [
+                { "desde": "2028-02-10", "hasta": "2028-02-15" }, { "desde": "2028-02-16", "hasta": "2028-02-29" },
+                { "desde": "2028-03-01", "hasta": "2028-03-15" }, { "desde": "2028-03-16", "hasta": "2028-03-20" } ] }
+        },
+        {
+            "nombre": "Periodos semanales de lunes a domingo: del miércoles 3 al lunes 15 de noviembre de 2027",
+            "tipo": "periodos",
+            "args": ["2027-11-03", "2027-11-15", "semanal"],
+            "esperado": { "n": 3, "lista": [
+                { "desde": "2027-11-03", "hasta": "2027-11-07" }, { "desde": "2027-11-08", "hasta": "2027-11-14" },
+                { "desde": "2027-11-15", "hasta": "2027-11-15" } ] }
+        },
+        {
+            "nombre": "Periodos con el fin antes del inicio: ninguno",
+            "tipo": "periodos",
+            "args": ["2027-03-10", "2027-03-01", "mensual"],
+            "esperado": { "n": 0 }
+        },
+        {
             "nombre": "Precio de un concepto con CD $100 en esa obra: los cargos en proporción y P.U. = 100 × 1.3464",
             "tipo": "precio",
             "cd": 100,

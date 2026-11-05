@@ -179,7 +179,29 @@
         return i <= c && (d === null || f >= d);
     }
 
-    raiz.AcriCalculoPU = { avanceProgramado: avanceProgramado, enPeriodo: enPeriodo, gastoOperacion: gastoOperacion, financiamientoEstimado: financiamientoEstimado, TIPOS: TIPOS, insumo: insumo, cantidad: cantidad, fsrInsumo: fsrInsumo, costoReal: costoReal, concepto: concepto,
+    // Programas de erogaciones (ver includes/presupuesto-calculo.php)
+    function fechaDia(n) { return new Date(n * 86400000).toISOString().slice(0, 10); }
+    function avancePeriodo(inicio, fin, desde, hasta) {
+        var i = dia(inicio), f = dia(fin), a = dia(desde), b = dia(hasta);
+        if (i === null || f === null || a === null || b === null || f < i) return null;
+        return Math.max(0, Math.min(f, b) - Math.max(i, a) + 1) / (f - i + 1);
+    }
+    function periodos(inicio, fin, periodicidad) {
+        var d = dia(inicio), f = dia(fin), lista = [];
+        if (d === null || f === null || f < d) return lista;
+        while (d <= f && lista.length < 520) {
+            var x = fechaDia(d), y = +x.slice(0, 4), m = +x.slice(5, 7), finMes = Math.floor(Date.UTC(y, m, 1) / 86400000) - 1, e;
+            if (periodicidad === 'semanal') e = d + 6 - (d + 3) % 7;   // de lunes a domingo (el día 0 fue jueves)
+            else if (periodicidad === 'quincenal') e = +x.slice(8, 10) <= 15 ? d - +x.slice(8, 10) + 15 : finMes;
+            else e = finMes;
+            e = Math.min(e, f);
+            lista.push({ desde: x, hasta: fechaDia(e) });
+            d = e + 1;
+        }
+        return lista;
+    }
+
+    raiz.AcriCalculoPU = { avancePeriodo: avancePeriodo, periodos: periodos, avanceProgramado: avanceProgramado, enPeriodo: enPeriodo,gastoOperacion: gastoOperacion, financiamientoEstimado: financiamientoEstimado, TIPOS: TIPOS, insumo: insumo, cantidad: cantidad, fsrInsumo: fsrInsumo, costoReal: costoReal, concepto: concepto,
                            resumen: resumen, sobrecosto: sobrecosto, precioConcepto: precioConcepto,
                            costos: costos, componentes: componentes, desgloseCompuesto: desgloseCompuesto, explosion: explosion };
 })(typeof window !== 'undefined' ? window : global);

@@ -24,6 +24,14 @@ casos.forEach(function (caso) {
             var av = M.avanceProgramado.apply(null, caso.args);
             comparar(caso.esperado, av === null ? { sin_programa: 1 } : { avance: av }, '');
         }
+        else if (caso.tipo === 'avance_periodo') {
+            var ap = M.avancePeriodo.apply(null, caso.args);
+            comparar(caso.esperado, ap === null ? { sin_programa: 1 } : { avance: ap }, '');
+        }
+        else if (caso.tipo === 'periodos') {
+            var pl = M.periodos.apply(null, caso.args);
+            comparar(caso.esperado, { n: pl.length, lista: pl }, '');
+        }
         else if (caso.tipo === 'periodo') {
             caso.casos.forEach(function (x) {
                 if (M.enPeriodo.apply(null, x[0]) !== !!x[1]) throw new Error(x[0].join(' / ') + ': se esperaba ' + x[1]);

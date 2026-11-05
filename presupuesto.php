@@ -335,6 +335,10 @@ $secciones = [
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="1.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M13 13.5v4.5M11 15.5l2 2.5 2-2.5"/></svg>
         <span>Cálculo</span>
     </button>
+    <button class="tb" data-accion="erogaciones" title="Programas de erogaciones: cuánto se ejerce por mes, quincena o semana, en total, en materiales y equipo y en mano de obra, según el programa de cada concepto">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M3.5 20.5h17"/><path d="M5 16.5h3.5M10.25 12.5h3.5M15.5 8.5H19"/><path d="M8.5 16.5V12.5h1.75M13.75 12.5V8.5h1.75"/><path d="M17.5 3.5v3M16 5h3"/></svg>
+        <span>Erogaciones</span>
+    </button>
     <button class="tb" data-accion="completo" title="Presupuesto completo: todos los conceptos por partida y subpartida con su costo directo, P.U., importe, % y familia">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/><path d="M3.5 8.5h17M9 8.5v12M12 12h5.5M12 15.5h5.5"/></svg>
         <span>Presupuesto completo</span>
@@ -923,6 +927,40 @@ $secciones = [
     <div class="hs-pie">
         <span class="extra-ayuda">El periodo y los programas se guardan con el presupuesto.</span>
         <button type="button" class="hs-btn principal" data-cal-cerrar>Listo</button>
+    </div>
+</dialog>
+
+<!-- ============ PROGRAMAS DE EROGACIONES (COMO NEODATA): LO QUE SE EJERCE POR PERIODO ============ -->
+<dialog class="hs-dialogo ero-dialogo" id="eroDialogo">
+    <div class="hs-cabecera">
+        <strong>Programas de erogaciones</strong>
+        <button type="button" class="hs-cerrar" data-ero-cerrar title="Cerrar">✕</button>
+    </div>
+    <div class="extra-barra ero-barra">
+        <label>Programa: <select id="eroVista" class="ct-btn">
+            <option value="general">Ejecución general de los trabajos (por concepto)</option>
+            <option value="mat">Utilización de materiales y equipo</option>
+            <option value="mo">Utilización de mano de obra</option>
+        </select></label>
+        <label>Periodicidad: <select id="eroPeriodo" class="ct-btn">
+            <option value="mensual">Mensual</option>
+            <option value="quincenal">Quincenal</option>
+            <option value="semanal">Semanal</option>
+        </select></label>
+        <button type="button" class="ct-btn" id="eroExportar" title="Descarga el programa para abrirlo en Excel">Exportar a Excel</button>
+        <span class="extra-ayuda" id="eroNota"></span>
+    </div>
+    <div class="extra-caja ero-tabla">
+        <table class="grid mini-grid">
+            <thead id="eroCabeza"></thead>
+            <tbody id="eroCuerpo"></tbody>
+            <tfoot id="eroPie"></tfoot>
+        </table>
+    </div>
+    <p class="extra-ayuda ero-ayuda">Cada concepto se reparte parejo por días entre su inicio y su fin (se capturan en el botón Cálculo). La ejecución general va a precio de venta; los materiales, el equipo y la mano de obra (con FSR), a costo directo.</p>
+    <div class="hs-pie">
+        <button type="button" class="hs-btn" id="eroProgramas" title="Abre el botón Cálculo para capturar el inicio y el fin de los conceptos">Capturar programas…</button>
+        <button type="button" class="hs-btn principal" data-ero-cerrar>Listo</button>
     </div>
 </dialog>
 

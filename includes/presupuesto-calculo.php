@@ -309,3 +309,34 @@ function pcEnPeriodo(string $inicio, string $fin, string $desde, string $corte):
     if ($i === null || $f === null || $c === null || $f < $i) return false;
     return $i <= $c && ($d === null || $f >= $d);
 }
+
+// ---------- Programas de erogaciones (botón Erogaciones) ----------
+// Qué parte del programa de un concepto cae en el periodo desde – hasta, parejo por días como el avance al corte:
+// del 1 al 10 de marzo, en el periodo del 6 al 31 = 5 / 10 = 50 %. Sin programa: null.
+function pcAvancePeriodo(string $inicio, string $fin, string $desde, string $hasta): ?float
+{
+    [$i, $f, $a, $b] = [pcDia($inicio), pcDia($fin), pcDia($desde), pcDia($hasta)];
+    if ($i === null || $f === null || $a === null || $b === null || $f < $i) return null;
+    return max(0, min($f, $b) - max($i, $a) + 1) / ($f - $i + 1);
+}
+
+// Periodos de la obra de inicio a fin: mensual (meses de calendario), quincenal (del 1 al 15 y del 16 a fin de mes)
+// o semanal (de lunes a domingo); el primero empieza en el inicio y el último acaba en el fin. Hasta 520 periodos.
+function pcPeriodos(string $inicio, string $fin, string $periodicidad): array
+{
+    [$d, $f] = [pcDia($inicio), pcDia($fin)];
+    $lista = [];
+    if ($d === null || $f === null || $f < $d) return $lista;
+    while ($d <= $f && count($lista) < 520) {
+        $x = gmdate('Y-m-d', $d * 86400);
+        [$y, $m, $dd] = array_map('intval', explode('-', $x));
+        $finMes = intdiv(gmmktime(0, 0, 0, $m + 1, 1, $y), 86400) - 1;
+        if ($periodicidad === 'semanal') $e = $d + 6 - ($d + 3) % 7;   // de lunes a domingo (el día 0 fue jueves)
+        elseif ($periodicidad === 'quincenal') $e = $dd <= 15 ? $d - $dd + 15 : $finMes;
+        else $e = $finMes;
+        $e = min($e, $f);
+        $lista[] = ['desde' => $x, 'hasta' => gmdate('Y-m-d', $e * 86400)];
+        $d = $e + 1;
+    }
+    return $lista;
+}

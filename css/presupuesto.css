@@ -782,6 +782,17 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .cal-tabla tfoot tr.pu-total td { font-weight: 700; color: var(--enfasis); }
 @media (max-width: 760px) { .cal-arriba { grid-template-columns: minmax(0, 1fr); } }
 .cal-sin { color: var(--texto-3); font-style: italic; }
+
+/* Programas de erogaciones */
+.ero-dialogo { width: min(1400px, calc(100vw - 24px)); }
+.ero-barra { padding: 10px 16px 0; flex-wrap: wrap; }
+.ero-tabla { margin: 10px 16px 0; max-height: 62vh; border: 1px solid var(--borde); border-radius: 4px; }
+.ero-tabla th.ero-per small, .ero-tabla td small { display: block; font-size: 11px; font-weight: 400; color: var(--texto-3); }
+.ero-tabla td.ero-desc { white-space: normal; min-width: 260px; }
+.ero-tabla td.ero-celda { background: var(--ambar-suave); }
+.ero-tabla tr.ero-grupo td { font-weight: 700; color: var(--enfasis); background: var(--fondo-2); }
+.ero-tabla tfoot tr.pu-total td { font-weight: 700; color: var(--enfasis); }
+.ero-ayuda { margin: 8px 16px 0; }
 /* Actividades programadas en el periodo de corte (Cálculo): también en el Catálogo de Conceptos y el Análisis P.U. */
 .grid tr.cal-marcado td { background: var(--ambar-suave); }
 .grid tr.cal-marcado td:first-child { box-shadow: inset 3px 0 0 var(--ambar); }

@@ -3308,6 +3308,13 @@
         }
     });
     $('cliente').addEventListener('blur', function () { setTimeout(function () { if (document.activeElement !== $('cliente')) cliCerrar(); }, 150); });
+    // Lupa: abre la lista (o la cierra si ya está abierta)
+    $('buscarCliente').addEventListener('mousedown', function (e) { e.preventDefault(); });
+    $('buscarCliente').addEventListener('click', function () {
+        if (!$('clienteLista').hidden) { cliCerrar(); return; }
+        $('cliente').focus();
+        cliBuscar();
+    });
     // Clic en la lista sin perder el foco del campo
     $('clienteLista').addEventListener('mousedown', function (e) { e.preventDefault(); });
     $('clienteLista').addEventListener('click', function (e) {
@@ -3446,7 +3453,7 @@
 
     function aplicarModo() {
         document.body.classList.toggle('solo-lectura', soloLectura);
-        document.querySelectorAll('.encabezado input, .encabezado select, #descripcion, #pctUtilidad, #modoUtilidad, #ivaTasa, #tSUB, #buscarHubspot, #puPanel input')
+        document.querySelectorAll('.encabezado input, .encabezado select, #descripcion, #pctUtilidad, #modoUtilidad, #ivaTasa, #tSUB, #buscarHubspot, #buscarCliente, #puPanel input')
             .forEach(function (el) { el.disabled = soloLectura; });
         $('modo').hidden = !soloLectura;
         var b = document.querySelector('.tb[data-accion="modificar"]');

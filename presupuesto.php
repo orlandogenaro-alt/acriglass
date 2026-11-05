@@ -377,11 +377,16 @@ $secciones = [
     <div class="encabezado">
         <div class="enc-izq">
             <label>Cliente:
-                <span class="cli-buscador">
-                    <input type="text" id="cliente" autocomplete="off" placeholder="Buscar en el Catálogo de Clientes"
-                           title="Escribe para buscar en el Catálogo de Clientes (↓ para ver la lista). Si no está: Traer de Microsip o Nuevo desde HubSpot">
-                    <span class="cli-marcas" id="clienteMarcas"></span>
-                    <div class="cli-lista" id="clienteLista" hidden></div>
+                <span class="con-boton">
+                    <span class="cli-buscador">
+                        <input type="text" id="cliente" autocomplete="off" placeholder="Buscar en el Catálogo de Clientes"
+                               title="Escribe para buscar en el Catálogo de Clientes (↓ para ver la lista). Si no está: Traer de Microsip o Nuevo desde HubSpot">
+                        <span class="cli-marcas" id="clienteMarcas"></span>
+                        <div class="cli-lista" id="clienteLista" hidden></div>
+                    </span>
+                    <button type="button" class="mini" id="buscarCliente" title="Buscar el cliente en el Catálogo de Clientes, Microsip o HubSpot">
+                        <svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.4 10.4L14 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    </button>
                 </span>
             </label>
             <label>Email:

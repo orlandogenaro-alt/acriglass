@@ -6,6 +6,7 @@ return [
     [
         'fecha' => '2026-11-05',
         'cambios' => [
+            ['mejora', 'Presupuesto: lupa para buscar el Cliente', 'Junto al campo Cliente hay un botón con lupa que abre la lista del Catálogo de Clientes (con lo escrito, o todos si está vacío), con las opciones Traer de Microsip y Nuevo desde HubSpot.'],
             ['nuevo', 'Presupuesto: el Cliente se elige del Catálogo de Clientes, ligado a Microsip y a HubSpot', 'Al escribir en Cliente sale la lista del Catálogo de Clientes (Catalogos › Clientes) con la clave de cada uno, su cuenta de Microsip y si tiene contactos de HubSpot; se elige con el ratón o con ↓ y Enter, y el presupuesto queda ligado a ese cliente (también aparece en su Historial). Si el cliente no está: «Traer de Microsip» busca la cuenta en Microsip (por la API de Easy-Glass) y lo agrega al catálogo con su clave, y «Nuevo desde HubSpot» busca su contacto en HubSpot y lo da de alta en el catálogo relacionado con ese contacto. Lo mismo pasa al usar un contacto con el botón naranja de HubSpot. Un cliente escrito a mano se sigue pudiendo guardar y se marca «Fuera del catálogo». La ficha del cliente muestra su Cuenta Microsip. Requiere la migración 022.'],
         ],
     ],

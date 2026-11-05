@@ -369,7 +369,7 @@ body.solo-lectura .ct-acciones .b-dup, body.solo-lectura .ct-acciones .b-del { d
 .con-boton input { flex: 1; }
 
 /* Cliente: buscador del Catálogo de Clientes (Microsip / HubSpot) */
-.cli-buscador { position: relative; display: block; min-width: 0; }
+.cli-buscador { position: relative; display: block; flex: 1; min-width: 0; }
 .cli-buscador > .cli-marcas { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); pointer-events: none; }
 .cli-marcas { display: inline-flex; gap: 4px; flex-wrap: wrap; }
 .cli-marca {

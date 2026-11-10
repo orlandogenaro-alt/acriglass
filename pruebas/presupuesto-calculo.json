@@ -70,6 +70,20 @@
             "esperado": { "insumos": [ { "cantidad": 0.25, "importe": 500 } ], "totales": { "otro": 500, "cd": 500 } }
         },
         {
+            "nombre": "% de los materiales (como los insumos % de Neodata): sobre los materiales de los renglones de arriba; un % de material entra en la base de los de abajo",
+            "tipo": "concepto",
+            "analisis": { "fsr": 1, "hm": 0 },
+            "concepto": { "cantidad": 3, "insumos": [
+                { "tipo": "MAT", "cantidad": 2, "costo": 500 }, { "tipo": "MO", "cantidad": 0.5, "costo": 200 },
+                { "tipo": "EQ", "base": "pct_mat", "cantidad": 3 }, { "tipo": "MAT", "base": "pct_mat", "cantidad": 1 },
+                { "tipo": "HER", "base": "pct_mat", "cantidad": 2 }, { "tipo": "MAT", "cantidad": 1, "costo": 100 } ] },
+            "esperado": {
+                "insumos": [ { "cantidad": 2, "importe": 1000 }, { "cantidad": 0.5, "importe": 100 }, { "cantidad": 3, "importe": 30 },
+                             { "cantidad": 1, "importe": 10 }, { "cantidad": 2, "importe": 20.2 }, { "cantidad": 1, "importe": 100 } ],
+                "totales": { "mat": 1110, "moReal": 100, "eq": 30, "her": 20.2, "hm": 0, "cd": 1260.2 }
+            }
+        },
+        {
             "nombre": "Sobrecosto: CD 1,000 + Ind 100, financiamiento 2 %, utilidad 20 % sobre el costo, sin cargos",
             "tipo": "sobrecosto",
             "args": [1000, 100, 2, 20, "costo", 0],

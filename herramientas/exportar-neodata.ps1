@@ -85,21 +85,37 @@ ORDER BY r.Orden, pc.Renglon
 OPTION (MAXRECURSION 100)
 "@
 
-# Insumos de la matriz de cada concepto del presupuesto, con su costo vigente en pesos
+# Matrices de los conceptos del presupuesto, completas: los renglones de cada concepto y, a cualquier nivel, los de los
+# basicos / cuadrillas / accesorios que llevan (matriz dentro de matriz), para que el sistema los recalcule como Neodata
 $sqlMatrices = @"
-SELECT cm.Codigo, ISNULL(NULLIF(LTRIM(RTRIM(cm.DescripcionLarga)), ''), cm.Descripcion) Concepto, t.Descripcion Tipo,
-       ISNULL(NULLIF(LTRIM(RTRIM(ci.DescripcionLarga)), ''), ci.Descripcion) Insumo, u.Unidad, m.Volumen Cantidad, k.Costo
-FROM (SELECT DISTINCT pc.IdExpIns, MIN(pc.Renglon) OVER (PARTITION BY pc.IdExpIns) Renglon FROM PuPresupuestosConceptos pc WHERE pc.IdPresupuesto = @p) c
-JOIN PuExpIns em ON em.IdExpIns = c.IdExpIns
-JOIN PuCatalogo cm ON cm.IdCodigo = em.IdCodigo
-JOIN PuMatrices m ON m.IdCodigoMatriz = c.IdExpIns
-JOIN PuExpIns ei ON ei.IdExpIns = m.IdCodigoInsumo
-JOIN PuCatalogo ci ON ci.IdCodigo = ei.IdCodigo
-LEFT JOIN PuTipoInsumos t ON t.IdTipo = ci.IdTipo
-LEFT JOIN PuUnidades u ON u.IdUnidad = ci.IdUnidad
-OUTER APPLY (SELECT TOP 1 x.Costo FROM PuExpInsCostos x WHERE x.IdExpIns = ei.IdExpIns ORDER BY CASE WHEN x.IdMoneda = 1 THEN 0 ELSE 1 END, x.Fecha DESC) k
-ORDER BY c.Renglon, cm.Codigo, m.Renglon
+WITH arbol AS (
+    SELECT DISTINCT pc.IdExpIns FROM PuPresupuestosConceptos pc WHERE pc.IdPresupuesto = @p
+    UNION ALL
+    SELECT m.IdCodigoInsumo FROM PuMatrices m JOIN arbol a ON a.IdExpIns = m.IdCodigoMatriz
+)
+SELECT DISTINCT m.IdMatriz, m.IdCodigoMatriz, m.Renglon, m.IdCodigoInsumo, m.Volumen
+FROM PuMatrices m WHERE m.IdCodigoMatriz IN (SELECT IdExpIns FROM arbol)
+ORDER BY m.IdCodigoMatriz, m.Renglon
+OPTION (MAXRECURSION 50)
 "@
+# Cada concepto o insumo que aparece en las matrices, con su costo vigente en pesos (o en dolares) y si es porcentaje
+$sqlNodos = @"
+WITH arbol AS (
+    SELECT DISTINCT pc.IdExpIns FROM PuPresupuestosConceptos pc WHERE pc.IdPresupuesto = @p
+    UNION ALL
+    SELECT m.IdCodigoInsumo FROM PuMatrices m JOIN arbol a ON a.IdExpIns = m.IdCodigoMatriz
+)
+SELECT e.IdExpIns, c.Codigo, ISNULL(NULLIF(LTRIM(RTRIM(c.DescripcionLarga)), ''), c.Descripcion) Descripcion, c.IdTipo, c.EsPorcentaje,
+       t.Descripcion Tipo, u.Unidad, k.Costo, k.IdMoneda
+FROM (SELECT DISTINCT IdExpIns FROM arbol) a
+JOIN PuExpIns e ON e.IdExpIns = a.IdExpIns
+JOIN PuCatalogo c ON c.IdCodigo = e.IdCodigo
+LEFT JOIN PuTipoInsumos t ON t.IdTipo = c.IdTipo
+LEFT JOIN PuUnidades u ON u.IdUnidad = c.IdUnidad
+OUTER APPLY (SELECT TOP 1 x.Costo, x.IdMoneda FROM PuExpInsCostos x WHERE x.IdExpIns = e.IdExpIns AND x.IdMoneda IN (1, 2) ORDER BY x.IdMoneda, x.Fecha DESC) k
+OPTION (MAXRECURSION 50)
+"@
+$sqlOrdenConceptos = "SELECT pc.IdExpIns, MIN(pc.Renglon) Renglon FROM PuPresupuestosConceptos pc WHERE pc.IdPresupuesto = @p GROUP BY pc.IdExpIns ORDER BY MIN(pc.Renglon)"
 
 # Insumos del presupuesto (Obra > Materiales, Mano de obra, Maquinaria de Neodata), sin los conceptos del catalogo.
 # Tipos de Neodata: 1 Materiales, 2 Mano de obra, 3 Equipo y herramienta, 4 Basicos, 5 Subcontratos (entra como material)
@@ -129,12 +145,50 @@ foreach ($p in $elegidos) {
     }
     $archivoCat = Guardar $filas "Catalogo $Obra - $nombre.csv"
 
-    $matrices = Consultar $base $sqlMatrices @{ '@p' = $id }
-    $filas = foreach ($r in $matrices.Rows) {
-        $importe = if ($r.Costo -is [DBNull]) { '' } else { Numero ([decimal]$r.Cantidad * [decimal]$r.Costo) }
-        [pscustomobject][ordered]@{ 'Codigo' = Texto $r.Codigo; 'Concepto' = Texto $r.Concepto; 'Tipo' = Texto $r.Tipo; 'Insumo' = Texto $r.Insumo
-                                    'Unidad' = Texto $r.Unidad; 'Cantidad' = Numero $r.Cantidad; 'Costo unitario' = Numero $r.Costo; 'Importe' = $importe }
+    # Renglones de las matrices: Renglon 2.1 = componente del renglon 2 (lo vuelve a armar Importar matrices).
+    # Reglas de Neodata (comprobadas con herramientas/validar-neodata.js):
+    #   EsPorcentaje 1 = % de los materiales de los renglones de arriba; 2 = % de la mano de obra; 0 = cantidad x costo
+    #   La mano de obra ya trae su FASAR en el costo (salario real): FSR 1
+    $hijos = @{}
+    foreach ($r in (Consultar $base $sqlMatrices @{ '@p' = $id }).Rows) {
+        $k = [int]$r.IdCodigoMatriz
+        if (-not $hijos.ContainsKey($k)) { $hijos[$k] = New-Object System.Collections.ArrayList }
+        [void]$hijos[$k].Add($r)
     }
+    $nodos = @{}
+    foreach ($r in (Consultar $base $sqlNodos @{ '@p' = $id }).Rows) { $nodos[[int]$r.IdExpIns] = $r }
+    $paridad = Consultar $base "SELECT TOP 1 Paridad FROM PuPresupuestosMonedas WHERE IdPresupuesto = @p AND IdMoneda = 2" @{ '@p' = $id }
+    $paridad = if ($paridad.Rows.Count -and -not ($paridad.Rows[0].Paridad -is [DBNull])) { [decimal]$paridad.Rows[0].Paridad } else { [decimal]0 }
+    $filas = New-Object System.Collections.ArrayList
+    function Renglones($idMatriz, $concepto, [string]$prefijo, [int]$nivel) {
+        $n = 0
+        foreach ($r in $hijos[[int]$idMatriz]) {
+            $n++
+            $i = $nodos[[int]$r.IdCodigoInsumo]
+            if (-not $i) { continue }
+            $ren = $prefijo + $n
+            $compuesto = $hijos.ContainsKey([int]$r.IdCodigoInsumo) -and $nivel -lt 4
+            $pct = if ($nivel -eq 0 -and -not ($i.EsPorcentaje -is [DBNull])) { [int]$i.EsPorcentaje } else { 0 }
+            $costo = if ($i.Costo -is [DBNull]) { [decimal]0 } elseif ([int]$i.IdMoneda -eq 2) { [decimal]$i.Costo * $paridad } else { [decimal]$i.Costo }
+            $calculo = ''
+            $cantidad = [decimal]$r.Volumen
+            if ($pct -eq 1) { $calculo = '% de materiales'; $cantidad = $cantidad * 100 }
+            elseif ($pct -eq 2) { $calculo = '% de la M.O.'; $cantidad = $cantidad * 100 }
+            $esMo = [int]$i.IdTipo -eq 2 -and -not $compuesto
+            [void]$filas.Add([pscustomobject][ordered]@{
+                'Codigo' = Texto $concepto.Codigo; 'Concepto' = Texto $concepto.Descripcion; 'Renglon' = $ren; 'Codigo insumo' = Texto $i.Codigo
+                'Tipo' = Texto $i.Tipo; 'Insumo' = Texto $i.Descripcion; 'Unidad' = if ($calculo) { '%' } else { Texto $i.Unidad }
+                'Calculo' = $calculo; 'Cantidad' = Numero $cantidad
+                'Costo unitario' = if ($calculo -or $compuesto) { '' } else { Numero $costo }
+                'Importe' = if ($calculo -or $compuesto) { '' } else { Numero ($cantidad * $costo) }
+                'FSR' = if ($esMo) { '1' } else { '' } })
+            if ($compuesto) { Renglones $r.IdCodigoInsumo $concepto ($ren + '.') ($nivel + 1) }
+        }
+    }
+    foreach ($c in (Consultar $base $sqlOrdenConceptos @{ '@p' = $id }).Rows) {
+        if ($hijos.ContainsKey([int]$c.IdExpIns)) { Renglones $c.IdExpIns $nodos[[int]$c.IdExpIns] '' 0 }
+    }
+    $matrices = $filas
     $archivoMat = Guardar $filas "Matrices $Obra - $nombre.csv"
 
     $insumos = Consultar $base $sqlInsumos @{ '@p' = $id }
@@ -145,7 +199,7 @@ foreach ($p in $elegidos) {
     }
     $archivoIns = Guardar $filas "Insumos $Obra - $nombre.csv"
 
-    '{0} ({1}): {2} conceptos, {3} insumos de matriz, {4} insumos' -f $nombre, $id, $catalogo.Rows.Count, $matrices.Rows.Count, $insumos.Rows.Count
+    '{0} ({1}): {2} conceptos, {3} renglones de matriz, {4} insumos' -f $nombre, $id, $catalogo.Rows.Count, $matrices.Count, $insumos.Rows.Count
     '  ' + $archivoCat
     '  ' + $archivoMat
     '  ' + $archivoIns

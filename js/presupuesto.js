@@ -589,9 +589,9 @@
         };
     }
 
-    // Cantidad del insumo por unidad del concepto: cantidad directa o 1 / rendimiento, con factor y merma (en pct_mo es el %)
+    // Cantidad del insumo por unidad del concepto: cantidad directa o 1 / rendimiento, con factor y merma (en pct_mo y pct_mat es el %)
     function cantidadInsumo(i, c) { return CALC.cantidad(i, c ? c.cantidad : 0); }
-    // Importe del insumo por unidad del concepto (mano de obra con FSR y viáticos; pct_mo sobre la mano de obra)
+    // Importe del insumo por unidad del concepto (mano de obra con FSR y viáticos; pct_mo sobre la mano de obra, pct_mat sobre los materiales)
     function importesInsumos(c) { return CALC.concepto(c, analisis).insumos; }
     var SIN_COSTO = { mat: 0, mo: 0, moReal: 0, eq: 0, maq: 0, her: 0, otro: 0, hm: 0, cd: 0 };
     // Costo de UNA unidad del concepto. Uno de precio fijo no suma al costo: su matriz es informativa, salvo con «La matriz
@@ -614,7 +614,7 @@
         if (c.cantidad <= 0) return 'Falta la cantidad';
         if (esVenta(c)) return '';
         if (!c.insumos.length) return 'Falta el análisis';
-        if (c.insumos.some(function (i) { return !i.descripcion.trim() || cantidadInsumo(i, c) <= 0 || (CALC.costoReal(i, factorFsr()) <= 0 && i.base !== 'pct_mo'); })) return 'Insumo incompleto';
+        if (c.insumos.some(function (i) { return !i.descripcion.trim() || cantidadInsumo(i, c) <= 0 || (CALC.costoReal(i, factorFsr()) <= 0 && !esPorcentaje(i)); })) return 'Insumo incompleto';
         return '';
     }
 
@@ -1095,6 +1095,7 @@
         t = clave(t);
         if (!t) return null;
         return /^REND/.test(t) ? { tipo_calculo: 'rendimiento' } : /^FIJ/.test(t) ? { tipo_calculo: 'cantidad', base: 'fijo' }
+             : /^%.*MAT/.test(t) ? { tipo_calculo: 'cantidad', base: 'pct_mat' }
              : /^%|M\.?\s*O\.?$/.test(t) ? { tipo_calculo: 'cantidad', base: 'pct_mo' } : { tipo_calculo: 'cantidad' };
     }
     // Fecha de costo del Excel: AAAA-MM-DD, DD/MM/AAAA o número de serie de Excel
@@ -1237,7 +1238,7 @@
             'Ej. 1 jornal de cuadrilla = 1 aluminero + 1 ayudante.</span>' : '';
         $('puDColCant').textContent = 'Cantidad por ' + uPadre;
         $('puDInsumos').innerHTML = lista.length ? lista.map(function (i, n) {
-            var mo = i.tipo === 'MO', modo = modoCalculo(i), rend = modo === 'rendimiento', pctMo = modo === 'pct_mo';
+            var mo = i.tipo === 'MO', modo = modoCalculo(i), rend = modo === 'rendimiento', pctMo = modo === 'pct_mo' || modo === 'pct_mat';
             var comp = CALC.componentes(i).length;
             function numero(campo, valor, paso, extra) {
                 return '<input type="number" class="num" data-ins="' + campo + '" step="' + paso + '" min="0" value="' + valor + '"' + (extra || '') + dis + '>';
@@ -1255,7 +1256,7 @@
                 '<td><input type="text" data-ins="unidad" list="puUnidades" maxlength="20" value="' + escapar(pctMo ? '%' : i.unidad) + '"' + (pctMo ? ' readonly' : '') + dis + '></td>' +
                 '<td><select data-ins="modo" title="Cómo se calcula la cantidad"' + dis + '>' + Object.keys(CALCULOS_INSUMO).map(function (m) {
                     // Dentro de un compuesto todo es por unidad del compuesto
-                    if (padre && (m === 'fijo' || m === 'pct_mo')) return '';
+                    if (padre && (m === 'fijo' || m === 'pct_mo' || m === 'pct_mat')) return '';
                     return '<option value="' + m + '"' + (m === modo ? ' selected' : '') + '>' + CALCULOS_INSUMO[m] + '</option>';
                 }).join('') + '</select></td>' +
                 '<td>' + (pctMo ? '<span class="pu-na">—</span>' : comp ? '<input type="number" class="num" data-ins-calc="costo-comp" readonly title="Suma de sus componentes">'
@@ -1294,7 +1295,7 @@
         });
         $('puDInsumos').querySelectorAll('tr[data-n]:not(.pu-mo-det)').forEach(function (tr) {
             var i = lista[tr.dataset.n], d = imps[tr.dataset.n], modo = modoCalculo(i);
-            tr.querySelector('[data-ins-calc="cantidad"]').textContent = modo === 'pct_mo' ? cant(d.cantidad) + ' %' : cant(Math.round(d.cantidad * 10000) / 10000);
+            tr.querySelector('[data-ins-calc="cantidad"]').textContent = modo === 'pct_mo' || modo === 'pct_mat' ? cant(d.cantidad) + ' %' : cant(Math.round(d.cantidad * 10000) / 10000);
             tr.querySelector('[data-ins-calc="importe"]').textContent = fmt(d.importe);
             tr.querySelector('[data-ins-calc="pct"]').textContent = base > 0 ? pct(d.importe / base * 100) : '';
             var cc = tr.querySelector('[data-ins-calc="costo-comp"]');
@@ -1328,7 +1329,8 @@
             (falta ? '<span class="pu-falta">⚠ ' + falta + '</span>' : '');
     }
 
-    var CALCULOS_INSUMO = { cantidad: 'Cantidad', rendimiento: 'Rendimiento', fijo: 'Fijo por concepto', pct_mo: '% de la M.O.' };
+    var CALCULOS_INSUMO = { cantidad: 'Cantidad', rendimiento: 'Rendimiento', fijo: 'Fijo por concepto', pct_mo: '% de la M.O.', pct_mat: '% de materiales' };
+    function esPorcentaje(i) { return i.base === 'pct_mo' || i.base === 'pct_mat'; }
     var EJEMPLOS_INSUMO = { MAT: 'ej. Vidrio claro 6 mm', MO: 'ej. Cuadrilla: 1 aluminero + 1 ayudante', EQ: 'ej. Andamio, equipo de seguridad',
                             MAQ: 'ej. Grúa, plataforma', HER: 'ej. Herramienta menor', OTRO: 'ej. Flete local' };
     // Cómo se calcula la cantidad del insumo (sin capturarlo: mano de obra con rinde = rendimiento, lo demás cantidad)
@@ -1379,7 +1381,7 @@
             if (!alCosto(c)) return;
             var imps = importesInsumos(c);
             c.insumos.forEach(function (i, n) {
-                if (i.tipo !== 'MO' || i.base === 'pct_mo') return;
+                if (i.tipo !== 'MO' || esPorcentaje(i)) return;
                 // Una cuadrilla compuesta: su salario base y su FSR salen de sus componentes
                 var d = imps[n], x = CALC.insumo(i), extras = d.compuesto ? 0 : x.viaticos + x.alimentacion + x.hospedaje;
                 var fasar = d.compuesto ? 'Según sus componentes' : nombreFasar(i);
@@ -1985,9 +1987,9 @@
             return;
         }
         if (campo === 'modo') {
-            // Cantidad directa / rendimiento; o costo fijo por concepto / % de la mano de obra (con cantidad directa)
+            // Cantidad directa / rendimiento; o costo fijo por concepto / % de la mano de obra o de los materiales (con cantidad directa)
             var v = e.target.value;
-            if (v === 'fijo' || v === 'pct_mo') { i.base = v; i.tipo_calculo = 'cantidad'; } else { delete i.base; i.tipo_calculo = v; }
+            if (v === 'fijo' || v === 'pct_mo' || v === 'pct_mat') { i.base = v; i.tipo_calculo = 'cantidad'; } else { delete i.base; i.tipo_calculo = v; }
             cambioDialogo(true);
             return;
         }
@@ -2097,7 +2099,7 @@
                 cd: x.cdU, especificacion: x.c ? x.c.especificacion || '' : '',
                 insumos: !detalle || (x.c && esVenta(x.c)) ? [] : x.c ? importesInsumos(x.c).map(function (d, n) {
                     var i = x.c.insumos[n];
-                    return { tipo: TIPOS_INSUMO[i.tipo], descripcion: i.descripcion, unidad: i.base === 'pct_mo' ? '%' : i.unidad, cantidad: d.cantidad,
+                    return { tipo: TIPOS_INSUMO[i.tipo], descripcion: i.descripcion, unidad: esPorcentaje(i) ? '%' : i.unidad, cantidad: d.cantidad,
                              costo: d.compuesto ? d.base : i.costo, importe: d.importe };
                 }).concat(u && u.hm ? [{ tipo: 'Herramienta menor', descripcion: pct(analisis.hm) + ' de la mano de obra', unidad: '', cantidad: 0, costo: 0, importe: u.hm }] : [])
                 : (x.articulos || []).map(function (a) {

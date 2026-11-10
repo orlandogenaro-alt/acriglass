@@ -11,13 +11,17 @@
 //                 Sin capturar: 'rendimiento' si es mano de obra con rinde > 0 (como siempre), si no 'cantidad'.
 //   base          'unidad' (por unidad del concepto) · 'fijo' (para todo el concepto: se reparte entre su cantidad)
 //                 · 'pct_mo' (cantidad = % sobre la mano de obra real del concepto; p. ej. herramienta 3 %)
+//                 · 'pct_mat' (cantidad = % sobre los materiales de los renglones de ARRIBA de él en la matriz;
+//                   como los insumos «%» de Neodata con EsPorcentaje 1: herramienta 3 %, seguridad 2 %). Un % de
+//                   tipo material suma a los materiales y entra en la base de los que están debajo.
 //   cantidad, rinde, factor (1), merma_pct (0), costo
 //   Mano de obra: costo = salario base por jornada; fsr del insumo (0 = el FSR del análisis);
 //                 viaticos, alimentacion, hospedaje por jornada (se suman al salario real, sin FSR)
 //
 //   cantidad resultante = (cantidad | 1 / rinde) [÷ cantidad del concepto si es fijo] × factor × (1 + merma / 100)
 //   costo real          = costo; en mano de obra: costo × FSR + viáticos + alimentación + hospedaje
-//   importe por unidad  = cantidad resultante × costo real;  pct_mo: % × mano de obra real del concepto
+//   importe por unidad  = cantidad resultante × costo real;  pct_mo: % × mano de obra real del concepto;
+//                         pct_mat: % × materiales de los renglones de arriba
 //
 // Costo directo por unidad = materiales + mano de obra real + equipo + maquinaria + herramienta + otros
 //                            + herramienta menor (% del análisis sobre la mano de obra real)
@@ -43,7 +47,7 @@ function pcInsumo(array $i): array
     $rinde = max(0, pcNum($i['rinde'] ?? 0));
     $tc = $i['tipo_calculo'] ?? '';
     if (!in_array($tc, ['cantidad', 'rendimiento'], true)) $tc = $tipo === 'MO' && $rinde > 0 ? 'rendimiento' : 'cantidad';
-    $base = in_array($i['base'] ?? '', ['unidad', 'fijo', 'pct_mo'], true) ? $i['base'] : 'unidad';
+    $base = in_array($i['base'] ?? '', ['unidad', 'fijo', 'pct_mo', 'pct_mat'], true) ? $i['base'] : 'unidad';
     $factor = isset($i['factor']) && $i['factor'] !== '' && $i['factor'] !== null ? max(0, pcNum($i['factor'])) : 1.0;
     return [
         'tipo' => $tipo, 'tipo_calculo' => $tc, 'base' => $base,
@@ -55,12 +59,12 @@ function pcInsumo(array $i): array
     ];
 }
 
-// Cantidad del insumo por UNA unidad del concepto (en pct_mo es el %)
+// Cantidad del insumo por UNA unidad del concepto (en pct_mo y pct_mat es el %)
 function pcCantidad(array $i, float $cantConcepto = 0): float
 {
     $i = pcInsumo($i);
     $q = $i['tipo_calculo'] === 'rendimiento' ? ($i['rinde'] > 0 ? 1 / $i['rinde'] : 0.0) : $i['cantidad'];
-    if ($i['base'] === 'pct_mo') return $q;
+    if ($i['base'] === 'pct_mo' || $i['base'] === 'pct_mat') return $q;
     if ($i['base'] === 'fijo' && $cantConcepto > 0) $q /= $cantConcepto;
     return $q * $i['factor'] * (1 + $i['merma_pct'] / 100);
 }
@@ -139,9 +143,11 @@ function pcConcepto(array $c, array $analisis): array
     $lista = array_values(array_map(fn($x) => (array) $x, $c['insumos'] ?? []));
     $renglones = [];
     $pctMo = [];
+    $pctMat = [];
     foreach ($lista as $n => $raw) {
         $i = pcInsumo($raw);
         if ($i['base'] === 'pct_mo') { $pctMo[] = $n; $renglones[$n] = null; continue; }
+        if ($i['base'] === 'pct_mat') { $pctMat[] = $n; $renglones[$n] = null; continue; }
         $q = pcCantidad($raw, $cantConcepto);
         $k = pcCostos($raw, $fsr);
         $imp = $q * $k['real'];
@@ -155,6 +161,17 @@ function pcConcepto(array $c, array $analisis): array
                           'compuesto' => (bool) pcComponentes($raw)];
         // FSR de la mano de obra; en una cuadrilla compuesta, el que resulta de sus componentes
         if ($i['tipo'] === 'MO') $renglones[$n]['fsr'] = pcComponentes($raw) ? ($k['base'] > 0 ? $k['real'] / $k['base'] : 1.0) : pcFsrInsumo($i, $fsr);
+    }
+    // Los porcentajes de los materiales van después, en su orden: su base son los materiales de los renglones de arriba
+    // (como Neodata; los de abajo no cuentan, y un % de material de arriba sí)
+    foreach ($pctMat as $n) {
+        $i = pcInsumo($lista[$n]);
+        $q = pcCantidad($i, $cantConcepto);
+        $base = 0.0;
+        for ($k = 0; $k < $n; $k++) if (($renglones[$k] ?? null) && $renglones[$k]['tipo'] === 'MAT') $base += $renglones[$k]['importe'];
+        $imp = $base * $q / 100;
+        $t[$i['tipo'] === 'MO' ? 'moReal' : strtolower($i['tipo'])] += $imp;
+        $renglones[$n] = ['tipo' => $i['tipo'], 'cantidad' => $q, 'base' => 0.0, 'costo' => 0.0, 'importe' => $imp, 'compuesto' => false];
     }
     // Los porcentajes de la mano de obra van después: su base es la mano de obra real ya sumada
     foreach ($pctMo as $n) {
@@ -231,7 +248,7 @@ function pcGastoOperacion(array $g, float $manoObra): ?float
 
 // Explosión de insumos: todo lo que llevan los conceptos (cantidad del concepto × lo que lleva una unidad), sumado por
 // tipo + descripción + unidad. Con $desglosar, los compuestos se desarman hasta sus insumos básicos (la cuadrilla en
-// aluminero y ayudante); sin él, el compuesto es un renglón. Un % de la mano de obra suma solo su importe (unidad «%»).
+// aluminero y ayudante); sin él, el compuesto es un renglón. Un % (de la mano de obra o de los materiales) suma solo su importe (unidad «%»).
 // Importe = cantidad × costo real (la mano de obra con su FSR). La herramienta menor del análisis va en totales['hm'].
 // Regresa ['insumos' => [{tipo, codigo, descripcion, unidad, cantidad, importe}] (por tipo y descripción), 'totales' => [tipo…, hm, total]]
 function pcExplosion(array $analisis, bool $desglosar = true): array
@@ -263,7 +280,7 @@ function pcExplosion(array $analisis, bool $desglosar = true): array
         $d = pcConcepto($c, $analisis);
         foreach (array_values($c['insumos'] ?? []) as $n => $i) {
             $i = (array) $i;
-            if (($i['base'] ?? '') === 'pct_mo') {
+            if (in_array($i['base'] ?? '', ['pct_mo', 'pct_mat'], true)) {
                 if ($d['insumos'][$n]['importe'] > 0) $sumar($i, '%', 0.0, $cc * $d['insumos'][$n]['importe']);
                 continue;
             }

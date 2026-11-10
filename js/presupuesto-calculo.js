@@ -12,7 +12,7 @@
         var tipo = TIPOS.indexOf(i.tipo) >= 0 ? i.tipo : 'MAT';
         var rinde = Math.max(0, num(i.rinde));
         var tc = i.tipo_calculo === 'cantidad' || i.tipo_calculo === 'rendimiento' ? i.tipo_calculo : (tipo === 'MO' && rinde > 0 ? 'rendimiento' : 'cantidad');
-        var base = ['unidad', 'fijo', 'pct_mo'].indexOf(i.base) >= 0 ? i.base : 'unidad';
+        var base = ['unidad', 'fijo', 'pct_mo', 'pct_mat'].indexOf(i.base) >= 0 ? i.base : 'unidad';
         var factor = i.factor !== undefined && i.factor !== null && i.factor !== '' ? Math.max(0, num(i.factor)) : 1;
         return {
             tipo: tipo, tipo_calculo: tc, base: base,
@@ -25,7 +25,7 @@
     function cantidad(i, cantConcepto) {
         i = insumo(i);
         var q = i.tipo_calculo === 'rendimiento' ? (i.rinde > 0 ? 1 / i.rinde : 0) : i.cantidad;
-        if (i.base === 'pct_mo') return q;
+        if (i.base === 'pct_mo' || i.base === 'pct_mat') return q;
         if (i.base === 'fijo' && cantConcepto > 0) q /= cantConcepto;
         return q * i.factor * (1 + i.merma_pct / 100);
     }
@@ -70,15 +70,25 @@
     function concepto(c, a) {
         var fsr = fsrAnalisis(a), cantC = num(c.cantidad);
         var t = { mat: 0, mo: 0, moReal: 0, eq: 0, maq: 0, her: 0, otro: 0, hm: 0, cd: 0 };
-        var lista = c.insumos || [], renglones = [], pctMo = [];
+        var lista = c.insumos || [], renglones = [], pctMo = [], pctMat = [];
         lista.forEach(function (raw, n) {
             var i = insumo(raw);
             if (i.base === 'pct_mo') { pctMo.push(n); renglones[n] = null; return; }
+            if (i.base === 'pct_mat') { pctMat.push(n); renglones[n] = null; return; }
             var q = cantidad(raw, cantC), k = costos(raw, fsr), imp = q * k.real, comp = componentes(raw).length > 0;
             if (i.tipo === 'MO') { t.mo += q * k.base; t.moReal += imp; }
             else t[i.tipo.toLowerCase()] += imp;
             renglones[n] = { tipo: i.tipo, cantidad: q, base: k.base, costo: k.real, importe: imp, compuesto: comp };
             if (i.tipo === 'MO') renglones[n].fsr = comp ? (k.base > 0 ? k.real / k.base : 1) : fsrInsumo(i, fsr);
+        });
+        // Primero los % de los materiales (en su orden, sobre los materiales de los renglones de arriba), luego los de la
+        // mano de obra (ver includes/presupuesto-calculo.php)
+        pctMat.forEach(function (n) {
+            var i = insumo(lista[n]), q = cantidad(i, cantC), base = 0;
+            for (var k = 0; k < n; k++) if (renglones[k] && renglones[k].tipo === 'MAT') base += renglones[k].importe;
+            var imp = base * q / 100;
+            t[i.tipo === 'MO' ? 'moReal' : i.tipo.toLowerCase()] += imp;
+            renglones[n] = { tipo: i.tipo, cantidad: q, base: 0, costo: 0, importe: imp, compuesto: false };
         });
         pctMo.forEach(function (n) {
             var i = insumo(lista[n]), q = cantidad(i, cantC), imp = t.moReal * q / 100;
@@ -116,7 +126,7 @@
             if (cc <= 0) return;
             var d = concepto(c, a);
             (c.insumos || []).forEach(function (i, n) {
-                if (i.base === 'pct_mo') { if (d.insumos[n].importe > 0) sumar(i, '%', 0, cc * d.insumos[n].importe); return; }
+                if (i.base === 'pct_mo' || i.base === 'pct_mat') { if (d.insumos[n].importe > 0) sumar(i, '%', 0, cc * d.insumos[n].importe); return; }
                 hojas(i, cc * d.insumos[n].cantidad, 0);
             });
             tot.hm += cc * d.totales.hm;

@@ -10,3 +10,6 @@ uploads/*
 .env
 .env.*
 .vercel
+
+# Datos de Neodata que saca herramientas/validar-neodata.ps1 (presupuestos de clientes; se regeneran)
+herramientas/validacion-neodata/

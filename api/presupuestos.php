@@ -200,8 +200,8 @@ function analisisInsumos($lista, int $nivel = 0): array
         ];
         // Campos opcionales del motor (includes/presupuesto-calculo.php): solo si se capturaron
         if (in_array($i['tipo_calculo'] ?? '', ['cantidad', 'rendimiento'], true)) $ins['tipo_calculo'] = $i['tipo_calculo'];
-        // Dentro de un compuesto todo es por unidad del compuesto: sin costo fijo por concepto ni % de la mano de obra
-        if (!$nivel && in_array($i['base'] ?? '', ['fijo', 'pct_mo'], true)) $ins['base'] = $i['base'];
+        // Dentro de un compuesto todo es por unidad del compuesto: sin costo fijo por concepto ni % de la mano de obra o de los materiales
+        if (!$nivel && in_array($i['base'] ?? '', ['fijo', 'pct_mo', 'pct_mat'], true)) $ins['base'] = $i['base'];
         foreach (['factor' => 6, 'merma_pct' => 4, 'fsr' => 4, 'viaticos' => 4, 'alimentacion' => 4, 'hospedaje' => 4] as $k => $dec) {
             if (isset($i[$k]) && is_numeric($i[$k])) $ins[$k] = max(0, numero($i[$k], $dec));
         }

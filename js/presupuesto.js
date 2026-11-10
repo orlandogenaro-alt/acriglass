@@ -3406,7 +3406,7 @@
         cliPedir('microsip_buscar', q).then(function (j) {
             if (n !== cli.pedido) return;
             cli.filas = j.filas;
-            cliPintar('<div class="cli-titulo">Cuentas de Microsip</div>' + j.filas.map(function (c, i) {
+            cliPintar('<div class="cli-titulo">Cuentas de Microsip' + (j.de_baja ? ' · no activas' : '') + '</div>' + j.filas.map(function (c, i) {
                 return '<div class="cli-op" data-i="' + i + '"><b>' + escapar(c.nombre) + '</b>' +
                     '<small>' + escapar([c.contacto, c.vendedor].filter(Boolean).join(' · ')) + '</small>' +
                     '<span class="cli-marcas"><span class="cli-marca ms">Microsip ' + escapar(c.clave) + '</span>' +

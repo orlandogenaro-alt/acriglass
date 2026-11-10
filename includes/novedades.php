@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-11-10',
+        'cambios' => [
+            ['correccion', 'Clientes: «Traer de Microsip» encuentra el cliente aunque la razón social se escriba distinto', 'Con «EJE DE ABASTOS S.A. DE C.V» en el campo Cliente, «Traer de Microsip» respondía «No se encontró», aunque en Microsip está como «EJE DE ABASTOS S.A. DE C.V.»: se buscaba el texto completo, con puntos y razón social, y solo entre las cuentas activas. Ahora, si el texto completo no encuentra nada, se busca solo el nombre sin razón social (S.A. DE C.V., S. DE R.L., SAPI, A.C., …) ni signos, y al final también entre las cuentas de baja, que se muestran como «no activas». Aplica al Presupuesto y a la pestaña Microsip de la Ficha de Clientes.'],
+        ],
+    ],
+    [
         'fecha' => '2026-11-05',
         'cambios' => [
             ['nuevo', 'Presupuesto: botón Erogaciones con los programas de erogaciones por periodo', 'Nuevo botón Erogaciones en la barra del presupuesto, como los programas de erogaciones de Neodata. Con el programa de cada concepto (su inicio y fin, que se capturan en el botón Cálculo o desde «Capturar programas…») reparte parejo por días lo que se ejerce en cada mes de calendario, quincena (del 1 al 15 y del 16 a fin de mes) o semana (de lunes a domingo) de la obra. Tres programas: Ejecución general de los trabajos (cada concepto por partida, a precio de venta), Utilización de materiales y equipo, y Utilización de mano de obra (la explosión de insumos de lo programado, a costo directo y con FSR, con la cantidad y el importe de cada periodo). Abajo, el total de cada periodo y el acumulado con su %. Sirve para el flujo de caja, programar las compras de material y la nómina. Se exporta a Excel. Solo consulta: no cambia nada del presupuesto; los conceptos sin programa se señalan y no entran en los periodos.'],

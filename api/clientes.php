@@ -332,13 +332,27 @@ try {
             if (!$conMicrosip) error('Falta ligar el catálogo con Microsip: aplica la migración 022_clientes_microsip.sql.', 503);
             $q = trim((string) ($_GET['q'] ?? ''));
             if (mb_strlen($q) < 2) error('Escribe al menos 2 letras de la clave o el nombre.');
-            $r = api_http('EASYGLASS', 'GET', '/clientes?activos=1&q=' . rawurlencode($q));
-            if (!$r['ok']) error('No se pudo consultar Microsip en la API de Easy-Glass: ' . ($r['error'] ?: 'sin respuesta'), 502);
-            $filas = array_slice((array) ($r['datos']['datos'] ?? []), 0, 30);
+            // El nombre en Microsip puede traer la razón social con otra puntuación o espacios
+            // («S.A. DE C.V.» / «SA DE CV»): si el texto completo no encuentra nada, se busca solo
+            // el nombre sin razón social ni signos, y al final también entre las cuentas de baja.
+            $nucleo = trim(preg_replace('/\s+/', ' ', preg_replace('/[^\p{L}\p{N} ]+/u', ' ', mb_strtoupper($q))));
+            $nucleo = trim(preg_replace('/\b(S\s?A\s?P\s?I|S\s?A\s?B|S\s?A|S\s?C|S\s?DE\s?R\s?L|A\s?C|I\s?A\s?P)\b(\s+DE\s+C\s?V)?\s*$/u', '', $nucleo));
+            $nucleo = trim(preg_replace('/\s+DE\s+C\s?V\s*$/u', '', $nucleo));
+            $intentos = [[$q, true]];
+            if (mb_strlen($nucleo) >= 2 && $nucleo !== mb_strtoupper($q)) $intentos[] = [$nucleo, true];
+            $intentos[] = [mb_strlen($nucleo) >= 2 ? $nucleo : $q, false];
+            $filas = [];
+            $deBaja = false;
+            foreach ($intentos as [$texto, $activos]) {
+                $r = api_http('EASYGLASS', 'GET', '/clientes?' . ($activos ? 'activos=1&' : '') . 'q=' . rawurlencode($texto));
+                if (!$r['ok']) error('No se pudo consultar Microsip en la API de Easy-Glass: ' . ($r['error'] ?: 'sin respuesta'), 502);
+                $filas = array_slice((array) ($r['datos']['datos'] ?? []), 0, 30);
+                if ($filas) { $deBaja = !$activos; break; }
+            }
             $ids = array_values(array_filter(array_map(fn($c) => (int) ($c['cliente_id'] ?? 0), $filas)));
             $ligados = $ids ? array_column(bd_filas('AW', 'select microsip_cliente_id, nombre from clientes where microsip_cliente_id in ('
                 . implode(',', array_fill(0, count($ids), '?')) . ')', $ids), 'nombre', 'microsip_cliente_id') : [];
-            responder(['ok' => true, 'filas' => array_map(fn($c) => [
+            responder(['ok' => true, 'de_baja' => $deBaja, 'filas' => array_map(fn($c) => [
                 'cliente_id' => (int) ($c['cliente_id'] ?? 0), 'clave' => (string) ($c['clave_cliente'] ?? ''), 'nombre' => $c['nombre'] ?? '',
                 'contacto' => $c['contacto'] ?? '', 'telefono' => $c['telefono'] ?? '', 'vendedor' => $c['vendedor'] ?? '',
                 'en_catalogo' => $ligados[(int) ($c['cliente_id'] ?? 0)] ?? null,

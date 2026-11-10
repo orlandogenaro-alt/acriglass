@@ -3406,10 +3406,11 @@
         cliPedir('microsip_buscar', q).then(function (j) {
             if (n !== cli.pedido) return;
             cli.filas = j.filas;
-            cliPintar('<div class="cli-titulo">Cuentas de Microsip' + (j.de_baja ? ' · no activas' : '') + '</div>' + j.filas.map(function (c, i) {
+            cliPintar('<div class="cli-titulo">Cuentas de Microsip</div>' + j.filas.map(function (c, i) {
                 return '<div class="cli-op" data-i="' + i + '"><b>' + escapar(c.nombre) + '</b>' +
-                    '<small>' + escapar([c.contacto, c.vendedor].filter(Boolean).join(' · ')) + '</small>' +
+                    '<small>' + escapar([c.rfc, c.contacto, c.vendedor].filter(Boolean).join(' · ')) + '</small>' +
                     '<span class="cli-marcas"><span class="cli-marca ms">Microsip ' + escapar(c.clave) + '</span>' +
+                    (c.activo === false ? '<span class="cli-marca" title="Cuenta no activa en Microsip">' + escapar(c.estatus || 'No activa') + '</span>' : '') +
                     (c.en_catalogo ? '<span class="cli-marca cat" title="Ya está en el Catálogo de Clientes">En catálogo</span>' : '') + '</span></div>';
             }).join('') + (j.filas.length ? '' : '<div class="cli-vacio">No se encontró «' + escapar(q) + '» en Microsip.</div>') + cliAcciones(false));
         }).catch(function (err) {

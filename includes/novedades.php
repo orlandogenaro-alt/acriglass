@@ -6,6 +6,7 @@ return [
     [
         'fecha' => '2026-11-10',
         'cambios' => [
+            ['correccion', 'Clientes: «Traer de Microsip» busca en el catálogo de clientes de Microsip', '«Traer de Microsip» buscaba en los clientes de Easy-Glass (/clientes de su API) y no en los de Microsip, por eso no salía EJE DE ABASTOS S.A. DE C.V. (KF207). Ahora usa /microsip-clientes: muestra clave, RFC, vendedor y si la cuenta no está activa (las activas primero), y al relacionar guarda el Id del cliente en Microsip. Esa ruta de la API falla con más de 16 caracteres, así que se le manda el principio del nombre (sin razón social ni signos) y aquí se filtra por el nombre completo. Aplica al Presupuesto y a la pestaña Microsip de la Ficha de Clientes.'],
             ['correccion', 'Clientes: «Traer de Microsip» encuentra el cliente aunque la razón social se escriba distinto', 'Con «EJE DE ABASTOS S.A. DE C.V» en el campo Cliente, «Traer de Microsip» respondía «No se encontró», aunque en Microsip está como «EJE DE ABASTOS S.A. DE C.V.»: se buscaba el texto completo, con puntos y razón social, y solo entre las cuentas activas. Ahora, si el texto completo no encuentra nada, se busca solo el nombre sin razón social (S.A. DE C.V., S. DE R.L., SAPI, A.C., …) ni signos, y al final también entre las cuentas de baja, que se muestran como «no activas». Aplica al Presupuesto y a la pestaña Microsip de la Ficha de Clientes.'],
         ],
     ],

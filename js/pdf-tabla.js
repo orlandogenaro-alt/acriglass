@@ -62,7 +62,8 @@
         for (var i = 0; i < titulos.length - 1; i++) {
             var a = titulos[i].fin, b = titulos[i + 1].x;
             if (b <= a) { lim.push((a + b) / 2); continue; }
-            var tramos = datos.filter(function (d) { return d.fin > a && d.x < b; })
+            // Un texto que cruza todo el hueco (p. ej. «TOTAL DEL PRESUPUESTO…» a lo ancho) no cuenta
+            var tramos = datos.filter(function (d) { return d.fin > a && d.x < b && !(d.x <= a && d.fin >= b); })
                               .map(function (d) { return [Math.max(a, d.x), Math.min(b, d.fin)]; })
                               .sort(function (p, q) { return p[0] - q[0]; });
             var mejor = null, desde = a;
@@ -90,7 +91,7 @@
             }
             return Promise.all(paginas);
         }).then(function (contenidos) {
-            var hayTexto = false, titulos = null, lim = null, salida = [];
+            var hayTexto = false, titulos = null, lim = null, enc = null, paginas = [];
             contenidos.forEach(function (contenido) {
                 var filas = renglones(contenido.items);
                 if (filas.length) hayTexto = true;
@@ -99,16 +100,21 @@
                     if (ES_ENCABEZADO(filas[i].items.map(function (it) { return it.t; }).join(' '))) { iEnc = i; break; }
                 }
                 if (iEnc >= 0) {
-                    titulos = juntar(filas[iEnc].items, function (it) { return it.alto * 0.9; });
-                    if (!salida.length) salida.push(titulos.map(function (c) { return c.t; }));
+                    var nuevos = juntar(filas[iEnc].items, function (it) { return it.alto * 0.9; });
                     filas = filas.slice(iEnc + 1);
-                    // Los límites salen de la hoja con encabezado; las hojas siguientes sin encabezado usan los mismos
-                    var datos = [];
-                    filas.forEach(function (f) { datos = datos.concat(f.items); });
-                    lim = limites(titulos, datos);
+                    // Los límites salen de la primera hoja con encabezado; si las demás repiten el mismo encabezado
+                    // (en el mismo lugar) se usan los mismos, para que los totales de la última hoja no los muevan
+                    var igual = titulos && titulos.length === nuevos.length && nuevos.every(function (c, i) { return Math.abs(c.x - titulos[i].x) < 3; });
+                    if (!igual) {
+                        titulos = nuevos;
+                        if (!enc) enc = titulos.map(function (c) { return c.t; });
+                        var datos = [];
+                        filas.forEach(function (f) { datos = datos.concat(f.items); });
+                        lim = limites(titulos, datos);
+                    }
                 }
                 if (!titulos) return; // hojas antes del encabezado (portada)
-                filas.forEach(function (f) {
+                paginas.push(filas.map(function (f) {
                     var celdas = titulos.map(function () { return []; });
                     // Cada texto va a la columna donde cae su centro
                     juntar(f.items, function (it) { return it.alto * 0.6; }).forEach(function (c) {
@@ -116,14 +122,90 @@
                         while (k < lim.length && centro > lim[k]) k++;
                         celdas[k].push(c.t);
                     });
-                    salida.push(celdas.map(function (c) { return c.join(' '); }));
-                });
+                    return { y: f.y, c: celdas.map(function (c) { return c.join(' '); }) };
+                }));
             });
             if (!hayTexto) throw new Error('El PDF no trae texto (parece escaneado): no se puede leer.');
             if (!titulos) throw new Error('No encontré el encabezado de la tabla (Código, Concepto, Unidad, Cantidad, P. Unitario…) en el PDF.');
+            var salida = ordenarBloques(paginas, enc);
             subirImportes(salida);
             return salida.map(function (f) { return f.map(celdaTexto).join('\t'); }).join('\n');
         });
+    }
+
+    // Cada concepto es un bloque de renglones juntos (entre conceptos queda un espacio más grande que entre líneas).
+    // Muchos PDF ponen el código y los importes a media altura del concepto: se pasan a la primera línea del bloque,
+    // para que las líneas de arriba no se peguen al concepto anterior. Además:
+    // - la primera oración (hasta el punto) queda como el concepto y lo demás como continuación (especificación);
+    // - el pie de página que se repite en cada hoja (p. ej. «DIRECTOR GENERAL: …») se quita;
+    // - una línea suelta de 1 a 4 letras o números en mayúsculas (p. ej. «A») es la partida de los conceptos que siguen.
+    function ordenarBloques(paginas, enc) {
+        var col = function (re) { return enc.findIndex(function (t) { return re.test(t); }); };
+        var iCod = col(/^(c[oó]digo|clave|cve)/i), iCon = col(/^(concepto|descripci)/i);
+        var nums = enc.map(function (t, i) { return /^(cant|p\.?\s*unit|precio|importe|total)/i.test(t) ? i : -1; })
+                      .filter(function (i) { return i >= 0; });
+        var llave = function (f) { return f.c.join('|') + '@' + Math.round(f.y / 4); };
+        var soloConcepto = function (f) { return f.c.every(function (t, i) { return i === iCon || !t; }); };
+        var conImporte = function (f) { return nums.some(function (i) { return ES_NUMERO.test(f.c[i] || ''); }); };
+        var esAncla = function (f) { return iCod >= 0 ? !!f.c[iCod] : conImporte(f); };
+        var veces = {};
+        paginas.forEach(function (p) {
+            var vistos = {};
+            p.forEach(function (f) { var k = llave(f); if (!vistos[k]) { vistos[k] = 1; veces[k] = (veces[k] || 0) + 1; } });
+        });
+        var salida = [enc.concat(['Partida'])], partida = '', hayPartida = false, enTotales = false;
+        var esPartida = function (f) { return iCon >= 0 && soloConcepto(f) && /^[A-Z0-9]{1,4}[.)]?$/.test(f.c[iCon]); };
+        paginas.forEach(function (p) {
+            // Totales (Total, Subtotal, IVA…): se quitan junto con lo que les sigue hasta el siguiente código
+            p = p.filter(function (f) {
+                var texto = f.c.join(' ').trim();
+                if (/^((sub)?total\b|iva\b)/i.test(texto) && conImporte(f)) { enTotales = true; return false; }
+                if (enTotales && esAncla(f)) enTotales = false;
+                return !enTotales;
+            });
+            var huecos = [];
+            for (var i = 1; i < p.length; i++) huecos.push(p[i - 1].y - p[i].y);
+            huecos.sort(function (a, b) { return a - b; });
+            var linea = huecos.length ? huecos[Math.floor(huecos.length / 2)] : 12;
+            var bloques = [], b = null;
+            p.forEach(function (f, i) {
+                if (!b || p[i - 1].y - f.y > linea * 1.7) { b = []; bloques.push(b); }
+                b.push(f);
+            });
+            bloques.forEach(function (b) {
+                // Partida en la primera línea del bloque (pegada o no al concepto)
+                if (b.length && esPartida(b[0])) {
+                    partida = b[0].c[iCon].replace(/[.)]$/, '');
+                    hayPartida = true;
+                    b = b.slice(1);
+                }
+                var anclas = b.filter(esAncla);
+                if (!anclas.length) {
+                    if (paginas.length > 1) b = b.filter(function (f) { return veces[llave(f)] < 2; });
+                } else if (anclas.length === 1 && iCon >= 0) {
+                    var primera = b[0];
+                    // Código, unidad e importes del bloque a la primera línea
+                    b.slice(1).forEach(function (f) {
+                        f.c.forEach(function (t, i) { if (i !== iCon && t && !primera.c[i]) { primera.c[i] = t; f.c[i] = ''; } });
+                    });
+                    // La primera oración completa es el concepto (si termina en punto dentro de las primeras 6 líneas)
+                    var n = 0;
+                    while (n < b.length && n < 6 && !/[.:]\s*$/.test(b[n].c[iCon])) n++;
+                    if (n > 0 && n < b.length && n < 6) {
+                        for (var k = 1; k <= n; k++) {
+                            primera.c[iCon] = primera.c[iCon].replace(/\s+$/, '') + ' ' + b[k].c[iCon];
+                            b[k].c[iCon] = '';
+                        }
+                    }
+                }
+                b.forEach(function (f) {
+                    if (f.c.every(function (t) { return !t; })) return;
+                    salida.push(f.c.concat([iCod >= 0 && f.c[iCod] ? partida : '']));
+                });
+            });
+        });
+        if (!hayPartida) salida.forEach(function (f) { f.pop(); });
+        return salida;
     }
 
     // Si el PDF centra los importes en la altura del concepto, quedan en un renglón sin código:

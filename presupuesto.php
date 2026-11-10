@@ -486,6 +486,7 @@ $secciones = [
                         <?php endif; ?>
                         <button type="button" class="ct-btn" id="ccRenumerar" title="Vuelve a poner las claves en orden por partida: 01-001, 01.01-001…">Renumerar claves</button>
                         <button type="button" class="ct-btn" id="ccImportar" title="Agrega conceptos copiados de Excel o de un archivo CSV (Código, Concepto, Unidad, Cantidad, P. Unitario…)">Importar de Excel</button>
+                        <button type="button" class="ct-btn" id="ccImportarPdf" title="Agrega los conceptos de un catálogo en PDF (con encabezado Código, Concepto, Unidad, Cantidad, P. Unitario…)">Importar de PDF</button>
                         <button type="button" class="ct-btn" id="ccExportar" title="Descarga el catálogo para abrirlo en Excel">Exportar a Excel</button>
                         <input type="search" id="ccBuscar" class="cc-buscar" placeholder="Buscar clave o descripción" autocomplete="off">
                     </div>
@@ -1154,12 +1155,12 @@ $secciones = [
         <button type="button" class="hs-cerrar" data-cci-cerrar title="Cerrar">✕</button>
     </div>
     <p class="pu-dlg-ayuda">En Excel selecciona las columnas <b>con su encabezado</b> (Código, Concepto, Unidad, Cantidad, P. Unitario; opcionales Partida y Especificación)
-        y pégalas aquí, o elige el archivo de Excel (.xlsx) o .csv. Si el código está en <b>Catalogos › Conceptos P.U.</b> se toma su análisis con los precios vigentes (automático);
+        y pégalas aquí, o elige el archivo de Excel (.xlsx), PDF o .csv (el PDF debe traer texto, no escaneado). Si el código está en <b>Catalogos › Conceptos P.U.</b> se toma su análisis con los precios vigentes (automático);
         si no, el concepto entra con el P. Unitario del archivo. Lo que ya está en el presupuesto (mismo código) no se vuelve a sumar: solo se actualiza si cambió.</p>
     <div class="cci-entrada">
         <textarea id="cciPegar" rows="6" placeholder="Pega aquí las celdas copiadas de Excel"></textarea>
         <div class="cci-opciones">
-            <label>Archivo de Excel (.xlsx) o CSV (opcional): <input type="file" id="cciArchivo" accept=".xlsx,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+            <label>Archivo de Excel (.xlsx), PDF o CSV (opcional): <input type="file" id="cciArchivo" accept=".xlsx,.pdf,.csv,.txt,text/csv,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
             <label><input type="checkbox" id="cciVenta"> Precio fijo para el cliente: el P. Unitario del archivo no suma al costo, porque el costo ya viene del Análisis (Materia Prima, Mano de Obra y Gastos de Operacion)</label>
             <label><input type="checkbox" id="cciCatalogo" checked> Usar el análisis del catálogo cuando el código exista</label>
             <button type="button" class="ct-btn" id="cciLeer">Revisar</button>
@@ -1287,6 +1288,7 @@ $secciones = [
 <script src="<?= recurso('js/formato-presupuesto.js') ?>"></script>
 <script src="<?= recurso('js/formato-analisis.js') ?>"></script>
 <script src="<?= recurso('js/xlsx-simple.js') ?>"></script>
+<script src="<?= recurso('js/pdf-tabla.js') ?>"></script>
 <script src="<?= recurso('js/formato-catalogo.js') ?>"></script>
 <script src="<?= recurso('js/ruta-critica.js') ?>"></script>
 <script src="<?= recurso('js/conceptos-tareas.js') ?>"></script>

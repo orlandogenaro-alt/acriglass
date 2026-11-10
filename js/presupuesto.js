@@ -2560,8 +2560,17 @@
     }
     $('ccExportar').addEventListener('click', exportarCc);
 
-    // Archivo para importar: Excel (.xlsx) o CSV; queda en la caja de texto como si se hubiera pegado
+    // Archivo para importar: Excel (.xlsx), PDF o CSV; queda en la caja de texto como si se hubiera pegado
     function leerArchivoImportar(f, caja, listo) {
+        if (/\.pdf$/i.test(f.name)) {
+            var aviso = $(caja).placeholder;
+            $(caja).value = '';
+            $(caja).placeholder = 'Leyendo el PDF…';
+            PdfTabla.leer(f).then(function (texto) { $(caja).value = texto; listo(); })
+                .catch(function (e) { alert('No se pudo leer el PDF: ' + (e && e.message || e)); })
+                .then(function () { $(caja).placeholder = aviso; });
+            return;
+        }
         if (/\.xlsx$/i.test(f.name)) {
             XlsxSimple.leer(f).then(function (filas) { $(caja).value = XlsxSimple.aTexto(filas); listo(); })
                 .catch(function (e) { alert('No se pudo leer el archivo de Excel: ' + (e && e.message || e)); });
@@ -2770,6 +2779,12 @@
         pintarImportacion('');
         $('ccImpDialogo').showModal();
         $('cciPegar').focus();
+    });
+    // Importar de PDF: el mismo diálogo, abriendo de una vez la selección del archivo
+    $('ccImportarPdf').addEventListener('click', function () {
+        if (soloLectura) { avisoSoloLectura(); return; }
+        $('ccImportar').click();
+        $('cciArchivo').click();
     });
     $('cciArchivo').addEventListener('change', function () {
         var f = this.files[0];

@@ -1188,7 +1188,7 @@ $secciones = [
         <button type="button" class="hs-cerrar" data-ani-cerrar title="Cerrar">✕</button>
     </div>
     <p class="pu-dlg-ayuda">En la hoja de Excel del Análisis selecciona desde el encabezado (<b>Anexos, Partidas, Presupuesto sugerido, Subtotal…</b>) hasta el Total de Gastos de Operacion
-        y pégalo aquí, o elige el archivo de Excel (el que descarga Exportar a Excel). Los renglones bajo <b>Materia Prima</b>, <b>Mano de Obra</b> y <b>Gastos de Operacion</b>
+        y pégalo aquí, o elige el archivo de Excel: el que descarga Exportar a Excel o la hoja de costos de Acristala (ANALISIS DE PRESUPUESTO …xlsx), aunque traiga otras hojas como GASTOS. Los renglones bajo <b>Materia Prima</b>, <b>Mano de Obra</b> y <b>Gastos de Operacion</b>
         actualizan el importe del concepto con el mismo nombre o se agregan como nuevos; los renglones automáticos (calculados) no se cambian.</p>
     <div class="cci-entrada">
         <textarea id="aniPegar" rows="6" placeholder="Pega aquí las celdas copiadas de Excel"></textarea>

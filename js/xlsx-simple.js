@@ -129,22 +129,37 @@ window.XlsxSimple = (function () {
         for (var i = 0; i < m[1].length; i++) n = n * 26 + m[1].charCodeAt(i) - 64;
         return n - 1;
     }
-    function leer(archivo) {
+    // elegir (opcional): function (filas, nombreHoja) → true para la hoja que se quiere. Se prueban en el orden del
+    // libro; si ninguna cumple (o no se pasa), se devuelve la primera hoja.
+    function leer(archivo, elegir) {
         return archivo.arrayBuffer().then(function (buf) {
             var lista = archivosZip(buf);
             return Promise.all([texto(lista, 'xl/workbook.xml'), texto(lista, 'xl/_rels/workbook.xml.rels'), texto(lista, 'xl/sharedStrings.xml')]).then(function (t) {
                 var dp = new DOMParser();
-                // La primera hoja del libro (no siempre es sheet1.xml)
-                var ruta = 'xl/worksheets/sheet1.xml';
-                var hoja = dp.parseFromString(t[0], 'application/xml').getElementsByTagName('sheet')[0];
-                var rid = hoja && (hoja.getAttribute('r:id') || hoja.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id'));
+                // Las hojas en el orden del libro (la primera no siempre es sheet1.xml)
+                var destino = {};
                 Array.prototype.forEach.call(dp.parseFromString(t[1] || '<x/>', 'application/xml').getElementsByTagName('Relationship'), function (r) {
-                    if (r.getAttribute('Id') === rid) ruta = 'xl/' + r.getAttribute('Target').replace(/^\/?xl\//, '').replace(/^\//, '');
+                    destino[r.getAttribute('Id')] = 'xl/' + r.getAttribute('Target').replace(/^\/?xl\//, '').replace(/^\//, '');
                 });
+                var hojas = Array.prototype.map.call(dp.parseFromString(t[0], 'application/xml').getElementsByTagName('sheet'), function (h) {
+                    var rid = h.getAttribute('r:id') || h.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+                    return { nombre: h.getAttribute('name') || '', ruta: destino[rid] };
+                }).filter(function (h) { return h.ruta; });
+                if (!hojas.length) hojas = [{ nombre: '', ruta: 'xl/worksheets/sheet1.xml' }];
                 var compartidos = Array.prototype.map.call(dp.parseFromString(t[2] || '<x/>', 'application/xml').getElementsByTagName('si'), function (si) {
                     return Array.prototype.map.call(si.getElementsByTagName('t'), function (x) { return x.textContent; }).join('');
                 });
-                return texto(lista, ruta).then(function (xml) {
+                var primera = null;
+                function probar(i) {
+                    if (i >= hojas.length) return primera;
+                    return leerHoja(hojas[i].ruta).then(function (filas) {
+                        if (i === 0) primera = filas;
+                        if (!elegir || elegir(filas, hojas[i].nombre)) return filas;
+                        return probar(i + 1);
+                    });
+                }
+                return probar(0);
+                function leerHoja(ruta) { return texto(lista, ruta).then(function (xml) {
                     var filas = [];
                     Array.prototype.forEach.call(dp.parseFromString(xml, 'application/xml').getElementsByTagName('row'), function (r) {
                         var fila = [];
@@ -160,7 +175,7 @@ window.XlsxSimple = (function () {
                     });
                     for (var k = 0; k < filas.length; k++) if (!filas[k]) filas[k] = [];
                     return filas;
-                });
+                }); }
             });
         });
     }

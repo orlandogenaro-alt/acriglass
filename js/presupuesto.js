@@ -2242,41 +2242,61 @@
     var anFilas = [], anSubtotal = 0;
     var SECCION_AN = [['mp', /^MATERIA PRIMA$/], ['mo', /^MANO DE OBRA$/], ['go', /^GASTOS DE OPERACI[OÓ]N$/]];
 
-    function leerImportacionAn() {
-        var celdas = separarCeldas($('aniPegar').value);
-        anFilas = [];
-        anSubtotal = 0;
-        var col = { anexo: 0, nombre: 1, pres: 2, sub: 3, tot: 4 }, inicio = 0;
-        for (var i = 0; i < Math.min(celdas.length, 10); i++) {
+    // Anexo tal como se ve en Excel. Del archivo .xlsx llega el valor guardado: 5.0999999999999996 es el 5.1 y
+    // 2.5000000000000001E-3 es el «0.25%» de las celdas con formato de porcentaje (Equipo de herramienta, Seguridad…)
+    function anexoAn(v) {
+        v = txt(v);
+        if (!/^\d+(\.\d+)?(e-?\d+)?$/i.test(v)) return v;
+        var n = Number(v);
+        return n > 0 && n < 1 ? String(+(n * 100).toFixed(4)) + '%' : String(+n.toFixed(4));
+    }
+
+    // La hoja del Análisis → renglones con su sección. Sirve para lo que exporta este sistema y para la hoja de costos de
+    // Acristala (Excel), que trae el encabezado más abajo, una columna oculta «Presupuesto sugerido con 20% de utilidad»
+    // y los Gastos de Operacion sin título, justo después del Margen de utilidad bruta.
+    function hojaAnalisisAn(celdas) {
+        var col = { anexo: 0, nombre: 1, pres: 2, sub: 3, tot: 4 }, inicio = 0, subtotal = 0;
+        for (var i = 0; i < Math.min(celdas.length, 40); i++) {
             var j = -1;
             celdas[i].forEach(function (t, k) { if (j < 0 && /^(partidas?|conceptos?)$/i.test(txt(t))) j = k; });
             if (j < 0) continue;
             col = { anexo: -1, nombre: j, pres: j + 1, sub: j + 2, tot: j + 3 };
+            var visto = {};
+            // Cada columna se toma la PRIMERA vez que aparece su título
             celdas[i].forEach(function (t, k) {
                 t = txt(t);
-                if (/^anexo/i.test(t)) col.anexo = k;
-                else if (/^presupuesto/i.test(t)) col.pres = k;
-                else if (/^subtotal/i.test(t)) col.sub = k;
-                else if (/^total$/i.test(t)) col.tot = k;
+                var c = /^anexo/i.test(t) ? 'anexo' : /^presupuesto/i.test(t) ? 'pres' : /^subtotal/i.test(t) ? 'sub' : /^total$/i.test(t) ? 'tot' : '';
+                if (c && !visto[c]) { col[c] = k; visto[c] = true; }
             });
             inicio = i + 1;
             break;
         }
-        calcularTotales();   // marca los renglones automáticos
-        var sec = null, candidatos = [];
+        var sec = null, filas = [];
         celdas.slice(inicio).forEach(function (f) {
-            var anexo = col.anexo < 0 ? '' : txt(f[col.anexo]), nombre = txt(f[col.nombre]), k = clave(nombre);
+            var anexo = col.anexo < 0 ? '' : anexoAn(f[col.anexo]), nombre = txt(f[col.nombre]), k = clave(nombre);
             if (/^(TOTAL|MARGEN|UTILIDAD|PORCENTAJE|SUBTOTAL|IVA)\b/.test(k)) {
                 // El Subtotal del archivo (precio de venta sin IVA) ajusta la Utilidad Neta para que el presupuesto quede igual
-                if (/^SUBTOTAL$/.test(k)) { sec = null; anSubtotal = anSubtotal || numeroCelda(f[col.tot]) || numeroCelda(f[col.sub]); }
+                if (/^SUBTOTAL$/.test(k)) { sec = null; subtotal = subtotal || numeroCelda(f[col.tot]) || numeroCelda(f[col.sub]); }
+                // Lo que sigue al Margen de utilidad bruta son los Gastos de Operacion, aunque no traigan su título
+                else if (/^MARGEN DE UTILIDAD BRUTA/.test(k)) sec = 'go';
+                // «Total Materia Prima», «Total costo primo»…: cierra la sección
+                else if (/^TOTAL\b/.test(k)) sec = null;
                 return;
             }
             for (var s = 0; s < SECCION_AN.length; s++) if (SECCION_AN[s][1].test(k)) { sec = SECCION_AN[s][0]; return; }
             // Anexo como número (5, 5.1) o como porcentaje (0.25%, 3%), igual que en la hoja de Excel
             if (!sec || !nombre || (col.anexo >= 0 && !/^\d+(\.\d+)*%?$/.test(anexo))) return;
             var pres = numeroCelda(f[col.pres]);
-            candidatos.push({ sec: sec, anexo: anexo, nombre: nombre, pres: pres, importe: pres || numeroCelda(f[col.sub]) });
+            filas.push({ sec: sec, anexo: anexo, nombre: nombre, pres: pres, importe: pres || numeroCelda(f[col.sub]) });
         });
+        return { filas: filas, subtotal: subtotal };
+    }
+
+    function leerImportacionAn() {
+        anFilas = [];
+        var hoja = hojaAnalisisAn(separarCeldas($('aniPegar').value)), candidatos = hoja.filas;
+        anSubtotal = hoja.subtotal;
+        calcularTotales();   // marca los renglones automáticos
         var padreCalc = {};
         candidatos.forEach(function (x) {
             var padre = /^\d+\.\d+$/.test(x.anexo) ? x.anexo.split('.')[0] : '';
@@ -2368,7 +2388,10 @@
     $('aniArchivo').addEventListener('change', function () {
         var f = this.files[0];
         if (!f) return;
-        leerArchivoImportar(f, 'aniPegar', leerImportacionAn);
+        // De un libro con varias hojas (Presupuesto, Gastos…) se lee la que trae Materia Prima
+        leerArchivoImportar(f, 'aniPegar', leerImportacionAn, function (filas) {
+            return filas.some(function (r) { return r.some(function (v) { return /^MATERIA PRIMA$/i.test(txt(v)); }); });
+        });
     });
     $('aniLeer').addEventListener('click', leerImportacionAn);
     $('aniAplicar').addEventListener('click', aplicarImportacionAn);
@@ -2563,7 +2586,8 @@
     $('ccExportar').addEventListener('click', exportarCc);
 
     // Archivo para importar: Excel (.xlsx), PDF o CSV; queda en la caja de texto como si se hubiera pegado
-    function leerArchivoImportar(f, caja, listo) {
+    // elegirHoja (opcional): en un libro de varias hojas, la primera que cumpla; si ninguna, la primera del libro
+    function leerArchivoImportar(f, caja, listo, elegirHoja) {
         if (/\.pdf$/i.test(f.name)) {
             var aviso = $(caja).placeholder;
             $(caja).value = '';
@@ -2574,7 +2598,7 @@
             return;
         }
         if (/\.xlsx$/i.test(f.name)) {
-            XlsxSimple.leer(f).then(function (filas) { $(caja).value = XlsxSimple.aTexto(filas); listo(); })
+            XlsxSimple.leer(f, elegirHoja).then(function (filas) { $(caja).value = XlsxSimple.aTexto(filas); listo(); })
                 .catch(function (e) { alert('No se pudo leer el archivo de Excel: ' + (e && e.message || e)); });
             return;
         }

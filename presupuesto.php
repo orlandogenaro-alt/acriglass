@@ -281,6 +281,8 @@ $secciones = [
             <button data-imprimir="pu-detalle">Imprimir Análisis de P.U.</button>
             <button data-imprimir="analisis">Análisis de Cancelería</button>
             <button data-imprimir="catalogo">Catálogo de Conceptos</button>
+            <button data-imprimir="insumos-mat">Relación de Costos de Materiales</button>
+            <button data-imprimir="insumos">Explosión de Insumos</button>
             <button data-versiones>Versiones aprobadas…</button>
         </div>
     </div>
@@ -1290,6 +1292,7 @@ $secciones = [
 <script src="<?= recurso('js/xlsx-simple.js') ?>"></script>
 <script src="<?= recurso('js/pdf-tabla.js') ?>"></script>
 <script src="<?= recurso('js/formato-catalogo.js') ?>"></script>
+<script src="<?= recurso('js/formato-insumos.js') ?>"></script>
 <script src="<?= recurso('js/ruta-critica.js') ?>"></script>
 <script src="<?= recurso('js/conceptos-tareas.js') ?>"></script>
 <script src="<?= recurso('js/presupuesto.js') ?>"></script>

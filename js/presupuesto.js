@@ -3973,6 +3973,27 @@
             })
         };
     }
+    // Imprimir › Relación de Costos de Materiales / Explosión de Insumos (js/formato-insumos.js), como los reportes
+    // Costos Mat y Costo Maq de Neodata: la explosión de toda la obra (básicos desarmados e importados de MP/MO/GO)
+    // agrupada por tipo de insumo y en orden alfabético
+    function documentoInsumos(soloMateriales) {
+        var orden = Object.keys(TIPOS_INSUMO).map(function (t) { return TIPOS_INSUMO[t]; })
+            .concat(['MP', 'MO', 'GO'].map(function (s) { return 'Importado (' + s + ')'; }));
+        var porTipo = {};
+        explosionPU(analisis.conceptos.filter(alCosto), true, true).forEach(function (i) {
+            if (soloMateriales && i.tipo !== TIPOS_INSUMO.MAT && i.tipo !== 'Importado (MP)') return;
+            if (orden.indexOf(i.tipo) < 0) orden.push(i.tipo);
+            (porTipo[i.tipo] = porTipo[i.tipo] || []).push(i);
+        });
+        return {
+            fecha: $('fecha').value, cotizacion: $('proyecto').value, empresa: $('cliente').value,
+            obra: txt($('obraNombre').value) || $('proyecto').value, lugar: $('ubicacion').value,
+            titulo: soloMateriales ? 'RELACIÓN Y ANÁLISIS DE COSTOS BÁSICOS DE LOS MATERIALES' : 'EXPLOSIÓN DE INSUMOS',
+            grupos: orden.filter(function (t) { return porTipo[t]; }).map(function (t) {
+                return { titulo: t.toUpperCase(), insumos: porTipo[t].sort(function (a, b) { return String(a.nombre).localeCompare(String(b.nombre), 'es'); }) };
+            })
+        };
+    }
     var impresionLista = false, atencionCatalogo = '';
     // modo: normal · detalle · pu (catálogo con precios unitarios) · pu-detalle (con el análisis de cada concepto)
     //       propuesta (para el cliente: especificación técnica, P.U. e importes, sin costos internos)
@@ -4007,6 +4028,11 @@
             impresionLista = true;
             return;
         }
+        if (modo === 'insumos' || modo === 'insumos-mat') {
+            $('formatoImpresion').innerHTML = FormatoInsumos(documentoInsumos(modo === 'insumos-mat'), window.ACRI_MEMBRETE || {});
+            impresionLista = true;
+            return;
+        }
         var doc = documentoImpresion(), pu = esModoPU(modo);
         if (pu) {
             var x = documentoPU(modo === 'pu-detalle');
@@ -4030,6 +4056,11 @@
                 if (r === null) return;
                 atencionCatalogo = r.trim();
                 try { localStorage.setItem(llave, atencionCatalogo); } catch (e) { /* sin almacenamiento */ }
+            }
+            if ((modo === 'insumos' || modo === 'insumos-mat') && !documentoInsumos(modo === 'insumos-mat').grupos.length) {
+                alert(modo === 'insumos-mat' ? 'La obra no lleva materiales: analiza los conceptos en el Catálogo de Conceptos o en Análisis P.U.'
+                                             : 'Aún no hay insumos: analiza los conceptos en el Catálogo de Conceptos o en Análisis P.U.');
+                return;
             }
             if (esModoPU(modo)) {
                 var r = calcularPU();

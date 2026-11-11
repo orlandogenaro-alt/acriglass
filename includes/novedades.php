@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-11-11',
+        'cambios' => [
+            ['nuevo', 'Presupuesto: imprimir la Relación de Costos de Materiales y la Explosión de Insumos', 'En el menú Imprimir hay dos formatos nuevos, como los reportes de insumos que se imprimían en Neodata (Costos Mat y Costo Maq): «Relación de Costos de Materiales» (los materiales de la obra con su código, unidad, costo unitario, cantidad e importe, en orden alfabético) y «Explosión de Insumos» (lo mismo para todos los insumos, agrupados en materiales, mano de obra, equipo, herramienta e importados de Materia Prima, Mano de Obra y Gastos de Operacion, con el total de cada grupo y el costo directo). Los básicos se desarman en sus insumos. Usan la hoja membretada del Catálogo de Conceptos.'],
+        ],
+    ],
+    [
         'fecha' => '2026-11-10',
         'cambios' => [
             ['correccion', 'Presupuesto: los insumos en % de Neodata (Herramienta, Seguridad) se calculan como en Neodata', 'Al validar el sistema contra 83 presupuestos reales de Neodata (1,365 conceptos) se encontró que los insumos con unidad «%» de Neodata no son siempre un % de la mano de obra: el catálogo de Neodata marca cada uno (EsPorcentaje) como % de los MATERIALES de los renglones de arriba en la matriz (Herramienta y Seguridad), % de la mano de obra, o cantidad × costo (Tornillería). Al traer un presupuesto de Neodata se tomaban como cantidad × el costo que guarda Neodata (que es la base del último cálculo, no un precio), y el costo directo salía distinto (hasta 9 % en un concepto). En la matriz del concepto hay un cálculo nuevo, «% de materiales» (sobre los materiales de los renglones de arriba), y la herramienta exportar-neodata.ps1 manda cada % con su base, los básicos con su matriz (renglones 2.1, 2.2…, para que se recalculen en lugar de usar un costo guardado viejo) y la mano de obra con FSR 1 (su costo ya trae el FASAR). Requiere la migración 023.'],

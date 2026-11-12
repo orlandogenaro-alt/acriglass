@@ -4,6 +4,7 @@ require_once __DIR__ . '/lib.php';
 require_once __DIR__ . '/../includes/sistema.php';
 require_once __DIR__ . '/../includes/acrineo/esquema.php';
 require_once __DIR__ . '/../includes/acrineo/documentos.php';
+require_once __DIR__ . '/../includes/acrineo/hoja-calculo.php';
 
 echo "ACRINEO · presupuestos\n";
 
@@ -157,4 +158,41 @@ prueba('documentos: extensión, tipo real, tamaño y nombre', function () {
     [, $moneda] = acrineoDocLugar('libro_fasar', '2');
     igual(2, $moneda);
     try { acrineoDocLugar('libro_fasar', 3); throw new RuntimeException('moneda 3 aceptada'); } catch (AcrineoError $e) {}
+});
+
+prueba('hoja: precio unitario con sobrecosto e importe redondeado por renglón', function () {
+    igual(1150.0, acrineoPrecioUnitario(1000, 15, 2));
+    igual(123.46, acrineoPrecioUnitario(123.456, 0, 2));
+    igual(0.0, acrineoPrecioUnitario(0, 15, 2));
+    igual(3450.0, acrineoImporte(3, 1150, 2));
+    igual(41.15, acrineoImporte(3.3333, 12.345, 2));
+    igual(41.1496, acrineoImporte(3.3333, 12.345, 4), 4);
+});
+
+prueba('hoja: la partida suma sus renglones y los de sus subpartidas', function () {
+    $padres = [1 => null, 2 => 1, 3 => 2, 4 => null];
+    $t = acrineoTotalesPartidas($padres, [3 => ['costo' => 100, 'venta' => 115], 2 => ['costo' => 10, 'venta' => 11.5], 4 => ['costo' => 5, 'venta' => 6]], 2);
+    igual(110.0, $t[1]['costo']); igual(126.5, $t[1]['venta']);
+    igual(110.0, $t[2]['costo']); igual(100.0, $t[3]['costo']);
+    igual(5.0, $t[4]['costo']);
+});
+
+prueba('hoja: código sugerido de partida y subpartida', function () {
+    igual('A', acrineoSiguienteCodigoPartida(null, []));
+    igual('C', acrineoSiguienteCodigoPartida(null, ['A', 'b', 'A1']));
+    $usados = array_map(fn($i) => chr(65 + $i), range(0, 25));
+    igual('AA', acrineoSiguienteCodigoPartida(null, $usados));
+    igual('A1', acrineoSiguienteCodigoPartida('A', ['A']));
+    igual('A11', acrineoSiguienteCodigoPartida('A1', ['A', 'A1']));
+    igual('A12', acrineoSiguienteCodigoPartida('A1', ['A', 'A1', 'a11']));
+});
+
+prueba('hoja: orden de árbol con niveles', function () {
+    $o = acrineoOrdenArbol([
+        ['id' => 5, 'padre_id' => null, 'orden' => 1], ['id' => 1, 'padre_id' => null, 'orden' => 0],
+        ['id' => 3, 'padre_id' => 1, 'orden' => 1], ['id' => 2, 'padre_id' => 1, 'orden' => 0], ['id' => 4, 'padre_id' => 2, 'orden' => 0],
+    ]);
+    igual([1, 2, 4, 3, 5], array_column($o, 'id'));
+    igual([0, 1, 2, 1, 0], array_column($o, 'nivel'));
+    igual([2, 1, 0, 0, 0], array_column($o, 'hijos'));
 });

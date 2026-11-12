@@ -392,6 +392,65 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-toast.error { border-left-color: var(--rojo); color: var(--rojo); }
 @keyframes an-entra { from { transform: translateY(8px); opacity: 0; } }
 
+/* ---------- Hoja del presupuesto ---------- */
+.an-hoja-barra {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 6px 12px; background: var(--tarjeta); border-bottom: 1px solid var(--borde);
+}
+.an-doc-pestana {
+    display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 6px 6px 0 0;
+    border-bottom: 2px solid var(--azul-texto); color: var(--azul-texto); font-weight: 800; font-size: 14px; text-decoration: none;
+    max-width: 50vw; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.an-doc-pestana span:last-child { color: var(--texto-3); font-size: 16px; }
+.an-doc-pestana:hover span:last-child { color: var(--rojo); }
+.an-sobrecosto { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 12px; color: var(--texto-2); }
+.an-sobrecosto input { width: 96px; height: 28px; padding: 0 6px; text-align: right; border: 1px solid var(--borde-2); border-radius: 5px; background: var(--input); }
+.an-totales { font-size: 12.5px; color: var(--texto-2); white-space: nowrap; }
+.an-totales b { color: var(--enfasis); font-variant-numeric: tabular-nums; }
+
+.an-hoja {
+    flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(320px, 38%) minmax(0, 1fr); gap: 8px; padding: 8px;
+}
+.an-hoja .an-ventana { margin: 0; min-height: 0; }
+.an-hoja-derecha { display: grid; grid-template-rows: minmax(0, 1.25fr) minmax(0, 1fr); gap: 8px; min-height: 0; }
+.an-barra-chica { padding: 5px 8px; gap: 6px; flex-wrap: nowrap; }
+.an-barra-chica .an-buscar { height: 30px; flex: 1 1 260px; }
+.an-partida-actual { font-size: 14px; color: var(--azul-texto); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+.an-arbol td:first-child { font-weight: 700; }
+.an-sangria { display: inline-flex; align-items: center; gap: 4px; }
+.an-sangria button { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 3px; color: var(--texto-2); }
+.an-sangria button svg { width: 13px; height: 13px; transition: transform .15s; }
+.an-sangria button.cerrado svg { transform: rotate(-90deg); }
+.an-sangria .an-hueco { display: inline-block; width: 18px; }
+.an-tabla tr.an-edicion td { background: var(--azul-suave) !important; padding: 4px 6px; overflow: visible; }
+.an-tabla tr.an-edicion input, .an-renglones input.an-celda-in {
+    width: 100%; min-width: 60px; height: 28px; padding: 0 6px;
+    border: 1px solid var(--borde-2); border-radius: 4px; background: var(--input);
+}
+.an-tabla tr.an-edicion input:focus, .an-renglones input.an-celda-in:focus { outline: none; border-color: var(--azul-texto); box-shadow: 0 0 0 3px var(--foco); }
+.an-renglones input.an-celda-in.num { text-align: right; }
+.an-renglones input.an-celda-in.invalido, .an-tabla tr.an-edicion input.invalido { border-color: var(--rojo); box-shadow: 0 0 0 3px var(--rojo-suave); }
+.an-tabla tr.an-edicion-botones td { background: var(--azul-suave) !important; text-align: right; padding: 4px 8px; }
+.an-tabla tr.an-edicion-botones small { float: left; line-height: 26px; color: var(--texto-2); }
+.an-renglones tr.nuevo-renglon td { background: var(--verde-suave) !important; }
+.an-renglones tr.modificado td:first-child { box-shadow: inset 3px 0 0 var(--ambar); }
+.an-renglones td { padding: 4px 8px; }
+.an-renglones .an-desc { white-space: normal; min-width: 220px; max-width: 520px; }
+.an-mover { justify-content: flex-start; gap: 4px; }
+.an-mover button { width: 30px; height: 24px; border-radius: 12px; background: var(--azul); color: #fff; font-size: 11px; }
+.an-mover button:hover { background: var(--azul-hover); }
+.an-btn.an-icono[aria-pressed=true] { background: var(--azul); border-color: var(--azul); color: #fff; }
+.an-vacio .an-btn { margin-top: 10px; }
+.an-catalogo-cant { width: 90px; height: 26px; padding: 0 6px; text-align: right; border: 1px solid var(--borde-2); border-radius: 4px; background: var(--input); }
+
+@media (max-width: 1000px) {
+    .an-hoja { grid-template-columns: 1fr; grid-auto-rows: minmax(260px, auto); overflow: auto; }
+    .an-hoja-derecha { grid-template-rows: minmax(320px, auto) minmax(280px, auto); }
+    .an-panel-partidas { max-height: 50vh; }
+}
+
 /* ---------- Responsive ---------- */
 /* Tableta: se ocultan las columnas secundarias del catálogo */
 @media (min-width: 701px) and (max-width: 1100px) {

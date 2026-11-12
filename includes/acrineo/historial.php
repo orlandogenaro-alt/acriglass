@@ -7,6 +7,7 @@ const ACRINEO_ACCIONES_HISTORIAL = [
     'MODIFICAR' => 'Modificó',
     'ELIMINAR'  => 'Eliminó el presupuesto',
     'DOCUMENTO' => 'Documento',
+    'HOJA'      => 'Hoja del presupuesto',
 ];
 
 // IP de quien hace la petición (en Vercel llega en X-Forwarded-For)

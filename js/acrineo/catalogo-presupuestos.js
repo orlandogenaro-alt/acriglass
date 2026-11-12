@@ -102,14 +102,14 @@
     function celda(c, f) {
         switch (c.k) {
             case 'sel': return '<td class="an-col-sel"><input type="checkbox" data-sel="' + f.id + '" aria-label="Seleccionar ' + esc(f.nombre) + '"' + (st.sel.has(f.id) ? ' checked' : '') + '></td>';
-            case 'url': return '<td><button type="button" class="an-btn-fila" data-abrir="' + f.id + '" title="Abrir presupuesto" aria-label="Abrir ' + esc(f.nombre) + '">' + ICONO.doc + '</button></td>';
+            case 'url': return '<td><a class="an-btn-fila" href="acrineo-hoja.php?id=' + f.id + '" title="Abrir la hoja del presupuesto (partidas y conceptos)" aria-label="Abrir la hoja de ' + esc(f.nombre) + '">' + ICONO.doc + '</a></td>';
             case 'sobrecosto_pct': return '<td class="num an-col-media">' + AN.ui.pct(f.sobrecosto_pct) + '</td>';
             case 'costo_directo': case 'precio_venta': return '<td class="num">' + AN.ui.dinero(f[c.k]) + '</td>';
             case 'updated_at': return '<td>' + esc(AN.ui.fechaCorta(f.updated_at)) + '</td>';
             case 'estatus': return '<td><span class="an-estatus ' + esc(f.estatus) + '">' + esc(f.estatus_texto) + '</span></td>';
             case 'acciones':
                 return '<td><span class="an-acciones">'
-                    + '<button type="button" data-abrir="' + f.id + '" title="' + (puede['presupuestos.editar'] ? 'Editar' : 'Consultar') + '">' + ICONO.editar + '</button>'
+                    + '<button type="button" data-abrir="' + f.id + '" title="' + (puede['presupuestos.editar'] ? 'Editar el detalle' : 'Consultar el detalle') + '">' + ICONO.editar + '</button>'
                     + '<button type="button" data-historial="' + f.id + '" title="Historial">' + ICONO.historial + '</button>'
                     + (puede['presupuestos.eliminar'] ? '<button type="button" class="an-borrar" data-eliminar="' + f.id + '" title="Eliminar">' + ICONO.borrar + '</button>' : '')
                     + '</span></td>';
@@ -401,6 +401,7 @@
     tbody.addEventListener('click', function (e) {
         var g = e.target.closest('[data-grupo]');
         if (g) { st.cerrados[g.dataset.grupo] = !st.cerrados[g.dataset.grupo]; pintar(); return; }
+        if (e.target.closest('a.an-btn-fila')) return;   // abre la hoja (enlace)
         var b = e.target.closest('[data-abrir], [data-historial], [data-eliminar]');
         if (b) {
             if (b.dataset.abrir) abrirDetalle(+b.dataset.abrir);

@@ -446,6 +446,8 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-mover button:hover { background: var(--azul-hover); }
 .an-btn.an-icono[aria-pressed=true] { background: var(--azul); border-color: var(--azul); color: #fff; }
 .an-vacio .an-btn { margin-top: 10px; }
+.an-vacio-grande td { padding: 90px 12px; font-size: 14px; color: var(--texto-2); }
+.an-agregar-registro { border-radius: 999px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
 .an-catalogo-cant { width: 90px; height: 26px; padding: 0 6px; text-align: right; border: 1px solid var(--borde-2); border-radius: 4px; background: var(--input); }
 
 /* Catálogo Unidades */

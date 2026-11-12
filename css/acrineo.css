@@ -612,3 +612,27 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-ajuste-tipos label { display: flex; align-items: center; gap: 8px; padding: 4px 14px; clear: left; }
 .an-ajuste-tipos label .an-ayuda { margin-left: auto; }
 .an-ajuste-tipos #anAjusteTipos label { padding-left: 34px; }
+
+/* Riel de acciones de la matriz: iconos a la derecha; con la hamburguesa se despliega con los nombres */
+.an-matriz-cuerpo { flex: 1; min-height: 0; display: flex; }
+.an-matriz-cuerpo > .an-tabla-cont { flex: 1; min-width: 0; }
+.an-matriz-riel {
+    display: flex; flex-direction: column; align-items: stretch; gap: 8px; flex: none;
+    width: 52px; padding: 10px 8px; border-left: 1px solid var(--borde); background: var(--sub);
+    overflow-y: auto; transition: width .15s ease;
+}
+.an-matriz-riel.abierto { width: 250px; }
+.an-riel-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px; height: 30px; padding: 0 10px;
+    border: 0; border-radius: 999px; background: none; color: var(--texto-2); cursor: pointer;
+    font: inherit; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
+}
+.an-riel-btn svg { width: 16px; height: 16px; flex: none; }
+.an-riel-btn:hover:not(:disabled) { background: var(--azul-suave); color: var(--azul-texto); }
+.an-riel-btn:disabled { opacity: .4; cursor: default; }
+.an-riel-btn.an-riel-primario { background: var(--azul); color: #fff; }
+.an-riel-btn.an-riel-primario:hover:not(:disabled) { background: var(--azul-hover); color: #fff; }
+.an-matriz-riel:not(.abierto) .an-riel-btn { padding: 0; }
+.an-matriz-riel:not(.abierto) .an-riel-btn span { display: none; }
+.an-btn-menu[aria-expanded=true] { background: var(--azul); border-color: var(--azul); color: #fff; }
+@media (max-width: 700px) { .an-matriz-riel.abierto { width: 190px; } }

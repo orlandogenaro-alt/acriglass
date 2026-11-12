@@ -40,6 +40,8 @@
         return CAMPOS.some(function (k) { return txt(b[k]) !== txt(b.original[k]); });
     }
     H.renglonesPendientes = pendiente;
+    // Conceptos guardados de la partida, en su orden (Anterior / Siguiente de la matriz)
+    H.conceptosPartida = function () { return st.filas.map(function (r) { return r.concepto_id; }); };
 
     function precioDe(b) { return b.precio_alzado ? H.redondear(Number(b.precio_fijo) || 0, H.ctx.dec_costos) : H.precio(b.costo); }
 

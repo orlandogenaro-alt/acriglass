@@ -44,9 +44,12 @@ $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2
             <span class="an-sep-barra" aria-hidden="true"></span>
             <button type="button" class="an-btn an-mini" id="anMatrizLibre" title="Agrega un renglón que no está en el catálogo">+ Renglón libre</button>
             <button type="button" class="an-btn an-mini" id="anMatrizActualizar" title="Toma el costo vigente del catálogo de insumos (no se guarda hasta GUARDAR)">Actualizar costos</button>
-            <button type="button" class="an-btn an-icono" id="anMatrizAjustar" title="Ajuste del precio unitario" aria-label="Ajuste del precio unitario"><?= $icoBillete ?></button>
             <?php endif; ?>
+            <button type="button" class="an-btn an-icono an-btn-menu" id="anMatrizMenu" title="Mostrar las acciones" aria-label="Mostrar las acciones" aria-expanded="false" aria-controls="anMatrizRiel">
+                <svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            </button>
         </div>
+        <div class="an-matriz-cuerpo">
         <div class="an-tabla-cont">
             <table class="an-tabla an-renglones an-matriz">
                 <thead><tr>
@@ -64,6 +67,16 @@ $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2
                 </tr></thead>
                 <tbody id="anMatrizFilas"></tbody>
             </table>
+        </div>
+        <!-- Acciones de la matriz: solo iconos; con la hamburguesa se despliegan con su nombre -->
+        <nav class="an-matriz-riel" id="anMatrizRiel" aria-label="Acciones de la matriz">
+            <?php if ($puedeMatriz): ?>
+            <button type="button" class="an-riel-btn an-riel-primario" id="anMatrizAjustar" title="Ajuste del precio unitario"><?= $icoBillete ?><span>Ajustar precio unitario</span></button>
+            <?php endif; ?>
+            <button type="button" class="an-riel-btn" id="anMatrizAnterior" title="Matriz del concepto anterior de la partida"><svg class="i" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Anterior</span></button>
+            <button type="button" class="an-riel-btn" id="anMatrizSiguiente" title="Matriz del concepto siguiente de la partida"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>Siguiente</span></button>
+            <button type="button" class="an-riel-btn" id="anMatrizRegresar" title="Regresar al presupuesto"><svg class="i" viewBox="0 0 24 24"><path d="M20 5v7a3 3 0 0 1-3 3H5M10 10l-5 5 5 5"/></svg><span>Regresar</span></button>
+        </nav>
         </div>
         <div class="an-pie an-matriz-pie">
             <span># <b id="anMatrizConteo">0</b></span>

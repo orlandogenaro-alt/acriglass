@@ -225,6 +225,13 @@
         $('anTabMatriz').textContent = 'Matriz · ' + c.codigo;
         $('anTabMatriz').title = c.codigo + ' · ' + c.descripcion;
         pintar();
+        navBotones();
+    }
+    // Anterior / Siguiente: deshabilitados en los extremos de la partida
+    function navBotones() {
+        var ids = H.conceptosPartida ? H.conceptosPartida() : [], i = st.concepto ? ids.indexOf(st.concepto.concepto_id) : -1;
+        $('anMatrizAnterior').disabled = i <= 0;
+        $('anMatrizSiguiente').disabled = i < 0 || i >= ids.length - 1;
     }
 
     function entrarEdicion() {
@@ -629,6 +636,29 @@
         dlgAjuste.querySelectorAll('[data-ajuste-cerrar]').forEach(function (b) { b.addEventListener('click', function () { dlgAjuste.close(); }); });
     }
     $('anMatrizCerrar').addEventListener('click', cerrar);
+
+    // ---------- Riel de acciones (hamburguesa) ----------
+    function rielAbierto(si) {
+        $('anMatrizRiel').classList.toggle('abierto', si);
+        $('anMatrizMenu').setAttribute('aria-expanded', String(si));
+        $('anMatrizMenu').setAttribute('aria-pressed', String(si));
+        $('anMatrizMenu').title = si ? 'Ocultar los nombres de las acciones' : 'Mostrar las acciones';
+    }
+    try { rielAbierto(localStorage.getItem('acrineo.matriz.riel') === '1'); } catch (e) { /* sin almacenamiento */ }
+    $('anMatrizMenu').addEventListener('click', function () {
+        var si = !$('anMatrizRiel').classList.contains('abierto');
+        rielAbierto(si);
+        try { localStorage.setItem('acrineo.matriz.riel', si ? '1' : '0'); } catch (e) { /* sin almacenamiento */ }
+    });
+    function vecino(paso) {
+        if (!st.concepto || !H.conceptosPartida) return;
+        var ids = H.conceptosPartida(), i = ids.indexOf(st.concepto.concepto_id), j = i + paso;
+        if (i < 0 || j < 0 || j >= ids.length) { estado(paso < 0 ? 'Es el primer concepto de la partida.' : 'Es el último concepto de la partida.', 'info'); return; }
+        abrir(ids[j]);
+    }
+    $('anMatrizAnterior').addEventListener('click', function () { vecino(-1); });
+    $('anMatrizSiguiente').addEventListener('click', function () { vecino(1); });
+    $('anMatrizRegresar').addEventListener('click', function () { verPestana(false); });
     $('anTabPresupuesto').addEventListener('click', function () { verPestana(false); });
     $('anTabMatriz').addEventListener('click', function () { verPestana(true); });
 

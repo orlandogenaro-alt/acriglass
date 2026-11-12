@@ -277,9 +277,10 @@
 
     // La ventana principal pregunta antes de cerrar la pestaña si hay cambios (js/principal.js)
     var anterior = window.acriHayCambios;
-    window.acriHayCambios = function () { return !!H.edicion || H.renglonesPendientes() || (anterior ? anterior() : false); };
+    var matrizSucia = function () { return !!(AN.hojaMatriz && AN.hojaMatriz.abierta()); };
+    window.acriHayCambios = function () { return !!H.edicion || H.renglonesPendientes() || matrizSucia() || (anterior ? anterior() : false); };
     window.addEventListener('beforeunload', function (e) {
-        if (H.edicion || H.renglonesPendientes()) { e.preventDefault(); e.returnValue = ''; }
+        if (H.edicion || H.renglonesPendientes() || matrizSucia()) { e.preventDefault(); e.returnValue = ''; }
     });
 
     // Carga inicial (después de que los otros módulos se registren)

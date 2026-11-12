@@ -20,7 +20,8 @@
         estado.className = 'an-estado info';
         estado.textContent = 'Buscando…';
         try {
-            var r = await AN.api.get(AN.api.url(AN.api.CATALOGOS, { catalogo: st.catalogo, q: txt.value.trim(), pagina: st.pagina }), { signal: st.ctrl.signal });
+            var base = st.fuente || AN.api.url(AN.api.CATALOGOS, { catalogo: st.catalogo });
+            var r = await AN.api.get(AN.api.url(base, { q: txt.value.trim(), pagina: st.pagina }), { signal: st.ctrl.signal });
             $('anBuscadorTitulo').textContent = r.titulo;
             $('anBuscadorExtra').querySelector('span').textContent = r.extra_titulo || '';
             st.items = st.items.concat(r.items);
@@ -59,9 +60,11 @@
         if (r) r(item || null);
     }
 
-    function abrir(catalogo) {
+    // op.url: otra fuente con la misma respuesta { titulo, extra_titulo, items, total, alta } (p. ej. insumos de la hoja)
+    function abrir(catalogo, op) {
         if (st.resolver) terminar(null);
         st.catalogo = catalogo;
+        st.fuente = op && op.url ? op.url : null;
         txt.value = '';
         alta.hidden = true;
         alta.reset();

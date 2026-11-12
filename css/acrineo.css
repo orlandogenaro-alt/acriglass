@@ -445,6 +445,23 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-vacio .an-btn { margin-top: 10px; }
 .an-catalogo-cant { width: 90px; height: 26px; padding: 0 6px; text-align: right; border: 1px solid var(--borde-2); border-radius: 4px; background: var(--input); }
 
+.an-col-pa { width: 44px; text-align: center; }
+.an-renglones td.an-col-pa { text-align: center; }
+.an-pa { color: var(--rojo); font-weight: 800; }
+.an-insignia { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 7px; font-size: 10px; font-weight: 800; background: var(--azul-suave); color: var(--azul-texto); border: 1px solid var(--azul-borde); vertical-align: middle; }
+.an-btn-pu { display: inline-grid; place-items: center; height: 22px; padding: 0 8px; border-radius: 11px; background: var(--azul); color: #fff; font-size: 11px; font-weight: 800; }
+.an-btn-pu:hover { background: var(--azul-hover); }
+.an-acciones .an-btn-pu { width: auto; height: 22px; color: #fff; }
+.an-acciones .an-btn-pu.vacia { color: var(--azul-texto); }
+.an-acciones .an-btn-pu:hover { background: var(--azul-hover); color: #fff; }
+.an-btn-pu.vacia { background: var(--sub); color: var(--azul-texto); border: 1px solid var(--azul-borde); }
+.an-renglones select.an-celda-in { height: 28px; padding: 0 4px; border: 1px solid var(--borde-2); border-radius: 4px; background: var(--input); }
+.an-renglones input.an-celda-in[readonly] { background: var(--sub); color: var(--texto-2); }
+.an-matriz-totales { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 8px 16px; border-top: 1px solid var(--borde); background: var(--sub); font-size: 12.5px; color: var(--texto-2); }
+.an-matriz-totales b { color: var(--enfasis); font-variant-numeric: tabular-nums; }
+.an-matriz-totales .an-cd { margin-left: auto; font-size: 14px; }
+.an-matriz-totales .an-cd b { color: var(--azul-texto); }
+
 @media (max-width: 1000px) {
     .an-hoja { grid-template-columns: 1fr; grid-auto-rows: minmax(260px, auto); overflow: auto; }
     .an-hoja-derecha { grid-template-rows: minmax(320px, auto) minmax(280px, auto); }

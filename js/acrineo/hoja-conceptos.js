@@ -35,9 +35,11 @@
                 + '<td>' + esc(c.codigo) + '</td>'
                 + '<td class="num"><input class="an-catalogo-cant" type="number" min="0" step="any" data-cant="' + c.id + '" value="' + esc(m ? st.marcados.get(c.id) : '1') + '"' + (H.puede ? '' : ' disabled') + ' aria-label="Cantidad a copiar de ' + esc(c.codigo) + '"></td>'
                 + '<td class="an-desc" title="' + esc(c.descripcion) + '">' + esc(c.descripcion) + '</td><td>' + esc(c.unidad || '') + '</td>'
-                + '<td class="num">' + AN.ui.dinero(c.costo) + '</td><td class="num">' + AN.ui.dinero(c.precio) + '</td>'
+                + '<td class="num">' + AN.ui.dinero(c.costo) + (c.matriz ? '<span class="an-insignia" title="Costo de su matriz de P.U.">M</span>' : '') + '</td>'
+                + '<td class="num">' + AN.ui.dinero(c.precio) + (c.precio_alzado ? '<span class="an-insignia" title="Precio alzado">P.A.</span>' : '') + '</td>'
                 + '<td class="num" title="Cantidad total en el presupuesto: ' + c.cantidad_total + '">' + c.usos + '</td>'
-                + '<td>' + (H.puede && !c.usos ? '<span class="an-acciones"><button type="button" class="an-borrar" data-borrar="' + c.id + '" title="Quitar del catálogo" aria-label="Quitar ' + esc(c.codigo) + ' del catálogo">' + BORRAR + '</button></span>' : '') + '</td></tr>';
+                + '<td><span class="an-acciones"><button type="button" class="an-btn-pu' + (c.matriz ? '' : ' vacia') + '" data-pu="' + c.id + '" title="Matriz de precio unitario">' + (c.matriz ? 'P.U.' : '+ P.U.') + '</button>'
+                + (H.puede && !c.usos ? '<button type="button" class="an-borrar" data-borrar="' + c.id + '" title="Quitar del catálogo" aria-label="Quitar ' + esc(c.codigo) + ' del catálogo">' + BORRAR + '</button>' : '') + '</span></td></tr>';
         }).join('') || '<tr class="an-vacio"><td colspan="9">' + ($('anConceptosQ').value.trim() ? 'Ningún concepto coincide con el filtro.' : 'La cuadrícula no tiene datos: los conceptos que guardes en las partidas aparecen aquí.') + '</td></tr>';
         $('anConceptosConteo').textContent = st.total + ' concepto' + (st.total === 1 ? '' : 's') + (st.marcados.size ? ' · ' + st.marcados.size + ' marcado' + (st.marcados.size === 1 ? '' : 's') : '');
         botones();
@@ -104,7 +106,9 @@
     });
     tbody.addEventListener('click', function (e) {
         var b = e.target.closest('[data-borrar]');
-        if (b) borrar(+b.dataset.borrar);
+        if (b) { borrar(+b.dataset.borrar); return; }
+        var pu = e.target.closest('[data-pu]');
+        if (pu && AN.hojaMatriz) AN.hojaMatriz.abrir(+pu.dataset.pu);
     });
     function pintarConteo() {
         $('anConceptosConteo').textContent = st.total + ' concepto' + (st.total === 1 ? '' : 's') + (st.marcados.size ? ' · ' + st.marcados.size + ' marcado' + (st.marcados.size === 1 ? '' : 's') : '');

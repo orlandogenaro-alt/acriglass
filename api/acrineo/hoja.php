@@ -8,7 +8,9 @@
 //        partida_crear {padre_id, codigo, descripcion} · partida_guardar {partida_id, codigo, descripcion}
 //        partida_eliminar {partida_id} · partida_mover {partida_id, direccion: arriba|abajo|izquierda|derecha}
 //        renglones_guardar {partida_id, filas, quitar} · copiar {partida_id, conceptos: [{concepto_id, cantidad}]}
-//        concepto_eliminar {concepto_id} · sobrecosto {sobrecosto_pct}
+//        concepto_eliminar {concepto_id} · sobrecosto {sobrecosto_pct} · matriz_guardar {concepto_id, filas}
+//   GET  ?id=P&recurso=matriz&concepto=C[&actualizar=1]   matriz de P.U. del concepto (con costos del catálogo)
+//   GET  ?id=P&recurso=insumos&q=                         catálogo de insumos del sistema, para la matriz
 define('ACRI_API', true);
 require __DIR__ . '/../../includes/sesion.php';
 require __DIR__ . '/../../includes/respuesta.php';
@@ -34,6 +36,10 @@ try {
         switch ($_GET['recurso'] ?? '') {
             case 'conceptos':
                 responder(['ok' => true] + acrineoConceptosCatalogo($ctx, (string) ($_GET['q'] ?? ''), (int) ($_GET['pagina'] ?? 1), (int) ($_GET['por_pagina'] ?? 100)));
+            case 'matriz':
+                responder(['ok' => true] + acrineoMatriz($ctx, (int) ($_GET['concepto'] ?? 0), ($_GET['actualizar'] ?? '') === '1'));
+            case 'insumos':
+                responder(['ok' => true] + acrineoInsumosBuscar((string) ($_GET['q'] ?? ''), (int) ($_GET['pagina'] ?? 1)));
             case 'codigo':
                 $padre = (int) ($_GET['padre'] ?? 0);
                 responder(['ok' => true, 'codigo' => acrineoCodigoSugerido($ctx, $padre ?: null)]);
@@ -72,6 +78,9 @@ try {
             break;
         case 'concepto_eliminar':
             acrineoConceptoEliminar($ctx, (int) ($in['concepto_id'] ?? 0), $usuario);
+            break;
+        case 'matriz_guardar':
+            $extra['matriz'] = acrineoMatrizGuardar($ctx, (int) ($in['concepto_id'] ?? 0), is_array($in['filas'] ?? null) ? $in['filas'] : [], $usuario);
             break;
         case 'sobrecosto':
             acrineoSobrecostoGuardar($ctx, $in['sobrecosto_pct'] ?? null, $usuario);

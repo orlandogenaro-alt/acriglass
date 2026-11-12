@@ -14,6 +14,45 @@ function acrineoImporte(float $cantidad, float $unitario, int $decimales): float
     return round($cantidad * $unitario, $decimales);
 }
 
+// Precio unitario del concepto: con P.A. (precio alzado) es el precio fijo capturado; si no, costo × sobrecosto
+function acrineoPrecioConcepto(float $costo, float $sobrecostoPct, int $decimales, bool $precioAlzado, ?float $precioFijo): float
+{
+    return $precioAlzado ? round((float) $precioFijo, $decimales) : acrineoPrecioUnitario($costo, $sobrecostoPct, $decimales);
+}
+
+const ACRINEO_TIPOS_INSUMO = ['MAT' => 'Materiales', 'MO' => 'Mano de obra', 'EQ' => 'Equipo y maquinaria', 'HER' => 'Herramienta',
+                              'BAS' => 'Básicos', 'OTR' => 'Otros'];
+
+// Matriz de precio unitario de un concepto (por unidad del concepto).
+//   Renglón por unidad:  importe = cantidad × (1 + % desperdicio) × costo
+//   Renglón % de M.O.:   importe = cantidad % × Σ importes de mano de obra (los renglones por unidad)
+//   Renglón % de mat.:   importe = cantidad % × Σ importes de materiales  (los renglones por unidad)
+// Cada importe se redondea a los decimales de costos; el costo directo del concepto es su suma.
+// Regresa ['filas' => [... + importe, cantidad_efectiva], 'totales' => [tipo => importe], 'total' => costo directo]
+function acrineoCalcularMatriz(array $filas, int $decimales): array
+{
+    $base = ['MO' => 0.0, 'MAT' => 0.0];
+    foreach ($filas as $i => $f) {
+        if (!empty($f['base'])) continue;
+        $cant = (float) $f['cantidad'] * (1 + (float) ($f['desperdicio_pct'] ?? 0) / 100);
+        $filas[$i]['cantidad_efectiva'] = round($cant, 6);
+        $filas[$i]['importe'] = round($cant * (float) $f['costo'], $decimales);
+        if (isset($base[$f['tipo']])) $base[$f['tipo']] += $filas[$i]['importe'];
+    }
+    $totales = array_fill_keys(array_keys(ACRINEO_TIPOS_INSUMO), 0.0);
+    foreach ($filas as $i => $f) {
+        if (!empty($f['base'])) {
+            $sobre = $f['base'] === 'pct_mo' ? $base['MO'] : $base['MAT'];
+            $filas[$i]['cantidad_efectiva'] = round((float) $f['cantidad'], 6);
+            $filas[$i]['costo'] = round($sobre, $decimales);   // la base sobre la que se aplica el %
+            $filas[$i]['importe'] = round((float) $f['cantidad'] / 100 * $sobre, $decimales);
+        }
+        $totales[$f['tipo']] += $filas[$i]['importe'];
+    }
+    $totales = array_map(fn($v) => round($v, $decimales), $totales);
+    return ['filas' => $filas, 'totales' => $totales, 'total' => round(array_sum($totales), $decimales)];
+}
+
 // $padres: [partida_id => padre_id|null] · $propios: [partida_id => ['costo' => x, 'venta' => y]] (solo sus renglones)
 // Regresa [partida_id => ['costo' => …, 'venta' => …]] con lo de sus subpartidas incluido.
 function acrineoTotalesPartidas(array $padres, array $propios, int $decimales): array

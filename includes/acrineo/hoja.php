@@ -11,6 +11,13 @@ const ACRINEO_CAMPO_UNIDAD   = ['tipo' => 'texto', 'max' => 20];
 const ACRINEO_CAMPO_CANTIDAD = ['tipo' => 'decimal', 'min' => 0, 'max' => 999999999999, 'decimales' => 6, 'requerido' => true];
 const ACRINEO_CAMPO_COSTO    = ['tipo' => 'decimal', 'min' => 0, 'max' => 999999999999, 'decimales' => 6, 'requerido' => true];
 const ACRINEO_CAMPO_SOBRECOSTO = ['tipo' => 'decimal', 'min' => -99.9999, 'max' => 1000, 'decimales' => 4, 'requerido' => true];
+const ACRINEO_CAMPO_PCT      = ['tipo' => 'decimal', 'min' => 0, 'max' => 99.9999, 'decimales' => 4, 'requerido' => true];
+
+// Cambio de un concepto desde la cuadrícula. Si su costo sale de la matriz, el costo capturado no se toma.
+// Parámetros: descripcion, unidad, costo, precio_alzado, precio_fijo (+ lo que se agregue después del set)
+const ACRINEO_SQL_CONCEPTO_CAMBIO = "update acrineo_conceptos set descripcion = ?, unidad = ?,
+        costo = case when costo_origen = 'matriz' then costo else ? end,
+        precio_alzado = cast(? as boolean), precio_fijo = ?, updated_at = now()";
 
 function acrineoHojaDisponible(): bool
 {
@@ -57,7 +64,8 @@ function acrineoPartidas(array $ctx): array
 // Renglones con sus importes. $where sobre acrineo_partidas p
 function acrineoRenglonesDe(array $ctx, string $where, array $params): array
 {
-    $filas = bd_filas('AW', "select r.renglon_id, r.partida_id, r.concepto_id, r.cantidad, r.orden, c.codigo, c.descripcion, c.unidad, c.costo
+    $filas = bd_filas('AW', "select r.renglon_id, r.partida_id, r.concepto_id, r.cantidad, r.orden, c.codigo, c.descripcion, c.unidad, c.costo,
+                                    c.costo_origen, c.precio_alzado, c.precio_fijo
                                from acrineo_partida_conceptos r
                                join acrineo_partidas p on p.partida_id = r.partida_id
                                join acrineo_conceptos c on c.concepto_id = r.concepto_id
@@ -65,12 +73,22 @@ function acrineoRenglonesDe(array $ctx, string $where, array $params): array
     foreach ($filas as &$r) {
         foreach (['renglon_id', 'partida_id', 'concepto_id', 'orden'] as $k) $r[$k] = (int) $r[$k];
         $r['cantidad'] = (float) $r['cantidad'];
-        $r['costo'] = round((float) $r['costo'], $ctx['dec_costos']);
-        $r['precio'] = acrineoPrecioUnitario($r['costo'], $ctx['sobrecosto_pct'], $ctx['dec_costos']);
+        acrineoTiparConcepto($r, $ctx);
         $r['importe_costo'] = acrineoImporte($r['cantidad'], $r['costo'], $ctx['dec_costos']);
         $r['importe'] = acrineoImporte($r['cantidad'], $r['precio'], $ctx['dec_costos']);
     }
     return $filas;
+}
+
+// Costo, P.A. y precio unitario de un concepto tal como los muestra la hoja
+function acrineoTiparConcepto(array &$c, array $ctx): void
+{
+    $c['costo'] = round((float) $c['costo'], $ctx['dec_costos']);
+    $c['precio_alzado'] = in_array($c['precio_alzado'], [true, 't', 1, '1'], true);
+    $c['precio_fijo'] = $c['precio_fijo'] === null ? null : round((float) $c['precio_fijo'], $ctx['dec_costos']);
+    $c['matriz'] = $c['costo_origen'] === 'matriz';
+    unset($c['costo_origen']);
+    $c['precio'] = acrineoPrecioConcepto($c['costo'], $ctx['sobrecosto_pct'], $ctx['dec_costos'], $c['precio_alzado'], $c['precio_fijo']);
 }
 
 function acrineoRenglones(array $ctx, int $partidaId): array
@@ -90,7 +108,7 @@ function acrineoConceptosCatalogo(array $ctx, string $q, int $pagina = 1, int $p
     }
     $porPagina = max(10, min(500, $porPagina));
     $total = (int) bd_valor('AW', "select count(*) from acrineo_conceptos c where $where", $params);
-    $filas = bd_filas('AW', "select c.concepto_id as id, c.codigo, c.descripcion, c.unidad, c.costo,
+    $filas = bd_filas('AW', "select c.concepto_id as id, c.codigo, c.descripcion, c.unidad, c.costo, c.costo_origen, c.precio_alzado, c.precio_fijo,
                                     count(r.renglon_id) as usos, coalesce(sum(r.cantidad), 0) as cantidad_total
                                from acrineo_conceptos c left join acrineo_partida_conceptos r on r.concepto_id = c.concepto_id
                               where $where group by c.concepto_id order by c.codigo limit ? offset ?",
@@ -99,8 +117,7 @@ function acrineoConceptosCatalogo(array $ctx, string $q, int $pagina = 1, int $p
         $f['id'] = (int) $f['id'];
         $f['usos'] = (int) $f['usos'];
         $f['cantidad_total'] = (float) $f['cantidad_total'];
-        $f['costo'] = round((float) $f['costo'], $ctx['dec_costos']);
-        $f['precio'] = acrineoPrecioUnitario($f['costo'], $ctx['sobrecosto_pct'], $ctx['dec_costos']);
+        acrineoTiparConcepto($f, $ctx);
     }
     return ['items' => $filas, 'total' => $total];
 }
@@ -256,6 +273,14 @@ function acrineoRenglonesGuardar(array $ctx, int $partidaId, array $filas, array
             $l[$k] = $v;
         }
         if ($l['cantidad'] !== null) $l['cantidad'] = round($l['cantidad'], $ctx['dec_cantidades']);
+        // P.A. (precio alzado): el precio unitario se captura fijo
+        $l['precio_alzado'] = in_array($f['precio_alzado'] ?? false, [true, 1, '1', 'true'], true);
+        $l['precio_fijo'] = null;
+        if ($l['precio_alzado']) {
+            [$pf, $e] = acrineoValor($f['precio_fijo'] ?? null, ACRINEO_CAMPO_COSTO);
+            if ($e) $errores["filas.$n.precio_fijo"] = $e;
+            $l['precio_fijo'] = $pf;
+        }
         if ($l['codigo'] !== null) {
             $k = mb_strtoupper($l['codigo']);
             if (isset($codigos[$k])) $errores["filas.$n.codigo"] = 'El código está repetido en la partida.';
@@ -286,8 +311,8 @@ function acrineoRenglonesGuardar(array $ctx, int $partidaId, array $filas, array
                 if (!isset($actuales[$l['renglon_id']])) { $errores["filas.$n.codigo"] = 'El renglón ya no existe; vuelve a cargar la partida.'; continue; }
                 $cid = $actuales[$l['renglon_id']];
                 if ($existente && (int) $existente['concepto_id'] !== $cid) { $errores["filas.$n.codigo"] = 'Ese código ya es de otro concepto del presupuesto.'; continue; }
-                bd_ejecutar('AW', 'update acrineo_conceptos set codigo = ?, descripcion = ?, unidad = ?, costo = ?, updated_at = now() where concepto_id = ?',
-                    [$l['codigo'], $l['descripcion'], $l['unidad'], $l['costo'], $cid]);
+                bd_ejecutar('AW', ACRINEO_SQL_CONCEPTO_CAMBIO . ', codigo = ? where concepto_id = ?',
+                    [$l['descripcion'], $l['unidad'], $l['costo'], $l['precio_alzado'] ? 'true' : 'false', $l['precio_fijo'], $l['codigo'], $cid]);
                 bd_ejecutar('AW', 'update acrineo_partida_conceptos set cantidad = ? where renglon_id = ?', [$l['cantidad'], $l['renglon_id']]);
                 $resumen['modificados']++;
                 continue;
@@ -295,11 +320,12 @@ function acrineoRenglonesGuardar(array $ctx, int $partidaId, array $filas, array
             if ($existente) {
                 $cid = (int) $existente['concepto_id'];
                 if (in_array($cid, $actuales, true)) { $errores["filas.$n.codigo"] = 'Ese concepto ya está en esta partida.'; continue; }
-                bd_ejecutar('AW', 'update acrineo_conceptos set descripcion = ?, unidad = ?, costo = ?, updated_at = now() where concepto_id = ?',
-                    [$l['descripcion'], $l['unidad'], $l['costo'], $cid]);
+                bd_ejecutar('AW', ACRINEO_SQL_CONCEPTO_CAMBIO . ' where concepto_id = ?',
+                    [$l['descripcion'], $l['unidad'], $l['costo'], $l['precio_alzado'] ? 'true' : 'false', $l['precio_fijo'], $cid]);
             } else {
                 $cid = bd_insertar('AW', 'acrineo_conceptos', 'concepto_id', ['presupuesto_id' => $ctx['id'], 'codigo' => $l['codigo'],
-                    'descripcion' => $l['descripcion'], 'unidad' => $l['unidad'], 'costo' => $l['costo']]);
+                    'descripcion' => $l['descripcion'], 'unidad' => $l['unidad'], 'costo' => $l['costo'],
+                    'precio_alzado' => $l['precio_alzado'] ? 'true' : 'false', 'precio_fijo' => $l['precio_fijo']]);
             }
             $rid = bd_insertar('AW', 'acrineo_partida_conceptos', 'renglon_id', ['partida_id' => $partidaId, 'concepto_id' => $cid,
                 'cantidad' => $l['cantidad'], 'orden' => $orden++]);
@@ -390,4 +416,161 @@ function acrineoTransaccion(callable $fn)
         if ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
+}
+
+// ---------- Matriz de precio unitario ----------
+
+function acrineoConceptoFila(array $ctx, int $conceptoId): array
+{
+    $c = bd_fila('AW', 'select concepto_id, codigo, descripcion, unidad, costo, costo_origen, precio_alzado, precio_fijo
+                          from acrineo_conceptos where concepto_id = ? and presupuesto_id = ?', [$conceptoId, $ctx['id']]);
+    if (!$c) throw new AcrineoError('El concepto ya no existe.', 404);
+    $c['concepto_id'] = (int) $c['concepto_id'];
+    acrineoTiparConcepto($c, $ctx);
+    return $c;
+}
+
+// Matriz del concepto ya calculada. Con $actualizar, el costo de los insumos del catálogo se toma del catálogo
+// (precio vigente; la mano de obra con su FSR; los básicos con sus componentes) sin guardar: la ventana lo muestra
+// y el usuario decide si lo guarda.
+function acrineoMatriz(array $ctx, int $conceptoId, bool $actualizar = false): array
+{
+    $concepto = acrineoConceptoFila($ctx, $conceptoId);
+    $filas = bd_filas('AW', 'select matriz_id, insumo_id, tipo, codigo, descripcion, unidad, base, cantidad, desperdicio_pct, costo
+                               from acrineo_matriz where concepto_id = ? order by orden, matriz_id', [$conceptoId]);
+    foreach ($filas as &$f) {
+        $f['matriz_id'] = (int) $f['matriz_id'];
+        $f['insumo_id'] = $f['insumo_id'] === null ? null : (int) $f['insumo_id'];
+        $f['tipo'] = trim($f['tipo']);
+        foreach (['cantidad', 'desperdicio_pct', 'costo'] as $k) $f[$k] = (float) $f[$k];
+        $f['base'] = $f['base'] ?: null;
+    }
+    unset($f);
+    $avisos = [];
+    if ($actualizar) {
+        $costos = acrineoCostosCatalogo(array_filter(array_column($filas, 'insumo_id')));
+        foreach ($filas as &$f) {
+            if (!$f['insumo_id'] || $f['base']) continue;
+            $c = $costos[$f['insumo_id']] ?? null;
+            if ($c === null || $c['costo'] === null) {
+                $avisos[] = ($f['codigo'] ?: $f['descripcion']) . ': ' . ($c ? 'sin precio (' . implode(', ', $c['faltan']) . ')' : 'ya no está en el catálogo');
+                continue;
+            }
+            $f['costo'] = $c['costo'];
+        }
+        unset($f);
+    }
+    $calc = acrineoCalcularMatriz($filas, $ctx['dec_costos']);
+    return ['concepto' => $concepto, 'filas' => $calc['filas'], 'totales' => $calc['totales'], 'total' => $calc['total'],
+            'avisos' => $avisos, 'tipos' => ACRINEO_TIPOS_INSUMO];
+}
+
+// Costo de catálogo de varios insumos con el motor del sistema (includes/pu.php): [insumo_id => ['costo', 'faltan']]
+function acrineoCostosCatalogo(array $ids): array
+{
+    if (!$ids) return [];
+    require_once ACRI_RAIZ . '/includes/pu.php';
+    if (!puDisponible()) return [];
+    [$insumos, $componentes] = puCargarCatalogo();
+    $tc = puTiposCambio();
+    $memo = [];
+    $r = [];
+    foreach (array_unique($ids) as $id) {
+        if (!isset($insumos[$id])) continue;
+        try {
+            $r[$id] = puCostoInsumo((int) $id, $insumos, $componentes, $tc, $memo);
+        } catch (Throwable $e) {
+            $r[$id] = ['costo' => null, 'faltan' => [$e->getMessage()]];
+        }
+    }
+    return $r;
+}
+
+// Búsqueda en el catálogo de insumos del sistema para la matriz (con el formato de la ventana de búsqueda)
+function acrineoInsumosBuscar(string $q, int $pagina = 1, int $porPagina = 50): array
+{
+    require_once ACRI_RAIZ . '/includes/pu.php';
+    if (!puDisponible()) throw new AcrineoError('El catálogo de insumos no está instalado (migración 004).', 503);
+    $where = "i.estatus = 'A'";
+    $params = [];
+    if (trim($q) !== '') {
+        $where .= ' and (i.clave ilike ? or i.descripcion ilike ? or i.familia ilike ?)';
+        array_push($params, acrineoPatron($q), acrineoPatron($q), acrineoPatron($q));
+    }
+    $porPagina = max(1, min(100, $porPagina));
+    $total = (int) bd_valor('AW', "select count(*) from insumos i where $where", $params);
+    $filas = bd_filas('AW', "select i.insumo_id, i.clave, i.descripcion, i.tipo, u.clave as unidad from insumos i
+                               join unidades u on u.unidad_id = i.unidad_id where $where order by i.descripcion, i.clave limit ? offset ?",
+        array_merge($params, [$porPagina, (max(1, $pagina) - 1) * $porPagina]));
+    $costos = acrineoCostosCatalogo(array_map(fn($f) => (int) $f['insumo_id'], $filas));
+    $items = [];
+    foreach ($filas as $f) {
+        $id = (int) $f['insumo_id'];
+        $tipo = trim($f['tipo']);
+        $costo = $costos[$id]['costo'] ?? null;
+        $items[] = ['id' => $id, 'nombre' => $f['clave'] . ' · ' . $f['descripcion'],
+                    'extra' => (ACRINEO_TIPOS_INSUMO[$tipo] ?? $tipo) . ' · ' . $f['unidad'] . ' · ' . ($costo === null ? 'sin precio' : '$ ' . number_format($costo, 2)),
+                    'datos' => ['insumo_id' => $id, 'tipo' => $tipo, 'codigo' => $f['clave'], 'descripcion' => $f['descripcion'],
+                                'unidad' => $f['unidad'], 'costo' => $costo]];
+    }
+    return ['titulo' => 'Catálogo de insumos', 'extra_titulo' => 'Tipo · unidad · costo', 'items' => $items, 'total' => $total, 'alta' => false];
+}
+
+// Guarda la matriz completa del concepto (reemplaza sus renglones) y pone su costo directo = total de la matriz.
+// Sin renglones, el concepto vuelve a costo capturado (conserva el último).
+function acrineoMatrizGuardar(array $ctx, int $conceptoId, array $filas, string $usuario): array
+{
+    $antes = acrineoConceptoFila($ctx, $conceptoId);
+    if (count($filas) > 300) throw new AcrineoError('Una matriz puede tener hasta 300 insumos.', 422);
+    $errores = [];
+    $limpias = [];
+    foreach (array_values($filas) as $n => $f) {
+        if (!is_array($f)) { $errores["filas.$n.descripcion"] = 'Renglón no válido.'; continue; }
+        $tipo = strtoupper(trim((string) ($f['tipo'] ?? '')));
+        if (!isset(ACRINEO_TIPOS_INSUMO[$tipo])) $errores["filas.$n.tipo"] = 'Tipo no válido.';
+        $base = in_array($f['base'] ?? null, ['pct_mo', 'pct_mat'], true) ? $f['base'] : null;
+        $l = ['tipo' => $tipo, 'base' => $base, 'insumo_id' => (int) ($f['insumo_id'] ?? 0) ?: null];
+        $reglas = [
+            'codigo'          => ['tipo' => 'texto', 'max' => 30],
+            'descripcion'     => ['tipo' => 'texto', 'max' => 250, 'requerido' => true],
+            'unidad'          => ACRINEO_CAMPO_UNIDAD,
+            'cantidad'        => $base ? ACRINEO_CAMPO_PCT : ACRINEO_CAMPO_CANTIDAD,
+            'desperdicio_pct' => ['tipo' => 'decimal', 'min' => 0, 'max' => 99.9999, 'decimales' => 4],
+            'costo'           => ACRINEO_CAMPO_COSTO,
+        ];
+        foreach ($reglas as $k => $def) {
+            if ($base && ($k === 'costo' || $k === 'desperdicio_pct')) { $l[$k] = 0.0; continue; }
+            [$v, $e] = acrineoValor($f[$k] ?? null, $def);
+            if ($e) $errores["filas.$n.$k"] = $e;
+            $l[$k] = $v;
+        }
+        $l['desperdicio_pct'] = (float) ($l['desperdicio_pct'] ?? 0);
+        $limpias[] = $l;
+    }
+    if ($errores) throw new AcrineoError('Revisa los insumos marcados.', 422, $errores);
+    // Un insumo del catálogo que ya no existe queda como renglón libre
+    $ids = array_values(array_unique(array_filter(array_column($limpias, 'insumo_id'))));
+    if ($ids) {
+        $existen = array_map('intval', array_column(bd_filas('AW', 'select insumo_id from insumos where insumo_id in ('
+            . implode(',', array_fill(0, count($ids), '?')) . ')', $ids), 'insumo_id'));
+        foreach ($limpias as &$l) if ($l['insumo_id'] && !in_array($l['insumo_id'], $existen, true)) $l['insumo_id'] = null;
+        unset($l);
+    }
+    $calc = acrineoCalcularMatriz($limpias, $ctx['dec_costos']);
+
+    acrineoTransaccion(function () use ($ctx, $conceptoId, $limpias, $calc, $antes, $usuario) {
+        bd_ejecutar('AW', 'delete from acrineo_matriz where concepto_id = ?', [$conceptoId]);
+        foreach ($limpias as $n => $l) {
+            bd_insertar('AW', 'acrineo_matriz', 'matriz_id', ['concepto_id' => $conceptoId, 'orden' => $n] + $l);
+        }
+        if ($limpias) {
+            bd_ejecutar('AW', "update acrineo_conceptos set costo = ?, costo_origen = 'matriz', updated_at = now() where concepto_id = ?", [$calc['total'], $conceptoId]);
+        } else {
+            bd_ejecutar('AW', "update acrineo_conceptos set costo_origen = 'directo', updated_at = now() where concepto_id = ?", [$conceptoId]);
+        }
+        acrineoRegistrar($ctx['id'], $usuario, 'HOJA', [["Matriz del concepto {$antes['codigo']} (" . count($limpias) . ' insumos) · costo directo',
+            acrineoTextoValor($antes['costo']), acrineoTextoValor($limpias ? $calc['total'] : $antes['costo'])]]);
+        acrineoActualizarTotales($ctx['id']);
+    });
+    return acrineoMatriz(acrineoHojaContexto($ctx['id']), $conceptoId);
 }

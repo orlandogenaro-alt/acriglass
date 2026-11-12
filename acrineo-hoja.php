@@ -115,6 +115,8 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
                     <b class="an-partida-actual" id="anPartidaActual">Selecciona una partida</b>
                     <span class="an-flex"></span>
                     <?php if ($puede['presupuestos.editar']): ?>
+                    <button type="button" class="an-btn an-icono" id="anDeshacer" title="Deshacer (Ctrl+Z)" aria-label="Deshacer" hidden disabled>↶</button>
+                    <button type="button" class="an-btn an-icono" id="anRehacer" title="Rehacer (Ctrl+Y)" aria-label="Rehacer" hidden disabled>↷</button>
                     <button type="button" class="an-btn an-icono" id="anEditarRenglones" title="Editar los conceptos" aria-label="Editar los conceptos" aria-pressed="false" disabled><?= anIcono('editar') ?></button>
                     <button type="button" class="an-btn an-mini" id="anAgregarRenglon" hidden>+ Agregar registro</button>
                     <button type="button" class="an-btn an-mini an-peligro" id="anQuitarRenglones" hidden>Quitar marcados</button>
@@ -126,6 +128,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
                     <table class="an-tabla an-renglones">
                         <thead><tr>
                             <th class="an-col-sel" scope="col"><div class="an-th"><input type="checkbox" id="anRenglonesTodos" aria-label="Marcar todos"></div></th>
+                            <th scope="col" class="an-col-pa" title="Precio alzado: el precio unitario se captura fijo"><div class="an-th"><span>P.A.</span></div></th>
                             <th scope="col"><div class="an-th"><span>Código</span></div></th>
                             <th scope="col"><div class="an-th"><span>Descripción completa</span></div></th>
                             <th scope="col"><div class="an-th"><span>Unidad</span></div></th>
@@ -133,6 +136,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
                             <th scope="col" class="num"><div class="an-th"><span>Costo</span></div></th>
                             <th scope="col" class="num"><div class="an-th"><span>Precio</span></div></th>
                             <th scope="col" class="num"><div class="an-th"><span>Importe</span></div></th>
+                            <th scope="col" title="Matriz de precio unitario"><div class="an-th"><span>P.U.</span></div></th>
                         </tr></thead>
                         <tbody id="anRenglones"></tbody>
                     </table>
@@ -164,7 +168,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
                             <th scope="col" class="num"><div class="an-th"><span>Costo</span></div></th>
                             <th scope="col" class="num"><div class="an-th"><span>Precio</span></div></th>
                             <th scope="col" class="num"><div class="an-th"><span>En partidas</span></div></th>
-                            <th scope="col"><div class="an-th"></div></th>
+                            <th scope="col"><div class="an-th"><span>P.U.</span></div></th>
                         </tr></thead>
                         <tbody id="anConceptos"></tbody>
                     </table>
@@ -179,6 +183,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
 <?php if ($aviso === ''): ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/detalle.php'; ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/dialogos.php'; ?>
+<?php require __DIR__ . '/includes/acrineo/vistas/matriz.php'; ?>
 <script>
     window.ACRINEO = <?= json_encode($cfgCliente, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_PRESERVE_ZERO_FRACTION) ?>;
 </script>
@@ -191,6 +196,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
 <script src="<?= recurso('js/acrineo/hoja.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-renglones.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-conceptos.js') ?>"></script>
+<script src="<?= recurso('js/acrineo/hoja-matriz.js') ?>"></script>
 <?php endif; ?>
 </body>
 </html>

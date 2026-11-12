@@ -196,3 +196,30 @@ prueba('hoja: orden de árbol con niveles', function () {
     igual([0, 1, 2, 1, 0], array_column($o, 'nivel'));
     igual([2, 1, 0, 0, 0], array_column($o, 'hijos'));
 });
+
+prueba('matriz P.U.: material con desperdicio, mano de obra, % de M.O. y % de materiales', function () {
+    $m = acrineoCalcularMatriz([
+        ['tipo' => 'MAT', 'cantidad' => 1.05, 'desperdicio_pct' => 0, 'costo' => 1250, 'base' => null],     // vidrio 1.05 m2 × 1250 = 1312.50
+        ['tipo' => 'MAT', 'cantidad' => 0.4, 'desperdicio_pct' => 10, 'costo' => 120, 'base' => null],      // silicón 0.44 × 120 = 52.80
+        ['tipo' => 'MO',  'cantidad' => 0.125, 'desperdicio_pct' => 0, 'costo' => 1600, 'base' => null],    // cuadrilla 1/8 jor = 200.00
+        ['tipo' => 'HER', 'cantidad' => 3, 'desperdicio_pct' => 0, 'costo' => 0, 'base' => 'pct_mo'],        // 3 % de 200 = 6.00
+        ['tipo' => 'EQ',  'cantidad' => 2, 'desperdicio_pct' => 0, 'costo' => 0, 'base' => 'pct_mat'],       // 2 % de 1365.30 = 27.31
+    ], 2);
+    igual(1312.50, $m['filas'][0]['importe']);
+    igual(52.80, $m['filas'][1]['importe']);
+    igual(0.44, $m['filas'][1]['cantidad_efectiva'], 6);
+    igual(200.00, $m['filas'][2]['importe']);
+    igual(6.00, $m['filas'][3]['importe']);
+    igual(200.00, $m['filas'][3]['costo']);   // la base del %
+    igual(27.31, $m['filas'][4]['importe']);
+    igual(1365.30, $m['totales']['MAT']);
+    igual(200.00, $m['totales']['MO']);
+    igual(1598.61, $m['total']);
+    igual(0.0, acrineoCalcularMatriz([], 2)['total']);
+});
+
+prueba('precio del concepto: costo × sobrecosto, o el precio fijo si es P.A.', function () {
+    igual(1150.0, acrineoPrecioConcepto(1000, 15, 2, false, 999));
+    igual(999.0, acrineoPrecioConcepto(1000, 15, 2, true, 999));
+    igual(0.0, acrineoPrecioConcepto(1000, 15, 2, true, null));
+});

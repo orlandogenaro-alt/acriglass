@@ -1,5 +1,6 @@
 <?php
 require __DIR__ . '/includes/sesion.php';
+require __DIR__ . '/includes/acrineo/permisos.php';
 
 $cfg      = sistemaConfig();
 $empresa  = $cfg['empresa'];
@@ -22,6 +23,13 @@ $menu = [
             ['Salidas de Personal a Obra',   '👷', 'modulo', ['SALIDA_PERSONAL_ID', 'FOLIO', 'FECHA', 'OBRA', 'EMPLEADO', 'ESTATUS']],
             ['Salidas de Materiales',        '📦', 'modulo', ['SALIDA_MATERIAL_ID', 'FOLIO', 'FECHA', 'OBRA', 'ESTATUS']],
             ['Consumibles de Material en Obra', '🧰', 'modulo', ['CONSUMO_MATERIAL_ID', 'FOLIO', 'FECHA', 'OBRA', 'ESTATUS']],
+        ],
+    ],
+    [
+        // ACRINEO: sistema propio de presupuestos y control de costos; sus opciones se agregan por etapas
+        'id' => 'acrineo', 'titulo' => 'ACRINEO', 'icono' => '🧮',
+        'items' => [
+            ['Catálogo de presupuestos', '📐', 'pagina', 'acrineo-presupuestos.php'],
         ],
     ],
     [
@@ -92,6 +100,10 @@ $menu = [
 // Servicios con los mismos permisos del módulo de obras
 if (!tienePermiso('MODULO_SUGERIDOS_OBRA', 'NUEVO_OBRA', 'MODIFICAR_OBRA', 'CERRAR_OBRA', 'ADMIN_USER')) {
     $menu = array_values(array_filter($menu, fn($g) => $g['id'] !== 'servicios'));
+}
+// ACRINEO: ACRINEO_VER + ACRINEO_PRESUPUESTOS_VER (o ADMIN_USER)
+if (!acrineoPuede('presupuestos.ver')) {
+    $menu = array_values(array_filter($menu, fn($g) => $g['id'] !== 'acrineo'));
 }
 // Administrador solo con el permiso ADMIN_USER de AW
 if (!tienePermiso('ADMIN_USER')) {

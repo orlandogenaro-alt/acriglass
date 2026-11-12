@@ -30,6 +30,16 @@ const ACRI_PERMISOS = [
     'PRECIOS_INSUMOS'         => 'Capturar precios de insumos',
     'AUTORIZAR_CONVENIOS'     => 'Autorizar convenios, aditivas y órdenes de cambio de obra',
     'AUTORIZAR_ESTIMACIONES'  => 'Autorizar anticipos y estimaciones de obra',
+    // ACRINEO (includes/acrineo/permisos.php): ACRINEO_VER más el de la acción
+    'ACRINEO_VER'                     => 'ACRINEO: entrar al módulo de presupuestos y control de costos',
+    'ACRINEO_PRESUPUESTOS_VER'        => 'ACRINEO: consultar el catálogo de presupuestos',
+    'ACRINEO_PRESUPUESTOS_CREAR'      => 'ACRINEO: crear presupuestos',
+    'ACRINEO_PRESUPUESTOS_EDITAR'     => 'ACRINEO: modificar presupuestos',
+    'ACRINEO_PRESUPUESTOS_ELIMINAR'   => 'ACRINEO: eliminar presupuestos',
+    'ACRINEO_PRESUPUESTOS_DOCUMENTOS' => 'ACRINEO: subir y quitar documentos del presupuesto (libros C.H., FASAR, indirectos)',
+    'ACRINEO_PRESUPUESTOS_COMPARTIR'  => 'ACRINEO: compartir el enlace de un presupuesto',
+    'ACRINEO_PRESUPUESTOS_RESPALDAR'  => 'ACRINEO: descargar respaldos de presupuestos',
+    'ACRINEO_CONFIGURACION'           => 'ACRINEO: configuración del módulo',
 ];
 
 // Solo los permisos conocidos, en mayúsculas y sin repetir

@@ -553,6 +553,7 @@ $secciones = [
                         <div class="extra-barra">
                             <strong>Catálogo de conceptos</strong>
                             <button type="button" class="ct-btn" id="puAgregar">+ Agregar concepto</button>
+                            <button type="button" class="ct-btn" id="puImportarAnalisis" title="Pone los importes de Materia Prima, Mano de Obra y Gastos de Operacion desde la hoja de Excel del Análisis de presupuesto">Importar Análisis de Excel</button>
                             <?php if ($plantillasPU): ?>
                             <select id="puPlantilla" class="ct-btn" title="Agrega todos los conceptos de una plantilla con los precios vigentes del catálogo">
                                 <option value="">+ Desde plantilla…</option>

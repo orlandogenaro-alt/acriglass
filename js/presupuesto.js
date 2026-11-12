@@ -2209,6 +2209,7 @@
         html += '<tr class="ccr-letra"><td colspan="6">' + escapar(r.letra) + '</td></tr>';
         $('ccrCuerpo').innerHTML = html;
         $('anImportar').disabled = soloLectura;
+        $('puImportarAnalisis').disabled = soloLectura;
     }
     // Un clic en un renglón lleva a la pestaña donde se captura
     $('ccrCuerpo').addEventListener('click', function (e) {
@@ -2807,6 +2808,8 @@
         $('cciPegar').focus();
     });
     // Importar de PDF: el mismo diálogo, abriendo de una vez la selección del archivo
+    // Análisis P.U.: el mismo «Importar de Excel» de la pestaña Análisis (hoja ANÁLISIS DE PRESUPUESTO)
+    $('puImportarAnalisis').addEventListener('click', function () { $('anImportar').click(); });
     $('ccImportarPdf').addEventListener('click', function () {
         if (soloLectura) { avisoSoloLectura(); return; }
         $('ccImportar').click();

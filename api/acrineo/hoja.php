@@ -11,6 +11,7 @@
 //        concepto_eliminar {concepto_id} · sobrecosto {sobrecosto_pct} · matriz_guardar {concepto_id, filas}
 //   GET  ?id=P&recurso=matriz&concepto=C[&actualizar=1]   matriz de P.U. del concepto (con costos del catálogo)
 //   GET  ?id=P&recurso=insumos&q=                         catálogo de insumos del sistema, para la matriz
+//   GET  ?id=P&recurso=insumos_tabla&q=&pagina=           catálogo de insumos de la pestaña Matriz (familia, proveedor…)
 define('ACRI_API', true);
 require __DIR__ . '/../../includes/sesion.php';
 require __DIR__ . '/../../includes/respuesta.php';
@@ -40,6 +41,8 @@ try {
                 responder(['ok' => true] + acrineoMatriz($ctx, (int) ($_GET['concepto'] ?? 0), ($_GET['actualizar'] ?? '') === '1'));
             case 'insumos':
                 responder(['ok' => true] + acrineoInsumosBuscar((string) ($_GET['q'] ?? ''), (int) ($_GET['pagina'] ?? 1)));
+            case 'insumos_tabla':
+                responder(['ok' => true] + acrineoInsumosTabla((string) ($_GET['q'] ?? ''), (int) ($_GET['pagina'] ?? 1), (int) ($_GET['por_pagina'] ?? 100)));
             case 'codigo':
                 $padre = (int) ($_GET['padre'] ?? 0);
                 responder(['ok' => true, 'codigo' => acrineoCodigoSugerido($ctx, $padre ?: null)]);

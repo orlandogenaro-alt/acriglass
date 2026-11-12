@@ -526,6 +526,42 @@ function acrineoInsumosBuscar(string $q, int $pagina = 1, int $porPagina = 50): 
     return ['titulo' => 'Catálogo de insumos', 'extra_titulo' => 'Tipo · unidad · costo', 'items' => $items, 'total' => $total, 'alta' => false];
 }
 
+// Catálogo de insumos de la pestaña Matriz (abajo): código, descripción, unidad, tipo, costo vigente (con el motor
+// del sistema), familia y el proveedor, fecha y moneda de su último precio vigente.
+function acrineoInsumosTabla(string $q, int $pagina = 1, int $porPagina = 100): array
+{
+    require_once ACRI_RAIZ . '/includes/pu.php';
+    if (!puDisponible()) throw new AcrineoError('El catálogo de insumos no está instalado (migración 004).', 503);
+    $where = "i.estatus = 'A'";
+    $params = [];
+    if (trim($q) !== '') {
+        $where .= ' and (i.clave ilike ? or i.descripcion ilike ? or i.familia ilike ? or u.clave ilike ?)';
+        array_push($params, acrineoPatron($q), acrineoPatron($q), acrineoPatron($q), acrineoPatron($q));
+    }
+    $porPagina = max(1, min(200, $porPagina));
+    $pagina = max(1, $pagina);
+    $total = (int) bd_valor('AW', "select count(*) from insumos i join unidades u on u.unidad_id = i.unidad_id where $where", $params);
+    $filas = bd_filas('AW', "select i.insumo_id, i.clave, i.descripcion, i.tipo, i.familia, i.clave_microsip, u.clave as unidad,
+                                    p.proveedor, p.vigente_desde, p.moneda
+                               from insumos i
+                               join unidades u on u.unidad_id = i.unidad_id
+                               left join lateral (select proveedor, vigente_desde, moneda from insumo_precios
+                                                   where insumo_id = i.insumo_id and vigente_desde <= current_date
+                                                   order by vigente_desde desc, precio_id desc limit 1) p on true
+                              where $where order by i.clave, i.descripcion limit ? offset ?",
+        array_merge($params, [$porPagina, ($pagina - 1) * $porPagina]));
+    $costos = acrineoCostosCatalogo(array_map(fn($f) => (int) $f['insumo_id'], $filas));
+    $items = [];
+    foreach ($filas as $f) {
+        $id = (int) $f['insumo_id'];
+        $items[] = ['insumo_id' => $id, 'codigo' => $f['clave'], 'descripcion' => $f['descripcion'], 'tipo' => trim($f['tipo']),
+                    'unidad' => $f['unidad'], 'costo' => $costos[$id]['costo'] ?? null, 'familia' => $f['familia'],
+                    'proveedor' => $f['proveedor'], 'fecha' => $f['vigente_desde'], 'moneda' => $f['moneda'],
+                    'clave_microsip' => $f['clave_microsip']];
+    }
+    return ['items' => $items, 'total' => $total, 'pagina' => $pagina, 'por_pagina' => $porPagina];
+}
+
 // Guarda la matriz completa del concepto (reemplaza sus renglones) y pone su costo directo = total de la matriz.
 // Sin renglones, el concepto vuelve a costo capturado (conserva el último).
 function acrineoMatrizGuardar(array $ctx, int $conceptoId, array $filas, string $usuario): array

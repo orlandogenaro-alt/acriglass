@@ -479,10 +479,6 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-btn-pu.vacia { background: var(--sub); color: var(--azul-texto); border: 1px solid var(--azul-borde); }
 .an-renglones select.an-celda-in { height: 28px; padding: 0 4px; border: 1px solid var(--borde-2); border-radius: 4px; background: var(--input); }
 .an-renglones input.an-celda-in[readonly] { background: var(--sub); color: var(--texto-2); }
-.an-matriz-totales { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 8px 16px; border-top: 1px solid var(--borde); background: var(--sub); font-size: 12.5px; color: var(--texto-2); }
-.an-matriz-totales b { color: var(--enfasis); font-variant-numeric: tabular-nums; }
-.an-matriz-totales .an-cd { margin-left: auto; font-size: 14px; }
-.an-matriz-totales .an-cd b { color: var(--azul-texto); }
 
 /* Pestañas de la hoja: Presupuesto | Matriz × (la matriz se abre con doble clic en un concepto o su botón P.U.) */
 .an-hoja-pestanas { display: flex; align-items: flex-end; gap: 2px; padding: 4px 12px 0; background: var(--tarjeta); border-bottom: 1px solid var(--borde); }
@@ -498,10 +494,51 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-tab-cerrar { padding: 6px 8px 8px 2px; font-size: 16px; line-height: 1; color: var(--texto-3); }
 .an-tab-cerrar:hover { color: var(--rojo); }
 .an-hoja[hidden], .an-matriz-panel[hidden], .an-tab-matriz[hidden] { display: none; }
-.an-matriz-panel { margin: 8px; }
+/* Pestaña Matriz: encabezado del concepto, insumos de la matriz arriba y catálogo de insumos abajo */
+.an-matriz-panel {
+    flex: 1; min-height: 0; display: grid; gap: 8px; padding: 8px;
+    grid-template-rows: auto auto minmax(0, 1.3fr) minmax(0, 1fr);
+}
+.an-matriz-panel > .an-ventana { margin: 0; min-height: 0; }
+.an-matriz-cab {
+    display: flex; align-items: center; gap: 10px; padding: 7px 14px; border-radius: 8px 8px 0 0;
+    background: var(--azul); color: #fff; margin-bottom: -8px;
+}
+.an-matriz-cab h2 { font-size: 17px; font-weight: 800; letter-spacing: .2px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .an-matriz-panel.con-cambios .an-sucio { display: inline-flex; }
-.an-matriz-panel .an-titulo-barra h2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.an-matriz-desc { margin: 0; padding: 8px 14px; border-bottom: 1px solid var(--borde); font-size: 13px; color: var(--texto); white-space: pre-wrap; max-height: 6.5em; overflow: auto; }
+.an-btn-cab {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 26px; padding: 0 12px;
+    border: 1.5px solid rgba(255, 255, 255, .85); border-radius: 13px; color: #fff; text-decoration: none;
+    font-size: 12px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
+}
+.an-btn-cab.an-icono { width: 36px; padding: 0; }
+.an-btn-cab:hover:not(:disabled):not(.vacia) { background: rgba(255, 255, 255, .18); }
+.an-btn-cab.vacia { opacity: .45; cursor: default; }
+.an-btn-cab[aria-pressed=true] { background: #fff; color: var(--azul); }
+#anMatrizUrl:empty { display: none; }
+.an-matriz-texto { padding: 8px 14px; background: var(--tarjeta); border: 1px solid var(--borde); border-top: none; border-radius: 0 0 8px 8px; box-shadow: var(--sombra); }
+.an-matriz-texto[hidden] { display: none; }
+.an-matriz-texto p { margin: 0 0 4px; font-size: 13.5px; color: var(--texto); white-space: pre-wrap; max-height: 5.5em; overflow: auto; }
+.an-matriz-panel .an-matriz-insumos { border-top: 3px solid var(--rojo-borde); }
+.an-matriz-panel .an-matriz-catalogo { border-top: 3px solid var(--rojo-borde); }
+.an-sep-barra { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--borde-2); }
+.an-matriz .an-col-n { width: 70px; color: var(--texto-2); }
+.an-matriz tr.an-libre td.an-col-n .an-insignia { background: var(--ambar-suave); color: var(--ambar); border-color: var(--ambar-borde); }
+.an-matriz select.an-celda-in { min-width: 120px; }
+.an-matriz-pie { gap: 14px; flex-wrap: wrap; }
+.an-matriz-pie .an-estado { flex: 1 1 200px; }
+.an-matriz-totales { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; font-size: 12.5px; color: var(--texto-2); }
+.an-matriz-totales b { color: var(--enfasis); font-variant-numeric: tabular-nums; }
+.an-matriz-totales .an-cd { font-size: 14px; }
+.an-matriz-totales .an-cd b { color: var(--azul-texto); }
+.an-tipo { display: inline-block; padding: 1px 8px; border-radius: 9px; font-size: 11px; font-weight: 800; white-space: nowrap; background: var(--sub); color: var(--texto-2); border: 1px solid var(--borde); }
+.an-tipo-MAT { background: var(--azul-suave); color: var(--azul-texto); border-color: var(--azul-borde); }
+.an-tipo-MO { background: var(--verde-suave); color: var(--verde); border-color: var(--verde-borde); }
+.an-tipo-EQ, .an-tipo-HER { background: var(--ambar-suave); color: var(--ambar); border-color: var(--ambar-borde); }
+.an-insumos-tabla td.an-cat-codigo { font-weight: 700; color: var(--azul-texto); }
+.an-insumos-tabla tr.marcado td { background: var(--fila-sel) !important; }
+.an-insumos-tabla .an-desc { white-space: normal; min-width: 240px; max-width: 480px; }
+#anInsumosCopiar svg { width: 13px; height: 13px; }
 
 @media (max-width: 1000px) {
     .an-hoja { grid-template-columns: 1fr; grid-auto-rows: minmax(260px, auto); overflow: auto; }

@@ -291,10 +291,11 @@
                 quitar: Array.from(st.quitar)
             });
             st.guardando = false;
+            // Guardado: la cuadrícula queda en solo lectura; para volver a modificar se usa el lápiz
             salirEdicion();
             st.filas = r.renglones || [];
             H.aplicar(r);
-            entrarEdicion();
+            pintar();
             estado('Guardado correctamente', 'ok');
             AN.ui.aviso('Conceptos de la partida ' + p.codigo + ' guardados.', 'ok');
         } catch (e) {

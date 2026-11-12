@@ -25,7 +25,7 @@
     var LUPA = '<svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
 
     var st = { concepto: null, filas: [], guardadas: '[]', original: '', sec: 0, marcados: new Set(), guardando: false, abierta: false,
-               editando: false, deshacer: [], rehacer: [], fotoPendiente: null };
+               editando: false, deshacer: [], rehacer: [], fotoPendiente: null, padre: null, ruta: [] };
     var cat = { items: [], total: 0, pagina: 1, marcados: new Map(), cargado: false, ctrl: null };
 
     function nueva(datos) {
@@ -33,7 +33,7 @@
         Object.keys(datos || {}).forEach(function (k) { if (datos[k] !== null && datos[k] !== undefined) f[k] = typeof datos[k] === 'number' ? String(datos[k]) : datos[k]; });
         return f;
     }
-    function limpia(f) { var o = { insumo_id: f.insumo_id }; CAMPOS.forEach(function (k) { o[k] = String(f[k] == null ? '' : f[k]).trim(); }); return o; }
+    function limpia(f) { var o = { insumo_id: f.insumo_id, matriz_id: f.matriz_id || null }; CAMPOS.forEach(function (k) { o[k] = String(f[k] == null ? '' : f[k]).trim(); }); return o; }
     function huella() { return JSON.stringify(st.filas.map(limpia)); }
     function sucio() { return H.puede && st.abierta && huella() !== st.original; }
     function editable() { return H.puede && st.editando; }
@@ -131,7 +131,9 @@
                     + '<button type="button" class="an-btn-buscar" data-tipo-insumo title="Catálogo Tipos de insumos" aria-label="Buscar en el catálogo de tipos de insumos">' + LUPA + '</button></span></td>'
                     + '<td><span class="an-celda-unidad">' + inp('unidad', 'text', ' maxlength="20"')
                     + '<button type="button" class="an-btn-buscar" data-unidad title="Catálogo Unidades" aria-label="Buscar en el catálogo de unidades">' + LUPA + '</button></span></td>'
-                    + '<td>' + (f.base ? '<span class="an-ayuda" title="Base sobre la que se aplica el %">' + AN.ui.dinero(f._base) + '</span>' : inp('costo', 'number', ' min="0" step="any"')) + '</td>'
+                    + '<td>' + (f.base ? '<span class="an-ayuda" title="Base sobre la que se aplica el %">' + AN.ui.dinero(f._base) + '</span>'
+                        : f.hijos ? '<span class="an-ayuda" title="Sale de su matriz (doble clic en el renglón)">' + AN.ui.dinero(f.costo) + '</span>'
+                        : inp('costo', 'number', ' min="0" step="any"')) + '</td>'
                     + '<td>' + sel('base', BASES) + '</td>'
                     + '<td>' + inp('cantidad', 'number', ' min="0" step="any"' + (f.base ? ' title="Porcentaje"' : '')) + '</td>'
                     + '<td>' + inp('desperdicio_pct', 'number', ' min="0" max="99.9999" step="any"' + (f.base ? ' readonly tabindex="-1"' : '')) + '</td>';
@@ -143,7 +145,8 @@
             }
             html += '<tr class="an-fila' + (f.insumo_id ? '' : ' an-libre') + '" data-clave="' + f.clave + '">'
                 + '<td class="an-col-sel">' + (ed ? '<input type="checkbox" data-marcar="' + f.clave + '"' + (st.marcados.has(f.clave) ? ' checked' : '') + ' aria-label="Marcar">' : '') + '</td>'
-                + '<td class="num an-col-n">' + (n + 1) + (f.insumo_id ? '' : '<span class="an-insignia" title="Renglón libre (no está en el catálogo)">L</span>') + '</td>'
+                + '<td class="num an-col-n">' + (n + 1) + (f.insumo_id ? '' : '<span class="an-insignia" title="Renglón libre (no está en el catálogo)">L</span>')
+                + (f.hijos ? '<span class="an-insignia an-insignia-m" title="Tiene su propia matriz (doble clic para abrirla)">M</span>' : '') + '</td>'
                 + celdas + '<td class="num" data-importe>' + AN.ui.dinero(f._importe) + '</td></tr>';
         });
         if (html && ed) {
@@ -204,7 +207,7 @@
         if (r.tipos) TIPOS = r.tipos;
         st.concepto = r.concepto;
         st.filas = r.filas.map(function (f) {
-            return nueva({ insumo_id: f.insumo_id, tipo: f.tipo, codigo: f.codigo || '', descripcion: f.descripcion, unidad: f.unidad || '', base: f.base || '',
+            return nueva({ matriz_id: f.matriz_id, hijos: f.hijos || null, insumo_id: f.insumo_id, tipo: f.tipo, codigo: f.codigo || '', descripcion: f.descripcion, unidad: f.unidad || '', base: f.base || '',
                            cantidad: f.cantidad, desperdicio_pct: f.desperdicio_pct, costo: f.base ? 0 : f.costo });
         });
         st.marcados.clear();
@@ -215,10 +218,17 @@
         st.original = huella();
         st.guardadas = JSON.stringify(st.filas);
         var c = r.concepto;
-        $('anMatrizTitulo').textContent = 'Código: ' + c.codigo + ' | Unidad: ' + (c.unidad || '—');
-        $('anMatrizDesc').textContent = c.descripcion;
-        $('anMatrizConcepto').textContent = 'Insumos por unidad del concepto' + (c.unidad ? ' (' + c.unidad + ')' : '')
-            + (c.matriz ? ' · su costo directo sale de esta matriz' : ' · hoy su costo es capturado: ' + AN.ui.dinero(c.costo));
+        st.padre = r.padre_id || null;
+        st.ruta = r.ruta || [];
+        st.submatriz = !!r.submatriz;
+        var ult = st.ruta[st.ruta.length - 1];
+        $('anMatrizTitulo').textContent = 'Código: ' + [c.codigo].concat(st.ruta.map(function (x) { return x.codigo || x.descripcion; })).join(' -> ')
+            + ' | Unidad: ' + ((ult ? ult.unidad : c.unidad) || '—');
+        $('anMatrizDesc').textContent = ult ? ult.descripcion : c.descripcion;
+        $('anMatrizConcepto').textContent = ult
+            ? 'Insumos por unidad de ' + (ult.codigo || ult.descripcion) + (ult.unidad ? ' (' + ult.unidad + ')' : '') + ' · su costo en la matriz de arriba sale de esta'
+            : 'Insumos por unidad del concepto' + (c.unidad ? ' (' + c.unidad + ')' : '')
+              + (c.matriz ? ' · su costo directo sale de esta matriz' : ' · hoy su costo es capturado: ' + AN.ui.dinero(c.costo));
         $('anMatrizUrl').innerHTML = /^https?:\/\/\S+$/i.test(String(c.url || '').trim())
             ? '<a class="an-btn-cab an-icono" href="' + esc(c.url) + '" target="_blank" rel="noopener noreferrer" title="' + esc(c.url) + '" aria-label="Abrir el enlace del concepto">' + ICONO_URL + '</a>'
             : '<span class="an-btn-cab an-icono vacia" title="El concepto no tiene enlace">' + ICONO_URL + '</span>';
@@ -228,10 +238,31 @@
         navBotones();
     }
     // Anterior / Siguiente: deshabilitados en los extremos de la partida
+    // En la matriz de un insumo solo se puede REGRESAR (a la de arriba)
     function navBotones() {
         var ids = H.conceptosPartida ? H.conceptosPartida() : [], i = st.concepto ? ids.indexOf(st.concepto.concepto_id) : -1;
-        $('anMatrizAnterior').disabled = i <= 0;
-        $('anMatrizSiguiente').disabled = i < 0 || i >= ids.length - 1;
+        $('anMatrizAnterior').disabled = !!st.padre || i <= 0;
+        $('anMatrizSiguiente').disabled = !!st.padre || i < 0 || i >= ids.length - 1;
+        $('anMatrizRegresar').classList.toggle('an-riel-primario', !!st.padre);
+        $('anMatrizRegresar').title = st.padre ? 'Regresar a la matriz de arriba' : 'Regresar al presupuesto';
+    }
+
+    // Abre la matriz de un renglón (padreId) o la del concepto (null), del concepto que ya está abierto
+    async function abrirNivel(padreId) {
+        if (!st.concepto || st.guardando) return;
+        if (sucio() && !(await AN.ui.confirmar({ titulo: 'Cambios sin guardar', mensaje: 'Existen cambios sin guardar en esta matriz.\n¿Deseas salir de ella sin guardarlos?', aceptar: 'Salir sin guardar', peligro: true }))) return;
+        estado('Cargando…', 'info');
+        var p = { recurso: 'matriz', concepto: st.concepto.concepto_id };
+        if (padreId) p.padre = padreId;
+        try {
+            $('anMatrizQ').value = '';
+            cargar(await AN.api.get(H.url(p)));
+            estado('');
+        } catch (e) { estado(e.message, 'error'); }
+    }
+    function regresar() {
+        if (!st.padre) { verPestana(false); return; }
+        abrirNivel(st.ruta.length > 1 ? st.ruta[st.ruta.length - 2].matriz_id : null);
     }
 
     function entrarEdicion() {
@@ -305,12 +336,13 @@
         estado('Guardando…', 'info');
         botones();
         try {
-            var r = await AN.api.post(H.url(), { accion: 'matriz_guardar', concepto_id: st.concepto.concepto_id, partida_id: H.sel || 0, filas: st.filas.map(limpia) });
+            var r = await AN.api.post(H.url(), { accion: 'matriz_guardar', concepto_id: st.concepto.concepto_id, padre_id: st.padre, partida_id: H.sel || 0, filas: st.filas.map(limpia) });
             st.guardando = false;
             cargar(r.matriz);
             H.aplicar(r);
             estado('Guardado correctamente', 'ok');
-            AN.ui.aviso('Matriz de ' + r.matriz.concepto.codigo + ' guardada: costo directo ' + AN.ui.dinero(r.matriz.total) + '.', 'ok');
+            var ruta = [r.matriz.concepto.codigo].concat((r.matriz.ruta || []).map(function (x) { return x.codigo || x.descripcion; })).join(' -> ');
+            AN.ui.aviso('Matriz de ' + ruta + ' guardada: ' + (r.matriz.padre_id ? 'total ' : 'costo directo ') + AN.ui.dinero(r.matriz.total) + '.', 'ok');
         } catch (e) {
             st.guardando = false;
             if (!st.editando) { st.editando = true; }
@@ -522,6 +554,7 @@
         $('anMatrizRehacer').addEventListener('click', rehacer);
         function agregarLibre() {
             agregarFilas([{}]);
+            AN.ui.aviso('Fila agregada', 'ok');
             var i = [].slice.call(tbody.querySelectorAll('tr[data-clave] [data-k="descripcion"]')).pop();
             if (i) i.focus();
         }
@@ -531,8 +564,10 @@
             else if (e.target.closest('[data-aplicar]')) guardar();
             else if (e.target.closest('[data-cancelar]')) cancelarEdicion();
         });
-        $('anMatrizQuitar').addEventListener('click', function () {
+        $('anMatrizQuitar').addEventListener('click', async function () {
             if (!st.marcados.size) return;
+            var conMatriz = st.filas.filter(function (f) { return st.marcados.has(f.clave) && f.hijos; }).length;
+            if (conMatriz && !(await AN.ui.confirmar({ titulo: 'Quitar insumos', mensaje: conMatriz + ' de los insumos marcados tiene(n) su propia matriz; al GUARDAR se borrará también.\n¿Deseas continuar?', aceptar: 'Quitar', peligro: true }))) return;
             guardarFoto();
             st.filas = st.filas.filter(function (f) { return !st.marcados.has(f.clave); });
             st.marcados.clear();
@@ -540,11 +575,13 @@
             pintar();
         });
         $('anMatrizActualizar').addEventListener('click', async function () {
-            var conCatalogo = st.filas.filter(function (f) { return f.insumo_id && !f.base; });
+            var conCatalogo = st.filas.filter(function (f) { return f.insumo_id && !f.base && !f.hijos; });
             if (!conCatalogo.length) { estado('Ningún insumo de la matriz viene del catálogo.', 'info'); return; }
             try {
                 // El servidor da el costo de catálogo de los insumos de la matriz guardada (los recién copiados ya lo traen)
-                var m = await AN.api.get(H.url({ recurso: 'matriz', concepto: st.concepto.concepto_id, actualizar: 1 }));
+                var pm = { recurso: 'matriz', concepto: st.concepto.concepto_id, actualizar: 1 };
+                if (st.padre) pm.padre = st.padre;
+                var m = await AN.api.get(H.url(pm));
                 var costos = {};
                 m.filas.forEach(function (f) { if (f.insumo_id && !f.base) costos[f.insumo_id] = f.costo; });
                 var cambian = conCatalogo.filter(function (f) { return costos[f.insumo_id] !== undefined && Number(costos[f.insumo_id]) !== Number(f.costo); });
@@ -658,7 +695,21 @@
     }
     $('anMatrizAnterior').addEventListener('click', function () { vecino(-1); });
     $('anMatrizSiguiente').addEventListener('click', function () { vecino(1); });
-    $('anMatrizRegresar').addEventListener('click', function () { verPestana(false); });
+    $('anMatrizRegresar').addEventListener('click', regresar);
+    // Doble clic en un renglón: abre su propia matriz («Código: 50450 -> B12»)
+    tbody.addEventListener('dblclick', function (e) {
+        if (e.target.closest('input, select, textarea, button, a')) return;
+        var tr = e.target.closest('tr[data-clave]');
+        if (!tr) return;
+        var f = st.filas.find(function (x) { return x.clave === tr.dataset.clave; });
+        if (!f) return;
+        var sel = window.getSelection && window.getSelection();
+        if (sel && sel.removeAllRanges) sel.removeAllRanges();
+        if (!st.submatriz) { estado('Falta aplicar la migración 029 para abrir la matriz de un insumo.', 'error'); return; }
+        if (f.base) { estado('Un renglón de porcentaje no tiene matriz propia.', 'info'); return; }
+        if (!f.matriz_id) { estado('Guarda primero la matriz para abrir la de este insumo.', 'error'); return; }
+        abrirNivel(f.matriz_id);
+    });
     $('anTabPresupuesto').addEventListener('click', function () { verPestana(false); });
     $('anTabMatriz').addEventListener('click', function () { verPestana(true); });
 

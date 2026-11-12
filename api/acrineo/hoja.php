@@ -8,8 +8,8 @@
 //        partida_crear {padre_id, codigo, descripcion} · partida_guardar {partida_id, codigo, descripcion}
 //        partida_eliminar {partida_id} · partida_mover {partida_id, direccion: arriba|abajo|izquierda|derecha}
 //        renglones_guardar {partida_id, filas, quitar} · copiar {partida_id, conceptos: [{concepto_id, cantidad}]}
-//        concepto_eliminar {concepto_id} · sobrecosto {sobrecosto_pct} · matriz_guardar {concepto_id, filas}
-//   GET  ?id=P&recurso=matriz&concepto=C[&actualizar=1]   matriz de P.U. del concepto (con costos del catálogo)
+//        concepto_eliminar {concepto_id} · sobrecosto {sobrecosto_pct} · matriz_guardar {concepto_id, padre_id?, filas}
+//   GET  ?id=P&recurso=matriz&concepto=C[&padre=M][&actualizar=1]  matriz de P.U. del concepto o la del renglón M de ella
 //   GET  ?id=P&recurso=insumos&q=                         catálogo de insumos del sistema, para la matriz
 //   GET  ?id=P&recurso=insumos_tabla&q=&pagina=           catálogo de insumos de la pestaña Matriz (familia, proveedor…)
 define('ACRI_API', true);
@@ -38,7 +38,7 @@ try {
             case 'conceptos':
                 responder(['ok' => true] + acrineoConceptosCatalogo($ctx, (string) ($_GET['q'] ?? ''), (int) ($_GET['pagina'] ?? 1), (int) ($_GET['por_pagina'] ?? 100)));
             case 'matriz':
-                responder(['ok' => true] + acrineoMatriz($ctx, (int) ($_GET['concepto'] ?? 0), ($_GET['actualizar'] ?? '') === '1'));
+                responder(['ok' => true] + acrineoMatriz($ctx, (int) ($_GET['concepto'] ?? 0), ($_GET['actualizar'] ?? '') === '1', (int) ($_GET['padre'] ?? 0) ?: null));
             case 'insumos':
                 responder(['ok' => true] + acrineoInsumosBuscar((string) ($_GET['q'] ?? ''), (int) ($_GET['pagina'] ?? 1)));
             case 'insumos_tabla':
@@ -83,7 +83,8 @@ try {
             acrineoConceptoEliminar($ctx, (int) ($in['concepto_id'] ?? 0), $usuario);
             break;
         case 'matriz_guardar':
-            $extra['matriz'] = acrineoMatrizGuardar($ctx, (int) ($in['concepto_id'] ?? 0), is_array($in['filas'] ?? null) ? $in['filas'] : [], $usuario);
+            $extra['matriz'] = acrineoMatrizGuardar($ctx, (int) ($in['concepto_id'] ?? 0), is_array($in['filas'] ?? null) ? $in['filas'] : [], $usuario,
+                (int) ($in['padre_id'] ?? 0) ?: null);
             break;
         case 'sobrecosto':
             acrineoSobrecostoGuardar($ctx, $in['sobrecosto_pct'] ?? null, $usuario);

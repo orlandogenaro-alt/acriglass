@@ -455,15 +455,53 @@ function acrineoConceptoFila(array $ctx, int $conceptoId): array
     return $c;
 }
 
-// Matriz del concepto ya calculada. Con $actualizar, el costo de los insumos del catálogo se toma del catálogo
-// (precio vigente; la mano de obra con su FSR; los básicos con sus componentes) sin guardar: la ventana lo muestra
-// y el usuario decide si lo guarda.
-function acrineoMatriz(array $ctx, int $conceptoId, bool $actualizar = false): array
+// ¿Ya está la migración 029 (matriz de un insumo de la matriz)?
+function acrineoSubmatrizDisponible(): bool
+{
+    static $si = null;
+    if ($si === null) $si = bd_tiene_columna('AW', 'acrineo_matriz', 'padre_id');
+    return $si;
+}
+
+// Renglones de un nivel de la matriz: el del concepto ($padreId null) o la submatriz del renglón $padreId.
+// Cada uno trae «hijos»: cuántos renglones tiene su propia submatriz (su costo sale de ella).
+function acrineoMatrizNivel(int $conceptoId, ?int $padreId): array
+{
+    if (!acrineoSubmatrizDisponible()) {
+        return bd_filas('AW', 'select matriz_id, insumo_id, tipo, codigo, descripcion, unidad, base, cantidad, desperdicio_pct, costo, 0 as hijos
+                                 from acrineo_matriz where concepto_id = ? order by orden, matriz_id', [$conceptoId]);
+    }
+    return bd_filas('AW', 'select m.matriz_id, m.insumo_id, m.tipo, m.codigo, m.descripcion, m.unidad, m.base, m.cantidad, m.desperdicio_pct, m.costo,
+                                  (select count(*) from acrineo_matriz h where h.padre_id = m.matriz_id) as hijos
+                             from acrineo_matriz m where m.concepto_id = ? and m.padre_id is not distinct from cast(? as bigint)
+                            order by m.orden, m.matriz_id', [$conceptoId, $padreId]);
+}
+
+// Renglones desde el concepto hasta $padreId (para «Código: 50450 -> B12»): [{matriz_id, codigo, descripcion, unidad}]
+function acrineoMatrizRuta(int $conceptoId, ?int $padreId): array
+{
+    $ruta = [];
+    while ($padreId) {
+        $r = bd_fila('AW', 'select matriz_id, padre_id, codigo, descripcion, unidad from acrineo_matriz where matriz_id = ? and concepto_id = ?', [$padreId, $conceptoId]);
+        if (!$r) throw new AcrineoError('El insumo de la matriz ya no existe.', 404);
+        array_unshift($ruta, ['matriz_id' => (int) $r['matriz_id'], 'codigo' => $r['codigo'], 'descripcion' => $r['descripcion'], 'unidad' => $r['unidad']]);
+        $padreId = $r['padre_id'] === null ? null : (int) $r['padre_id'];
+        if (count($ruta) > 20) throw new AcrineoError('La matriz tiene demasiados niveles.', 422);
+    }
+    return $ruta;
+}
+
+// Matriz del concepto ya calculada (o la submatriz del renglón $padreId). Con $actualizar, el costo de los insumos
+// del catálogo se toma del catálogo (precio vigente; la mano de obra con su FSR; los básicos con sus componentes)
+// sin guardar: la ventana lo muestra y el usuario decide si lo guarda. Los renglones con submatriz no se actualizan.
+function acrineoMatriz(array $ctx, int $conceptoId, bool $actualizar = false, ?int $padreId = null): array
 {
     $concepto = acrineoConceptoFila($ctx, $conceptoId);
-    $filas = bd_filas('AW', 'select matriz_id, insumo_id, tipo, codigo, descripcion, unidad, base, cantidad, desperdicio_pct, costo
-                               from acrineo_matriz where concepto_id = ? order by orden, matriz_id', [$conceptoId]);
+    if ($padreId && !acrineoSubmatrizDisponible()) throw new AcrineoError('Falta la migración 029 para abrir la matriz de un insumo.', 503);
+    $ruta = acrineoMatrizRuta($conceptoId, $padreId);
+    $filas = acrineoMatrizNivel($conceptoId, $padreId);
     foreach ($filas as &$f) {
+        $f['hijos'] = (int) $f['hijos'];
         $f['matriz_id'] = (int) $f['matriz_id'];
         $f['insumo_id'] = $f['insumo_id'] === null ? null : (int) $f['insumo_id'];
         $f['tipo'] = trim($f['tipo']);
@@ -475,7 +513,7 @@ function acrineoMatriz(array $ctx, int $conceptoId, bool $actualizar = false): a
     if ($actualizar) {
         $costos = acrineoCostosCatalogo(array_filter(array_column($filas, 'insumo_id')));
         foreach ($filas as &$f) {
-            if (!$f['insumo_id'] || $f['base']) continue;
+            if (!$f['insumo_id'] || $f['base'] || $f['hijos']) continue;
             $c = $costos[$f['insumo_id']] ?? null;
             if ($c === null || $c['costo'] === null) {
                 $avisos[] = ($f['codigo'] ?: $f['descripcion']) . ': ' . ($c ? 'sin precio (' . implode(', ', $c['faltan']) . ')' : 'ya no está en el catálogo');
@@ -487,7 +525,8 @@ function acrineoMatriz(array $ctx, int $conceptoId, bool $actualizar = false): a
     }
     $calc = acrineoCalcularMatriz($filas, $ctx['dec_costos']);
     return ['concepto' => $concepto, 'filas' => $calc['filas'], 'totales' => $calc['totales'], 'total' => $calc['total'],
-            'avisos' => $avisos, 'tipos' => acrineoTiposInsumo()];
+            'avisos' => $avisos, 'tipos' => acrineoTiposInsumo(), 'padre_id' => $padreId, 'ruta' => $ruta,
+            'submatriz' => acrineoSubmatrizDisponible()];
 }
 
 // Costo de catálogo de varios insumos con el motor del sistema (includes/pu.php): [insumo_id => ['costo', 'faltan']]
@@ -577,11 +616,17 @@ function acrineoInsumosTabla(string $q, int $pagina = 1, int $porPagina = 100): 
     return ['items' => $items, 'total' => $total, 'pagina' => $pagina, 'por_pagina' => $porPagina];
 }
 
-// Guarda la matriz completa del concepto (reemplaza sus renglones) y pone su costo directo = total de la matriz.
-// Sin renglones, el concepto vuelve a costo capturado (conserva el último).
-function acrineoMatrizGuardar(array $ctx, int $conceptoId, array $filas, string $usuario): array
+// Guarda un nivel completo de la matriz: la del concepto ($padreId null) o la submatriz del renglón $padreId.
+// Los renglones que traen su matriz_id se actualizan (y conservan su submatriz); los que faltan se borran (con la
+// suya) y los nuevos se agregan. El costo de un renglón con submatriz es el total de ella, y el total sube nivel por
+// nivel hasta el costo directo del concepto. Sin renglones en la del concepto, vuelve a costo capturado.
+function acrineoMatrizGuardar(array $ctx, int $conceptoId, array $filas, string $usuario, ?int $padreId = null): array
 {
     $antes = acrineoConceptoFila($ctx, $conceptoId);
+    if ($padreId && !acrineoSubmatrizDisponible()) throw new AcrineoError('Falta la migración 029 para guardar la matriz de un insumo.', 503);
+    $ruta = acrineoMatrizRuta($conceptoId, $padreId);
+    $actuales = [];
+    foreach (acrineoMatrizNivel($conceptoId, $padreId) as $r) $actuales[(int) $r['matriz_id']] = ['costo' => (float) $r['costo'], 'hijos' => (int) $r['hijos']];
     if (count($filas) > 300) throw new AcrineoError('Una matriz puede tener hasta 300 insumos.', 422);
     $errores = [];
     $limpias = [];
@@ -591,6 +636,8 @@ function acrineoMatrizGuardar(array $ctx, int $conceptoId, array $filas, string 
         if (!isset(acrineoTiposInsumo()[$tipo])) $errores["filas.$n.tipo"] = 'Tipo no válido.';
         $base = in_array($f['base'] ?? null, ['pct_mo', 'pct_mat'], true) ? $f['base'] : null;
         $l = ['tipo' => $tipo, 'base' => $base, 'insumo_id' => (int) ($f['insumo_id'] ?? 0) ?: null];
+        $mid = (int) ($f['matriz_id'] ?? 0);
+        $l['_id'] = isset($actuales[$mid]) ? $mid : null;   // un matriz_id de otro nivel o ya borrado se agrega como nuevo
         $reglas = [
             'codigo'          => ['tipo' => 'texto', 'max' => 30],
             'descripcion'     => ['tipo' => 'texto', 'max' => 250, 'requerido' => true],
@@ -606,6 +653,8 @@ function acrineoMatrizGuardar(array $ctx, int $conceptoId, array $filas, string 
             $l[$k] = $v;
         }
         $l['desperdicio_pct'] = (float) ($l['desperdicio_pct'] ?? 0);
+        // Con submatriz, el costo es el total de ella (no el que venga capturado)
+        if ($l['_id'] && $actuales[$l['_id']]['hijos'] && !$base) $l['costo'] = $actuales[$l['_id']]['costo'];
         $limpias[] = $l;
     }
     if ($errores) throw new AcrineoError('Revisa los insumos marcados.', 422, $errores);
@@ -619,19 +668,46 @@ function acrineoMatrizGuardar(array $ctx, int $conceptoId, array $filas, string 
     }
     $calc = acrineoCalcularMatriz($limpias, $ctx['dec_costos']);
 
-    acrineoTransaccion(function () use ($ctx, $conceptoId, $limpias, $calc, $antes, $usuario) {
-        bd_ejecutar('AW', 'delete from acrineo_matriz where concepto_id = ?', [$conceptoId]);
-        foreach ($limpias as $n => $l) {
-            bd_insertar('AW', 'acrineo_matriz', 'matriz_id', ['concepto_id' => $conceptoId, 'orden' => $n] + $l);
+    acrineoTransaccion(function () use ($ctx, $conceptoId, $padreId, $ruta, $limpias, $calc, $antes, $actuales, $usuario) {
+        $quedan = array_filter(array_column($limpias, '_id'));
+        foreach (array_keys($actuales) as $id) {
+            if (!in_array($id, $quedan, true)) bd_ejecutar('AW', 'delete from acrineo_matriz where matriz_id = ?', [$id]);
         }
-        if ($limpias) {
+        foreach ($limpias as $n => $l) {
+            $id = $l['_id'];
+            unset($l['_id']);
+            if ($id) {
+                bd_ejecutar('AW', 'update acrineo_matriz set insumo_id = ?, tipo = ?, codigo = ?, descripcion = ?, unidad = ?, base = ?, cantidad = ?,
+                                   desperdicio_pct = ?, costo = ?, orden = ? where matriz_id = ?',
+                    [$l['insumo_id'], $l['tipo'], $l['codigo'], $l['descripcion'], $l['unidad'], $l['base'], $l['cantidad'], $l['desperdicio_pct'], $l['costo'], $n, $id]);
+            } else {
+                bd_insertar('AW', 'acrineo_matriz', 'matriz_id', ['concepto_id' => $conceptoId, 'orden' => $n] + ($padreId ? ['padre_id' => $padreId] : []) + $l);
+            }
+        }
+        if ($padreId) {
+            // Submatriz con renglones: el renglón padre toma su total y el total sube nivel por nivel hasta el concepto.
+            // Si quedó vacía, el renglón padre conserva su costo (vuelve a capturarse a mano).
+            if ($limpias) {
+                $total = $calc['total'];
+                $nivel = $padreId;
+                while ($nivel) {
+                    bd_ejecutar('AW', 'update acrineo_matriz set costo = ? where matriz_id = ?', [$total, $nivel]);
+                    $arriba = bd_valor('AW', 'select padre_id from acrineo_matriz where matriz_id = ?', [$nivel]);
+                    $nivel = $arriba === null || $arriba === false ? null : (int) $arriba;
+                    $total = acrineoCalcularMatriz(acrineoMatrizNivel($conceptoId, $nivel), $ctx['dec_costos'])['total'];
+                }
+                bd_ejecutar('AW', "update acrineo_conceptos set costo = ?, costo_origen = 'matriz', updated_at = now() where concepto_id = ?", [$total, $conceptoId]);
+            }
+        } elseif ($limpias) {
             bd_ejecutar('AW', "update acrineo_conceptos set costo = ?, costo_origen = 'matriz', updated_at = now() where concepto_id = ?", [$calc['total'], $conceptoId]);
         } else {
             bd_ejecutar('AW', "update acrineo_conceptos set costo_origen = 'directo', updated_at = now() where concepto_id = ?", [$conceptoId]);
         }
-        acrineoRegistrar($ctx['id'], $usuario, 'HOJA', [["Matriz del concepto {$antes['codigo']} (" . count($limpias) . ' insumos) · costo directo',
-            acrineoTextoValor($antes['costo']), acrineoTextoValor($limpias ? $calc['total'] : $antes['costo'])]]);
+        $donde = $ruta ? ' -> ' . implode(' -> ', array_map(fn($r) => $r['codigo'] ?: $r['descripcion'], $ruta)) : '';
+        $nuevo = (float) bd_valor('AW', 'select costo from acrineo_conceptos where concepto_id = ?', [$conceptoId]);
+        acrineoRegistrar($ctx['id'], $usuario, 'HOJA', [["Matriz del concepto {$antes['codigo']}$donde (" . count($limpias) . ' insumos) · costo directo',
+            acrineoTextoValor($antes['costo']), acrineoTextoValor($nuevo)]]);
         acrineoActualizarTotales($ctx['id']);
     });
-    return acrineoMatriz(acrineoHojaContexto($ctx['id']), $conceptoId);
+    return acrineoMatriz(acrineoHojaContexto($ctx['id']), $conceptoId, false, $padreId);
 }

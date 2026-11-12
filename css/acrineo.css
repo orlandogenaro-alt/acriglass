@@ -636,3 +636,7 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-matriz-riel:not(.abierto) .an-riel-btn span { display: none; }
 .an-btn-menu[aria-expanded=true] { background: var(--azul); border-color: var(--azul); color: #fff; }
 @media (max-width: 700px) { .an-matriz-riel.abierto { width: 190px; } }
+
+/* Renglón de la matriz con su propia matriz (doble clic la abre) */
+.an-matriz tr td.an-col-n .an-insignia.an-insignia-m { background: var(--azul-suave); color: var(--azul-texto); border-color: var(--azul-borde); }
+.an-matriz tbody tr[data-clave] { cursor: default; }

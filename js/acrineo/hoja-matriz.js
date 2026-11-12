@@ -3,12 +3,14 @@
 // con su FSR) o renglones libres; «% de M.O.» / «% de materiales» para herramienta menor, seguridad, etc.
 // GUARDAR pone el costo directo del concepto = total de la matriz (en todas las partidas donde está).
 // El cálculo en pantalla es el mismo que acrineoCalcularMatriz() del servidor, que vuelve a calcular al guardar.
+// Se ve en la pestaña «Matriz» de la hoja (junto a «Presupuesto»): se abre con doble clic en un concepto de la partida
+// o con su botón P.U.; la × de la pestaña la cierra (pregunta si hay cambios sin guardar).
 (function (AN) {
     'use strict';
 
     var H = AN.hoja;
-    var dlg = document.getElementById('anMatriz');
-    if (!H || !dlg) return;
+    var panel = document.getElementById('anMatriz');
+    if (!H || !panel) return;
     var $ = function (id) { return document.getElementById(id); };
     var esc = AN.ui.esc;
     var tbody = $('anMatrizFilas');
@@ -16,7 +18,30 @@
     var BASES = { '': 'Por unidad', pct_mo: '% de M.O.', pct_mat: '% de materiales' };
     var CAMPOS = ['tipo', 'codigo', 'descripcion', 'unidad', 'base', 'cantidad', 'desperdicio_pct', 'costo'];
 
-    var st = { concepto: null, filas: [], original: '', sec: 0, marcados: new Set(), guardando: false };
+    var st = { concepto: null, filas: [], original: '', sec: 0, marcados: new Set(), guardando: false, abierta: false };
+
+    // ---------- Pestañas Presupuesto / Matriz ----------
+    function verPestana(matriz) {
+        $('anHoja').hidden = matriz;
+        panel.hidden = !matriz;
+        $('anTabPresupuesto').setAttribute('aria-selected', String(!matriz));
+        $('anTabMatriz').setAttribute('aria-selected', String(matriz));
+    }
+    function mostrarMatriz() {
+        st.abierta = true;
+        $('anTabMatrizCont').hidden = false;
+        verPestana(true);
+    }
+    function ocultarMatriz() {
+        st.abierta = false;
+        st.concepto = null;
+        st.filas = [];
+        st.original = huella();
+        panel.classList.remove('con-cambios');
+        $('anTabMatriz').classList.remove('con-cambios');
+        $('anTabMatrizCont').hidden = true;
+        verPestana(false);
+    }
 
     function nueva(datos) {
         var f = { clave: 'm' + (++st.sec), insumo_id: null, tipo: 'MAT', codigo: '', descripcion: '', unidad: '', base: '', cantidad: '1', desperdicio_pct: '0', costo: '0' };
@@ -90,7 +115,8 @@
             if (!tr) return;
             tr.querySelector('[data-importe]').textContent = AN.ui.dinero(f._importe);
         });
-        dlg.classList.toggle('con-cambios', sucio());
+        panel.classList.toggle('con-cambios', sucio());
+        $('anTabMatriz').classList.toggle('con-cambios', sucio());
         if ($('anMatrizGuardar')) $('anMatrizGuardar').disabled = st.guardando || !sucio();
         if ($('anMatrizQuitar')) $('anMatrizQuitar').disabled = !st.marcados.size;
     }
@@ -107,21 +133,34 @@
         calcular();
         st.original = huella();
         var c = r.concepto;
-        $('anMatrizTitulo').textContent = 'Matriz de precio unitario · ' + c.codigo + ' · ' + c.descripcion;
-        $('anMatrizConcepto').textContent = 'Por unidad del concepto' + (c.unidad ? ' (' + c.unidad + ')' : '') + (c.matriz ? '' : ' · hoy su costo es capturado: ' + AN.ui.dinero(c.costo));
+        $('anMatrizTitulo').textContent = 'Código: ' + c.codigo + ' | Unidad: ' + (c.unidad || '—');
+        $('anMatrizDesc').textContent = c.descripcion;
+        $('anTabMatriz').textContent = 'Matriz · ' + c.codigo;
+        $('anTabMatriz').title = c.codigo + ' · ' + c.descripcion;
+        $('anMatrizConcepto').textContent = 'Insumos por unidad del concepto' + (c.unidad ? ' (' + c.unidad + ')' : '') + (c.matriz ? '' : ' · hoy su costo es capturado: ' + AN.ui.dinero(c.costo));
         pintar();
     }
 
     async function abrir(conceptoId) {
         if (H.renglonesPendientes()) { AN.ui.aviso('Guarda o cancela primero los cambios de los conceptos de la partida.', 'error'); return; }
+        if (st.guardando) return;
+        // Ya está abierta la matriz de este concepto: solo se muestra la pestaña (sin perder lo capturado)
+        if (st.abierta && st.concepto && st.concepto.concepto_id === conceptoId) { mostrarMatriz(); return; }
+        if (st.abierta && sucio()) {
+            mostrarMatriz();
+            if (!(await AN.ui.confirmar({ titulo: 'Cambios sin guardar', mensaje: 'Existen cambios sin guardar en la matriz de ' + st.concepto.codigo + '.\n¿Deseas abrir otra sin guardarlos?', aceptar: 'Abrir sin guardar', peligro: true }))) return;
+        }
         estado('Cargando…', 'info');
         tbody.innerHTML = '<tr class="an-vacio"><td colspan="10">Cargando…</td></tr>';
-        if (!dlg.open) dlg.showModal();
+        $('anMatrizTitulo').textContent = 'Matriz de precio unitario';
+        $('anMatrizDesc').textContent = '';
+        $('anMatrizTotales').innerHTML = '';
+        mostrarMatriz();
         try {
             cargar(await AN.api.get(H.url({ recurso: 'matriz', concepto: conceptoId })));
             estado(H.puede ? '' : 'Solo consulta: no tienes permiso para modificar presupuestos.');
         } catch (e) {
-            dlg.close();
+            ocultarMatriz();
             AN.ui.aviso(e.message, 'error');
         }
     }
@@ -129,7 +168,7 @@
     async function cerrar() {
         if (st.guardando) return;
         if (sucio() && !(await AN.ui.confirmar({ titulo: 'Cambios sin guardar', mensaje: 'Existen cambios sin guardar en la matriz.\n¿Deseas cerrar?', aceptar: 'Cerrar sin guardar', peligro: true }))) return;
-        dlg.close();
+        ocultarMatriz();
     }
 
     async function guardar() {
@@ -255,7 +294,9 @@
     }
     $('anMatrizCerrar').addEventListener('click', cerrar);
     $('anMatrizCancelar').addEventListener('click', cerrar);
-    dlg.addEventListener('cancel', function (e) { e.preventDefault(); cerrar(); });
+    $('anTabPresupuesto').addEventListener('click', function () { verPestana(false); });
+    $('anTabMatriz').addEventListener('click', function () { verPestana(true); });
 
-    AN.hojaMatriz = { abrir: abrir, abierta: function () { return dlg.open && sucio(); } };
+    // abierta() = la matriz tiene cambios sin guardar (la hoja pregunta antes de cerrar la pestaña del navegador)
+    AN.hojaMatriz = { abrir: abrir, abierta: function () { return st.abierta && sucio(); } };
 })(window.AcriNeo = window.AcriNeo || {});

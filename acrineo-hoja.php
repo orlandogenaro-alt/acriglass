@@ -74,7 +74,16 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
         <span class="an-totales" id="anTotales" aria-live="polite"></span>
     </div>
 
-    <main class="an-hoja">
+    <!-- Pestañas de la hoja: Presupuesto y Matriz (doble clic en un concepto o su botón P.U.) -->
+    <div class="an-hoja-pestanas" role="tablist" aria-label="Vistas del presupuesto">
+        <button type="button" role="tab" id="anTabPresupuesto" aria-controls="anHoja" aria-selected="true">Presupuesto</button>
+        <span class="an-tab-matriz" id="anTabMatrizCont" hidden>
+            <button type="button" role="tab" id="anTabMatriz" aria-controls="anMatriz" aria-selected="false">Matriz</button>
+            <button type="button" class="an-tab-cerrar" id="anMatrizCerrar" title="Cerrar la matriz" aria-label="Cerrar la matriz">×</button>
+        </span>
+    </div>
+
+    <main class="an-hoja" id="anHoja" role="tabpanel" aria-labelledby="anTabPresupuesto">
         <!-- Partidas -->
         <section class="an-ventana an-panel-partidas" aria-label="Partidas">
             <div class="an-barra an-barra-chica">
@@ -180,6 +189,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
             </section>
         </div>
     </main>
+    <?php require __DIR__ . '/includes/acrineo/vistas/matriz.php'; ?>
     <?php endif; ?>
 </div>
 <div class="an-toasts" id="anToasts" aria-live="polite"></div>
@@ -187,7 +197,6 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
 <?php if ($aviso === ''): ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/detalle.php'; ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/dialogos.php'; ?>
-<?php require __DIR__ . '/includes/acrineo/vistas/matriz.php'; ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/unidades.php'; ?>
 <script>
     window.ACRINEO = <?= json_encode($cfgCliente, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_PRESERVE_ZERO_FRACTION) ?>;

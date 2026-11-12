@@ -388,6 +388,19 @@
         var pu = e.target.closest('[data-pu]');
         if (pu && AN.hojaMatriz) AN.hojaMatriz.abrir(+pu.dataset.pu);
     });
+    // Doble clic en cualquier parte del concepto: abre su matriz en la pestaña «Matriz».
+    // En edición no cuenta el doble clic dentro de un campo (sirve para seleccionar el texto).
+    tbody.addEventListener('dblclick', function (e) {
+        if (!AN.hojaMatriz || e.target.closest('input, select, textarea, button, a')) return;
+        var tr = e.target.closest('tr[data-renglon], tr[data-clave]');
+        if (!tr) return;
+        var id = tr.dataset.renglon ? +tr.dataset.renglon : (borrador(tr.dataset.clave) || {}).renglon_id;
+        var r = id && st.filas.find(function (x) { return x.renglon_id === id; });
+        if (!r) { AN.ui.aviso('Guarda primero el concepto para armar su matriz.', 'error'); return; }
+        var sel = window.getSelection && window.getSelection();
+        if (sel && sel.removeAllRanges) sel.removeAllRanges();   // el doble clic selecciona una palabra
+        AN.hojaMatriz.abrir(r.concepto_id);
+    });
     $('anRenglonesTodos').addEventListener('change', function () {
         var si = this.checked;
         st.marcados.clear();
@@ -397,7 +410,7 @@
     });
     // Ctrl+Z / Ctrl+Y mientras la cuadrícula está en edición (si no hay otra ventana abierta encima ni se escribe en otro lado)
     document.addEventListener('keydown', function (e) {
-        if (!st.editando || !(e.ctrlKey || e.metaKey) || document.querySelector('dialog[open]')) return;
+        if (!st.editando || !(e.ctrlKey || e.metaKey) || document.querySelector('dialog[open]') || $('anHoja').hidden) return;
         var a = document.activeElement;
         if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && !tbody.contains(a)) return;
         var k = e.key.toLowerCase();

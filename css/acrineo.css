@@ -484,6 +484,25 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-matriz-totales .an-cd { margin-left: auto; font-size: 14px; }
 .an-matriz-totales .an-cd b { color: var(--azul-texto); }
 
+/* Pestañas de la hoja: Presupuesto | Matriz × (la matriz se abre con doble clic en un concepto o su botón P.U.) */
+.an-hoja-pestanas { display: flex; align-items: flex-end; gap: 2px; padding: 4px 12px 0; background: var(--tarjeta); border-bottom: 1px solid var(--borde); }
+.an-hoja-pestanas [role=tab] {
+    padding: 6px 14px; border-radius: 6px 6px 0 0; border-bottom: 2px solid transparent;
+    font-size: 14px; font-weight: 700; color: var(--texto-2); background: var(--sub);
+    max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.an-hoja-pestanas [role=tab]:hover { color: var(--enfasis); background: var(--fila-hover); }
+.an-hoja-pestanas [role=tab][aria-selected=true] { color: var(--azul-texto); background: var(--azul-suave); border-bottom-color: var(--azul-texto); }
+.an-hoja-pestanas [role=tab].con-cambios::after { content: ' •'; color: var(--ambar); }
+.an-tab-matriz { display: inline-flex; align-items: flex-end; }
+.an-tab-cerrar { padding: 6px 8px 8px 2px; font-size: 16px; line-height: 1; color: var(--texto-3); }
+.an-tab-cerrar:hover { color: var(--rojo); }
+.an-hoja[hidden], .an-matriz-panel[hidden], .an-tab-matriz[hidden] { display: none; }
+.an-matriz-panel { margin: 8px; }
+.an-matriz-panel.con-cambios .an-sucio { display: inline-flex; }
+.an-matriz-panel .an-titulo-barra h2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.an-matriz-desc { margin: 0; padding: 8px 14px; border-bottom: 1px solid var(--borde); font-size: 13px; color: var(--texto); white-space: pre-wrap; max-height: 6.5em; overflow: auto; }
+
 @media (max-width: 1000px) {
     .an-hoja { grid-template-columns: 1fr; grid-auto-rows: minmax(260px, auto); overflow: auto; }
     .an-hoja-derecha { grid-template-rows: minmax(320px, auto) minmax(280px, auto); }

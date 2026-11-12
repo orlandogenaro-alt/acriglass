@@ -759,16 +759,39 @@
         return catalogoPU(r).filter(function (x) { return !(venta && x.otro); });
     }
 
+    // Análisis P.U. con precios fijos importados del Catálogo (PDF o Excel): su precio ya incluye lo capturado por importe
+    // en Materia Prima / Mano de Obra (p. ej. el Análisis de Excel), así que el total no suma las dos cosas. Con «Ocultar
+    // los precios fijos del Catálogo» se ven solo los importes y conceptos analizados (el precio del análisis); los precios
+    // fijos siguen en el Catálogo de Conceptos. La casilla se recuerda en este navegador.
+    var LLAVE_OCULTAR_FIJOS = 'acri-pu-ocultar-fijos';
+    try { $('puOcultarFijos').checked = localStorage.getItem(LLAVE_OCULTAR_FIJOS) === '1'; } catch (e) { /* sin almacenamiento */ }
+    function ocultarFijos() { return hayVenta() && $('puOcultarFijos').checked; }
+    $('puOcultarFijos').addEventListener('change', function () {
+        try { localStorage.setItem(LLAVE_OCULTAR_FIJOS, this.checked ? '1' : '0'); } catch (e) { /* sin almacenamiento */ }
+        renderPu();
+    });
+    // Renglones de la pestaña Análisis P.U. y qué entra a su total
+    function listaPu(r) {
+        var ocultar = ocultarFijos(), venta = hayVenta();
+        return catalogoPU(r).filter(function (x) { return !(ocultar && x.venta); }).map(function (x) {
+            x.sumaTotal = ocultar || !venta || !x.otro;   // con precios fijos a la vista, lo capturado por importe ya está dentro
+            return x;
+        });
+    }
+
     function renderPu() {
         construirSugerencias();
         var r = calcularPU(), dis = soloLectura ? ' disabled' : '';
-        var lista = catalogoPU(r);
-        var html = analisis.conceptos.length ? '' :
-            '<tr class="vacio-fila"><td colspan="9">Aún no hay conceptos analizados. Presiona «+ Agregar concepto» (o Ctrl + I).</td></tr>';
+        var lista = listaPu(r), ocultos = ocultarFijos();
+        $('puOcultarFijosCaja').hidden = !hayVenta();
+        var html = lista.some(function (x) { return !x.otro; }) || (ocultos && lista.length) ? '' : ocultos
+            ? '<tr class="vacio-fila"><td colspan="9">Los conceptos del Catálogo (precio fijo) están ocultos y no hay importes capturados. Quita la casilla «Ocultar los precios fijos del Catálogo» para verlos.</td></tr>'
+            : '<tr class="vacio-fila"><td colspan="9">Aún no hay conceptos analizados. Presiona «+ Agregar concepto» (o Ctrl + I).</td></tr>';
         lista.forEach(function (x, i) {
             if (x.otro) {
                 if (!lista[i - 1] || !lista[i - 1].otro) {
-                    html += '<tr class="pu-partida"><td class="ro izq" colspan="9">Capturados por importe en Materia Prima / Mano de Obra (sin análisis)</td></tr>';
+                    html += '<tr class="pu-partida"><td class="ro izq" colspan="9">Capturados por importe en Materia Prima / Mano de Obra (sin análisis)' +
+                        (x.sumaTotal ? '' : ' · ya están dentro de los precios fijos del Catálogo: no se suman al total') + '</td></tr>';
                 }
                 html += '<tr class="pu-otro"><td class="id">' + escapar(x.clave) + '</td><td class="ro izq">' + escapar(x.partida) + '</td>' +
                     '<td class="ro izq">' + escapar(x.descripcion) + '</td><td class="ro izq">' + escapar(x.unidad) + '</td>' +
@@ -800,7 +823,7 @@
     // Cifras sin volver a pintar los campos (para no perder el cursor mientras se escribe)
     function pintarPu(r, lista) {
         r = r || calcularPU();
-        lista = lista || catalogoPU(r);
+        lista = lista || listaPu(r);
         if (document.activeElement !== $('puUtilVis')) $('puUtilVis').value = num($('pctUtilidad').value);
         $('puUtilVis').disabled = soloLectura || subtotalManual;
         $('puModoVis').disabled = soloLectura;
@@ -830,7 +853,7 @@
 
         var total = 0;
         lista.forEach(function (x) {
-            total += x.importe;
+            if (x.sumaTotal) total += x.importe;
             if (x.otro) return;
             var tr = $('puConceptos').querySelector('tr[data-uid="' + x.c.uid + '"]');
             if (!tr) return;
@@ -842,6 +865,8 @@
             rev.className = 'ro izq pu-rev' + (falta ? ' falta' : ' ok');
         });
         $('puTotalCat').textContent = fmt(total);
+        $('puTotalCatTxt').textContent = ocultarFijos() ? 'Total del análisis, sin los precios fijos del Catálogo (precio de venta sin IVA)'
+            : hayVenta() ? 'Total del catálogo con sus precios fijos (precio de venta sin IVA)' : 'Total del catálogo (precio de venta sin IVA)';
         pintarExplosion();
         marcarProgramados();
     }

@@ -562,13 +562,14 @@ $secciones = [
                                 <?php endforeach; ?>
                             </select>
                             <?php endif; ?>
+                            <label class="ex-check" id="puOcultarFijosCaja" hidden title="Solo en esta pestaña: los conceptos importados del Catálogo (PDF o Excel) siguen en el Catálogo de Conceptos con su precio"><input type="checkbox" id="puOcultarFijos"> Ocultar los precios fijos del Catálogo</label>
                             <span class="extra-ayuda">Si el concepto ya se hizo en otro presupuesto, elígelo de la lista al escribirlo y se copia su análisis.</span>
                         </div>
                         <div class="extra-caja">
                             <table class="grid mini-grid">
                                 <thead><tr><th class="c-id">Clave</th><th>Partida</th><th>Concepto</th><th>Unidad</th><th class="c-num">Cantidad</th><th class="c-num">P.U.</th><th class="c-num">Importe</th><th>Revisión</th><th></th></tr></thead>
                                 <tbody id="puConceptos"></tbody>
-                                <tfoot><tr class="pu-total"><td colspan="6" class="ro">Total del catálogo (precio de venta sin IVA)</td><td class="ro" id="puTotalCat">0.00</td><td colspan="2"></td></tr></tfoot>
+                                <tfoot><tr class="pu-total"><td colspan="6" class="ro" id="puTotalCatTxt">Total del catálogo (precio de venta sin IVA)</td><td class="ro" id="puTotalCat">0.00</td><td colspan="2"></td></tr></tfoot>
                             </table>
                         </div>
                     </section>

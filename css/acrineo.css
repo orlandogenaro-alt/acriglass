@@ -371,6 +371,9 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-chico .an-cuerpo { line-height: 1.5; }
 .an-buscador { width: min(720px, 94vw); height: min(620px, 88vh); }
 .an-buscador .an-cuerpo { display: flex; flex-direction: column; gap: 10px; }
+/* En columna, el filtro no crece (flex: 1 lo estiraría hacia abajo); la tabla toma el espacio */
+.an-buscador .an-cuerpo > .an-buscar { flex: 0 0 34px; max-width: none; }
+.an-buscador .an-cuerpo > .an-tabla-cont { flex: 1 1 auto; min-height: 120px; }
 .an-buscador .an-tabla-cont { border: 1px solid var(--borde); border-radius: 6px; background: var(--tarjeta); }
 .an-buscador tr.an-fila { cursor: pointer; }
 .an-alta { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 8px; align-items: end; padding: 10px; border: 1px dashed var(--azul-borde); border-radius: 6px; background: var(--azul-suave); }
@@ -445,6 +448,18 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-vacio .an-btn { margin-top: 10px; }
 .an-catalogo-cant { width: 90px; height: 26px; padding: 0 6px; text-align: right; border: 1px solid var(--borde-2); border-radius: 4px; background: var(--input); }
 
+/* Catálogo Unidades */
+.an-unidades { width: min(720px, 94vw); height: min(560px, 88vh); }
+.an-unidades td.an-uni-clave { background: var(--azul) !important; color: #fff; font-weight: 700; width: 140px; }
+.an-unidades tr.sel td.an-uni-clave { background: var(--azul-hover) !important; }
+.an-unidades td.an-col-acc, .an-unidades th.an-col-acc { width: 120px; text-align: right; padding: 2px 8px; }
+.an-acciones-fila { display: inline-flex; gap: 6px; }
+.an-acciones-fila button { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--azul); color: #fff; box-shadow: var(--sombra); }
+.an-acciones-fila button:hover { background: var(--azul-hover); }
+.an-acciones-fila button svg { width: 14px; height: 14px; }
+.an-celda-unidad { display: flex; align-items: center; gap: 4px; }
+.an-celda-unidad input { flex: 1; min-width: 60px; }
+.an-celda-unidad .an-btn-buscar { width: 32px; height: 24px; }
 .an-col-pa { width: 44px; text-align: center; }
 .an-renglones td.an-col-url { text-align: center; }
 .an-renglones input.an-celda-in[data-k="url"] { min-width: 150px; }

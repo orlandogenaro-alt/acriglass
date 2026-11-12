@@ -105,7 +105,11 @@
                     + '<td class="an-col-sel"><input type="checkbox" data-marcar="' + b.clave + '"' + (st.marcados.has(b.clave) ? ' checked' : '') + ' aria-label="Marcar renglón"></td>'
                     + '<td><input class="an-celda-in" type="url" data-k="url" value="' + esc(b.url) + '" maxlength="500" placeholder="https://…" aria-label="URL del concepto"></td>'
                     + '<td class="an-col-pa"><input type="checkbox" data-k="precio_alzado"' + (b.precio_alzado ? ' checked' : '') + ' aria-label="Precio alzado (P.A.)" title="P.A.: precio unitario fijo"></td>'
-                    + celda(b, 'codigo', 'text', 30) + celda(b, 'descripcion', 'text', 4000) + celda(b, 'unidad', 'text', 20)
+                    + celda(b, 'codigo', 'text', 30) + celda(b, 'descripcion', 'text', 4000)
+                    // Unidad: se escribe o se elige con la lupa del «Catálogo Unidades»
+                    + '<td><span class="an-celda-unidad"><input class="an-celda-in" type="text" data-k="unidad" value="' + esc(b.unidad) + '" maxlength="20" aria-label="Unidad">'
+                    + '<button type="button" class="an-btn-buscar" data-unidad title="Catálogo Unidades" aria-label="Buscar en el catálogo de unidades">'
+                    + '<svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button></span></td>'
                     + celda(b, 'cantidad', 'number', null, 'num')
                     + (b.matriz ? '<td class="num" title="Sale de su matriz de P.U.">' + AN.ui.dinero(b.costo) + '<span class="an-insignia">M</span></td>' : celda(b, 'costo', 'number', null, 'num'))
                     // Precio siempre editable: escribirlo lo deja fijo (P.A.); vacío vuelve a costo × sobrecosto
@@ -361,6 +365,25 @@
     });
     tbody.addEventListener('click', function (e) {
         if (e.target.closest('[data-agregar]')) { agregar(); return; }
+        var lupa = e.target.closest('[data-unidad]');
+        if (lupa && AN.unidades) {
+            var tr = lupa.closest('tr[data-clave]');
+            var b = borrador(tr.dataset.clave);
+            AN.unidades.elegir(b.unidad).then(function (u) {
+                if (u === null || u === b.unidad) return;
+                guardarFoto();   // se puede deshacer
+                b.unidad = u;
+                var fila = tbody.querySelector('tr[data-clave="' + b.clave + '"]');
+                if (!fila) return;
+                var i = fila.querySelector('input[data-k="unidad"]');
+                i.value = u;
+                i.classList.remove('invalido');
+                fila.classList.toggle('modificado', !!b.renglon_id && modificado(b));
+                botones();
+                i.focus();
+            });
+            return;
+        }
         var pu = e.target.closest('[data-pu]');
         if (pu && AN.hojaMatriz) AN.hojaMatriz.abrir(+pu.dataset.pu);
     });

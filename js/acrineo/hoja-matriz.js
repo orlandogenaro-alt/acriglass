@@ -60,7 +60,10 @@
                 var inp = function (k, tipo, extra) { return '<input class="an-celda-in' + (tipo === 'number' ? ' num' : '') + '" type="' + tipo + '" data-k="' + k + '" value="' + esc(f[k]) + '"' + (extra || '') + ' aria-label="' + k + '">'; };
                 celdas = '<td>' + sel('tipo', TIPOS) + '</td><td>' + inp('codigo', 'text', ' maxlength="30"') + '</td>'
                     + '<td class="an-desc">' + inp('descripcion', 'text', ' maxlength="250"') + (f.insumo_id ? '<span class="an-insignia" title="Del catálogo de insumos">CAT</span>' : '') + '</td>'
-                    + '<td>' + inp('unidad', 'text', ' maxlength="20"') + '</td><td>' + sel('base', BASES) + '</td>'
+                    + '<td><span class="an-celda-unidad">' + inp('unidad', 'text', ' maxlength="20"')
+                    + '<button type="button" class="an-btn-buscar" data-unidad title="Catálogo Unidades" aria-label="Buscar en el catálogo de unidades">'
+                    + '<svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button></span></td>'
+                    + '<td>' + sel('base', BASES) + '</td>'
                     + '<td>' + inp('cantidad', 'number', ' min="0" step="any"' + (f.base ? ' title="Porcentaje"' : '')) + '</td>'
                     + '<td>' + inp('desperdicio_pct', 'number', ' min="0" max="99.9999" step="any"' + (f.base ? ' readonly tabindex="-1"' : '')) + '</td>'
                     + '<td>' + (f.base ? '<span class="an-ayuda" title="Base sobre la que se aplica el %">' + AN.ui.dinero(f._base) + '</span>' : inp('costo', 'number', ' min="0" step="any"')) + '</td>';
@@ -172,6 +175,19 @@
         f[k] = e.target.value;
         e.target.classList.remove('invalido');
         pintarTotales();
+    });
+    // Lupa de Unidad: «Catálogo Unidades»
+    tbody.addEventListener('click', function (e) {
+        var lupa = e.target.closest('[data-unidad]');
+        if (!lupa || !AN.unidades) return;
+        var f = st.filas.find(function (x) { return x.clave === lupa.closest('tr').dataset.clave; });
+        AN.unidades.elegir(f.unidad).then(function (u) {
+            if (u === null) return;
+            f.unidad = u;
+            var i = tbody.querySelector('tr[data-clave="' + f.clave + '"] [data-k="unidad"]');
+            if (i) i.value = u;
+            pintarTotales();
+        });
     });
     tbody.addEventListener('change', function (e) {
         var tr = e.target.closest('tr[data-clave]');

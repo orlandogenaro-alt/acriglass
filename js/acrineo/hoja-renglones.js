@@ -108,7 +108,10 @@
                     + celda(b, 'codigo', 'text', 30) + celda(b, 'descripcion', 'text', 4000) + celda(b, 'unidad', 'text', 20)
                     + celda(b, 'cantidad', 'number', null, 'num')
                     + (b.matriz ? '<td class="num" title="Sale de su matriz de P.U.">' + AN.ui.dinero(b.costo) + '<span class="an-insignia">M</span></td>' : celda(b, 'costo', 'number', null, 'num'))
-                    + (b.precio_alzado ? celda(b, 'precio_fijo', 'number', null, 'num') : '<td class="num" data-precio>' + AN.ui.dinero(precio) + '</td>')
+                    // Precio siempre editable: escribirlo lo deja fijo (P.A.); vacío vuelve a costo × sobrecosto
+                    + '<td><input class="an-celda-in num" type="number" data-k="precio_fijo" min="0" step="any" inputmode="decimal" value="'
+                    + esc(b.precio_alzado ? b.precio_fijo : String(precio)) + '" title="' + (b.precio_alzado ? 'Precio fijo (P.A.). Bórralo para volver a costo × sobrecosto.' : 'Calculado: costo × (1 + % sobrecosto). Escríbelo para fijarlo (P.A.).')
+                    + '" aria-label="Precio"></td>'
                     + '<td class="num" data-importe>' + AN.ui.dinero(importe) + '</td>'
                     + '<td><input class="an-celda-in num" type="number" data-k="tipo" value="' + esc(b.tipo) + '" min="0" max="99" step="1" inputmode="numeric" aria-label="Tipo"></td><td></td></tr>';
             });
@@ -241,8 +244,12 @@
 
     function recalcular(b, tr) {
         var precio = precioDe(b);
-        var celdaPrecio = tr.querySelector('[data-precio]');
-        if (celdaPrecio) celdaPrecio.textContent = AN.ui.dinero(precio);
+        // Sin precio fijo, el precio sigue al costo (si no se está escribiendo en él)
+        var inPrecio = tr.querySelector('input[data-k="precio_fijo"]');
+        if (inPrecio && !b.precio_alzado && document.activeElement !== inPrecio) inPrecio.value = String(precio);
+        if (inPrecio) inPrecio.title = b.precio_alzado ? 'Precio fijo (P.A.). Bórralo para volver a costo × sobrecosto.' : 'Calculado: costo × (1 + % sobrecosto). Escríbelo para fijarlo (P.A.).';
+        var pa = tr.querySelector('input[data-k="precio_alzado"]');
+        if (pa) pa.checked = !!b.precio_alzado;
         tr.querySelector('[data-importe]').textContent = AN.ui.dinero(H.redondear(Number(b.cantidad) * precio, H.ctx.dec_costos));
         tr.classList.toggle('modificado', !!b.renglon_id && modificado(b));
         total();
@@ -323,6 +330,8 @@
         var tr = e.target.closest('tr[data-clave]');
         var b = borrador(tr.dataset.clave);
         b[k] = e.target.value;
+        // Escribir el precio lo fija (P.A.); dejarlo vacío regresa al precio calculado
+        if (k === 'precio_fijo') b.precio_alzado = e.target.value.trim() !== '';
         e.target.classList.remove('invalido');
         if (k === 'cantidad' || k === 'costo' || k === 'precio_fijo') recalcular(b, tr);
         else { tr.classList.toggle('modificado', !!b.renglon_id && modificado(b)); botones(); }

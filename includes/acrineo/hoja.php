@@ -4,6 +4,7 @@
 // presupuesto (los que muestra el Catálogo de presupuestos) y deja constancia en su historial.
 require_once __DIR__ . '/presupuestos.php';
 require_once __DIR__ . '/hoja-calculo.php';
+require_once __DIR__ . '/tipos-insumo.php';
 
 const ACRINEO_CAMPO_CODIGO   = ['tipo' => 'texto', 'max' => 30, 'requerido' => true];
 const ACRINEO_CAMPO_DESC     = ['tipo' => 'largo', 'max' => 4000, 'requerido' => true];
@@ -472,7 +473,7 @@ function acrineoMatriz(array $ctx, int $conceptoId, bool $actualizar = false): a
     }
     $calc = acrineoCalcularMatriz($filas, $ctx['dec_costos']);
     return ['concepto' => $concepto, 'filas' => $calc['filas'], 'totales' => $calc['totales'], 'total' => $calc['total'],
-            'avisos' => $avisos, 'tipos' => ACRINEO_TIPOS_INSUMO];
+            'avisos' => $avisos, 'tipos' => acrineoTiposInsumo()];
 }
 
 // Costo de catálogo de varios insumos con el motor del sistema (includes/pu.php): [insumo_id => ['costo', 'faltan']]
@@ -519,7 +520,7 @@ function acrineoInsumosBuscar(string $q, int $pagina = 1, int $porPagina = 50): 
         $tipo = trim($f['tipo']);
         $costo = $costos[$id]['costo'] ?? null;
         $items[] = ['id' => $id, 'nombre' => $f['clave'] . ' · ' . $f['descripcion'],
-                    'extra' => (ACRINEO_TIPOS_INSUMO[$tipo] ?? $tipo) . ' · ' . $f['unidad'] . ' · ' . ($costo === null ? 'sin precio' : '$ ' . number_format($costo, 2)),
+                    'extra' => (acrineoTiposInsumo()[$tipo] ?? $tipo) . ' · ' . $f['unidad'] . ' · ' . ($costo === null ? 'sin precio' : '$ ' . number_format($costo, 2)),
                     'datos' => ['insumo_id' => $id, 'tipo' => $tipo, 'codigo' => $f['clave'], 'descripcion' => $f['descripcion'],
                                 'unidad' => $f['unidad'], 'costo' => $costo]];
     }
@@ -573,7 +574,7 @@ function acrineoMatrizGuardar(array $ctx, int $conceptoId, array $filas, string 
     foreach (array_values($filas) as $n => $f) {
         if (!is_array($f)) { $errores["filas.$n.descripcion"] = 'Renglón no válido.'; continue; }
         $tipo = strtoupper(trim((string) ($f['tipo'] ?? '')));
-        if (!isset(ACRINEO_TIPOS_INSUMO[$tipo])) $errores["filas.$n.tipo"] = 'Tipo no válido.';
+        if (!isset(acrineoTiposInsumo()[$tipo])) $errores["filas.$n.tipo"] = 'Tipo no válido.';
         $base = in_array($f['base'] ?? null, ['pct_mo', 'pct_mat'], true) ? $f['base'] : null;
         $l = ['tipo' => $tipo, 'base' => $base, 'insumo_id' => (int) ($f['insumo_id'] ?? 0) ?: null];
         $reglas = [

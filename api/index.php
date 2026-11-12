@@ -10,7 +10,7 @@ const ACRI_RUTAS = [
     'api/catalogos.php', 'api/clientes.php', 'api/registro-obra.php', 'api/tareas.php', 'api/servicios-obra.php', 'api/insumos.php', 'api/costos.php', 'api/conceptos-pu.php', 'api/parametros-presupuesto.php', 'api/importar-insumos.php', 'api/plantillas.php', 'api/contratos.php', 'api/estimaciones.php',
     // ACRINEO
     'acrineo-presupuestos.php', 'api/acrineo/presupuestos.php', 'api/acrineo/catalogos.php',
-    'acrineo-hoja.php', 'api/acrineo/hoja.php', 'api/acrineo/unidades.php',
+    'acrineo-hoja.php', 'api/acrineo/hoja.php', 'api/acrineo/unidades.php', 'api/acrineo/tipos-insumo.php',
 ];
 
 $ruta = ltrim(rawurldecode((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH)), '/');

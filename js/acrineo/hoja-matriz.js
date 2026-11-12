@@ -17,7 +17,7 @@
     var tbody = $('anMatrizFilas');
     var cuerpoCat = $('anInsumosFilas');
     var COLS = 11;
-    var ETIQUETAS = { codigo: 'Código', descripcion: 'Descripción completa', unidad: 'Unidad', costo: 'Costo', cantidad: 'Cantidad', desperdicio_pct: '% Desp.' };
+    var ETIQUETAS = { tipo: 'Tipo', codigo: 'Código', descripcion: 'Descripción completa', unidad: 'Unidad', costo: 'Costo', cantidad: 'Cantidad', desperdicio_pct: '% Desp.' };
     var TIPOS = { MAT: 'Materiales', MO: 'Mano de obra', EQ: 'Equipo y maquinaria', HER: 'Herramienta', BAS: 'Básicos', OTR: 'Otros' };
     var BASES = { '': 'Por unidad', pct_mo: '% de M.O.', pct_mat: '% de materiales' };
     var CAMPOS = ['tipo', 'codigo', 'descripcion', 'unidad', 'base', 'cantidad', 'desperdicio_pct', 'costo'];
@@ -124,10 +124,11 @@
                         return '<option value="' + o + '"' + (String(f[k] || '') === o ? ' selected' : '') + '>' + esc(opciones[o]) + '</option>';
                     }).join('') + '</select>';
                 };
-                var inp = function (k, tipo, extra) { return '<input class="an-celda-in' + (tipo === 'number' ? ' num' : '') + '" type="' + tipo + '" data-k="' + k + '" value="' + esc(f[k]) + '"' + (extra || '') + ' placeholder="' + ETIQUETAS[k] + '" aria-label="' + ETIQUETAS[k] + '">'; };
+                var inp = function (k, tipo, extra, cls) { return '<input class="an-celda-in' + (tipo === 'number' ? ' num' : '') + (cls ? ' ' + cls : '') + '" type="' + tipo + '" data-k="' + k + '" value="' + esc(f[k]) + '"' + (extra || '') + ' placeholder="' + ETIQUETAS[k] + '" aria-label="' + ETIQUETAS[k] + '">'; };
                 celdas = '<td>' + inp('codigo', 'text', ' maxlength="30"') + '</td>'
                     + '<td class="an-desc">' + inp('descripcion', 'text', ' maxlength="250"') + '</td>'
-                    + '<td>' + sel('tipo', TIPOS) + '</td>'
+                    + '<td><span class="an-celda-unidad">' + inp('tipo', 'text', ' maxlength="3" title="' + esc(TIPOS[f.tipo] || 'Tipo no válido') + '"', TIPOS[f.tipo] ? '' : 'invalido')
+                    + '<button type="button" class="an-btn-buscar" data-tipo-insumo title="Catálogo Tipos de insumos" aria-label="Buscar en el catálogo de tipos de insumos">' + LUPA + '</button></span></td>'
                     + '<td><span class="an-celda-unidad">' + inp('unidad', 'text', ' maxlength="20"')
                     + '<button type="button" class="an-btn-buscar" data-unidad title="Catálogo Unidades" aria-label="Buscar en el catálogo de unidades">' + LUPA + '</button></span></td>'
                     + '<td>' + (f.base ? '<span class="an-ayuda" title="Base sobre la que se aplica el %">' + AN.ui.dinero(f._base) + '</span>' : inp('costo', 'number', ' min="0" step="any"')) + '</td>'
@@ -200,6 +201,7 @@
 
     // ---------- Cargar / editar / guardar ----------
     function cargar(r) {
+        if (r.tipos) TIPOS = r.tipos;
         st.concepto = r.concepto;
         st.filas = r.filas.map(function (f) {
             return nueva({ insumo_id: f.insumo_id, tipo: f.tipo, codigo: f.codigo || '', descripcion: f.descripcion, unidad: f.unidad || '', base: f.base || '',
@@ -404,21 +406,32 @@
         if (!k || e.target.tagName === 'SELECT') return;
         if (st.fotoPendiente) { guardarFoto(st.fotoPendiente); st.fotoPendiente = null; }
         var f = st.filas.find(function (x) { return x.clave === e.target.closest('tr').dataset.clave; });
+        if (k === 'tipo') {
+            var pos = e.target.selectionStart;
+            e.target.value = e.target.value.toUpperCase();
+            e.target.setSelectionRange(pos, pos);
+        }
         f[k] = e.target.value;
-        e.target.classList.remove('invalido');
+        e.target.classList.toggle('invalido', k === 'tipo' && !TIPOS[f.tipo]);
+        if (k === 'tipo') e.target.title = TIPOS[f.tipo] || 'Tipo no válido';
         pintarTotales();
     });
-    // Lupa de Unidad: «Catálogo Unidades»
+    // Lupas de Unidad («Catálogo Unidades») y de Tipo («Catálogo Tipos de insumos»)
     tbody.addEventListener('click', function (e) {
-        var lupa = e.target.closest('[data-unidad]');
-        if (!lupa || !AN.unidades) return;
+        var lupa = e.target.closest('[data-unidad], [data-tipo-insumo]');
+        if (!lupa) return;
+        var k = lupa.hasAttribute('data-unidad') ? 'unidad' : 'tipo';
+        var cat = k === 'unidad' ? AN.unidades : AN.tiposInsumo;
+        if (!cat) return;
         var f = st.filas.find(function (x) { return x.clave === lupa.closest('tr').dataset.clave; });
-        AN.unidades.elegir(f.unidad).then(function (u) {
-            if (u === null || u === f.unidad) return;
+        cat.elegir(f[k]).then(function (v) {
+            if (k === 'tipo') cat.items().forEach(function (t) { TIPOS[t.tipo] = t.descripcion || t.tipo; });
+            if (v === null || v === f[k]) return;
             guardarFoto();
-            f.unidad = u;
+            f[k] = v;
+            if (k === 'tipo') { calcular(); pintar(); return; }
             var i = tbody.querySelector('tr[data-clave="' + f.clave + '"] [data-k="unidad"]');
-            if (i) i.value = u;
+            if (i) i.value = v;
             pintarTotales();
         });
     });

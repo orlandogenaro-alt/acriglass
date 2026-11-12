@@ -451,10 +451,10 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-catalogo-cant { width: 90px; height: 26px; padding: 0 6px; text-align: right; border: 1px solid var(--borde-2); border-radius: 4px; background: var(--input); }
 
 /* Catálogo Unidades */
-.an-unidades { width: min(720px, 94vw); height: min(560px, 88vh); }
-.an-unidades td.an-uni-clave { background: var(--azul) !important; color: #fff; font-weight: 700; width: 140px; }
-.an-unidades tr.sel td.an-uni-clave { background: var(--azul-hover) !important; }
-.an-unidades td.an-col-acc, .an-unidades th.an-col-acc { width: 120px; text-align: right; padding: 2px 8px; }
+.an-cat-chico { width: min(720px, 94vw); height: min(560px, 88vh); }
+.an-cat-chico td.an-cat-clave { background: var(--azul) !important; color: #fff; font-weight: 700; width: 140px; }
+.an-cat-chico tr.sel td.an-cat-clave { background: var(--azul-hover) !important; }
+.an-cat-chico td.an-col-acc, .an-cat-chico th.an-col-acc { width: 120px; text-align: right; padding: 2px 8px; }
 .an-acciones-fila { display: inline-flex; gap: 6px; }
 .an-acciones-fila button { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--azul); color: #fff; box-shadow: var(--sombra); }
 .an-acciones-fila button:hover { background: var(--azul-hover); }
@@ -533,7 +533,7 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
     border: 2px solid transparent; border-radius: 0; background: transparent; box-shadow: none; font-style: italic;
 }
 .an-matriz select.an-celda-in { appearance: none; -webkit-appearance: none; cursor: pointer; }
-.an-matriz input.an-celda-in.num { padding-right: 10px; -moz-appearance: textfield; }
+.an-matriz input.an-celda-in.num { padding-right: 8px; font-style: normal; -moz-appearance: textfield; }
 .an-matriz input.an-celda-in.num::-webkit-inner-spin-button, .an-matriz input.an-celda-in.num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .an-matriz input.an-celda-in::placeholder { color: var(--texto-3); }
 .an-matriz input.an-celda-in:hover, .an-matriz select.an-celda-in:hover { border-color: var(--borde-2); }

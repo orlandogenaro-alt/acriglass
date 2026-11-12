@@ -59,7 +59,7 @@ function acrineoCalcularMatriz(array $filas, int $decimales): array
             $filas[$i]['costo'] = round($sobre, $decimales);   // la base sobre la que se aplica el %
             $filas[$i]['importe'] = round((float) $f['cantidad'] / 100 * $sobre, $decimales);
         }
-        $totales[$f['tipo']] += $filas[$i]['importe'];
+        $totales[$f['tipo']] = ($totales[$f['tipo']] ?? 0.0) + $filas[$i]['importe'];
     }
     $totales = array_map(fn($v) => round($v, $decimales), $totales);
     return ['filas' => $filas, 'totales' => $totales, 'total' => round(array_sum($totales), $decimales)];

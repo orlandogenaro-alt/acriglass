@@ -13,7 +13,10 @@ $aviso = '';
 $ctx = null;
 try {
     if (!acrineoHojaDisponible()) $aviso = 'Faltan las migraciones de la hoja (025, 026 y 027) (php herramientas/migrar.php --aplicar).';
-    else $ctx = acrineoHojaContexto($id);
+    else {
+        $ctx = acrineoHojaContexto($id);
+        $ctx['monedas'] = acrineoHojaMonedas($id);
+    }
 } catch (AcrineoError $e) {
     $aviso = $e->getMessage();
 } catch (Throwable $e) {

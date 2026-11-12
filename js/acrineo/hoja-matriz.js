@@ -191,7 +191,7 @@
         $('anMatrizDeshacer').disabled = !ed || !st.deshacer.length;
         $('anMatrizRehacer').disabled = !ed || !st.rehacer.length;
         $('anMatrizEditar').disabled = !st.concepto;
-        $('anMatrizLibre').disabled = $('anMatrizActualizar').disabled = !st.concepto;
+        $('anMatrizLibre').disabled = $('anMatrizActualizar').disabled = $('anMatrizAjustar').disabled = !st.concepto;
         var b = $('anInsumosCopiar');
         b.disabled = !st.concepto || !cat.marcados.size;
         b.lastChild.textContent = ' Copiar a la matriz' + (cat.marcados.size ? ' (' + cat.marcados.size + ')' : '');
@@ -552,6 +552,81 @@
             } catch (e) { estado(e.message, 'error'); }
         });
         $('anInsumosCopiar').addEventListener('click', copiar);
+
+        // ---------- Ajuste del precio unitario ----------
+        // Lleva el costo directo al deseado multiplicando por un mismo factor las cantidades de los insumos de los
+        // tipos marcados (los costos no cambian). Los renglones «% de M.O. / materiales» se recalculan solos, así que
+        // el total es lineal en el factor: total(f) = t0 + (t1 − t0)·f.
+        var MONEDAS = (window.ACRINEO && window.ACRINEO.hoja && window.ACRINEO.hoja.monedas) || [{ numero: 1, descripcion: 'PESOS', tipo_cambio: 1 }];
+        var dlgAjuste = $('anAjuste');
+        function ajusteTc() { var m = MONEDAS.find(function (x) { return String(x.numero) === $('anAjusteMoneda').value; }); return m ? Number(m.tipo_cambio) || 1 : 1; }
+        function ajusteEstado(t, tipo) { var e = $('anAjusteEstado'); e.textContent = t || ''; e.className = 'an-estado' + (tipo ? ' ' + tipo : ''); }
+        function ajusteMostrar() {
+            var tc = ajusteTc(), d = H.ctx.dec_costos;
+            var actual = H.redondear(calcular().total / tc, d);
+            $('anAjusteActual').textContent = AN.ui.dinero(actual);
+            $('anAjusteDeseado').value = actual.toFixed(d);
+        }
+        function ajusteTodos() {
+            var cs = [].slice.call($('anAjusteTipos').querySelectorAll('input[type=checkbox]'));
+            var n = cs.filter(function (c) { return c.checked; }).length;
+            $('anAjusteTodos').checked = cs.length > 0 && n === cs.length;
+            $('anAjusteTodos').indeterminate = n > 0 && n < cs.length;
+        }
+        function abrirAjuste() {
+            if (!st.concepto) return;
+            $('anAjusteMoneda').innerHTML = MONEDAS.map(function (m) { return '<option value="' + m.numero + '">' + esc(m.descripcion) + '</option>'; }).join('');
+            var c = calcular(), tipos = [];
+            st.filas.forEach(function (f) { if (!f.base && tipos.indexOf(f.tipo) < 0) tipos.push(f.tipo); });
+            tipos.sort(function (a, b) { var k = Object.keys(TIPOS); return k.indexOf(a) - k.indexOf(b); });
+            $('anAjusteTipos').innerHTML = tipos.map(function (t) {
+                return '<label><input type="checkbox" value="' + esc(t) + '" checked> ' + esc(TIPOS[t] || t)
+                    + ' <span class="an-ayuda">' + AN.ui.dinero(c.totales[t] || 0) + '</span></label>';
+            }).join('');
+            $('anAjusteTodos').checked = true;
+            $('anAjusteTodos').indeterminate = false;
+            $('anAjusteTodos').disabled = !tipos.length;
+            ajusteEstado(tipos.length ? '' : 'La matriz no tiene insumos para ajustar.', tipos.length ? '' : 'info');
+            ajusteMostrar();
+            dlgAjuste.showModal();
+            $('anAjusteDeseado').focus();
+            $('anAjusteDeseado').select();
+        }
+        function aceptarAjuste() {
+            var tc = ajusteTc(), d = H.ctx.dec_costos;
+            var txtDeseado = $('anAjusteDeseado').value.trim(), deseado = Number(txtDeseado) * tc;
+            if (txtDeseado === '' || !isFinite(deseado) || deseado < 0) { $('anAjusteDeseado').classList.add('invalido'); ajusteEstado('Escribe un costo directo deseado válido.', 'error'); return; }
+            var marcados = [].slice.call($('anAjusteTipos').querySelectorAll('input:checked')).map(function (c) { return c.value; });
+            var aj = st.filas.filter(function (f) { return !f.base && marcados.indexOf(f.tipo) >= 0 && Number(f.cantidad) > 0 && Number(f.costo) > 0; });
+            if (!aj.length) { ajusteEstado('No hay insumos con importe en los tipos marcados.', 'error'); return; }
+            var orig = aj.map(function (f) { return f.cantidad; });
+            var totalCon = function (fac) { aj.forEach(function (f, i) { f.cantidad = Number(orig[i]) * fac; }); return calcular().total; };
+            var t0 = totalCon(0), t1 = totalCon(1);
+            aj.forEach(function (f, i) { f.cantidad = orig[i]; });
+            calcular();
+            var fac = (deseado - t0) / (t1 - t0);
+            if (!(t1 - t0 > 0)) { ajusteEstado('Los tipos marcados no tienen importe que ajustar.', 'error'); return; }
+            if (fac < 0) { ajusteEstado('El deseado es menor que lo que no se ajusta (' + AN.ui.dinero(H.redondear(t0 / tc, d)) + ').', 'error'); return; }
+            if (!st.editando) entrarEdicion();
+            guardarFoto();
+            aj.forEach(function (f, i) { f.cantidad = String(H.redondear(Number(orig[i]) * fac, 6)); });
+            calcular();
+            pintar();
+            dlgAjuste.close();
+            estado('Cantidades de ' + aj.length + ' insumo(s) × ' + H.redondear(fac, 6) + '. Revisa y GUARDA.', 'info');
+        }
+        $('anMatrizAjustar').addEventListener('click', abrirAjuste);
+        $('anAjusteMoneda').addEventListener('change', ajusteMostrar);
+        $('anAjusteDeseado').addEventListener('input', function () { this.classList.remove('invalido'); ajusteEstado(''); });
+        $('anAjusteDeseado').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); aceptarAjuste(); } });
+        $('anAjusteTodos').addEventListener('change', function () {
+            var si = this.checked;
+            $('anAjusteTipos').querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = si; });
+            ajusteEstado('');
+        });
+        $('anAjusteTipos').addEventListener('change', function () { ajusteTodos(); ajusteEstado(''); });
+        $('anAjusteAceptar').addEventListener('click', aceptarAjuste);
+        dlgAjuste.querySelectorAll('[data-ajuste-cerrar]').forEach(function (b) { b.addEventListener('click', function () { dlgAjuste.close(); }); });
     }
     $('anMatrizCerrar').addEventListener('click', cerrar);
     $('anTabPresupuesto').addEventListener('click', function () { verPestana(false); });

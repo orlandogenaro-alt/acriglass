@@ -6,6 +6,7 @@ require_once __DIR__ . '/campos.php';
 $puedeMatriz = acrineoPuede('presupuestos.editar');
 $icoUrl = '<svg class="i" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>';
 $icoGuardar = '<svg class="i" viewBox="0 0 24 24"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/></svg>';
+$icoBillete = '<svg class="i" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 10v4M18 10v4"/></svg>';
 $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2.5-8z"/></svg>';
 ?>
 <section class="an-matriz-panel" id="anMatriz" role="tabpanel" aria-labelledby="anTabMatriz" hidden>
@@ -43,6 +44,7 @@ $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2
             <span class="an-sep-barra" aria-hidden="true"></span>
             <button type="button" class="an-btn an-mini" id="anMatrizLibre" title="Agrega un renglón que no está en el catálogo">+ Renglón libre</button>
             <button type="button" class="an-btn an-mini" id="anMatrizActualizar" title="Toma el costo vigente del catálogo de insumos (no se guarda hasta GUARDAR)">Actualizar costos</button>
+            <button type="button" class="an-btn an-icono" id="anMatrizAjustar" title="Ajuste del precio unitario" aria-label="Ajuste del precio unitario"><?= $icoBillete ?></button>
             <?php endif; ?>
         </div>
         <div class="an-tabla-cont">
@@ -106,3 +108,36 @@ $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2
         </div>
     </section>
 </section>
+
+<?php if ($puedeMatriz): ?>
+<!-- Ajuste del precio unitario: lleva el costo directo de la matriz al deseado ajustando las cantidades de los tipos marcados -->
+<dialog class="an-dialogo an-chico an-ajuste" id="anAjuste" aria-labelledby="anAjusteTitulo">
+    <div class="an-titulo-barra">
+        <?= $icoBillete ?>
+        <h2 id="anAjusteTitulo">Ajuste del precio unitario</h2>
+        <button type="button" class="an-cerrar" data-ajuste-cerrar aria-label="Cerrar"><?= anIcono('cerrar') ?></button>
+    </div>
+    <div class="an-cuerpo">
+        <div class="an-ajuste-fila">
+            <span>Costo directo actual:</span>
+            <b id="anAjusteActual">$ 0.00</b>
+            <select id="anAjusteMoneda" aria-label="Moneda"></select>
+        </div>
+        <label class="an-ajuste-fila">
+            <span>Costo directo deseado:</span>
+            <input type="number" id="anAjusteDeseado" min="0" step="any" inputmode="decimal">
+        </label>
+        <fieldset class="an-ajuste-tipos">
+            <legend>Tipos de insumos</legend>
+            <label class="an-ajuste-todos"><input type="checkbox" id="anAjusteTodos" checked> Marcar todos</label>
+            <div id="anAjusteTipos"></div>
+        </fieldset>
+        <p class="an-ayuda">Se ajustan las cantidades de los insumos de los tipos marcados; sus costos no cambian. Nada se guarda hasta GUARDAR.</p>
+    </div>
+    <div class="an-botonera">
+        <span class="an-estado" id="anAjusteEstado" role="status"></span>
+        <button type="button" class="an-btn an-primario" id="anAjusteAceptar">Aceptar</button>
+        <button type="button" class="an-btn an-texto" data-ajuste-cerrar>Cancelar</button>
+    </div>
+</dialog>
+<?php endif; ?>

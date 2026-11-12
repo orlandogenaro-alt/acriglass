@@ -41,6 +41,20 @@ function acrineoHojaContexto(int $id): array
             'precio_venta' => (float) $f['precio_venta'], 'dec_costos' => (int) $f['dc'], 'dec_cantidades' => (int) $f['dq']];
 }
 
+// Monedas del presupuesto (las del sistema con el tipo de cambio que tenga el presupuesto): [{numero, descripcion, tipo_cambio}]
+function acrineoHojaMonedas(int $id): array
+{
+    $m = [];
+    foreach (ACRINEO_MONEDAS as $n => [$desc, , $tc]) $m[$n] = ['numero' => $n, 'descripcion' => $desc, 'tipo_cambio' => (float) $tc];
+    if (bd_tiene_tabla('AW', 'acrineo_presupuesto_monedas')) {
+        foreach (bd_filas('AW', 'select numero, descripcion, tipo_cambio from acrineo_presupuesto_monedas where presupuesto_id = ?', [$id]) as $r) {
+            $n = (int) $r['numero'];
+            if (isset($m[$n]) && (float) $r['tipo_cambio'] > 0) $m[$n] = ['numero' => $n, 'descripcion' => $r['descripcion'] ?: $m[$n]['descripcion'], 'tipo_cambio' => (float) $r['tipo_cambio']];
+        }
+    }
+    return array_values($m);
+}
+
 // ---------- Lectura ----------
 
 // Partidas en orden de árbol, con nivel y totales (los suyos más los de sus subpartidas)

@@ -446,6 +446,13 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-catalogo-cant { width: 90px; height: 26px; padding: 0 6px; text-align: right; border: 1px solid var(--borde-2); border-radius: 4px; background: var(--input); }
 
 .an-col-pa { width: 44px; text-align: center; }
+.an-renglones td.an-col-url { text-align: center; }
+.an-renglones input.an-celda-in[data-k="url"] { min-width: 150px; }
+.an-renglones input.an-celda-in[data-k="tipo"] { width: 56px; min-width: 56px; }
+.an-btn-url { display: inline-grid; place-items: center; width: 30px; height: 22px; border-radius: 11px; background: var(--azul); color: #fff; }
+.an-btn-url:hover { background: var(--azul-hover); }
+.an-btn-url svg { width: 13px; height: 13px; }
+.an-btn-url.vacia { background: var(--sub); color: var(--texto-3); border: 1px solid var(--borde); cursor: default; }
 .an-renglones td.an-col-pa { text-align: center; }
 .an-pa { color: var(--rojo); font-weight: 800; }
 .an-insignia { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 7px; font-size: 10px; font-weight: 800; background: var(--azul-suave); color: var(--azul-texto); border: 1px solid var(--azul-borde); vertical-align: middle; }

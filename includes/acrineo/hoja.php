@@ -14,14 +14,17 @@ const ACRINEO_CAMPO_SOBRECOSTO = ['tipo' => 'decimal', 'min' => -99.9999, 'max' 
 const ACRINEO_CAMPO_PCT      = ['tipo' => 'decimal', 'min' => 0, 'max' => 99.9999, 'decimales' => 4, 'requerido' => true];
 
 // Cambio de un concepto desde la cuadrícula. Si su costo sale de la matriz, el costo capturado no se toma.
-// Parámetros: descripcion, unidad, costo, precio_alzado, precio_fijo (+ lo que se agregue después del set)
+// Parámetros: descripcion, unidad, costo, precio_alzado, precio_fijo, url, tipo (+ lo que se agregue después del set)
 const ACRINEO_SQL_CONCEPTO_CAMBIO = "update acrineo_conceptos set descripcion = ?, unidad = ?,
         costo = case when costo_origen = 'matriz' then costo else ? end,
-        precio_alzado = cast(? as boolean), precio_fijo = ?, updated_at = now()";
+        precio_alzado = cast(? as boolean), precio_fijo = ?, url = ?, tipo = ?, updated_at = now()";
+const ACRINEO_CAMPO_TIPO_CONCEPTO = ['tipo' => 'entero', 'min' => 0, 'max' => 99, 'requerido' => true];
 
+// La hoja necesita las migraciones 025 (partidas), 026 (matriz) y 027 (URL y tipo del concepto)
 function acrineoHojaDisponible(): bool
 {
-    return acrineoDisponible() && bd_tiene_tabla('AW', 'acrineo_partidas');
+    return acrineoDisponible() && bd_tiene_tabla('AW', 'acrineo_partidas') && bd_tiene_tabla('AW', 'acrineo_matriz')
+        && bd_tiene_columna('AW', 'acrineo_conceptos', 'url');
 }
 
 // Datos del presupuesto que usa la hoja; 404 si no existe
@@ -65,7 +68,7 @@ function acrineoPartidas(array $ctx): array
 function acrineoRenglonesDe(array $ctx, string $where, array $params): array
 {
     $filas = bd_filas('AW', "select r.renglon_id, r.partida_id, r.concepto_id, r.cantidad, r.orden, c.codigo, c.descripcion, c.unidad, c.costo,
-                                    c.costo_origen, c.precio_alzado, c.precio_fijo
+                                    c.costo_origen, c.precio_alzado, c.precio_fijo, c.url, c.tipo
                                from acrineo_partida_conceptos r
                                join acrineo_partidas p on p.partida_id = r.partida_id
                                join acrineo_conceptos c on c.concepto_id = r.concepto_id
@@ -88,6 +91,8 @@ function acrineoTiparConcepto(array &$c, array $ctx): void
     $c['precio_fijo'] = $c['precio_fijo'] === null ? null : round((float) $c['precio_fijo'], $ctx['dec_costos']);
     $c['matriz'] = $c['costo_origen'] === 'matriz';
     unset($c['costo_origen']);
+    $c['tipo'] = (int) ($c['tipo'] ?? 4);
+    $c['url'] = ($c['url'] ?? '') === '' ? null : $c['url'];
     $c['precio'] = acrineoPrecioConcepto($c['costo'], $ctx['sobrecosto_pct'], $ctx['dec_costos'], $c['precio_alzado'], $c['precio_fijo']);
 }
 
@@ -108,7 +113,7 @@ function acrineoConceptosCatalogo(array $ctx, string $q, int $pagina = 1, int $p
     }
     $porPagina = max(10, min(500, $porPagina));
     $total = (int) bd_valor('AW', "select count(*) from acrineo_conceptos c where $where", $params);
-    $filas = bd_filas('AW', "select c.concepto_id as id, c.codigo, c.descripcion, c.unidad, c.costo, c.costo_origen, c.precio_alzado, c.precio_fijo,
+    $filas = bd_filas('AW', "select c.concepto_id as id, c.codigo, c.descripcion, c.unidad, c.costo, c.costo_origen, c.precio_alzado, c.precio_fijo, c.url, c.tipo,
                                     count(r.renglon_id) as usos, coalesce(sum(r.cantidad), 0) as cantidad_total
                                from acrineo_conceptos c left join acrineo_partida_conceptos r on r.concepto_id = c.concepto_id
                               where $where group by c.concepto_id order by c.codigo limit ? offset ?",
@@ -281,6 +286,11 @@ function acrineoRenglonesGuardar(array $ctx, int $partidaId, array $filas, array
             if ($e) $errores["filas.$n.precio_fijo"] = $e;
             $l['precio_fijo'] = $pf;
         }
+        // URL (solo http/https) y Tipo del concepto (4 si no viene, como Neodata)
+        [$l['url'], $e] = acrineoUrlConcepto($f['url'] ?? null);
+        if ($e) $errores["filas.$n.url"] = $e;
+        [$l['tipo'], $e] = acrineoValor(($f['tipo'] ?? '') === '' || ($f['tipo'] ?? null) === null ? 4 : $f['tipo'], ACRINEO_CAMPO_TIPO_CONCEPTO);
+        if ($e) $errores["filas.$n.tipo"] = $e;
         if ($l['codigo'] !== null) {
             $k = mb_strtoupper($l['codigo']);
             if (isset($codigos[$k])) $errores["filas.$n.codigo"] = 'El código está repetido en la partida.';
@@ -312,7 +322,7 @@ function acrineoRenglonesGuardar(array $ctx, int $partidaId, array $filas, array
                 $cid = $actuales[$l['renglon_id']];
                 if ($existente && (int) $existente['concepto_id'] !== $cid) { $errores["filas.$n.codigo"] = 'Ese código ya es de otro concepto del presupuesto.'; continue; }
                 bd_ejecutar('AW', ACRINEO_SQL_CONCEPTO_CAMBIO . ', codigo = ? where concepto_id = ?',
-                    [$l['descripcion'], $l['unidad'], $l['costo'], $l['precio_alzado'] ? 'true' : 'false', $l['precio_fijo'], $l['codigo'], $cid]);
+                    [$l['descripcion'], $l['unidad'], $l['costo'], $l['precio_alzado'] ? 'true' : 'false', $l['precio_fijo'], $l['url'], $l['tipo'], $l['codigo'], $cid]);
                 bd_ejecutar('AW', 'update acrineo_partida_conceptos set cantidad = ? where renglon_id = ?', [$l['cantidad'], $l['renglon_id']]);
                 $resumen['modificados']++;
                 continue;
@@ -321,11 +331,11 @@ function acrineoRenglonesGuardar(array $ctx, int $partidaId, array $filas, array
                 $cid = (int) $existente['concepto_id'];
                 if (in_array($cid, $actuales, true)) { $errores["filas.$n.codigo"] = 'Ese concepto ya está en esta partida.'; continue; }
                 bd_ejecutar('AW', ACRINEO_SQL_CONCEPTO_CAMBIO . ' where concepto_id = ?',
-                    [$l['descripcion'], $l['unidad'], $l['costo'], $l['precio_alzado'] ? 'true' : 'false', $l['precio_fijo'], $cid]);
+                    [$l['descripcion'], $l['unidad'], $l['costo'], $l['precio_alzado'] ? 'true' : 'false', $l['precio_fijo'], $l['url'], $l['tipo'], $cid]);
             } else {
                 $cid = bd_insertar('AW', 'acrineo_conceptos', 'concepto_id', ['presupuesto_id' => $ctx['id'], 'codigo' => $l['codigo'],
                     'descripcion' => $l['descripcion'], 'unidad' => $l['unidad'], 'costo' => $l['costo'],
-                    'precio_alzado' => $l['precio_alzado'] ? 'true' : 'false', 'precio_fijo' => $l['precio_fijo']]);
+                    'precio_alzado' => $l['precio_alzado'] ? 'true' : 'false', 'precio_fijo' => $l['precio_fijo'], 'url' => $l['url'], 'tipo' => $l['tipo']]);
             }
             $rid = bd_insertar('AW', 'acrineo_partida_conceptos', 'renglon_id', ['partida_id' => $partidaId, 'concepto_id' => $cid,
                 'cantidad' => $l['cantidad'], 'orden' => $orden++]);
@@ -422,7 +432,7 @@ function acrineoTransaccion(callable $fn)
 
 function acrineoConceptoFila(array $ctx, int $conceptoId): array
 {
-    $c = bd_fila('AW', 'select concepto_id, codigo, descripcion, unidad, costo, costo_origen, precio_alzado, precio_fijo
+    $c = bd_fila('AW', 'select concepto_id, codigo, descripcion, unidad, costo, costo_origen, precio_alzado, precio_fijo, url, tipo
                           from acrineo_conceptos where concepto_id = ? and presupuesto_id = ?', [$conceptoId, $ctx['id']]);
     if (!$c) throw new AcrineoError('El concepto ya no existe.', 404);
     $c['concepto_id'] = (int) $c['concepto_id'];

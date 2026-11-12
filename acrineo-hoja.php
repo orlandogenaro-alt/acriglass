@@ -12,7 +12,7 @@ $id = max(0, (int) ($_GET['id'] ?? 0));
 $aviso = '';
 $ctx = null;
 try {
-    if (!acrineoHojaDisponible()) $aviso = 'Falta aplicar la migración 025_acrineo_hoja_presupuesto.sql (php herramientas/migrar.php --aplicar).';
+    if (!acrineoHojaDisponible()) $aviso = 'Faltan las migraciones de la hoja (025, 026 y 027) (php herramientas/migrar.php --aplicar).';
     else $ctx = acrineoHojaContexto($id);
 } catch (AcrineoError $e) {
     $aviso = $e->getMessage();
@@ -128,6 +128,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
                     <table class="an-tabla an-renglones">
                         <thead><tr>
                             <th class="an-col-sel" scope="col"><div class="an-th"><input type="checkbox" id="anRenglonesTodos" aria-label="Marcar todos"></div></th>
+                            <th scope="col" class="an-col-url" title="Enlace del concepto (ficha técnica, plano…)"><div class="an-th"><span>URL</span></div></th>
                             <th scope="col" class="an-col-pa" title="Precio alzado: el precio unitario se captura fijo"><div class="an-th"><span>P.A.</span></div></th>
                             <th scope="col"><div class="an-th"><span>Código</span></div></th>
                             <th scope="col"><div class="an-th"><span>Descripción completa</span></div></th>
@@ -136,6 +137,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
                             <th scope="col" class="num"><div class="an-th"><span>Costo</span></div></th>
                             <th scope="col" class="num"><div class="an-th"><span>Precio</span></div></th>
                             <th scope="col" class="num"><div class="an-th"><span>Importe</span></div></th>
+                            <th scope="col" class="num an-col-tipo" title="Tipo de concepto"><div class="an-th"><span>Tipo</span></div></th>
                             <th scope="col" title="Matriz de precio unitario"><div class="an-th"><span>P.U.</span></div></th>
                         </tr></thead>
                         <tbody id="anRenglones"></tbody>
@@ -168,6 +170,8 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
                             <th scope="col" class="num"><div class="an-th"><span>Costo</span></div></th>
                             <th scope="col" class="num"><div class="an-th"><span>Precio</span></div></th>
                             <th scope="col" class="num"><div class="an-th"><span>En partidas</span></div></th>
+                            <th scope="col" class="num"><div class="an-th"><span>Tipo</span></div></th>
+                            <th scope="col"><div class="an-th"><span>URL</span></div></th>
                             <th scope="col"><div class="an-th"><span>P.U.</span></div></th>
                         </tr></thead>
                         <tbody id="anConceptos"></tbody>

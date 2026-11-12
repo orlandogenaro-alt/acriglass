@@ -223,3 +223,13 @@ prueba('precio del concepto: costo × sobrecosto, o el precio fijo si es P.A.', 
     igual(999.0, acrineoPrecioConcepto(1000, 15, 2, true, 999));
     igual(0.0, acrineoPrecioConcepto(1000, 15, 2, true, null));
 });
+
+prueba('URL del concepto: solo http/https, vacía = sin enlace', function () {
+    igual([null, null], acrineoUrlConcepto('  '));
+    igual(['https://proveedor.mx/ficha-vidrio.pdf', null], acrineoUrlConcepto(' https://proveedor.mx/ficha-vidrio.pdf '));
+    igual('http://x.mx/a?b=1', acrineoUrlConcepto('http://x.mx/a?b=1')[0]);
+    foreach (['javascript:alert(1)', 'ftp://x.mx/a', 'www.sin-esquema.mx', 'https://con espacio.mx', 'data:text/html,<b>x</b>'] as $mala) {
+        verificar(acrineoUrlConcepto($mala)[1] !== null, "se aceptó «{$mala}»");
+    }
+    verificar(acrineoUrlConcepto('https://x.mx/' . str_repeat('a', 500))[1] !== null, 'más de 500 caracteres');
+});

@@ -20,6 +20,18 @@ function acrineoPrecioConcepto(float $costo, float $sobrecostoPct, int $decimale
     return $precioAlzado ? round((float) $precioFijo, $decimales) : acrineoPrecioUnitario($costo, $sobrecostoPct, $decimales);
 }
 
+// URL del concepto: vacía (null) o una dirección http/https válida. Regresa [url|null, error|null]
+function acrineoUrlConcepto($v): array
+{
+    $v = trim((string) ($v ?? ''));
+    if ($v === '') return [null, null];
+    if (mb_strlen($v) > 500) return [null, 'Máximo 500 caracteres.'];
+    if (!preg_match('~^https?://\S+$~i', $v) || filter_var($v, FILTER_VALIDATE_URL) === false) {
+        return [null, 'Debe ser una dirección que empiece con http:// o https://'];
+    }
+    return [$v, null];
+}
+
 const ACRINEO_TIPOS_INSUMO = ['MAT' => 'Materiales', 'MO' => 'Mano de obra', 'EQ' => 'Equipo y maquinaria', 'HER' => 'Herramienta',
                               'BAS' => 'Básicos', 'OTR' => 'Otros'];
 

@@ -12,8 +12,17 @@
     var $ = function (id) { return document.getElementById(id); };
     var esc = AN.ui.esc;
     var tbody = $('anRenglones');
-    var COLS = 10;
-    var CAMPOS = ['codigo', 'descripcion', 'unidad', 'cantidad', 'costo', 'precio_alzado', 'precio_fijo'];
+    var COLS = 12;
+    var CAMPOS = ['codigo', 'descripcion', 'unidad', 'cantidad', 'costo', 'precio_alzado', 'precio_fijo', 'url', 'tipo'];
+    var ICONO_URL = '<svg class="i" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>';
+    var urlValida = function (u) { return /^https?:\/\/\S+$/i.test(String(u || '').trim()); };
+
+    // Botón de la columna URL: abre el enlace del concepto en otra pestaña (solo http/https)
+    function botonUrl(url) {
+        return urlValida(url)
+            ? '<a class="an-btn-url" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" title="' + esc(url) + '" aria-label="Abrir el enlace del concepto">' + ICONO_URL + '</a>'
+            : '<span class="an-btn-url vacia" title="Sin enlace">' + ICONO_URL + '</span>';
+    }
 
     var st = { filas: [], editando: false, borradores: [], quitar: new Set(), marcados: new Set(), sec: 0, guardando: false, cargando: 0,
                deshacer: [], rehacer: [], fotoPendiente: null };
@@ -94,21 +103,23 @@
                 var precio = precioDe(b), importe = H.redondear(Number(b.cantidad) * precio, H.ctx.dec_costos);
                 html += '<tr class="an-fila' + (!b.renglon_id ? ' nuevo-renglon' : modificado(b) ? ' modificado' : '') + '" data-clave="' + b.clave + '">'
                     + '<td class="an-col-sel"><input type="checkbox" data-marcar="' + b.clave + '"' + (st.marcados.has(b.clave) ? ' checked' : '') + ' aria-label="Marcar renglón"></td>'
+                    + '<td><input class="an-celda-in" type="url" data-k="url" value="' + esc(b.url) + '" maxlength="500" placeholder="https://…" aria-label="URL del concepto"></td>'
                     + '<td class="an-col-pa"><input type="checkbox" data-k="precio_alzado"' + (b.precio_alzado ? ' checked' : '') + ' aria-label="Precio alzado (P.A.)" title="P.A.: precio unitario fijo"></td>'
                     + celda(b, 'codigo', 'text', 30) + celda(b, 'descripcion', 'text', 4000) + celda(b, 'unidad', 'text', 20)
                     + celda(b, 'cantidad', 'number', null, 'num')
                     + (b.matriz ? '<td class="num" title="Sale de su matriz de P.U.">' + AN.ui.dinero(b.costo) + '<span class="an-insignia">M</span></td>' : celda(b, 'costo', 'number', null, 'num'))
                     + (b.precio_alzado ? celda(b, 'precio_fijo', 'number', null, 'num') : '<td class="num" data-precio>' + AN.ui.dinero(precio) + '</td>')
-                    + '<td class="num" data-importe>' + AN.ui.dinero(importe) + '</td><td></td></tr>';
+                    + '<td class="num" data-importe>' + AN.ui.dinero(importe) + '</td>'
+                    + '<td><input class="an-celda-in num" type="number" data-k="tipo" value="' + esc(b.tipo) + '" min="0" max="99" step="1" inputmode="numeric" aria-label="Tipo"></td><td></td></tr>';
             });
         } else {
             st.filas.forEach(function (r) {
                 html += '<tr class="an-fila" data-renglon="' + r.renglon_id + '">'
-                    + '<td class="an-col-sel"></td><td class="an-col-pa">' + (r.precio_alzado ? '<span class="an-pa" title="Precio alzado">✕</span>' : '') + '</td>'
+                    + '<td class="an-col-sel"></td><td class="an-col-url">' + botonUrl(r.url) + '</td><td class="an-col-pa">' + (r.precio_alzado ? '<span class="an-pa" title="Precio alzado">✕</span>' : '') + '</td>'
                     + '<td>' + esc(r.codigo) + '</td><td class="an-desc">' + esc(r.descripcion) + '</td><td>' + esc(r.unidad || '') + '</td>'
                     + '<td class="num">' + cantidad(r.cantidad) + '</td><td class="num">' + AN.ui.dinero(r.costo) + (r.matriz ? '<span class="an-insignia" title="Costo de su matriz de P.U.">M</span>' : '') + '</td>'
                     + '<td class="num">' + AN.ui.dinero(r.precio) + '</td><td class="num">' + AN.ui.dinero(r.importe) + '</td>'
-                    + '<td>' + botonPU(r) + '</td></tr>';
+                    + '<td class="num">' + esc(r.tipo) + '</td><td>' + botonPU(r) + '</td></tr>';
             });
         }
         if (!html) {
@@ -172,6 +183,8 @@
             ['codigo', 'descripcion', 'unidad', 'cantidad', 'costo'].forEach(function (k) { b[k] = r[k] == null ? '' : String(r[k]); });
             b.precio_alzado = !!r.precio_alzado;
             b.precio_fijo = r.precio_fijo == null ? '' : String(r.precio_fijo);
+            b.url = r.url || '';
+            b.tipo = String(r.tipo == null ? 4 : r.tipo);
             b.original = Object.assign({}, b);
             return b;
         });
@@ -191,7 +204,7 @@
 
     function agregar() {
         guardarFoto();
-        var b = { clave: 'n' + (++st.sec), renglon_id: null, matriz: false, codigo: '', descripcion: '', unidad: '', cantidad: '1', costo: '0', precio_alzado: false, precio_fijo: '' };
+        var b = { clave: 'n' + (++st.sec), renglon_id: null, matriz: false, codigo: '', descripcion: '', unidad: '', cantidad: '1', costo: '0', precio_alzado: false, precio_fijo: '', url: '', tipo: '4' };
         st.borradores.push(b);
         pintar();
         var input = tbody.querySelector('tr[data-clave="' + b.clave + '"] input[data-k="codigo"]');
@@ -218,6 +231,8 @@
             if (!b.unidad.trim()) b.unidad = c.unidad || '';
             if (Number(b.costo) === 0) b.costo = String(c.costo);
             b.matriz = c.matriz;
+            if (!String(b.url).trim() && c.url) b.url = c.url;
+            if (String(b.tipo) === '4' && c.tipo != null) b.tipo = String(c.tipo);
             if (c.precio_alzado && !b.precio_alzado) { b.precio_alzado = true; b.precio_fijo = String(c.precio_fijo == null ? '' : c.precio_fijo); }
             pintar();
             estado('«' + c.codigo + '» ya está en el catálogo: se usan sus datos (si los cambias, cambian en todas sus partidas).', 'info');
@@ -245,10 +260,11 @@
         enviar.forEach(function (b) {
             var tr = tbody.querySelector('tr[data-clave="' + b.clave + '"]');
             [['codigo', !String(b.codigo).trim()], ['descripcion', !String(b.descripcion).trim()], ['cantidad', !noNeg(b.cantidad)],
-             ['costo', !b.matriz && !noNeg(b.costo)], ['precio_fijo', b.precio_alzado && !noNeg(b.precio_fijo)]]
+             ['costo', !b.matriz && !noNeg(b.costo)], ['precio_fijo', b.precio_alzado && !noNeg(b.precio_fijo)],
+             ['url', String(b.url).trim() !== '' && !urlValida(b.url)], ['tipo', !/^\d{1,2}$/.test(String(b.tipo).trim())]]
                 .forEach(function (x) { if (x[1]) { malos++; var i = tr && tr.querySelector('input[data-k="' + x[0] + '"]'); if (i) { i.classList.add('invalido'); i.title = 'Es obligatorio (y no negativo).'; } } });
         });
-        if (malos) { estado('Revisa los renglones marcados: código, descripción, cantidad y costo (o precio si es P.A.) son obligatorios.', 'error'); return; }
+        if (malos) { estado('Revisa los renglones marcados: código, descripción, cantidad y costo (o precio si es P.A.) son obligatorios; la URL debe empezar con http:// o https:// y el Tipo es un número de 0 a 99.', 'error'); return; }
 
         st.guardando = true;
         botones();
@@ -258,7 +274,7 @@
                 accion: 'renglones_guardar', partida_id: p.id,
                 filas: enviar.map(function (b) {
                     var f = { renglon_id: b.renglon_id, precio_alzado: !!b.precio_alzado, precio_fijo: b.precio_alzado ? String(b.precio_fijo).trim() : null };
-                    ['codigo', 'descripcion', 'unidad', 'cantidad', 'costo'].forEach(function (k) { f[k] = String(b[k]).trim(); });
+                    ['codigo', 'descripcion', 'unidad', 'cantidad', 'costo', 'url', 'tipo'].forEach(function (k) { f[k] = String(b[k]).trim(); });
                     return f;
                 }),
                 quitar: Array.from(st.quitar)

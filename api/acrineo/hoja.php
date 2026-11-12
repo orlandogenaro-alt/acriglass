@@ -28,7 +28,7 @@ session_write_close();
 $id = max(0, (int) ($_GET['id'] ?? 0));
 
 try {
-    if (!acrineoHojaDisponible()) error('Falta aplicar la migración 025_acrineo_hoja_presupuesto.sql.', 503);
+    if (!acrineoHojaDisponible()) error('Faltan las migraciones de la hoja (025, 026 y 027).', 503);
     if (!$id) error('Falta el presupuesto.', 400);
     $ctx = acrineoHojaContexto($id);
 

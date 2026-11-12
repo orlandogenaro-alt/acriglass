@@ -527,6 +527,29 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-matriz .an-col-n { width: 70px; color: var(--texto-2); }
 .an-matriz tr.an-libre td.an-col-n .an-insignia { background: var(--ambar-suave); color: var(--ambar); border-color: var(--ambar-borde); }
 .an-matriz select.an-celda-in { min-width: 120px; }
+/* Edición tipo hoja: celdas sin caja, el nombre de la columna como guía y la celda activa con marco azul */
+.an-matriz tr.an-fila:has(.an-celda-in) td { border-bottom: 1px solid var(--azul-texto); }
+.an-matriz input.an-celda-in, .an-matriz select.an-celda-in {
+    border: 2px solid transparent; border-radius: 0; background: transparent; box-shadow: none; font-style: italic;
+}
+.an-matriz select.an-celda-in { appearance: none; -webkit-appearance: none; cursor: pointer; }
+.an-matriz input.an-celda-in.num { padding-right: 10px; -moz-appearance: textfield; }
+.an-matriz input.an-celda-in.num::-webkit-inner-spin-button, .an-matriz input.an-celda-in.num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.an-matriz input.an-celda-in::placeholder { color: var(--texto-3); }
+.an-matriz input.an-celda-in:hover, .an-matriz select.an-celda-in:hover { border-color: var(--borde-2); }
+.an-matriz input.an-celda-in:focus, .an-matriz select.an-celda-in:focus {
+    outline: none; border-color: var(--azul-texto); background: var(--input); box-shadow: none; font-style: normal;
+}
+.an-matriz input.an-celda-in[readonly] { background: transparent; }
+.an-matriz .an-celda-unidad .an-btn-buscar { opacity: 0; transition: opacity .12s; }
+.an-matriz td:hover .an-celda-unidad .an-btn-buscar, .an-matriz .an-celda-unidad:focus-within .an-btn-buscar { opacity: 1; }
+.an-matriz-acciones td { padding: 14px 16px; text-align: right; background: var(--sub); }
+.an-btn-texto {
+    margin-left: 16px; padding: 4px 6px; border: 0; background: none; color: var(--azul-texto);
+    font: inherit; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+}
+.an-btn-texto:hover:not(:disabled) { text-decoration: underline; }
+.an-btn-texto:disabled { opacity: .45; cursor: default; }
 .an-matriz-pie { gap: 14px; flex-wrap: wrap; }
 .an-matriz-pie .an-estado { flex: 1 1 200px; }
 .an-matriz-totales { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; font-size: 12.5px; color: var(--texto-2); }

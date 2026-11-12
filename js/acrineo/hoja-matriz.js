@@ -17,6 +17,7 @@
     var tbody = $('anMatrizFilas');
     var cuerpoCat = $('anInsumosFilas');
     var COLS = 11;
+    var ETIQUETAS = { codigo: 'Código', descripcion: 'Descripción completa', unidad: 'Unidad', costo: 'Costo', cantidad: 'Cantidad', desperdicio_pct: '% Desp.' };
     var TIPOS = { MAT: 'Materiales', MO: 'Mano de obra', EQ: 'Equipo y maquinaria', HER: 'Herramienta', BAS: 'Básicos', OTR: 'Otros' };
     var BASES = { '': 'Por unidad', pct_mo: '% de M.O.', pct_mat: '% de materiales' };
     var CAMPOS = ['tipo', 'codigo', 'descripcion', 'unidad', 'base', 'cantidad', 'desperdicio_pct', 'costo'];
@@ -123,7 +124,7 @@
                         return '<option value="' + o + '"' + (String(f[k] || '') === o ? ' selected' : '') + '>' + esc(opciones[o]) + '</option>';
                     }).join('') + '</select>';
                 };
-                var inp = function (k, tipo, extra) { return '<input class="an-celda-in' + (tipo === 'number' ? ' num' : '') + '" type="' + tipo + '" data-k="' + k + '" value="' + esc(f[k]) + '"' + (extra || '') + ' aria-label="' + k + '">'; };
+                var inp = function (k, tipo, extra) { return '<input class="an-celda-in' + (tipo === 'number' ? ' num' : '') + '" type="' + tipo + '" data-k="' + k + '" value="' + esc(f[k]) + '"' + (extra || '') + ' placeholder="' + ETIQUETAS[k] + '" aria-label="' + ETIQUETAS[k] + '">'; };
                 celdas = '<td>' + inp('codigo', 'text', ' maxlength="30"') + '</td>'
                     + '<td class="an-desc">' + inp('descripcion', 'text', ' maxlength="250"') + '</td>'
                     + '<td>' + sel('tipo', TIPOS) + '</td>'
@@ -144,6 +145,11 @@
                 + '<td class="num an-col-n">' + (n + 1) + (f.insumo_id ? '' : '<span class="an-insignia" title="Renglón libre (no está en el catálogo)">L</span>') + '</td>'
                 + celdas + '<td class="num" data-importe>' + AN.ui.dinero(f._importe) + '</td></tr>';
         });
+        if (html && ed) {
+            html += '<tr class="an-matriz-acciones"><td colspan="' + COLS + '">'
+                + '<button type="button" class="an-btn-texto" data-cancelar>Cancelar</button>'
+                + '<button type="button" class="an-btn-texto" data-aplicar' + (sucio() && !st.guardando ? '' : ' disabled') + '>Aplicar</button></td></tr>';
+        }
         if (!html) {
             html = '<tr class="an-vacio' + (ed && !st.filas.length ? ' an-vacio-grande' : '') + '"><td colspan="' + COLS + '">' + (st.filas.length ? 'Ningún insumo coincide con el filtro.'
                 : ed ? 'La cuadrícula no tiene datos.<br><button type="button" class="an-btn an-mini an-primario an-agregar-registro" data-agregar-registro>Agregar registro</button>'
@@ -177,6 +183,8 @@
         $('anMatrizEditar').setAttribute('aria-pressed', String(ed));
         $('anMatrizEditar').title = ed ? 'Salir de la edición' : 'Editar la matriz';
         $('anMatrizGuardar').disabled = $('anMatrizGuardarCab').disabled = st.guardando || !s;
+        var aplicar = tbody.querySelector('[data-aplicar]');
+        if (aplicar) aplicar.disabled = st.guardando || !s;
         $('anMatrizCancelar').disabled = !ed;
         $('anMatrizQuitar').disabled = !ed || !st.marcados.size;
         $('anMatrizDeshacer').disabled = !ed || !st.deshacer.length;
@@ -318,7 +326,7 @@
         $('anMatrizQ').value = '';
         calcular();
         pintar();
-        var ult = tbody.querySelector('tr:last-child');
+        var ult = [].slice.call(tbody.querySelectorAll('tr[data-clave]')).pop();
         if (ult) ult.scrollIntoView({ block: 'nearest' });
     }
 
@@ -494,12 +502,14 @@
         $('anMatrizRehacer').addEventListener('click', rehacer);
         function agregarLibre() {
             agregarFilas([{}]);
-            var i = tbody.querySelector('tr:last-child [data-k="descripcion"]');
+            var i = [].slice.call(tbody.querySelectorAll('tr[data-clave] [data-k="descripcion"]')).pop();
             if (i) i.focus();
         }
         $('anMatrizLibre').addEventListener('click', agregarLibre);
         tbody.addEventListener('click', function (e) {
             if (e.target.closest('[data-agregar-registro]')) agregarLibre();
+            else if (e.target.closest('[data-aplicar]')) guardar();
+            else if (e.target.closest('[data-cancelar]')) cancelarEdicion();
         });
         $('anMatrizQuitar').addEventListener('click', function () {
             if (!st.marcados.size) return;

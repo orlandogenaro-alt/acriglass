@@ -349,20 +349,6 @@
     $('anFiltroAplicar').addEventListener('click', aplicarFiltro);
     $('anFiltroTodo').addEventListener('change', function () { if (H.filtro.q) aplicarFiltro(); });
 
-    // Cuadrícula (arriba a la derecha): muestra u oculta el catálogo de conceptos de abajo
-    function verCatalogo(si) {
-        $('anPanelCatalogo').hidden = !si;
-        $('anHojaDerecha').classList.toggle('sin-catalogo', !si);
-        $('anVistaCatalogo').setAttribute('aria-pressed', String(si));
-        $('anVistaCatalogo').classList.toggle('an-primario', si);
-        $('anVistaCatalogo').title = si ? 'Ocultar el catálogo de conceptos' : 'Mostrar el catálogo de conceptos';
-        try { localStorage.setItem('acrineo.hoja.catalogo', si ? '1' : '0'); } catch (e) { /* sin memoria */ }
-    }
-    var catalogoGuardado = null;
-    try { catalogoGuardado = localStorage.getItem('acrineo.hoja.catalogo'); } catch (e) { /* sin memoria */ }
-    verCatalogo(catalogoGuardado !== '0');
-    $('anVistaCatalogo').addEventListener('click', function () { verCatalogo($('anPanelCatalogo').hidden); });
-
     // ⋮ del árbol de partidas
     if (AN.rejilla) AN.rejilla.opciones('partidas', {
         fijas: 1,

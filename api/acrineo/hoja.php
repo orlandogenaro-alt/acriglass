@@ -3,6 +3,7 @@
 //   GET  ?id=P                                  presupuesto (totales) y partidas en árbol
 //   GET  ?id=P&partida=X                         además, los conceptos de la partida
 //   GET  ?id=P&recurso=conceptos&q=&pagina=      catálogo de conceptos del presupuesto
+//   GET  ?id=P&recurso=calculo                    opciones de la ventana «Cálculo» · POST calcular {opciones…, marcados} (includes/acrineo/calculo.php)
 //   GET  ?id=P&recurso=filtrar&q=                partidas con conceptos que coinciden (filtro de todo el presupuesto)
 //   GET  ?id=P&recurso=codigo&padre=X           código sugerido para una partida nueva
 //   POST ?id=P  { accion, … }                    cambios (regresa el estado de la hoja):
@@ -19,6 +20,7 @@ require __DIR__ . '/../../includes/respuesta.php';
 require_once __DIR__ . '/../../includes/bd.php';
 require __DIR__ . '/../../includes/acrineo/permisos.php';
 require __DIR__ . '/../../includes/acrineo/hoja.php';
+require __DIR__ . '/../../includes/acrineo/calculo.php';
 
 acrineoExigir('presupuestos.ver');
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -44,6 +46,8 @@ try {
                 responder(['ok' => true] + acrineoInsumosBuscar((string) ($_GET['q'] ?? ''), (int) ($_GET['pagina'] ?? 1)));
             case 'insumos_tabla':
                 responder(['ok' => true] + acrineoInsumosTabla((string) ($_GET['q'] ?? ''), (int) ($_GET['pagina'] ?? 1), (int) ($_GET['por_pagina'] ?? 100)));
+            case 'calculo':
+                responder(['ok' => true, 'opciones' => acrineoCalculoOpciones($ctx), 'monedas' => acrineoHojaMonedas($id)]);
             case 'filtrar':
                 responder(['ok' => true] + acrineoPartidasConConceptos($ctx, (string) ($_GET['q'] ?? '')));
             case 'codigo':
@@ -92,6 +96,9 @@ try {
         case 'matriz_guardar':
             $extra['matriz'] = acrineoMatrizGuardar($ctx, (int) ($in['concepto_id'] ?? 0), is_array($in['filas'] ?? null) ? $in['filas'] : [], $usuario,
                 (int) ($in['padre_id'] ?? 0) ?: null);
+            break;
+        case 'calcular':
+            $extra['calculo'] = acrineoCalculoEjecutar($ctx, $in, $usuario);
             break;
         case 'sobrecosto':
             acrineoSobrecostoGuardar($ctx, $in['sobrecosto_pct'] ?? null, $usuario);

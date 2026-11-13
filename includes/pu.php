@@ -269,12 +269,12 @@ function puNumeroTexto($v): ?float
 // ---------- Carga desde la base (Supabase) ----------
 
 // Tipo de cambio vigente de cada moneda: ['USD' => 18.25] (vacío sin la tabla o sin capturas)
-function puTiposCambio(): array
+function puTiposCambio(?string $fecha = null): array
 {
     if (!bd_tiene_tabla('AW', 'tipos_cambio')) return [];
     $r = [];
     foreach (bd_filas('AW', 'select distinct on (moneda) moneda, tipo_cambio from tipos_cambio
-                              where fecha <= current_date order by moneda, fecha desc, tipo_cambio_id desc') as $f) {
+                              where fecha <= coalesce(cast(? as date), current_date) order by moneda, fecha desc, tipo_cambio_id desc', [$fecha]) as $f) {
         $r[trim($f['moneda'])] = (float) $f['tipo_cambio'];
     }
     return $r;
@@ -286,15 +286,19 @@ function puDisponible(): bool
     return bd_tiene_tabla('AW', 'insumos');
 }
 
-// Catálogo completo con su precio vigente: [$insumos, $componentes] para puCostoInsumo
-function puCargarCatalogo(): array
+// Catálogo completo con su precio vigente: [$insumos, $componentes] para puCostoInsumo.
+// Con $fecha ('AAAA-MM-DD'), el precio vigente en esa fecha en lugar del de hoy.
+function puCargarCatalogo(?string $fecha = null): array
 {
     $insumos = [];
-    foreach (bd_filas('AW', 'select i.insumo_id, i.clave, i.descripcion, i.tipo, i.fsr, i.familia, i.estatus, u.clave as unidad,
+    $precio = $fecha === null ? 'left join insumos_precio_vigente p on p.insumo_id = i.insumo_id'
+        : 'left join lateral (select precio, moneda, vigente_desde from insumo_precios x where x.insumo_id = i.insumo_id and x.vigente_desde <= cast(? as date)
+                               order by x.vigente_desde desc, x.precio_id desc limit 1) p on true';
+    foreach (bd_filas('AW', "select i.insumo_id, i.clave, i.descripcion, i.tipo, i.fsr, i.familia, i.estatus, u.clave as unidad,
                                     p.precio, p.moneda, p.vigente_desde
                                from insumos i
                                join unidades u on u.unidad_id = i.unidad_id
-                               left join insumos_precio_vigente p on p.insumo_id = i.insumo_id') as $f) {
+                               $precio", $fecha === null ? [] : [$fecha]) as $f) {
         $insumos[(int) $f['insumo_id']] = $f;
     }
     $componentes = [];

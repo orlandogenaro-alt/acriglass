@@ -441,8 +441,45 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-pop-lista .an-check { padding: 4px 4px; border-radius: 4px; font-size: 12.5px; margin: 0; }
 .an-pop-lista .an-check:hover { background: var(--fila-hover); }
 .an-pop-rejilla .an-pop-lista input { width: 15px; height: 15px; padding: 0; }
-.an-hoja-derecha.sin-catalogo { grid-template-rows: minmax(0, 1fr); }
-.an-panel-catalogo[hidden] { display: none; }
+
+/* Ventana «Cálculo: <presupuesto>» (como Neodata: dos columnas de recuadros) */
+.an-calculo-dlg { width: min(940px, 96vw); max-height: 94vh; }
+.an-calculo-dlg form { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.an-calculo-dlg .an-titulo-barra svg.i { width: 18px; height: 18px; }
+.an-calculo-cuerpo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; padding: 12px 18px; overflow: auto; }
+.an-calculo-col { display: flex; flex-direction: column; gap: 10px; }
+.an-calculo-caja { display: grid; gap: 4px; margin: 0; padding: 4px 14px 10px; border: 1px solid var(--azul-borde); border-radius: 10px; }
+.an-calculo-caja legend { padding: 0 4px; font-size: 13px; color: var(--texto); }
+.an-calculo-caja .an-check, .an-calculo-suelto { padding: 6px 4px; font-size: 14px; font-weight: 600; white-space: normal; }
+.an-calculo-suelto { margin: 6px 0 0 10px; }
+.an-calculo-fila { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 4px; font-size: 13px; }
+.an-calculo-fila .an-check { flex: 1; }
+.an-calculo-num { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.an-calculo-num input { width: 70px; height: 30px; padding: 0 6px; text-align: center; border: none; border-bottom: 1px dashed var(--borde-2); background: none; font-size: 14px; }
+.an-calculo-fecha input { width: 150px; }
+.an-calculo-num input:focus { outline: none; border-bottom: 2px solid var(--azul-texto); }
+.an-calculo-num input:disabled { color: var(--texto-3); }
+.an-calculo-num input.invalido { border-bottom-color: var(--rojo); }
+.an-calculo-pie { display: flex; align-items: center; gap: 8px; padding: 8px 18px 12px; border-top: 1px solid var(--linea); }
+
+/* Resultado del cálculo: explosión de insumos */
+.an-explosion-dlg { width: min(1100px, 96vw); height: min(760px, 92vh); }
+.an-explosion-cuerpo { flex: 1; min-height: 0; overflow: auto; padding: 12px 18px 18px; }
+.an-explosion-resumen { margin-bottom: 10px; color: var(--texto-2); }
+.an-explosion-h { margin: 12px 0 6px; font-size: 14px; color: var(--azul-texto); }
+.an-explosion-errores { margin: 6px 0 12px; padding: 8px 12px; border-radius: 8px; background: var(--ambar-suave); border: 1px solid var(--ambar-borde); }
+.an-explosion-errores h3 { font-size: 13px; color: var(--ambar); margin-bottom: 4px; }
+.an-explosion-errores ul { margin: 0; padding-left: 18px; font-size: 12.5px; max-height: 180px; overflow: auto; }
+.an-explosion th { position: static; }
+.an-explosion .an-desc { white-space: normal; min-width: 260px; }
+.an-explosion tr.an-explosion-sub td { font-weight: 700; background: var(--sub); text-align: right; }
+.an-explosion tr.an-explosion-sub td.num { color: var(--enfasis); }
+.an-explosion-total { margin-top: 8px; text-align: right; font-size: 14px; }
+.an-explosion-total b { color: var(--enfasis); }
+.an-explosion-concepto { margin-top: 8px; border: 1px solid var(--borde); border-radius: 8px; }
+.an-explosion-concepto summary { display: flex; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px; }
+.an-explosion-concepto .an-explosion { border-top: 1px solid var(--borde); }
+@media (max-width: 760px) { .an-calculo-cuerpo { grid-template-columns: 1fr; } }
 
 /* Gráfica del catálogo de conceptos: una barra por concepto, de mayor a menor */
 .an-grafica-dlg { width: min(860px, 94vw); max-height: 88vh; }

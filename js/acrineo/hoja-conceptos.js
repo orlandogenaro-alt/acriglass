@@ -118,6 +118,8 @@
         botones();
     }
     if ($('anCopiar')) $('anCopiar').addEventListener('click', copiar);
+    // Conceptos marcados (para «Sólo conceptos marcados» de la ventana Cálculo)
+    AN.hojaConceptos = { marcados: function () { return Array.from(st.marcados.keys()); } };
 
     // Gráfica: importe de cada concepto en el presupuesto (precio × cantidad en todas sus partidas), de mayor a menor;
     // después de los 15 primeros, el resto se junta en «Otros».

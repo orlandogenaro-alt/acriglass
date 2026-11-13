@@ -696,9 +696,9 @@
     $('anMatrizAnterior').addEventListener('click', function () { vecino(-1); });
     $('anMatrizSiguiente').addEventListener('click', function () { vecino(1); });
     $('anMatrizRegresar').addEventListener('click', regresar);
-    // Doble clic en un renglón: abre su propia matriz («Código: 50450 -> B12»)
+    // Doble clic en cualquier parte del renglón (también en sus celdas al editar): abre su propia matriz («Código: 50450 -> B12»)
     tbody.addEventListener('dblclick', function (e) {
-        if (e.target.closest('input, select, textarea, button, a')) return;
+        if (e.target.closest('select, textarea, button, a, input[type=checkbox]')) return;
         var tr = e.target.closest('tr[data-clave]');
         if (!tr) return;
         var f = st.filas.find(function (x) { return x.clave === tr.dataset.clave; });

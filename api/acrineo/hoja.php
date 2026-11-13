@@ -3,10 +3,11 @@
 //   GET  ?id=P                                  presupuesto (totales) y partidas en árbol
 //   GET  ?id=P&partida=X                         además, los conceptos de la partida
 //   GET  ?id=P&recurso=conceptos&q=&pagina=      catálogo de conceptos del presupuesto
-//   GET  ?id=P&recurso=codigo&padre=X            código sugerido para una partida nueva
+//   GET  ?id=P&recurso=filtrar&q=                partidas con conceptos que coinciden (filtro de todo el presupuesto)
+//   GET  ?id=P&recurso=codigo&padre=X           código sugerido para una partida nueva
 //   POST ?id=P  { accion, … }                    cambios (regresa el estado de la hoja):
 //        partida_crear {padre_id, codigo, descripcion} · partida_guardar {partida_id, codigo, descripcion}
-//        partida_eliminar {partida_id} · partida_mover {partida_id, direccion: arriba|abajo|izquierda|derecha}
+//        partida_eliminar {partida_id} · partida_duplicar {partida_id} · partida_mover {partida_id, direccion: arriba|abajo|izquierda|derecha}
 //        renglones_guardar {partida_id, filas, quitar} · copiar {partida_id, conceptos: [{concepto_id, cantidad}]}
 //        concepto_eliminar {concepto_id} · sobrecosto {sobrecosto_pct} · matriz_guardar {concepto_id, padre_id?, filas}
 //   GET  ?id=P&recurso=matriz&concepto=C[&padre=M][&actualizar=1]  matriz de P.U. del concepto o la del renglón M de ella
@@ -43,6 +44,8 @@ try {
                 responder(['ok' => true] + acrineoInsumosBuscar((string) ($_GET['q'] ?? ''), (int) ($_GET['pagina'] ?? 1)));
             case 'insumos_tabla':
                 responder(['ok' => true] + acrineoInsumosTabla((string) ($_GET['q'] ?? ''), (int) ($_GET['pagina'] ?? 1), (int) ($_GET['por_pagina'] ?? 100)));
+            case 'filtrar':
+                responder(['ok' => true] + acrineoPartidasConConceptos($ctx, (string) ($_GET['q'] ?? '')));
             case 'codigo':
                 $padre = (int) ($_GET['padre'] ?? 0);
                 responder(['ok' => true, 'codigo' => acrineoCodigoSugerido($ctx, $padre ?: null)]);
@@ -69,6 +72,10 @@ try {
         case 'partida_eliminar':
             acrineoPartidaEliminar($ctx, $partida, $usuario);
             $partida = 0;
+            break;
+        case 'partida_duplicar':
+            $partida = acrineoPartidaDuplicar($ctx, $partida, $usuario);
+            $extra['partida_id'] = $partida;
             break;
         case 'partida_mover':
             acrineoPartidaMover($ctx, $partida, (string) ($in['direccion'] ?? ''));

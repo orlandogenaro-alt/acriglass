@@ -27,7 +27,14 @@
     var st = { filas: [], editando: false, borradores: [], quitar: new Set(), marcados: new Set(), sec: 0, guardando: false, cargando: 0,
                deshacer: [], rehacer: [], fotoPendiente: null };
 
-    function partidaTexto(p) { return p ? p.codigo + ' · ' + p.descripcion : 'Selecciona una partida'; }
+    function partidaTexto(p) { return p ? p.codigo + '-' + p.descripcion : 'Selecciona una partida'; }
+
+    // Filtro de conceptos de la barra de arriba (código, descripción o unidad); en edición se ven todos
+    function sinAcentos(t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+    function pasaFiltro(r) {
+        var q = sinAcentos(H.filtro && H.filtro.q);
+        return !q || [r.codigo, r.descripcion, r.unidad].some(function (v) { return sinAcentos(v).indexOf(q) >= 0; });
+    }
     function txt(v) { return v === true ? '1' : v === false ? '' : String(v == null ? '' : v).trim(); }
 
     function pendiente() {
@@ -123,6 +130,7 @@
             });
         } else {
             st.filas.forEach(function (r) {
+                if (!pasaFiltro(r)) return;
                 html += '<tr class="an-fila" data-renglon="' + r.renglon_id + '">'
                     + '<td class="an-col-sel"></td><td class="an-col-url">' + botonUrl(r.url) + '</td><td class="an-col-pa">' + (r.precio_alzado ? '<span class="an-pa" title="Precio alzado">✕</span>' : '') + '</td>'
                     + '<td>' + esc(r.codigo) + '</td><td class="an-desc">' + esc(r.descripcion) + '</td><td>' + esc(r.unidad || '') + '</td>'
@@ -131,13 +139,19 @@
                     + '<td class="num">' + esc(r.tipo) + '</td><td>' + botonPU(r) + '</td></tr>';
             });
         }
-        if (!html) {
+        if (!html && !st.editando && st.filas.length && H.filtro && H.filtro.q) {
+            html = '<tr class="an-vacio"><td colspan="' + COLS + '">Ningún concepto de esta partida coincide con «' + esc(H.filtro.q) + '».</td></tr>';
+        } else if (!html) {
             html = '<tr class="an-vacio"><td colspan="' + COLS + '">' + (p ? 'La cuadrícula no tiene datos.' : 'Selecciona o crea una partida a la izquierda.')
                 + (p && st.editando ? '<br><button type="button" class="an-btn an-primario" data-agregar>Agregar registro</button>'
                     : p && H.puede ? '<br><small class="an-ayuda">Usa el lápiz para agregar conceptos, o cópialos del catálogo de abajo.</small>' : '')
                 + '</td></tr>';
         }
         tbody.innerHTML = html;
+        if (!st.editando && H.filtro && H.filtro.q && st.filas.length) {
+            var n = st.filas.filter(pasaFiltro).length;
+            estado('Filtro «' + H.filtro.q + '»: ' + n + ' de ' + st.filas.length + ' concepto' + (st.filas.length === 1 ? '' : 's') + '.', 'info');
+        } else if (!st.editando && /^Filtro «/.test($('anRenglonesEstado').textContent)) estado('');
         $('anRenglonesTodos').disabled = !st.editando;
         $('anRenglonesTodos').checked = false;
         total();
@@ -157,7 +171,7 @@
                 if (b.renglon_id && st.quitar.has(b.renglon_id)) return;
                 t += H.redondear(Number(b.cantidad) * precioDe(b), H.ctx.dec_costos);
             });
-        } else st.filas.forEach(function (r) { t += r.importe; });
+        } else st.filas.forEach(function (r) { if (pasaFiltro(r)) t += r.importe; });
         $('anRenglonesTotal').textContent = AN.ui.dinero(t);
     }
 
@@ -166,11 +180,12 @@
         var p = H.partida();
         $('anEditarRenglones').disabled = !p || st.guardando;
         $('anEditarRenglones').setAttribute('aria-pressed', String(st.editando));
-        ['anAgregarRenglon', 'anCancelarRenglones', 'anGuardarRenglones', 'anDeshacer', 'anRehacer'].forEach(function (id) { $(id).hidden = !st.editando; });
-        $('anQuitarRenglones').hidden = !st.editando || !st.marcados.size;
-        $('anGuardarRenglones').disabled = st.guardando || !pendiente();
-        $('anDeshacer').disabled = !st.deshacer.length;
-        $('anRehacer').disabled = !st.rehacer.length;
+        $('anAgregarRenglon').hidden = !st.editando;
+        $('anCancelarRenglones').disabled = !st.editando || st.guardando;
+        $('anQuitarRenglones').disabled = !st.editando || !st.marcados.size;
+        $('anGuardarRenglones').disabled = !st.editando || st.guardando || !pendiente();
+        $('anDeshacer').disabled = !st.editando || !st.deshacer.length;
+        $('anRehacer').disabled = !st.editando || !st.rehacer.length;
     }
 
     function estado(texto, tipo) {
@@ -317,6 +332,7 @@
     // ---------- Eventos ----------
     H.on(function (evento, datos) {
         if (evento === 'partida') cargar(datos);
+        else if (evento === 'filtro') pintar();
         else if (evento === 'estado') {
             var p = H.partida();
             $('anPartidaActual').textContent = partidaTexto(p);
@@ -439,6 +455,45 @@
             pintar();
         });
     }
+
+    function opcionesPartida() {
+        var p = H.partida(), op = [];
+        if (H.puede) {
+            op.push({ texto: 'Agregar registro', accion: function () { if (!st.editando) entrarEdicion(); agregar(); }, desactivado: !p || st.guardando });
+            op.push(st.editando ? { texto: 'Salir de la edición', accion: cancelarEdicion } : { texto: 'Editar los conceptos', accion: entrarEdicion, desactivado: !p });
+            op.push({ texto: 'Marcar todos', accion: function () { $('anRenglonesTodos').checked = true; $('anRenglonesTodos').dispatchEvent(new Event('change')); }, desactivado: !st.editando });
+        }
+        var marcado = st.filas.find(function (r) { return r.renglon_id === (borrador(Array.from(st.marcados)[0]) || {}).renglon_id; }) || st.filas[0];
+        op.push({ texto: 'Abrir la matriz (P.U.)' + (marcado ? ' de ' + marcado.codigo : ''), accion: function () { if (marcado && AN.hojaMatriz) AN.hojaMatriz.abrir(marcado.concepto_id); }, desactivado: !marcado || !AN.hojaMatriz });
+        if (H.puede) op.push(null,
+            { texto: 'Editar la partida', accion: function () { H.editarPartida(); }, desactivado: !p || !!H.edicion },
+            { texto: 'Copiar la partida', accion: function () { $('anPartidaCopiar').click(); }, desactivado: !p || !!H.edicion });
+        return op;
+    }
+    var menuLista = $('anRenglonesMenuLista'), menuAcciones = [];
+    $('anRenglonesMenu').addEventListener('click', function (e) {
+        e.stopPropagation();
+        var abierto = !menuLista.hidden;
+        if (AN.rejilla) AN.rejilla.cerrar();
+        if (abierto) return;
+        menuAcciones = opcionesPartida();
+        menuLista.innerHTML = menuAcciones.map(function (a, i) {
+            return a ? '<button type="button" role="menuitem" data-accion="' + i + '"' + (a.desactivado ? ' disabled' : '') + '>' + esc(a.texto) + '</button>' : '<div class="an-sep"></div>';
+        }).join('');
+        menuLista.hidden = false;
+        this.setAttribute('aria-expanded', 'true');
+    });
+    menuLista.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-accion]');
+        if (!b) return;
+        var a = menuAcciones[+b.dataset.accion];
+        if (AN.rejilla) AN.rejilla.cerrar();
+        if (a && a.accion) a.accion();
+    });
+    if (AN.rejilla) AN.rejilla.opciones('renglones', {
+        fijas: 3,
+        archivo: function () { var p = H.partida(); return 'Conceptos ' + (p ? p.codigo : ''); }
+    });
 
     AN.hojaRenglones = { editando: function () { return st.editando; } };
 })(window.AcriNeo = window.AcriNeo || {});

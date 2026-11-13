@@ -23,6 +23,7 @@
         puede: puede,
         cerrados: {},
         edicion: null,          // { modo: 'nueva'|'editar', padre_id, partida_id, codigo, descripcion }
+        filtro: { q: '', ids: null, visibles: null },   // filtro de conceptos: texto y, con «Todo el presupuesto», las partidas que coinciden
         renglonesPendientes: function () { return false; },   // lo reemplaza hoja-renglones.js
         url: function (p) { return AN.api.url(API, Object.assign({ id: H.id }, p || {})); },
         on: function (fn) { oyentes.push(fn); },
@@ -41,8 +42,10 @@
         H.ctx = r.presupuesto;
         H.partidas = r.partidas;
         if (H.sel && !H.partida()) H.sel = null;
+        if (H.filtro.ids) calcularVisibles();
         pintar();
         H.emitir('estado', r);
+        if (H.filtro.ids) refrescarFiltro();
     };
 
     H.post = async function (cuerpo) {
@@ -89,6 +92,17 @@
         return false;
     }
 
+    // Con el filtro de todo el presupuesto, solo las partidas con conceptos que coinciden (y sus padres)
+    function porFiltro(p) { return !H.filtro.visibles || H.filtro.visibles.has(p.id); }
+    function calcularVisibles() {
+        if (!H.filtro.ids) { H.filtro.visibles = null; return; }
+        var v = new Set(), buscar = function (id) { return H.partidas.find(function (q) { return q.id === id; }); };
+        H.filtro.ids.forEach(function (id) {
+            for (var x = buscar(id); x && !v.has(x.id); x = x.padre_id ? buscar(x.padre_id) : null) v.add(x.id);
+        });
+        H.filtro.visibles = v;
+    }
+
     function filaEdicion(e, nivel) {
         return '<tr class="an-edicion"><td style="padding-left:' + (8 + nivel * 16) + 'px">'
             + '<input id="anPEdCodigo" maxlength="30" value="' + esc(e.codigo) + '" aria-label="Partida"></td>'
@@ -119,6 +133,7 @@
         if (e && e.modo === 'nueva' && despues === null) html += filaEdicion(e, 0);
         H.partidas.forEach(function (p) {
             if (oculta(p) && !(e && e.modo === 'nueva' && e.padre_id === p.padre_id)) return;
+            if (!porFiltro(p) && !(e && e.modo === 'editar' && e.partida_id === p.id)) return;
             if (e && e.modo === 'editar' && e.partida_id === p.id) {
                 html += filaEdicion(e, p.nivel);
             } else {
@@ -131,12 +146,14 @@
             }
             if (despues === p.id) html += filaEdicion(e, nivelNueva);
         });
-        if (!html) {
+        if (!html && H.filtro.visibles && H.partidas.length) {
+            html = '<tr class="an-vacio"><td colspan="4">Ninguna partida tiene conceptos que coincidan con «' + esc(H.filtro.q) + '».</td></tr>';
+        } else if (!html) {
             html = '<tr class="an-vacio"><td colspan="4">El presupuesto todavía no tiene partidas.'
                 + (puede ? '<br><button type="button" class="an-btn an-primario" data-primera>+ Agregar partida</button>' : '') + '</td></tr>';
         }
         tbody.innerHTML = html;
-        $('anPartidasConteo').textContent = H.partidas.length + ' partida' + (H.partidas.length === 1 ? '' : 's');
+        $('anPartidasConteo').textContent = (H.filtro.visibles ? H.filtro.ids.size + ' de ' : '') + H.partidas.length + ' partida' + (H.partidas.length === 1 ? '' : 's');
         if (e) {
             var c = $('anPEdCodigo');
             if (c && !c.dataset.listo) { c.dataset.listo = '1'; (e.modo === 'nueva' ? $('anPEdDesc') : c).focus(); }
@@ -151,6 +168,7 @@
         $('anSubpartidaNueva').disabled = editando || !p;
         $('anPartidaEditar').disabled = editando || !p;
         $('anPartidaEliminar').disabled = editando || !p;
+        $('anPartidaCopiar').disabled = editando || !p;
         document.querySelectorAll('[data-mover]').forEach(function (b) { b.disabled = editando || !p; });
     }
 
@@ -216,6 +234,60 @@
         } catch (e) { AN.ui.aviso(e.message, 'error'); }
     }
 
+    async function copiarPartida() {
+        var p = H.partida();
+        if (!p || H.edicion) return;
+        if (H.renglonesPendientes()) { AN.ui.aviso('Guarda o cancela primero los cambios de los conceptos de la partida.', 'error'); return; }
+        if (!(await AN.ui.confirmar({ titulo: 'Copiar partida', mensaje: '¿Copiar la partida «' + p.codigo + ' · ' + p.descripcion + '»'
+            + (p.hijos ? ' con sus subpartidas' : '') + ' y sus conceptos?\nLa copia queda debajo de ella con el siguiente código libre.', aceptar: 'Copiar' }))) return;
+        try {
+            var r = await AN.api.post(H.url(), { accion: 'partida_duplicar', partida_id: p.id });
+            H.aplicar(r);
+            var nueva = H.partidas.find(function (x) { return x.id === r.partida_id; });
+            await H.seleccionar(r.partida_id);
+            AN.ui.aviso('Partida copiada como ' + (nueva ? nueva.codigo : '') + '.', 'ok');
+        } catch (e) { AN.ui.aviso(e.message, 'error'); }
+    }
+
+    // ---------- Filtro de conceptos en todo el presupuesto ----------
+    // Enter o el embudo lo aplica: los conceptos de la partida se filtran y, con «Todo el presupuesto», el árbol muestra solo
+    // las partidas que tienen conceptos que coinciden. Vacío lo quita.
+    async function aplicarFiltro() {
+        var q = $('anFiltroQ').value.trim();
+        H.filtro.q = q;
+        H.filtro.ids = null;
+        H.filtro.visibles = null;
+        if (q && $('anFiltroTodo').checked) {
+            try {
+                var r = await AN.api.get(H.url({ recurso: 'filtrar', q: q }));
+                if (H.filtro.q !== q) return;
+                H.filtro.ids = new Set(r.partidas);
+                calcularVisibles();
+                if (!r.partidas.length) AN.ui.aviso('Ningún concepto del presupuesto coincide con «' + q + '».', 'info');
+                else AN.ui.aviso(r.renglones + ' concepto' + (r.renglones === 1 ? '' : 's') + ' en ' + r.partidas.length + ' partida' + (r.partidas.length === 1 ? '' : 's') + '.', 'ok');
+            } catch (e) { AN.ui.aviso(e.message, 'error'); return; }
+        }
+        $('anFiltroAplicar').setAttribute('aria-pressed', String(!!q));
+        $('anFiltroAplicar').classList.toggle('an-primario', !!q);
+        pintar();
+        H.emitir('filtro', H.filtro);
+        // Si la partida seleccionada no tiene coincidencias, se pasa a la primera que sí
+        if (H.filtro.ids && H.filtro.ids.size && !H.filtro.ids.has(H.sel)) {
+            var primera = H.partidas.find(function (p) { return H.filtro.ids.has(p.id); });
+            if (primera) await H.seleccionar(primera.id);
+        }
+    }
+    var refrescarFiltro = AN.ui.retrasar(async function () {
+        if (!H.filtro.ids || !H.filtro.q) return;
+        try {
+            var r = await AN.api.get(H.url({ recurso: 'filtrar', q: H.filtro.q }));
+            if (!H.filtro.ids) return;
+            H.filtro.ids = new Set(r.partidas);
+            calcularVisibles();
+            pintar();
+        } catch (e) { /* se queda el anterior */ }
+    }, 300);
+
     async function mover(direccion) {
         var p = H.partida();
         if (!p) return;
@@ -257,6 +329,7 @@
         $('anSubpartidaNueva').addEventListener('click', function () { if (H.sel) nueva(H.sel); });
         $('anPartidaEditar').addEventListener('click', editar);
         $('anPartidaEliminar').addEventListener('click', eliminar);
+        $('anPartidaCopiar').addEventListener('click', copiarPartida);
         document.querySelectorAll('[data-mover]').forEach(function (b) { b.addEventListener('click', function () { mover(b.dataset.mover); }); });
     }
 
@@ -270,6 +343,43 @@
             AN.ui.aviso((e.errores && e.errores.sobrecosto_pct) || e.message, 'error');
         }
     });
+
+    $('anFiltroQ').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); aplicarFiltro(); } });
+    $('anFiltroQ').addEventListener('input', function () { if (!this.value.trim() && H.filtro.q) aplicarFiltro(); });
+    $('anFiltroAplicar').addEventListener('click', aplicarFiltro);
+    $('anFiltroTodo').addEventListener('change', function () { if (H.filtro.q) aplicarFiltro(); });
+
+    // Cuadrícula (arriba a la derecha): muestra u oculta el catálogo de conceptos de abajo
+    function verCatalogo(si) {
+        $('anPanelCatalogo').hidden = !si;
+        $('anHojaDerecha').classList.toggle('sin-catalogo', !si);
+        $('anVistaCatalogo').setAttribute('aria-pressed', String(si));
+        $('anVistaCatalogo').classList.toggle('an-primario', si);
+        $('anVistaCatalogo').title = si ? 'Ocultar el catálogo de conceptos' : 'Mostrar el catálogo de conceptos';
+        try { localStorage.setItem('acrineo.hoja.catalogo', si ? '1' : '0'); } catch (e) { /* sin memoria */ }
+    }
+    var catalogoGuardado = null;
+    try { catalogoGuardado = localStorage.getItem('acrineo.hoja.catalogo'); } catch (e) { /* sin memoria */ }
+    verCatalogo(catalogoGuardado !== '0');
+    $('anVistaCatalogo').addEventListener('click', function () { verCatalogo($('anPanelCatalogo').hidden); });
+
+    // ⋮ del árbol de partidas
+    if (AN.rejilla) AN.rejilla.opciones('partidas', {
+        fijas: 1,
+        archivo: function () { return 'Partidas ' + H.ctx.codigo; },
+        extras: function () {
+            var p = H.partida(), op = [
+                { texto: 'Expandir todas', accion: function () { H.cerrados = {}; pintar(); } },
+                { texto: 'Contraer todas', accion: function () { H.partidas.forEach(function (x) { if (x.hijos) H.cerrados[x.id] = true; }); pintar(); } }];
+            if (puede) op.push(null,
+                { texto: 'Nueva partida', accion: function () { nueva(null); }, desactivado: !!H.edicion },
+                { texto: 'Nueva subpartida', accion: function () { if (H.sel) nueva(H.sel); }, desactivado: !!H.edicion || !p },
+                { texto: 'Editar partida', accion: editar, desactivado: !!H.edicion || !p },
+                { texto: 'Copiar partida', accion: copiarPartida, desactivado: !!H.edicion || !p });
+            return op;
+        }
+    });
+    H.editarPartida = editar;
 
     $('anHojaDetalle').addEventListener('click', function () {
         AN.detalle.abrir(H.id, { alGuardar: function () { H.recargar(); } });

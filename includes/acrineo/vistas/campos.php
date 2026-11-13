@@ -25,6 +25,14 @@ const AN_ICONOS = [
     'chevron'   => '<path d="m6 9 6 6 6-6"/>',
     'refrescar' => '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>',
     'limpiar'   => '<path d="M3 5h18l-7 8v6l-4 2v-8z"/><path d="m16 16 5 5M21 16l-5 5"/>',
+    'ojo_no'    => '<path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.6 3.5M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+    'fijar'     => '<path d="M15 3l6 6-3 1-4 4 1 4-2 2-4-4-5 5M9 11l-4-4 2-2 4 1 4-4z"/>',
+    'portapapeles' => '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 2h6v4H9zM8.5 11h7M8.5 15h5"/>',
+    'cuadricula'=> '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/>',
+    'grafica'   => '<path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/>',
+    'enviar'    => '<path d="M3 11.5 21 4l-7.5 18-2.5-8z"/>',
+    'guardar'   => '<path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/>',
+    'subpartida'=> '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/>',
 ];
 
 function anIcono(string $nombre): string

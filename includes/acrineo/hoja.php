@@ -219,6 +219,67 @@ function acrineoPartidaEliminar(array $ctx, int $partidaId, string $usuario): vo
     });
 }
 
+// Copia una partida (con sus subpartidas y sus conceptos, que son los mismos del catálogo) justo debajo de ella.
+// La copia toma el siguiente código libre de su nivel; sus subpartidas cambian el prefijo del código por el nuevo.
+function acrineoPartidaDuplicar(array $ctx, int $partidaId, string $usuario): int
+{
+    $p = acrineoPartidaFila($ctx, $partidaId);
+    return acrineoTransaccion(function () use ($ctx, $partidaId, $p, $usuario) {
+        $todas = bd_filas('AW', 'select partida_id, padre_id, codigo, descripcion, orden from acrineo_partidas where presupuesto_id = ? order by orden, partida_id', [$ctx['id']]);
+        $usados = array_column($todas, 'codigo');
+        $padre = $p['padre_id'] === null ? null : (int) $p['padre_id'];
+        $padreCodigo = null;
+        foreach ($todas as $t) if ($padre !== null && (int) $t['partida_id'] === $padre) $padreCodigo = $t['codigo'];
+        $raiz = acrineoSiguienteCodigoPartida($padreCodigo, $usados);
+        $usados[] = $raiz;
+        $libre = function (string $c) use (&$usados): string {
+            $c = mb_substr($c, 0, 30);
+            $mayus = array_map('mb_strtoupper', $usados);
+            for ($n = 2, $base = $c; in_array(mb_strtoupper($c), $mayus, true); $n++) $c = mb_substr($base, 0, 30 - strlen("-$n")) . "-$n";
+            $usados[] = $c;
+            return $c;
+        };
+
+        bd_ejecutar('AW', 'update acrineo_partidas set orden = orden + 1 where presupuesto_id = ? and orden > ? and '
+            . ($padre === null ? 'padre_id is null' : 'padre_id = ?'), $padre === null ? [$ctx['id'], $p['orden']] : [$ctx['id'], $p['orden'], $padre]);
+        $mapa = [$partidaId => bd_insertar('AW', 'acrineo_partidas', 'partida_id',
+            ['presupuesto_id' => $ctx['id'], 'padre_id' => $padre, 'codigo' => $raiz, 'descripcion' => $p['descripcion'], 'orden' => (int) $p['orden'] + 1])];
+        // Subpartidas, de arriba hacia abajo (el padre se copia antes que sus hijas)
+        for ($cambio = true; $cambio;) {
+            $cambio = false;
+            foreach ($todas as $t) {
+                $id = (int) $t['partida_id'];
+                if (isset($mapa[$id]) || $t['padre_id'] === null || !isset($mapa[(int) $t['padre_id']])) continue;
+                $codigo = str_starts_with(mb_strtoupper($t['codigo']), mb_strtoupper($p['codigo']))
+                    ? $raiz . mb_substr($t['codigo'], mb_strlen($p['codigo'])) : $t['codigo'] . '-C';
+                $mapa[$id] = bd_insertar('AW', 'acrineo_partidas', 'partida_id',
+                    ['presupuesto_id' => $ctx['id'], 'padre_id' => $mapa[(int) $t['padre_id']], 'codigo' => $libre($codigo), 'descripcion' => $t['descripcion'], 'orden' => (int) $t['orden']]);
+                $cambio = true;
+            }
+        }
+        foreach ($mapa as $vieja => $nueva) {
+            bd_ejecutar('AW', 'insert into acrineo_partida_conceptos (partida_id, concepto_id, cantidad, orden)
+                               select ?, concepto_id, cantidad, orden from acrineo_partida_conceptos where partida_id = ?', [$nueva, $vieja]);
+        }
+        acrineoRegistrar($ctx['id'], $usuario, 'HOJA', [['Copió partida', "{$p['codigo']} · {$p['descripcion']}", "$raiz · {$p['descripcion']}"]]);
+        acrineoActualizarTotales($ctx['id']);
+        return $mapa[$partidaId];
+    });
+}
+
+// Filtro de conceptos en todo el presupuesto: partidas que tienen algún concepto que coincide (código, descripción o unidad)
+function acrineoPartidasConConceptos(array $ctx, string $q): array
+{
+    $pat = acrineoPatron($q);
+    $filas = bd_filas('AW', 'select r.partida_id, count(*) as n
+                               from acrineo_partida_conceptos r
+                               join acrineo_partidas p on p.partida_id = r.partida_id
+                               join acrineo_conceptos c on c.concepto_id = r.concepto_id
+                              where p.presupuesto_id = ? and (c.codigo ilike ? or c.descripcion ilike ? or c.unidad ilike ?)
+                              group by r.partida_id', [$ctx['id'], $pat, $pat, $pat]);
+    return ['partidas' => array_map(fn($f) => (int) $f['partida_id'], $filas), 'renglones' => array_sum(array_map(fn($f) => (int) $f['n'], $filas))];
+}
+
 // Mover: arriba / abajo entre sus hermanas; izquierda = sube de nivel (queda después de su padre);
 // derecha = baja de nivel (pasa a ser la última subpartida de la hermana de arriba)
 function acrineoPartidaMover(array $ctx, int $partidaId, string $direccion): void

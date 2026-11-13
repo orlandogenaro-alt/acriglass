@@ -4,6 +4,14 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-11-13',
+        'cambios' => [
+            ['nuevo', 'ACRINEO: barras de la pestaña Presupuesto como en Neodata', 'Arriba: «Conceptos a filtrar en todo el presupuesto» (Enter o el embudo; con «Todo el presupuesto» el árbol deja solo las partidas que tienen conceptos que coinciden y los conceptos de la partida se filtran), los totales Pre / Par y el botón de cuadrícula que muestra u oculta el catálogo de conceptos. Partidas: nuevo botón para copiar la partida (con sus subpartidas y conceptos, queda debajo con el siguiente código libre). Conceptos de la partida: ⋮ con las opciones de la partida, título «A1-Descripción» y la barra de lápiz, deshacer, rehacer, guardar, cancelar y quitar siempre a la vista. Catálogo: gráfica del importe de cada concepto y ➤ para copiar a la partida. Las tres cuadrículas traen el ojo (columnas ocultas), la chincheta (columnas fijas al desplazarse) y ⋮ (exportar a Excel, mostrar todas las columnas…); lo que elige cada usuario se recuerda en su navegador.'],
+            ['correccion', 'ACRINEO: los avisos flotantes ya no tapan los botones', 'Los avisos de abajo a la derecha dejaban sin efecto el clic en los botones que quedaban debajo (p. ej. ➤ Copiar a la partida); ahora el clic pasa al botón.'],
+            ['mejora', 'ACRINEO: el doble clic abre la matriz de un insumo recién agregado', 'Antes, al dar doble clic en un insumo que acababa de agregarse a la matriz (todavía sin guardar) solo aparecía «Guarda primero la matriz para abrir la de este insumo». Ahora, como en Neodata, la matriz se guarda sola y se entra directo a la matriz del insumo (Código: B12 -> 89). Si la matriz tiene otros cambios pendientes también se guardan en ese momento, en lugar de preguntar si se sale sin guardar; si algo no es válido (p. ej. un insumo sin descripción) se marca y no se entra.'],
+        ],
+    ],
+    [
         'fecha' => '2026-11-12',
         'cambios' => [
             ['mejora', 'ACRINEO: el doble clic abre la matriz del insumo también en edición', 'En modo edición (lápiz), el doble clic sobre cualquier celda del renglón (código, descripción, unidad…) también abre la matriz de ese insumo, como en modo consulta.'],

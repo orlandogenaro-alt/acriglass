@@ -74,7 +74,6 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
         <label class="an-sobrecosto">% Sobrecosto
             <input type="number" id="anSobrecosto" step="0.0001" min="-99.9999" max="1000" inputmode="decimal"<?= $puede['presupuestos.editar'] ? '' : ' disabled' ?>>
         </label>
-        <span class="an-totales" id="anTotales" aria-live="polite"></span>
     </div>
 
     <!-- Pestañas de la hoja: Presupuesto y Matriz (doble clic en un concepto o su botón P.U.) -->
@@ -86,21 +85,47 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
         </span>
     </div>
 
+    <?php
+    // Ojo (columnas ocultas), chincheta (columnas fijas) y ⋮ (más opciones) de una cuadrícula (js/acrineo/rejilla.js)
+    $rejilla = function (string $nombre, string $tabla): string {
+        return '<span class="an-rejilla-btns" data-rejilla="' . $nombre . '" data-tabla="' . $tabla . '">'
+            . '<button type="button" class="an-btn an-mini an-btn-cuenta" data-cols title="Columnas ocultas" aria-label="Columnas ocultas" aria-haspopup="true">' . anIcono('ojo_no') . '<span>0</span></button>'
+            . '<button type="button" class="an-btn an-mini an-btn-cuenta" data-fijas title="Columnas fijas" aria-label="Columnas fijas" aria-haspopup="true">' . anIcono('fijar') . '<span>0</span></button>'
+            . '<span class="an-menu-cont"><button type="button" class="an-btn an-primario an-icono an-redondo" data-menu title="Más opciones" aria-label="Más opciones" aria-haspopup="true" aria-expanded="false">' . anIcono('mas') . '</button>'
+            . '<div class="an-menu" role="menu" hidden></div></span></span>';
+    };
+    ?>
     <main class="an-hoja" id="anHoja" role="tabpanel" aria-labelledby="anTabPresupuesto">
+        <!-- Filtro de conceptos en todo el presupuesto, totales y vista -->
+        <div class="an-hoja-filtro">
+            <label class="an-buscar an-buscar-azul">
+                <span class="an-buscar-ico"><?= anIcono('buscar') ?></span>
+                <input type="search" id="anFiltroQ" placeholder="Conceptos a filtrar en todo el presupuesto" aria-label="Conceptos a filtrar en todo el presupuesto">
+            </label>
+            <span class="an-flex"></span>
+            <button type="button" class="an-btn an-icono an-redondo" id="anFiltroAplicar" title="Aplicar el filtro (Enter)" aria-label="Aplicar el filtro" aria-pressed="false"><?= anIcono('filtro') ?></button>
+            <label class="an-check"><input type="checkbox" id="anFiltroTodo" checked> Todo el presupuesto</label>
+            <span class="an-totales" id="anTotales" aria-live="polite"></span>
+            <span class="an-flex"></span>
+            <button type="button" class="an-btn an-primario an-icono an-redondo" id="anVistaCatalogo" title="Ocultar el catálogo de conceptos" aria-label="Mostrar u ocultar el catálogo de conceptos" aria-pressed="true"><?= anIcono('cuadricula') ?></button>
+        </div>
+
         <!-- Partidas -->
         <section class="an-ventana an-panel-partidas" aria-label="Partidas">
             <div class="an-barra an-barra-chica">
                 <?php if ($puede['presupuestos.editar']): ?>
-                <button type="button" class="an-btn an-primario an-icono" id="anPartidaNueva" title="Nueva partida" aria-label="Nueva partida">+</button>
-                <button type="button" class="an-btn an-primario an-icono" id="anSubpartidaNueva" title="Nueva subpartida de la seleccionada" aria-label="Nueva subpartida"><?= anIcono('nuevo') ?></button>
-                <button type="button" class="an-btn an-icono" id="anPartidaEditar" title="Editar la partida seleccionada" aria-label="Editar partida"><?= anIcono('editar') ?></button>
-                <button type="button" class="an-btn an-icono an-peligro" id="anPartidaEliminar" title="Eliminar la partida seleccionada" aria-label="Eliminar partida"><?= anIcono('borrar') ?></button>
+                <button type="button" class="an-btn an-primario an-icono an-redondo" id="anPartidaNueva" title="Nueva partida" aria-label="Nueva partida">+</button>
+                <button type="button" class="an-btn an-primario an-icono an-redondo" id="anSubpartidaNueva" title="Nueva subpartida de la seleccionada" aria-label="Nueva subpartida"><?= anIcono('subpartida') ?></button>
+                <button type="button" class="an-btn an-primario an-icono an-redondo" id="anPartidaEliminar" title="Eliminar la partida seleccionada" aria-label="Eliminar partida"><?= anIcono('borrar') ?></button>
+                <button type="button" class="an-btn an-primario an-icono an-redondo" id="anPartidaCopiar" title="Copiar la partida seleccionada (con sus subpartidas y conceptos)" aria-label="Copiar partida"><?= anIcono('portapapeles') ?></button>
+                <button type="button" class="an-btn an-icono an-redondo" id="anPartidaEditar" title="Editar la partida seleccionada (F2 o doble clic)" aria-label="Editar partida"><?= anIcono('editar') ?></button>
                 <?php endif; ?>
                 <span class="an-flex"></span>
                 <span class="an-ayuda" id="anPartidasConteo"></span>
+                <?= $rejilla('partidas', 'anTablaPartidas') ?>
             </div>
             <div class="an-tabla-cont">
-                <table class="an-tabla an-arbol">
+                <table class="an-tabla an-arbol" id="anTablaPartidas">
                     <thead><tr>
                         <th scope="col"><div class="an-th"><span>Partida</span></div></th>
                         <th scope="col"><div class="an-th"><span>Descripción completa</span></div></th>
@@ -120,24 +145,29 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
             <?php endif; ?>
         </section>
 
-        <div class="an-hoja-derecha">
+        <div class="an-hoja-derecha" id="anHojaDerecha">
             <!-- Conceptos de la partida -->
             <section class="an-ventana an-panel-renglones" aria-label="Conceptos de la partida">
                 <div class="an-barra an-barra-chica">
+                    <span class="an-menu-cont">
+                        <button type="button" class="an-btn an-primario an-icono an-redondo" id="anRenglonesMenu" title="Opciones de la partida" aria-label="Opciones de la partida" aria-haspopup="true" aria-expanded="false"><?= anIcono('mas') ?></button>
+                        <div class="an-menu an-menu-izq" id="anRenglonesMenuLista" role="menu" hidden></div>
+                    </span>
                     <b class="an-partida-actual" id="anPartidaActual">Selecciona una partida</b>
                     <span class="an-flex"></span>
                     <?php if ($puede['presupuestos.editar']): ?>
-                    <button type="button" class="an-btn an-icono" id="anDeshacer" title="Deshacer (Ctrl+Z)" aria-label="Deshacer" hidden disabled>↶</button>
-                    <button type="button" class="an-btn an-icono" id="anRehacer" title="Rehacer (Ctrl+Y)" aria-label="Rehacer" hidden disabled>↷</button>
-                    <button type="button" class="an-btn an-icono" id="anEditarRenglones" title="Editar los conceptos" aria-label="Editar los conceptos" aria-pressed="false" disabled><?= anIcono('editar') ?></button>
                     <button type="button" class="an-btn an-mini" id="anAgregarRenglon" hidden>+ Agregar registro</button>
-                    <button type="button" class="an-btn an-mini an-peligro" id="anQuitarRenglones" hidden>Quitar marcados</button>
-                    <button type="button" class="an-btn an-mini" id="anCancelarRenglones" hidden>Cancelar</button>
-                    <button type="button" class="an-btn an-mini an-primario" id="anGuardarRenglones" hidden>Guardar</button>
+                    <button type="button" class="an-btn an-icono" id="anEditarRenglones" title="Editar los conceptos" aria-label="Editar los conceptos" aria-pressed="false" disabled><?= anIcono('editar') ?></button>
+                    <button type="button" class="an-btn an-icono" id="anDeshacer" title="Deshacer (Ctrl+Z)" aria-label="Deshacer" disabled>↶</button>
+                    <button type="button" class="an-btn an-icono" id="anRehacer" title="Rehacer (Ctrl+Y)" aria-label="Rehacer" disabled>↷</button>
+                    <button type="button" class="an-btn an-icono" id="anGuardarRenglones" title="Guardar" aria-label="Guardar" disabled><?= anIcono('guardar') ?></button>
+                    <button type="button" class="an-btn an-icono" id="anCancelarRenglones" title="Cancelar los cambios" aria-label="Cancelar los cambios" disabled><?= anIcono('cerrar') ?></button>
+                    <button type="button" class="an-btn an-icono an-peligro" id="anQuitarRenglones" title="Quitar los marcados de la partida" aria-label="Quitar los marcados" disabled><?= anIcono('borrar') ?></button>
                     <?php endif; ?>
+                    <?= $rejilla('renglones', 'anTablaRenglones') ?>
                 </div>
                 <div class="an-tabla-cont">
-                    <table class="an-tabla an-renglones">
+                    <table class="an-tabla an-renglones" id="anTablaRenglones">
                         <thead><tr>
                             <th class="an-col-sel" scope="col"><div class="an-th"><input type="checkbox" id="anRenglonesTodos" aria-label="Marcar todos"></div></th>
                             <th scope="col" class="an-col-url" title="Enlace del concepto (ficha técnica, plano…)"><div class="an-th"><span>URL</span></div></th>
@@ -159,20 +189,22 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
             </section>
 
             <!-- Catálogo de conceptos del presupuesto -->
-            <section class="an-ventana an-panel-catalogo" aria-label="Catálogo de conceptos del presupuesto">
+            <section class="an-ventana an-panel-catalogo" id="anPanelCatalogo" aria-label="Catálogo de conceptos del presupuesto">
                 <div class="an-barra an-barra-chica">
-                    <label class="an-buscar">
-                        <?= anIcono('buscar') ?>
+                    <label class="an-buscar an-buscar-azul">
+                        <span class="an-buscar-ico"><?= anIcono('buscar') ?></span>
                         <input type="search" id="anConceptosQ" placeholder="Filtrar por código, descripción, unidad…" aria-label="Filtrar conceptos">
                     </label>
                     <span class="an-ayuda" id="anConceptosConteo"></span>
                     <span class="an-flex"></span>
+                    <button type="button" class="an-btn an-primario an-icono an-redondo" id="anConceptosGrafica" title="Gráfica: importe de los conceptos en el presupuesto" aria-label="Gráfica de los conceptos"><?= anIcono('grafica') ?></button>
                     <?php if ($puede['presupuestos.editar']): ?>
-                    <button type="button" class="an-btn an-mini an-primario" id="anCopiar" disabled title="Copia los marcados a la partida seleccionada">➤ Copiar a la partida</button>
+                    <button type="button" class="an-btn an-primario an-icono an-redondo" id="anCopiar" disabled title="Copia los marcados a la partida seleccionada" aria-label="Copiar a la partida"><?= anIcono('enviar') ?></button>
                     <?php endif; ?>
+                    <?= $rejilla('conceptos', 'anTablaConceptos') ?>
                 </div>
                 <div class="an-tabla-cont">
-                    <table class="an-tabla">
+                    <table class="an-tabla" id="anTablaConceptos">
                         <thead><tr>
                             <th class="an-col-sel" scope="col"><div class="an-th"></div></th>
                             <th scope="col"><div class="an-th"><span>Código</span></div></th>
@@ -192,6 +224,13 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
             </section>
         </div>
     </main>
+
+    <!-- Gráfica del catálogo de conceptos -->
+    <dialog class="an-dialogo an-grafica-dlg" id="anGrafica" aria-labelledby="anGraficaTitulo">
+        <div class="an-titulo-barra"><h2 id="anGraficaTitulo">Importe de los conceptos en el presupuesto</h2><span class="an-flex"></span>
+            <button type="button" class="an-btn-cab an-icono" data-grafica-cerrar aria-label="Cerrar"><?= anIcono('cerrar') ?></button></div>
+        <div class="an-grafica" id="anGraficaCuerpo"></div>
+    </dialog>
     <?php require __DIR__ . '/includes/acrineo/vistas/matriz.php'; ?>
     <?php endif; ?>
 </div>
@@ -211,6 +250,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
 <script src="<?= recurso('js/acrineo/documentos.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/detalle-presupuesto.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/catalogo-chico.js') ?>"></script>
+<script src="<?= recurso('js/acrineo/rejilla.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-renglones.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-conceptos.js') ?>"></script>

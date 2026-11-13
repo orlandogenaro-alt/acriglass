@@ -118,4 +118,52 @@
         botones();
     }
     if ($('anCopiar')) $('anCopiar').addEventListener('click', copiar);
+
+    // Gráfica: importe de cada concepto en el presupuesto (precio × cantidad en todas sus partidas), de mayor a menor;
+    // después de los 15 primeros, el resto se junta en «Otros».
+    async function grafica() {
+        var cuerpo = $('anGraficaCuerpo');
+        cuerpo.innerHTML = '<p class="an-ayuda">Cargando…</p>';
+        $('anGrafica').showModal();
+        try {
+            var r = await AN.api.get(H.url({ recurso: 'conceptos', q: '', por_pagina: 500 }));
+            var datos = r.items.map(function (c) { return { codigo: c.codigo, desc: c.descripcion, cant: c.cantidad_total, importe: H.redondear(c.precio * c.cantidad_total, H.ctx.dec_costos) }; })
+                .filter(function (d) { return d.importe > 0; })
+                .sort(function (a, b) { return b.importe - a.importe; });
+            var total = datos.reduce(function (t, d) { return t + d.importe; }, 0);
+            if (!datos.length) { cuerpo.innerHTML = '<p class="an-vacio-texto">Ningún concepto tiene importe todavía: copia conceptos a las partidas con su cantidad y precio.</p>'; return; }
+            if (datos.length > 16) {
+                var resto = datos.splice(15);
+                datos.push({ codigo: 'Otros', desc: resto.length + ' conceptos más', cant: null, importe: resto.reduce(function (t, d) { return t + d.importe; }, 0), otros: true });
+            }
+            var max = datos.reduce(function (m, d) { return Math.max(m, d.importe); }, 0);
+            cuerpo.innerHTML = '<p class="an-grafica-total">Total del presupuesto <b>' + AN.ui.dinero(total) + '</b></p><ol class="an-barras">'
+                + datos.map(function (d) {
+                    var pct = total ? d.importe / total * 100 : 0;
+                    var tip = d.codigo + ' · ' + d.desc + '\n' + AN.ui.dinero(d.importe) + ' (' + pct.toFixed(1) + ' % del total)' + (d.cant != null ? '\nCantidad en el presupuesto: ' + d.cant : '');
+                    return '<li title="' + esc(tip) + '"' + (d.otros ? ' class="otros"' : '') + '><span class="an-barra-etq"><b>' + esc(d.codigo) + '</b> ' + esc(d.desc) + '</span>'
+                        + '<span class="an-barra-pista"><span class="an-barra-relleno" style="width:' + Math.max(0.5, d.importe / max * 100).toFixed(2) + '%"></span></span>'
+                        + '<span class="an-barra-valor">' + AN.ui.dinero(d.importe) + ' <small>' + pct.toFixed(1) + ' %</small></span></li>';
+                }).join('') + '</ol>';
+        } catch (e) { cuerpo.innerHTML = '<p class="an-estado error">' + esc(e.message) + '</p>'; }
+    }
+    $('anConceptosGrafica').addEventListener('click', grafica);
+    document.querySelectorAll('[data-grafica-cerrar]').forEach(function (b) { b.addEventListener('click', function () { $('anGrafica').close(); }); });
+    $('anGrafica').addEventListener('click', function (e) { if (e.target === this) this.close(); });
+
+    // ⋮ de la cuadrícula del catálogo
+    if (AN.rejilla) AN.rejilla.opciones('conceptos', {
+        fijas: 2,
+        archivo: function () { return 'Catalogo de conceptos ' + H.ctx.codigo; },
+        extras: function () {
+            if (!H.puede) return [];
+            return [
+                { texto: 'Marcar todos', accion: function () {
+                    st.items.forEach(function (c) { if (!st.marcados.has(c.id)) { var i = tbody.querySelector('input[data-cant="' + c.id + '"]'); st.marcados.set(c.id, i ? i.value : '1'); } });
+                    pintar();
+                }, desactivado: !st.items.length },
+                { texto: 'Desmarcar todos', accion: function () { st.marcados.clear(); pintar(); }, desactivado: !st.marcados.size },
+                { texto: 'Copiar los marcados a la partida', accion: copiar, desactivado: !H.partida() || !st.marcados.size }];
+        }
+    });
 })(window.AcriNeo = window.AcriNeo || {});

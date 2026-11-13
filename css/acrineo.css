@@ -388,7 +388,7 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-toast {
     min-width: 240px; max-width: 420px; padding: 10px 14px; border-radius: 8px;
     background: var(--tarjeta); border: 1px solid var(--borde-2); border-left: 4px solid var(--azul-texto);
-    box-shadow: var(--sombra-flot); font-weight: 700; pointer-events: auto;
+    box-shadow: var(--sombra-flot); font-weight: 700; pointer-events: none;   /* solo informa: los clics pasan a lo de abajo */
     animation: an-entra .2s ease-out;
 }
 .an-toast.ok { border-left-color: var(--verde); }
@@ -413,8 +413,53 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-totales b { color: var(--enfasis); font-variant-numeric: tabular-nums; }
 
 .an-hoja {
-    flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(320px, 38%) minmax(0, 1fr); gap: 8px; padding: 8px;
+    flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(320px, 38%) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 8px; padding: 8px;
 }
+/* Filtro de conceptos en todo el presupuesto, totales y vista (arriba de los paneles) */
+.an-hoja-filtro {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 6px 10px; border-radius: var(--radio); background: var(--sub); border-bottom: 1px solid var(--borde-2);
+}
+.an-hoja-filtro .an-buscar { flex: 0 1 460px; height: 34px; border: none; border-radius: 0; background: none; border-bottom: 1px solid var(--borde-2); }
+.an-hoja-filtro .an-buscar:focus-within { box-shadow: none; }
+.an-hoja-filtro .an-buscar input { font-size: 14px; }
+.an-buscar-azul { padding-left: 2px; }
+.an-buscar-azul .an-buscar-ico { display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 6px; background: var(--azul); }
+.an-buscar-azul .an-buscar-ico svg { color: #fff; width: 15px; height: 15px; }
+.an-check { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.an-check input { width: 16px; height: 16px; accent-color: var(--azul); }
+.an-btn.an-icono.an-redondo { width: 34px; border-radius: 8px; }
+.an-btn.an-icono.an-redondo svg { width: 16px; height: 16px; }
+.an-btn-cuenta { gap: 4px; border-color: var(--azul-texto); color: var(--azul-texto); border-radius: 13px; }
+.an-btn-cuenta svg { width: 14px; height: 14px; }
+.an-btn-cuenta.activo { background: var(--azul-suave); }
+.an-rejilla-btns { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.an-menu-izq { left: 0; right: auto; }
+.an-pop-rejilla { width: 250px; max-height: min(420px, 80vh); overflow: auto; }
+.an-pop-titulo { display: block; margin-bottom: 8px; font-size: 12.5px; color: var(--texto-2); }
+.an-pop-lista { display: grid; gap: 2px; }
+.an-pop-lista .an-check { padding: 4px 4px; border-radius: 4px; font-size: 12.5px; margin: 0; }
+.an-pop-lista .an-check:hover { background: var(--fila-hover); }
+.an-pop-rejilla .an-pop-lista input { width: 15px; height: 15px; padding: 0; }
+.an-hoja-derecha.sin-catalogo { grid-template-rows: minmax(0, 1fr); }
+.an-panel-catalogo[hidden] { display: none; }
+
+/* Gráfica del catálogo de conceptos: una barra por concepto, de mayor a menor */
+.an-grafica-dlg { width: min(860px, 94vw); max-height: 88vh; }
+.an-grafica { padding: 14px 18px 18px; overflow: auto; }
+.an-grafica-total { margin-bottom: 12px; color: var(--texto-2); }
+.an-grafica-total b { color: var(--enfasis); }
+.an-barras { list-style: none; display: grid; gap: 4px; margin: 0; padding: 0; }
+.an-barras li { display: grid; grid-template-columns: minmax(140px, 32%) 1fr 150px; align-items: center; gap: 10px; padding: 3px 4px; border-radius: 4px; font-size: 12.5px; }
+.an-barras li:hover { background: var(--fila-hover); }
+.an-barra-etq { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--texto-2); }
+.an-barra-etq b { color: var(--texto); }
+.an-barra-pista { height: 14px; }
+.an-barra-relleno { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--azul); }
+.an-barras li.otros .an-barra-relleno { background: var(--texto-3); }
+.an-barra-valor { text-align: right; font-variant-numeric: tabular-nums; color: var(--texto); }
+.an-barra-valor small { color: var(--texto-3); }
+.an-vacio-texto { padding: 30px 10px; text-align: center; color: var(--texto-3); }
 .an-hoja .an-ventana { margin: 0; min-height: 0; }
 .an-hoja-derecha { display: grid; grid-template-rows: minmax(0, 1.25fr) minmax(0, 1fr); gap: 8px; min-height: 0; }
 .an-barra-chica { padding: 5px 8px; gap: 6px; flex-wrap: nowrap; }
@@ -566,7 +611,9 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 #anInsumosCopiar svg { width: 13px; height: 13px; }
 
 @media (max-width: 1000px) {
-    .an-hoja { grid-template-columns: 1fr; grid-auto-rows: minmax(260px, auto); overflow: auto; }
+    .an-hoja { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-rows: auto; overflow: auto; }
+    .an-hoja > .an-panel-partidas, .an-hoja > .an-hoja-derecha { min-height: 260px; }
+    .an-hoja-filtro .an-buscar { flex: 1 1 100%; }
     .an-hoja-derecha { grid-template-rows: minmax(320px, auto) minmax(280px, auto); }
     .an-panel-partidas { max-height: 50vh; }
 }

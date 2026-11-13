@@ -320,8 +320,10 @@
         ocultarMatriz();
     }
 
+    // Regresa true si quedó guardada (o no había nada que guardar)
     async function guardar() {
-        if (st.guardando || !sucio()) return;
+        if (st.guardando) return false;
+        if (!sucio()) return true;
         tbody.querySelectorAll('.invalido').forEach(function (i) { i.classList.remove('invalido'); });
         var malos = st.filas.filter(function (f) { return !String(f.descripcion).trim(); });
         if (malos.length) {
@@ -330,7 +332,7 @@
             pintar();
             malos.forEach(function (f) { var i = tbody.querySelector('tr[data-clave="' + f.clave + '"] [data-k="descripcion"]'); if (i) i.classList.add('invalido'); });
             estado('Cada insumo necesita descripción.', 'error');
-            return;
+            return false;
         }
         st.guardando = true;
         estado('Guardando…', 'info');
@@ -343,6 +345,7 @@
             estado('Guardado correctamente', 'ok');
             var ruta = [r.matriz.concepto.codigo].concat((r.matriz.ruta || []).map(function (x) { return x.codigo || x.descripcion; })).join(' -> ');
             AN.ui.aviso('Matriz de ' + ruta + ' guardada: ' + (r.matriz.padre_id ? 'total ' : 'costo directo ') + AN.ui.dinero(r.matriz.total) + '.', 'ok');
+            return true;
         } catch (e) {
             st.guardando = false;
             if (!st.editando) { st.editando = true; }
@@ -356,6 +359,7 @@
             });
             estado(e.message, 'error');
             botones();
+            return false;
         }
     }
 
@@ -696,8 +700,10 @@
     $('anMatrizAnterior').addEventListener('click', function () { vecino(-1); });
     $('anMatrizSiguiente').addEventListener('click', function () { vecino(1); });
     $('anMatrizRegresar').addEventListener('click', regresar);
-    // Doble clic en cualquier parte del renglón (también en sus celdas al editar): abre su propia matriz («Código: 50450 -> B12»)
-    tbody.addEventListener('dblclick', function (e) {
+    // Doble clic en cualquier parte del renglón (también en sus celdas al editar): abre su propia matriz («Código: 50450 -> B12»).
+    // Si la matriz tiene cambios (p. ej. el insumo se acaba de agregar y aún no tiene matriz_id) se guarda sola antes de
+    // entrar, como en Neodata; los renglones regresan en el mismo orden, así que se ubica el insumo por su posición.
+    tbody.addEventListener('dblclick', async function (e) {
         if (e.target.closest('select, textarea, button, a, input[type=checkbox]')) return;
         var tr = e.target.closest('tr[data-clave]');
         if (!tr) return;
@@ -707,7 +713,12 @@
         if (sel && sel.removeAllRanges) sel.removeAllRanges();
         if (!st.submatriz) { estado('Falta aplicar la migración 029 para abrir la matriz de un insumo.', 'error'); return; }
         if (f.base) { estado('Un renglón de porcentaje no tiene matriz propia.', 'info'); return; }
-        if (!f.matriz_id) { estado('Guarda primero la matriz para abrir la de este insumo.', 'error'); return; }
+        if (sucio() || !f.matriz_id) {
+            var pos = st.filas.indexOf(f);
+            if (!(await guardar())) return;
+            f = st.filas[pos];
+            if (!f || !f.matriz_id) { estado('No se pudo ubicar el insumo después de guardar; vuelve a darle doble clic.', 'error'); return; }
+        }
         abrirNivel(f.matriz_id);
     });
     $('anTabPresupuesto').addEventListener('click', function () { verPestana(false); });

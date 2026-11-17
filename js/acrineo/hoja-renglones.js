@@ -148,6 +148,7 @@
                 + '</td></tr>';
         }
         tbody.innerHTML = html;
+        tbody.querySelectorAll('textarea.an-celda-desc').forEach(crecer);
         if (!st.editando && H.filtro && H.filtro.q && st.filas.length) {
             var n = st.filas.filter(pasaFiltro).length;
             estado('Filtro «' + H.filtro.q + '»: ' + n + ' de ' + st.filas.length + ' concepto' + (st.filas.length === 1 ? '' : 's') + '.', 'info');
@@ -160,9 +161,15 @@
 
     function celda(b, k, tipo, max, clase) {
         var v = b[k] == null ? '' : b[k];
+        if (k === 'descripcion') {
+            return '<td class="an-desc"><textarea class="an-celda-in an-celda-desc" data-k="descripcion" maxlength="' + max + '" rows="1" aria-label="descripcion">' + esc(v) + '</textarea></td>';
+        }
         return '<td' + (k === 'descripcion' ? ' class="an-desc"' : '') + '><input class="an-celda-in ' + (clase || '') + '" type="' + tipo + '" data-k="' + k + '" value="' + esc(v) + '"'
             + (max ? ' maxlength="' + max + '"' : ' min="0" step="any" inputmode="decimal"') + ' aria-label="' + k + '"></td>';
     }
+
+    // El cuadro de la descripción muestra todo el texto (crece con sus renglones)
+    function crecer(t) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; }
 
     function total() {
         var t = 0;
@@ -284,13 +291,13 @@
         // Validación rápida aquí; el servidor vuelve a validar todo
         var malos = 0;
         var noNeg = function (v) { return String(v).trim() !== '' && Number(v) >= 0; };
-        tbody.querySelectorAll('input.invalido').forEach(function (i) { i.classList.remove('invalido'); });
+        tbody.querySelectorAll('.invalido').forEach(function (i) { i.classList.remove('invalido'); });
         enviar.forEach(function (b) {
             var tr = tbody.querySelector('tr[data-clave="' + b.clave + '"]');
             [['codigo', !String(b.codigo).trim()], ['descripcion', !String(b.descripcion).trim()], ['cantidad', !noNeg(b.cantidad)],
              ['costo', !b.matriz && !noNeg(b.costo)], ['precio_fijo', b.precio_alzado && !noNeg(b.precio_fijo)],
              ['url', String(b.url).trim() !== '' && !urlValida(b.url)], ['tipo', !/^\d{1,2}$/.test(String(b.tipo).trim())]]
-                .forEach(function (x) { if (x[1]) { malos++; var i = tr && tr.querySelector('input[data-k="' + x[0] + '"]'); if (i) { i.classList.add('invalido'); i.title = 'Es obligatorio (y no negativo).'; } } });
+                .forEach(function (x) { if (x[1]) { malos++; var i = tr && tr.querySelector('[data-k="' + x[0] + '"]'); if (i) { i.classList.add('invalido'); i.title = 'Es obligatorio (y no negativo).'; } } });
         });
         if (malos) { estado('Revisa los renglones marcados: código, descripción, cantidad y costo (o precio si es P.A.) son obligatorios; la URL debe empezar con http:// o https:// y el Tipo es un número de 0 a 99.', 'error'); return; }
 
@@ -320,7 +327,7 @@
             Object.keys(e.errores || {}).forEach(function (k) {
                 var m = /^filas\.(\d+)\.(\w+)$/.exec(k);
                 if (!m || !enviar[+m[1]]) return;
-                var i = tbody.querySelector('tr[data-clave="' + enviar[+m[1]].clave + '"] input[data-k="' + m[2] + '"]');
+                var i = tbody.querySelector('tr[data-clave="' + enviar[+m[1]].clave + '"] [data-k="' + m[2] + '"]');
                 if (i) { i.classList.add('invalido'); i.title = e.errores[k]; }
             });
             var primero = Object.keys(e.errores || {})[0];
@@ -356,6 +363,7 @@
         // Escribir el precio lo fija (P.A.); dejarlo vacío regresa al precio calculado
         if (k === 'precio_fijo') b.precio_alzado = e.target.value.trim() !== '';
         e.target.classList.remove('invalido');
+        if (e.target.tagName === 'TEXTAREA') crecer(e.target);
         if (k === 'cantidad' || k === 'costo' || k === 'precio_fijo') recalcular(b, tr);
         else { tr.classList.toggle('modificado', !!b.renglon_id && modificado(b)); botones(); }
     });
@@ -379,6 +387,7 @@
     });
     tbody.addEventListener('keydown', function (e) {
         if (!e.target.dataset.k) return;
+        if (e.key === 'Enter' && e.target.tagName === 'TEXTAREA') return;   // renglón nuevo dentro de la descripción
         if (e.key === 'Enter') { e.preventDefault(); guardar(); }
         else if (e.key === 'Escape') { e.preventDefault(); cancelarEdicion(); }
     });
@@ -528,9 +537,11 @@
                 if (pu === null && imp !== null && cant) pu = imp / cant;   // sin precio unitario: importe / cantidad
                 c = { codigo: cod.slice(0, 30), descripcion: desc, unidad: (f[iUni] || '').slice(0, 20), cantidad: cant === null ? 1 : cant, costo: pu === null ? 0 : pu };
                 lista.push(c);
-            } else if (c && desc) c.descripcion = (c.descripcion + ' ' + desc).trim();
+            } else if (c && desc) c.descripcion = (c.descripcion + (/[.:]$/.test(c.descripcion) ? '\n' : ' ') + desc).trim();
         });
-        lista.forEach(function (x) { x.descripcion = x.descripcion.replace(/\s+/g, ' ').slice(0, 4000); });
+        // Se respetan los renglones del PDF que terminan en punto o dos puntos (6mm. / Correspondiente… / aproximadas: / 2.26 m. x 1.66 m.…);
+        // las demás líneas eran solo el ancho de la columna y se unen con espacio
+        lista.forEach(function (x) { x.descripcion = x.descripcion.split('\n').map(function (l) { return l.replace(/\s+/g, ' ').trim(); }).filter(Boolean).join('\n').slice(0, 4000); });
         return lista;
     }
     var entradaPdf = document.createElement('input');

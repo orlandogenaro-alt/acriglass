@@ -523,6 +523,14 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-renglones tr.modificado td:first-child { box-shadow: inset 3px 0 0 var(--ambar); }
 .an-renglones td { padding: 4px 8px; }
 .an-renglones .an-desc { white-space: normal; min-width: 220px; max-width: 520px; }
+/* Conceptos de la partida: la descripción con sus renglones (como en el PDF) y, en edición, completa en un cuadro que crece */
+#anTablaRenglones .an-desc { white-space: pre-line; min-width: 320px; }
+#anTablaRenglones textarea.an-celda-desc {
+    display: block; width: 100%; min-width: 300px; min-height: 28px; padding: 5px 6px; resize: vertical; overflow: hidden;
+    border: 1px solid var(--borde-2); border-radius: 4px; background: var(--input); font: inherit; line-height: 1.4;
+}
+#anTablaRenglones textarea.an-celda-desc:focus { outline: none; border-color: var(--azul-texto); box-shadow: 0 0 0 3px var(--foco); }
+#anTablaRenglones textarea.an-celda-desc.invalido { border-color: var(--rojo); box-shadow: 0 0 0 3px var(--rojo-suave); }
 .an-mover { justify-content: flex-start; gap: 4px; }
 .an-mover button { width: 30px; height: 24px; border-radius: 12px; background: var(--azul); color: #fff; font-size: 11px; }
 .an-mover button:hover { background: var(--azul-hover); }

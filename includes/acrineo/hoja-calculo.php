@@ -122,3 +122,21 @@ function acrineoOrdenArbol(array $partidas): array
     $agregar(0, 0);
     return $salida;
 }
+
+// Sobrecosto por pie de indirectos (como la hoja «Cálculo» de Neodata), sobre un costo directo de 100:
+//   CI = CD × (indirecto de campo + de oficina) → subtotal 1; CF = subtotal 1 × financiamiento → subtotal 2;
+//   CU = subtotal 2 × utilidad → subtotal 3; CA = subtotal 3 × cargos adicionales → precio unitario.
+//   % sobrecosto = precio unitario − 100. $f: indirecto_campo, indirecto_oficina, financiamiento, utilidad, cargos_adicionales (en %)
+function acrineoSobrecostoDesglose(array $f): array
+{
+    $p = fn($k) => (float) ($f[$k] ?? 0) / 100;
+    $cd = 100.0;
+    $ind = ($p('indirecto_campo') + $p('indirecto_oficina'));
+    $ci = $cd * $ind;              $s1 = $cd + $ci;
+    $cf = $s1 * $p('financiamiento'); $s2 = $s1 + $cf;
+    $cu = $s2 * $p('utilidad');       $s3 = $s2 + $cu;
+    $ca = $s3 * $p('cargos_adicionales'); $pu = $s3 + $ca;
+    return ['costo_directo' => $cd, 'indirectos' => $ci, 'subtotal1' => $s1, 'financiamiento' => $cf, 'subtotal2' => $s2,
+            'utilidad' => $cu, 'subtotal3' => $s3, 'cargos' => $ca, 'precio_unitario' => $pu,
+            'indirecto_total' => round($ind * 100, 6), 'sobrecosto_pct' => round($pu - $cd, 4)];
+}

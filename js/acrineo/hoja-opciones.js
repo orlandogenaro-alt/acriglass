@@ -1,5 +1,5 @@
 // ACRINEO · «Opciones del presupuesto» (pestaña vertical de la izquierda, como en Neodata) y sus teclas rápidas:
-// F4 Presupuesto completo · F10 Cálculo · F12 Detalle del presupuesto. «Buscar opción» filtra la lista.
+// F4 Presupuesto completo · F10 Cálculo · F12 Detalle del presupuesto · Ctrl+Shift+S Sobrecosto. «Buscar opción» filtra la lista.
 (function (AN) {
     'use strict';
 
@@ -13,7 +13,8 @@
         calculo: function () { var b = $('anCalculoBoton'); if (b) b.click(); },
         detalle: function () { var b = $('anHojaDetalle'); if (b) b.click(); },
         pegado: function () { if (AN.hojaPegado) AN.hojaPegado.abrir(); },
-        grafica: function () { var b = $('anConceptosGrafica'); if (b) b.click(); }
+        grafica: function () { var b = $('anConceptosGrafica'); if (b) b.click(); },
+        sobrecosto: function () { if (AN.hojaSobrecosto) AN.hojaSobrecosto.abrir(); }
     };
     var TECLAS = { F4: 'completo', F10: 'calculo', F12: 'detalle' };
 
@@ -57,6 +58,8 @@
     });
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && !caja.hidden) { abrir(false); return; }
+        // Ctrl+Shift+S: Sobrecosto
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 's' && !document.querySelector('dialog[open]')) { e.preventDefault(); ejecutar('sobrecosto'); return; }
         var op = TECLAS[e.key];
         if (!op || e.ctrlKey || e.altKey || e.metaKey || document.querySelector('dialog[open]')) return;
         e.preventDefault();

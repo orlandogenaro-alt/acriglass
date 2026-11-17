@@ -233,3 +233,15 @@ prueba('URL del concepto: solo http/https, vacía = sin enlace', function () {
     }
     verificar(acrineoUrlConcepto('https://x.mx/' . str_repeat('a', 500))[1] !== null, 'más de 500 caracteres');
 });
+
+prueba('sobrecosto por pie de indirectos (cascada como Neodata)', function () {
+    // campo 8 % + oficina 4 % = 12 %; financiamiento 4.4 %; utilidad 12 %; cargos 0.05 %
+    $d = acrineoSobrecostoDesglose(['indirecto_campo' => 8, 'indirecto_oficina' => 4, 'financiamiento' => 4.4, 'utilidad' => 12, 'cargos_adicionales' => 0.05]);
+    igual(12.0, $d['indirecto_total'], 6);
+    igual(112.0, $d['subtotal1'], 6);
+    igual(116.928, $d['subtotal2'], 6);
+    igual(130.95936, $d['subtotal3'], 6);
+    igual(31.0248, $d['sobrecosto_pct'], 4);   // 130.95936 × 1.0005 − 100
+    igual(0.0, acrineoSobrecostoDesglose([])['sobrecosto_pct'], 4);
+    igual(12.0, acrineoSobrecostoDesglose(['indirecto_campo' => 12])['sobrecosto_pct'], 4);
+});

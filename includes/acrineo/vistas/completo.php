@@ -60,6 +60,8 @@ require_once __DIR__ . '/campos.php';
         <button type="button" data-opcion="calculo"><span class="an-op-ico"><?= anIcono('calc') ?></span><span>Cálculo (F10)<small>Procesos</small></span></button>
         <button type="button" data-opcion="detalle"><span class="an-op-ico"><?= anIcono('aviso') ?></span><span>Detalle del presupuesto (F12)<small>Otros</small></span></button>
         <button type="button" data-opcion="pegado"><span class="an-op-ico"><?= anIcono('portapapeles') ?></span><span>Pegado especial (Excel)<small>Otros</small></span></button>
+        <h3><span class="an-op-ico">1×</span>Factores</h3>
+        <button type="button" data-opcion="sobrecosto"><span class="an-op-ico">$</span><span>Sobrecosto (Ctrl + Shift + S)<small>Factores</small></span></button>
         <h3><span class="an-op-ico"><?= anIcono('grafica') ?></span>Reporte</h3>
         <button type="button" data-opcion="grafica"><span class="an-op-ico"><?= anIcono('grafica') ?></span><span>Gráfica de la explosión de insumos<small>Reporte</small></span></button>
     </nav>

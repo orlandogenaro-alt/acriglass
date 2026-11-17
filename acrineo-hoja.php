@@ -71,7 +71,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
         </a>
         <button type="button" class="an-btn an-mini" id="anHojaDetalle"><?= anIcono('editar') ?>Detalle</button>
         <span class="an-flex"></span>
-        <label class="an-sobrecosto">% Sobrecosto
+        <label class="an-sobrecosto" title="Se captura directo o se calcula con los factores (Opciones del presupuesto › Sobrecosto, Ctrl+Shift+S)">% Sobrecosto
             <input type="number" id="anSobrecosto" step="0.0001" min="-99.9999" max="1000" inputmode="decimal"<?= $puede['presupuestos.editar'] ? '' : ' disabled' ?>>
         </label>
     </div>
@@ -269,6 +269,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
 <?php require __DIR__ . '/includes/acrineo/vistas/catalogos-chicos.php'; ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/calculo.php'; ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/pegado.php'; ?>
+<?php require __DIR__ . '/includes/acrineo/vistas/sobrecosto.php'; ?>
 <script>
     window.ACRINEO = <?= json_encode($cfgCliente, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_PRESERVE_ZERO_FRACTION) ?>;
 </script>
@@ -289,6 +290,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
 <script src="<?= recurso('js/acrineo/hoja-calculo.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-pegado.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-completo.js') ?>"></script>
+<script src="<?= recurso('js/acrineo/hoja-sobrecosto.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-opciones.js') ?>"></script>
 <?php endif; ?>
 </body>

@@ -15,6 +15,7 @@ $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2
         <span class="an-sucio" title="Existen cambios sin guardar"><?= anIcono('aviso') ?></span>
         <h2 id="anMatrizTitulo">Matriz de precio unitario</h2>
         <span id="anMatrizUrl"></span>
+        <button type="button" class="an-btn-cab an-icono" id="anMatrizGrafica" title="Explosión de insumos (gráfica por tipo de insumo)" aria-label="Gráfica de la matriz"><?= anIcono('grafica') ?></button>
         <span class="an-flex"></span>
         <button type="button" class="an-btn-cab" id="anMatrizOcultarTexto" aria-pressed="false">Ocultar texto</button>
         <?php if ($puedeMatriz): ?>

@@ -481,21 +481,37 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-explosion-concepto .an-explosion { border-top: 1px solid var(--borde); }
 @media (max-width: 760px) { .an-calculo-cuerpo { grid-template-columns: 1fr; } }
 
-/* Gráfica del catálogo de conceptos: una barra por concepto, de mayor a menor */
-.an-grafica-dlg { width: min(860px, 94vw); max-height: 88vh; }
-.an-grafica { padding: 14px 18px 18px; overflow: auto; }
-.an-grafica-total { margin-bottom: 12px; color: var(--texto-2); }
-.an-grafica-total b { color: var(--enfasis); }
-.an-barras { list-style: none; display: grid; gap: 4px; margin: 0; padding: 0; }
-.an-barras li { display: grid; grid-template-columns: minmax(140px, 32%) 1fr 150px; align-items: center; gap: 10px; padding: 3px 4px; border-radius: 4px; font-size: 12.5px; }
-.an-barras li:hover { background: var(--fila-hover); }
-.an-barra-etq { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--texto-2); }
-.an-barra-etq b { color: var(--texto); }
-.an-barra-pista { height: 14px; }
-.an-barra-relleno { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--azul); }
-.an-barras li.otros .an-barra-relleno { background: var(--texto-3); }
-.an-barra-valor { text-align: right; font-variant-numeric: tabular-nums; color: var(--texto); }
-.an-barra-valor small { color: var(--texto-3); }
+/* Gráfica «Explosión de insumos»: columnas o barras por tipo de insumo, serie moneda 1 (azul) y moneda 2 (naranja) */
+.an-grafica-dlg { width: min(1100px, 96vw); max-height: 92vh; }
+.an-grafica-dlg { --serie-1: #2a78d6; --serie-2: #eb6834; --g-grid: #e6e8ec; --g-eje: #6b7280; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .an-grafica-dlg { --serie-1: #3987e5; --serie-2: #d95926; --g-grid: #26324a; --g-eje: #9aa4b5; } }
+:root[data-theme="dark"] .an-grafica-dlg { --serie-1: #3987e5; --serie-2: #d95926; --g-grid: #26324a; --g-eje: #9aa4b5; }
+.an-grafica-dlg .an-titulo-barra > svg.i { width: 18px; height: 18px; }
+.an-grafica { padding: 12px 18px 18px; overflow: auto; }
+.an-grafica-opciones { display: flex; justify-content: center; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+.an-campo-linea { display: grid; gap: 2px; font-size: 11.5px; color: var(--texto-2); }
+.an-campo-linea select { min-width: 190px; height: 32px; padding: 0 6px; border: none; border-bottom: 1px solid var(--borde-2); background: var(--sub); font-size: 14px; color: var(--texto); }
+.an-grafica-nota { text-align: center; margin: 8px 0 4px; }
+.an-grafica-leyenda { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; font-size: 12.5px; color: var(--texto); margin: 6px 0; }
+.an-leyenda { display: inline-flex; align-items: center; gap: 6px; }
+.an-leyenda i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.an-leyenda.s1 i { background: var(--serie-1); }
+.an-leyenda.s2 i { background: var(--serie-2); }
+.an-grafica-lienzo { width: 100%; overflow-x: auto; }
+.an-grafica-lienzo svg { display: block; font-size: 11.5px; }
+.an-g-grid line { stroke: var(--g-grid); stroke-width: 1; }
+.an-g-eje text, .an-g-cat { fill: var(--g-eje); }
+.an-g-cat { font-size: 12px; fill: var(--texto-2); }
+.an-g-base { stroke: var(--g-eje); stroke-width: 1; }
+.an-g-barra.s1 { fill: var(--serie-1); }
+.an-g-barra.s2 { fill: var(--serie-2); }
+.an-g-barra.otros { opacity: .55; }
+.an-g-zona { fill: transparent; cursor: default; }
+.an-g-zona:hover + text, .an-g-barra:hover { filter: brightness(1.08); }
+.an-g-valor { fill: var(--texto); font-size: 11px; font-variant-numeric: tabular-nums; }
+.an-grafica-tabla { margin-top: 12px; border: 1px solid var(--borde); border-radius: 8px; overflow: auto; }
+.an-grafica-tabla tfoot td { padding: 6px 10px; border-top: 1px solid var(--borde-2); }
+.an-grafica-tip { position: absolute; z-index: 5; max-width: 320px; padding: 6px 9px; border-radius: 6px; background: var(--tarjeta); border: 1px solid var(--borde-2); box-shadow: var(--sombra-flot); font-size: 12px; color: var(--texto); white-space: pre-line; pointer-events: none; }
 .an-vacio-texto { padding: 30px 10px; text-align: center; color: var(--texto-3); }
 .an-hoja .an-ventana { margin: 0; min-height: 0; }
 .an-hoja-derecha { display: grid; grid-template-rows: minmax(0, 1.25fr) minmax(0, 1fr); gap: 8px; min-height: 0; }

@@ -700,6 +700,18 @@
     $('anMatrizAnterior').addEventListener('click', function () { vecino(-1); });
     $('anMatrizSiguiente').addEventListener('click', function () { vecino(1); });
     $('anMatrizRegresar').addEventListener('click', regresar);
+    // Gráfica de la matriz abierta: importe de sus insumos por tipo (los marcados, si hay)
+    $('anMatrizGrafica').addEventListener('click', function () {
+        if (!AN.grafica || !st.concepto) return;
+        calcular();
+        var filas = st.marcados.size ? st.filas.filter(function (f) { return st.marcados.has(f.clave); }) : st.filas;
+        AN.grafica.abrir({
+            titulo: 'Explosión de insumos · ' + $('anMatrizTitulo').textContent.replace(/ \| Unidad.*$/, ''),
+            nota: (st.marcados.size ? st.marcados.size + ' insumo(s) marcado(s)' : 'Todos los insumos de esta matriz') + ' · importe por unidad del concepto.',
+            nombreTipo: function (t) { return TIPOS[t] || t; },
+            filas: filas.map(function (f) { return { tipo: f.tipo, codigo: f.codigo, descripcion: f.descripcion, unidad: f.unidad, importe: f._importe || 0 }; })
+        });
+    });
     // Doble clic en cualquier parte del renglón (también en sus celdas al editar): abre su propia matriz («Código: 50450 -> B12»).
     // Si la matriz tiene cambios (p. ej. el insumo se acaba de agregar y aún no tiene matriz_id) se guarda sola antes de
     // entrar, como en Neodata; los renglones regresan en el mismo orden, así que se ubica el insumo por su posición.

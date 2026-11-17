@@ -225,11 +225,24 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
         </div>
     </main>
 
-    <!-- Gráfica del catálogo de conceptos -->
+    <!-- Gráfica «Explosión de insumos» (catálogo de conceptos y matriz) · js/acrineo/grafica.js -->
     <dialog class="an-dialogo an-grafica-dlg" id="anGrafica" aria-labelledby="anGraficaTitulo">
-        <div class="an-titulo-barra"><h2 id="anGraficaTitulo">Importe de los conceptos en el presupuesto</h2><span class="an-flex"></span>
+        <div class="an-titulo-barra"><?= anIcono('grafica') ?><h2 id="anGraficaTitulo">Explosión de insumos</h2>
             <button type="button" class="an-btn-cab an-icono" data-grafica-cerrar aria-label="Cerrar"><?= anIcono('cerrar') ?></button></div>
-        <div class="an-grafica" id="anGraficaCuerpo"></div>
+        <div class="an-grafica">
+            <div class="an-grafica-opciones">
+                <label class="an-campo-linea">Agrupar por
+                    <select id="anGraficaPor"><option value="tipo">Tipo de insumo</option><option value="insumo">Insumo / concepto</option><option value="unidad">Unidad</option></select></label>
+                <label class="an-campo-linea">Tipo de gráfica
+                    <select id="anGraficaForma"><option value="columnas">Columnas</option><option value="barras">Barras</option></select></label>
+                <label class="an-check"><input type="checkbox" id="anGraficaVerTabla"> Ver tabla</label>
+            </div>
+            <p class="an-ayuda an-grafica-nota" id="anGraficaNota"></p>
+            <div class="an-grafica-leyenda" id="anGraficaLeyenda"></div>
+            <div class="an-grafica-lienzo" id="anGraficaLienzo"></div>
+            <div class="an-grafica-tabla" id="anGraficaTabla" hidden></div>
+        </div>
+        <div class="an-grafica-tip" id="anGraficaTip" role="tooltip" hidden></div>
     </dialog>
     <?php require __DIR__ . '/includes/acrineo/vistas/matriz.php'; ?>
     <?php endif; ?>
@@ -255,6 +268,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
 <script src="<?= recurso('js/acrineo/rejilla.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-renglones.js') ?>"></script>
+<script src="<?= recurso('js/acrineo/grafica.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-conceptos.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-matriz.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-calculo.js') ?>"></script>

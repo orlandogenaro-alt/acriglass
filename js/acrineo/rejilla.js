@@ -16,7 +16,7 @@
         try { return JSON.parse(localStorage.getItem('acrineo.rejilla.' + nombre)) || null; } catch (e) { return null; }
     }
     function escribir(r) {
-        try { localStorage.setItem('acrineo.rejilla.' + r.nombre, JSON.stringify({ ocultas: r.ocultas, fijas: r.fijas })); } catch (e) { /* sin memoria */ }
+        try { localStorage.setItem('acrineo.rejilla.' + r.nombre, JSON.stringify({ ocultas: r.ocultas, fijas: r.fijas, ajustar: !!r.ajustar, altoAuto: !!r.altoAuto })); } catch (e) { /* sin memoria */ }
     }
 
     // Columnas con nombre (la de las casillas no cuenta): [{ n: posición 1…, texto }]
@@ -44,6 +44,8 @@
             izq += c.th.getBoundingClientRect().width;
         });
         if (r.estilo.textContent !== css) r.estilo.textContent = css;
+        r.tabla.classList.toggle('an-rejilla-ajustar', !!r.ajustar);
+        r.tabla.classList.toggle('an-rejilla-alto', !!r.altoAuto);
         r.btnCols.querySelector('span').textContent = r.ocultas.length;
         r.btnFijas.querySelector('span').textContent = hasta ? visibles.filter(function (c) { return c.n <= hasta; }).length : 0;
         r.btnCols.classList.toggle('activo', r.ocultas.length > 0);
@@ -51,8 +53,9 @@
 
     function cerrarPop() {
         if (pop) { pop.remove(); pop = null; }
-        document.querySelectorAll('.an-rejilla-btns .an-menu, .an-menu-cont > .an-menu').forEach(function (m) {
+        document.querySelectorAll('.an-rejilla-btns .an-menu:not(.an-menu-hijo), .an-menu-cont > .an-menu, .an-menu-rejilla').forEach(function (m) {
             m.hidden = true;
+            if (m === ctx) return;
             var b = m.parentNode.querySelector('[aria-expanded]');
             if (b) b.setAttribute('aria-expanded', 'false');
         });
@@ -121,8 +124,8 @@
             filas.push(cols.map(function (c) {
                 var td = tr.cells[c.n - 1];
                 if (!td) return '';
-                var i = td.querySelector('input:not([type=checkbox])');
-                var t = (i ? i.value : td.textContent).replace(/\s+/g, ' ').trim();
+                var i = td.querySelector('input:not([type=checkbox]), select');
+                var t = (i ? (i.tagName === 'SELECT' ? (i.selectedOptions[0] || {}).textContent || '' : i.value) : td.textContent).replace(/\s+/g, ' ').trim();
                 var num = /^\$?\s?-?[\d,]+(\.\d+)?$/.test(t) ? Number(t.replace(/[$,\s]/g, '')) : NaN;
                 return isNaN(num) || t === '' ? t : num;
             }));
@@ -133,22 +136,90 @@
         window.XlsxSimple.descargar(blob, nombre.replace(/[\\\/:*?"<>|]+/g, ' ').trim() + '.xlsx');
     }
 
+    // Pinta un menú: null = separador; { texto, accion, desactivado, marcado, atajo, sub: [...] }
+    function pintarMenu(menu, acciones, pre) {
+        pre = pre || '';
+        menu.innerHTML = acciones.map(function (a, i) {
+            if (!a) return '<div class="an-sep"></div>';
+            var marca = a.marcado != null ? '<i class="an-menu-marca">' + (a.marcado ? '✓' : '') + '</i>' : '';
+            var atajo = a.atajo ? '<small class="an-menu-atajo">' + esc(a.atajo) + '</small>' : '';
+            if (a.sub) {
+                return '<div class="an-menu-sub"><button type="button" role="menuitem" aria-haspopup="true" data-sub="' + pre + i + '">' + marca + '<span>' + esc(a.texto) + '</span><small class="an-menu-atajo">▸</small></button>'
+                    + '<div class="an-menu an-menu-hijo" role="menu"></div></div>';
+            }
+            return '<button type="button" role="menuitem" data-accion="' + pre + i + '"' + (a.desactivado ? ' disabled' : '') + '>' + marca + '<span>' + esc(a.texto) + '</span>' + atajo + '</button>';
+        }).join('');
+        acciones.forEach(function (a, i) {
+            if (a && a.sub) pintarMenu(menu.querySelector('[data-sub="' + pre + i + '"]').nextElementSibling, a.sub, pre + i + '.');
+        });
+    }
+    function accionDe(acciones, ruta) {
+        var a = null;
+        String(ruta).split('.').forEach(function (k, n) { a = n ? (a && a.sub ? a.sub[+k] : null) : acciones[+k]; });
+        return a;
+    }
+
+    // «Config. grid ▸» (como en Neodata): alto de fila automático, guardar y restablecer
+    function configGrid(r) {
+        return [
+            { texto: 'Alto de fila automático', marcado: !!r.altoAuto, accion: function () { r.altoAuto = !r.altoAuto; escribir(r); aplicar(r); } },
+            { texto: 'Guardar config. grid', accion: function () { escribir(r); AN.ui.aviso('Se guardó la configuración de la cuadrícula.', 'ok'); } },
+            { texto: 'Restablecer config. grid', accion: function () { restablecer(r); } }
+        ];
+    }
+    function restablecer(r) {
+        try { localStorage.removeItem('acrineo.rejilla.' + r.nombre); } catch (e) { /* sin memoria */ }
+        r.ocultas = (r.cfg.ocultas || []).slice();
+        r.fijas = r.cfg.fijas || 0;
+        r.ajustar = false;
+        r.altoAuto = false;
+        aplicar(r);
+        AN.ui.aviso('La cuadrícula quedó como al principio.', 'ok');
+    }
+
     function abrirMenu(r) {
         var menu = r.btnMenu.parentNode.querySelector('.an-menu');
         if (!menu.hidden) { cerrarPop(); return; }
         cerrarPop();
         var extras = r.cfg.extras ? r.cfg.extras() : [];
         r.acciones = extras.concat([null,
+            { texto: 'Ajustar', marcado: !!r.ajustar, accion: function () { r.ajustar = !r.ajustar; escribir(r); aplicar(r); } },
             { texto: 'Exportar a Excel', accion: function () { exportar(r); } }],
-            r.cfg.trasExportar ? r.cfg.trasExportar() : [], [
+            r.cfg.trasExportar ? r.cfg.trasExportar() : [],
+            r.cfg.limpiarFiltro ? [{ texto: 'Limpiar filtro', accion: r.cfg.limpiarFiltro, desactivado: r.cfg.hayFiltro ? !r.cfg.hayFiltro() : false }] : [], [null,
             { texto: 'Mostrar todas las columnas', accion: function () { r.ocultas = []; escribir(r); aplicar(r); }, desactivado: !r.ocultas.length },
-            { texto: 'Quitar las columnas fijas', accion: function () { r.fijas = 0; escribir(r); aplicar(r); }, desactivado: !r.fijas }]);
+            { texto: 'Quitar las columnas fijas', accion: function () { r.fijas = 0; escribir(r); aplicar(r); }, desactivado: !r.fijas },
+            { texto: 'Config. grid', sub: configGrid(r) }]);
         if (r.acciones[0] === null) r.acciones.shift();
-        menu.innerHTML = r.acciones.map(function (a, i) {
-            return a ? '<button type="button" role="menuitem" data-accion="' + i + '"' + (a.desactivado ? ' disabled' : '') + '>' + esc(a.texto) + '</button>' : '<div class="an-sep"></div>';
-        }).join('');
+        pintarMenu(menu, r.acciones);
         menu.hidden = false;
         r.btnMenu.setAttribute('aria-expanded', 'true');
+    }
+
+    // Menú del clic derecho sobre una cuadrícula: las acciones que da la pantalla + «Config. grid ▸»
+    var ctx = document.createElement('div'), ctxAcciones = [];
+    ctx.className = 'an-menu an-menu-ctx an-menu-rejilla';
+    ctx.setAttribute('role', 'menu');
+    ctx.hidden = true;
+    document.body.appendChild(ctx);
+    ctx.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-accion]');
+        if (!b || b.disabled) return;
+        var a = accionDe(ctxAcciones, b.dataset.accion);
+        cerrarPop();
+        if (a && a.accion) a.accion();
+    });
+    function contextual(nombre, e, acciones) {
+        var r = rejillas[nombre];
+        e.preventDefault();
+        cerrarPop();
+        ctxAcciones = (acciones || []).slice();
+        if (r && r.tabla) ctxAcciones = ctxAcciones.concat(ctxAcciones.length ? [null] : [], [{ texto: 'Config. grid', sub: configGrid(r) }]);
+        pintarMenu(ctx, ctxAcciones);
+        ctx.hidden = false;
+        ctx.style.left = Math.max(8, Math.min(e.clientX, window.innerWidth - ctx.offsetWidth - 8)) + 'px';
+        ctx.style.top = Math.max(8, Math.min(e.clientY, window.innerHeight - ctx.offsetHeight - 8)) + 'px';
+        ctx.classList.toggle('an-menu-izq', ctx.getBoundingClientRect().right + 230 > window.innerWidth);
     }
 
     function preparar(cont) {
@@ -162,6 +233,8 @@
         r.btnMenu = cont.querySelector('[data-menu]');
         r.ocultas = guardado && Array.isArray(guardado.ocultas) ? guardado.ocultas : (r.cfg.ocultas || []).slice();
         r.fijas = guardado && guardado.fijas != null ? +guardado.fijas : (r.cfg.fijas || 0);
+        r.ajustar = !!(guardado && guardado.ajustar);
+        r.altoAuto = !!(guardado && guardado.altoAuto);
         r.estilo = document.createElement('style');
         document.head.appendChild(r.estilo);
         r.btnCols.addEventListener('click', function (e) { e.stopPropagation(); if (pop && pop.dataset.de === 'cols-' + nombre) cerrarPop(); else { popColumnas(r); pop.dataset.de = 'cols-' + nombre; } });
@@ -170,7 +243,8 @@
         r.btnMenu.parentNode.querySelector('.an-menu').addEventListener('click', function (e) {
             var b = e.target.closest('[data-accion]');
             if (!b) return;
-            var a = r.acciones[+b.dataset.accion];
+            if (b.disabled) return;
+            var a = accionDe(r.acciones, b.dataset.accion);
             cerrarPop();
             if (a && a.accion) a.accion();
         });
@@ -183,9 +257,9 @@
 
     document.addEventListener('click', function (e) {
         if (pop && !pop.contains(e.target)) cerrarPop();
-        else if (!pop && !e.target.closest('.an-menu-cont')) cerrarPop();
+        else if (!pop && !e.target.closest('.an-menu-cont, .an-menu-rejilla')) cerrarPop();
     });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && (pop || document.querySelector('.an-menu-cont > .an-menu:not([hidden])'))) cerrarPop(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && (pop || !ctx.hidden || document.querySelector('.an-menu-cont > .an-menu:not([hidden])'))) cerrarPop(); });
     window.addEventListener('resize', function () { if (pop) cerrarPop(); });
 
     AN.rejilla = {
@@ -195,7 +269,9 @@
             // Valores por omisión si el usuario nunca los ha cambiado
             if (r.tabla && !leer(nombre)) { r.ocultas = (cfg.ocultas || r.ocultas || []).slice(); if (cfg.fijas != null) r.fijas = cfg.fijas; aplicar(r); }
         },
-        cerrar: cerrarPop
+        cerrar: cerrarPop,
+        contextual: contextual,
+        exportar: function (nombre) { if (rejillas[nombre]) exportar(rejillas[nombre]); }
     };
     document.querySelectorAll('[data-rejilla]').forEach(preparar);
 })(window.AcriNeo = window.AcriNeo || {});

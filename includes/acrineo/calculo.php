@@ -233,7 +233,7 @@ function acrineoExplosionAcoplada(array $ctx, string $q, string $modo = 'contien
         };
         $recorrer = function (array $niveles, int $padre, float $factor, int $cid) use (&$recorrer, &$mapa, $nivel, $ctx) {
             foreach (acrineoCalcularMatriz($niveles[$padre] ?? [], $ctx['dec_costos'])['filas'] as $f) {
-                $k = $f['insumo_id'] ? 'i' . $f['insumo_id'] : 'l' . mb_strtoupper(trim((string) $f['codigo']) . '|' . trim($f['descripcion']) . '|' . trim((string) $f['unidad']) . '|' . $f['tipo']);
+                $k = acrineoClaveInsumo($f);
                 if (!isset($mapa[$k])) {
                     $mapa[$k] = ['clave' => $k, 'clase' => 'insumo', 'insumo_id' => $f['insumo_id'], 'codigo' => $f['codigo'], 'descripcion' => $f['descripcion'],
                                  'unidad' => $f['base'] ? '%' : $f['unidad'], 'tipo' => $f['tipo'], 'costo' => (float) $f['costo'], 'cantidad' => 0.0, 'importe' => 0.0,
@@ -379,4 +379,49 @@ function acrineoErroresPotenciales(array $ctx, array $matrices, array $avisos): 
     }
     foreach ($avisos as $a) $e[] = ['tipo' => 'catalogo', 'texto' => "Catálogo de insumos · $a"];
     return $e;
+}
+
+// Clave con la que la explosión junta un insumo: i<insumo_id> o l<CÓDIGO|DESCRIPCIÓN|UNIDAD|TIPO> si es un renglón libre
+function acrineoClaveInsumo(array $f): string
+{
+    return $f['insumo_id'] ? 'i' . $f['insumo_id'] : 'l' . mb_strtoupper(trim((string) $f['codigo']) . '|' . trim((string) $f['descripcion']) . '|' . trim((string) $f['unidad']) . '|' . trim((string) $f['tipo']));
+}
+
+// «Participa» (como en Neodata): en qué conceptos y en qué matriz (o submatriz) se usa un insumo, con su cantidad en
+// esa matriz y la que suma en todo el presupuesto (cantidad del concepto × cantidades de las matrices de arriba).
+function acrineoParticipa(array $ctx, string $clave): array
+{
+    $clave = trim($clave);
+    if ($clave === '') throw new AcrineoError('Falta el insumo.', 422);
+    $matrices = acrineoCalculoMatrices($ctx);
+    $cant = [];
+    foreach (bd_filas('AW', 'select r.concepto_id, sum(r.cantidad) as c from acrineo_partida_conceptos r join acrineo_partidas p on p.partida_id = r.partida_id
+                              where p.presupuesto_id = ? group by r.concepto_id', [$ctx['id']]) as $r) $cant[(int) $r['concepto_id']] = (float) $r['c'];
+    $conceptos = [];
+    if ($matrices) {
+        $ids = implode(',', array_map('intval', array_keys($matrices)));
+        foreach (bd_filas('AW', "select concepto_id, codigo, descripcion, unidad from acrineo_conceptos where concepto_id in ($ids)") as $c) $conceptos[(int) $c['concepto_id']] = $c;
+    }
+    $usos = [];
+    $insumo = null;
+    $recorrer = function (array $niveles, int $padre, float $factor, int $cid, array $ruta) use (&$recorrer, &$usos, &$insumo, $clave, $ctx, $conceptos) {
+        foreach (acrineoCalcularMatriz($niveles[$padre] ?? [], $ctx['dec_costos'])['filas'] as $f) {
+            if (acrineoClaveInsumo($f) === $clave) {
+                $insumo = $insumo ?? ['codigo' => $f['codigo'], 'descripcion' => $f['descripcion'], 'unidad' => $f['base'] ? '%' : $f['unidad'], 'tipo' => $f['tipo']];
+                $c = $conceptos[$cid] ?? ['codigo' => '', 'descripcion' => '', 'unidad' => ''];
+                $usos[] = ['concepto_id' => $cid, 'codigo' => $c['codigo'], 'descripcion' => $c['descripcion'], 'unidad' => $c['unidad'],
+                           'matriz_id' => $f['matriz_id'], 'hijos' => isset($niveles[$f['matriz_id']]),
+                           'padre' => $padre ?: null, 'ruta' => $ruta, 'cantidad' => (float) $f['cantidad'], 'pct' => (bool) $f['base'],
+                           'costo' => (float) $f['costo'], 'importe' => (float) $f['importe'],
+                           'total' => $f['base'] ? 0.0 : round((float) $f['cantidad_efectiva'] * $factor, 8)];
+            }
+            if (isset($niveles[$f['matriz_id']])) {
+                $recorrer($niveles, $f['matriz_id'], $f['base'] ? 0.0 : (float) $f['cantidad_efectiva'] * $factor, $cid,
+                    array_merge($ruta, [['matriz_id' => $f['matriz_id'], 'codigo' => $f['codigo'] ?: $f['descripcion']]]));
+            }
+        }
+    };
+    foreach ($matrices as $cid => $niveles) if (isset($niveles[0])) $recorrer($niveles, 0, $cant[$cid] ?? 0.0, $cid, []);
+    usort($usos, fn($a, $b) => [(string) $a['codigo'], count($a['ruta'])] <=> [(string) $b['codigo'], count($b['ruta'])]);
+    return ['insumo' => $insumo, 'usos' => $usos, 'total' => round(array_sum(array_column($usos, 'total')), 8)];
 }

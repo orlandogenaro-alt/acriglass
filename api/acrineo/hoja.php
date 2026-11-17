@@ -61,6 +61,8 @@ try {
             case 'explosion_acoplada':
                 $ver = in_array($_GET['ver'] ?? '', ['todos', 'conceptos', 'insumos'], true) ? $_GET['ver'] : 'todos';
                 responder(['ok' => true] + acrineoExplosionAcoplada($ctx, (string) ($_GET['q'] ?? ''), acrineoModoBusqueda(), $ver));
+            case 'participa':
+                responder(['ok' => true] + acrineoParticipa($ctx, (string) ($_GET['clave'] ?? '')));
             case 'explosion':
                 responder(['ok' => true] + acrineoExplosionConcepto($ctx, (int) ($_GET['concepto'] ?? 0)));
             case 'calculo':

@@ -850,3 +850,18 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 /* Renglón de la matriz con su propia matriz (doble clic la abre) */
 .an-matriz tr td.an-col-n .an-insignia.an-insignia-m { background: var(--azul-suave); color: var(--azul-texto); border-color: var(--azul-borde); }
 .an-matriz tbody tr[data-clave] { cursor: default; }
+
+/* Menús de las cuadrículas: marca ✓, atajo, submenú «Config. grid ▸»; Ajustar y Alto de fila automático */
+.an-menu .an-menu-marca { width: 14px; flex: none; font-style: normal; color: var(--azul-texto); }
+.an-menu button > span { flex: 1; }
+.an-menu .an-menu-atajo { margin-left: 14px; font-weight: 600; color: var(--texto-3); }
+.an-menu-sub { position: relative; }
+.an-menu .an-menu-hijo { display: none; top: -6px; right: auto; left: calc(100% + 2px); }
+.an-menu-sub:hover > .an-menu-hijo, .an-menu-sub:focus-within > .an-menu-hijo { display: block; }
+.an-menu-izq .an-menu-hijo { left: auto; right: calc(100% + 2px); }
+.an-rejilla-ajustar td, .an-rejilla-ajustar th { max-width: none !important; }
+.an-rejilla-alto td { white-space: normal !important; max-width: 420px; overflow-wrap: anywhere; }
+.an-participa .an-tabla td { max-width: 420px; }
+.an-participa { width: min(920px, 96vw); }
+.an-participa-cuerpo { padding: 10px 14px; }
+.an-participa-cuerpo .an-tabla-cont { max-height: 55vh; overflow: auto; }

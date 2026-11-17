@@ -790,6 +790,11 @@
         if (!f) return;
         var sel = window.getSelection && window.getSelection();
         if (sel && sel.removeAllRanges) sel.removeAllRanges();
+        verMatrizDe(f);
+    });
+    // «Ver matriz» de un renglón: su propia matriz (la crea guardando antes si hace falta)
+    async function verMatrizDe(f) {
+        if (!f) return;
         if (!st.submatriz) { estado('Falta aplicar la migración 029 para abrir la matriz de un insumo.', 'error'); return; }
         if (f.base) { estado('Un renglón de porcentaje no tiene matriz propia.', 'info'); return; }
         if (sucio() || !f.matriz_id) {
@@ -799,7 +804,7 @@
             if (!f || !f.matriz_id) { estado('No se pudo ubicar el insumo después de guardar; vuelve a darle doble clic.', 'error'); return; }
         }
         abrirNivel(f.matriz_id);
-    });
+    }
     $('anTabPresupuesto').addEventListener('click', function () { verPestana(false); });
     $('anTabMatriz').addEventListener('click', function () { verPestana(true); });
 
@@ -814,6 +819,132 @@
         if (k === 'z' && !e.shiftKey) { e.preventDefault(); st.fotoPendiente = null; deshacer(); }
         else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); rehacer(); }
     });
+
+    // ---------- Menús de las cuadrículas (clic derecho y ⋮), como en Neodata ----------
+    // La misma clave con la que la explosión junta un insumo (acrineoClaveInsumo en el servidor)
+    function claveExplosion(f) {
+        return f.insumo_id ? 'i' + f.insumo_id
+            : 'l' + [f.codigo, f.descripcion, f.unidad, f.tipo].map(function (v) { return String(v == null ? '' : v).trim(); }).join('|').toUpperCase();
+    }
+    var ultimo = { donde: null, clave: null };   // el último renglón tocado (para Ctrl+M y Ctrl+C)
+    tbody.addEventListener('mousedown', function (e) { var tr = e.target.closest('tr[data-clave]'); if (tr) ultimo = { donde: 'matriz', clave: tr.dataset.clave }; });
+    cuerpoCat.addEventListener('mousedown', function (e) { var tr = e.target.closest('tr[data-insumo]'); if (tr) ultimo = { donde: 'insumos', clave: tr.dataset.insumo }; });
+    function insumoAbajo(k) { return cat.items.find(function (i) { return claveIns(i) === k; }) || null; }
+    function claveAbajo(i) { return i.clave || 'i' + i.insumo_id; }
+
+    function marcarTodo(si) {
+        if (!H.puede || !st.concepto) return;
+        if (!st.editando) entrarEdicion();
+        st.marcados.clear();
+        if (si) st.filas.forEach(function (f) { st.marcados.add(f.clave); });
+        tbody.querySelectorAll('input[data-marcar]').forEach(function (c) { c.checked = si; });
+        if ($('anMatrizTodos')) $('anMatrizTodos').checked = si && st.filas.length > 0;
+        botones();
+    }
+
+    // «Participa»: los conceptos (y la matriz o submatriz) donde se usa el insumo
+    var dlgPart = $('anParticipa'), partUsos = [];
+    async function participa(clave, nombre, irDirecto) {
+        if (!st.concepto) return;
+        var r;
+        try { r = await AN.api.get(H.url({ recurso: 'participa', clave: clave })); } catch (e) { AN.ui.aviso(e.message, 'error'); return; }
+        partUsos = r.usos;
+        if (irDirecto) {
+            if (!r.usos.length) { AN.ui.aviso('El insumo no está en ninguna matriz del presupuesto.', 'info'); return; }
+            if (r.usos.length === 1) { verUso(r.usos[0]); return; }
+        }
+        var ins = r.insumo || {};
+        $('anParticipaTitulo').textContent = 'Participa · ' + (ins.codigo || nombre || '');
+        $('anParticipaInsumo').textContent = ins.descripcion ? ins.descripcion + (ins.unidad ? ' (' + ins.unidad + ')' : '') + ' · está en ' + r.usos.length + ' matriz(ces)' + (r.total ? ' · cantidad total en el presupuesto ' + cantidadTexto(r.total) : '') : '';
+        $('anParticipaFilas').innerHTML = r.usos.map(function (u, n) {
+            var ruta = [u.codigo].concat(u.ruta.map(function (x) { return x.codigo; })).join(' -> ');
+            return '<tr class="an-fila" data-uso="' + n + '"><td>' + esc(u.codigo) + '</td><td class="an-desc">' + esc(u.descripcion) + '</td><td>' + esc(ruta) + '</td>'
+                + '<td class="num">' + cantidadTexto(u.cantidad) + (u.pct ? ' %' : '') + '</td><td class="num">' + (u.pct ? '—' : cantidadTexto(u.total)) + '</td>'
+                + '<td><button type="button" class="an-btn an-mini" data-ver-uso="' + n + '">Ver matriz</button></td></tr>';
+        }).join('') || '<tr class="an-vacio"><td colspan="6">El insumo no está en ninguna matriz del presupuesto.</td></tr>';
+        $('anParticipaEstado').textContent = '';
+        if (!dlgPart.open) dlgPart.showModal();
+    }
+    // Abre la matriz donde está el insumo (o la suya propia, si tiene análisis)
+    async function verUso(u) {
+        if (dlgPart.open) dlgPart.close();
+        if (st.concepto.concepto_id !== u.concepto_id) await abrir(u.concepto_id);
+        if (!st.concepto || st.concepto.concepto_id !== u.concepto_id) return;
+        var destino = u.hijos ? u.matriz_id : u.padre;
+        if (destino || st.padre) await abrirNivel(destino);
+    }
+    dlgPart.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-ver-uso]');
+        if (b) verUso(partUsos[+b.dataset.verUso]);
+        else if (e.target.closest('[data-participa-cerrar]')) dlgPart.close();
+    });
+    dlgPart.addEventListener('dblclick', function (e) { var tr = e.target.closest('tr[data-uso]'); if (tr) verUso(partUsos[+tr.dataset.uso]); });
+
+    // Copia renglones del panel de abajo (los marcados, o el del clic) como texto separado por tabuladores
+    function copiarAbajo(claves) {
+        var items = claves.map(insumoAbajo).filter(Boolean);
+        if (!items.length) return;
+        var exp = cat.fuente === 'explosion';
+        var cab = ['Código', 'Descripción', 'Unidad', 'Tipo', 'Costo'].concat(exp ? ['N', 'Cant. exp. ins.', 'Importe'] : ['Familia', 'Proveedor']);
+        var txt = [cab].concat(items.map(function (i) {
+            return [i.codigo, i.descripcion, i.unidad, tipoTexto(i.tipo), i.pct ? '' : i.costo == null ? '' : i.costo]
+                .concat(exp ? [i.n, i.pct ? '' : i.cantidad, i.importe] : [i.familia || '', i.proveedor || '']);
+        })).map(function (r) { return r.map(function (v) { return String(v == null ? '' : v).replace(/[\t\r\n]+/g, ' '); }).join('\t'); }).join('\r\n');
+        var listo = function () { AN.ui.aviso(items.length + ' insumo(s) copiados al portapapeles.', 'ok'); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(listo, function () { AN.ui.aviso('El navegador no dejó copiar al portapapeles.', 'error'); });
+    }
+    function clavesAbajo(k) { return cat.marcados.size && cat.marcados.has(k) ? Array.from(cat.marcados.keys()) : [k]; }
+
+    tbody.addEventListener('contextmenu', function (e) {
+        if (e.target.closest('input:not([type=checkbox]), select, textarea')) return;
+        var tr = e.target.closest('tr[data-clave]');
+        var f = tr ? st.filas.find(function (x) { return x.clave === tr.dataset.clave; }) : null;
+        if (f) ultimo = { donde: 'matriz', clave: f.clave };
+        AN.rejilla.contextual('matriz', e, [
+            { texto: 'Ver matriz', atajo: 'Ctrl+M', desactivado: !f || !!f.base, accion: function () { verMatrizDe(f); } },
+            { texto: 'Participa', desactivado: !f, accion: function () { participa(claveExplosion(f), f.codigo || f.descripcion); } },
+            null,
+            { texto: 'Marcar todo', desactivado: !H.puede || !st.filas.length, accion: function () { marcarTodo(true); } },
+            { texto: 'Desmarcar todo', desactivado: !H.puede || !st.marcados.size, accion: function () { marcarTodo(false); } }
+        ]);
+    });
+    cuerpoCat.addEventListener('contextmenu', function (e) {
+        if (e.target.closest('input:not([type=checkbox])')) return;
+        var tr = e.target.closest('tr[data-insumo]');
+        var i = tr ? insumoAbajo(tr.dataset.insumo) : null;
+        if (i) ultimo = { donde: 'insumos', clave: tr.dataset.insumo };
+        AN.rejilla.contextual('insumos', e, [
+            { texto: 'Participa', desactivado: !i, accion: function () { participa(claveAbajo(i), i.codigo); } },
+            { texto: 'Ver matriz', atajo: 'Ctrl+M', desactivado: !i, accion: function () { participa(claveAbajo(i), i.codigo, true); } },
+            { texto: 'Copiar', atajo: 'Ctrl+C', desactivado: !i, accion: function () { copiarAbajo(clavesAbajo(claveIns(i))); } }
+        ]);
+    });
+    // Ctrl+M (ver matriz) y Ctrl+C (copiar del panel de abajo) sobre el último renglón tocado
+    document.addEventListener('keydown', function (e) {
+        if (panel.hidden || !(e.ctrlKey || e.metaKey) || e.shiftKey || document.querySelector('dialog[open]')) return;
+        var k = e.key.toLowerCase(), a = document.activeElement;
+        if (k === 'm' && ultimo.clave) {
+            e.preventDefault();
+            if (ultimo.donde === 'matriz') { var f = st.filas.find(function (x) { return x.clave === ultimo.clave; }); if (f && !f.base) verMatrizDe(f); }
+            else { var i = insumoAbajo(ultimo.clave); if (i) participa(claveAbajo(i), i.codigo, true); }
+        } else if (k === 'c' && ultimo.donde === 'insumos' && ultimo.clave && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))
+                   && !(window.getSelection && String(window.getSelection()))) {
+            e.preventDefault();
+            copiarAbajo(clavesAbajo(ultimo.clave));
+        }
+    });
+    if (AN.rejilla) {
+        AN.rejilla.opciones('matriz', {
+            archivo: function () { return 'Matriz ' + $('anMatrizTitulo').textContent.replace(/^Código:\s*/, '').replace(/ \| .*$/, '').replace(/ -> /g, ' - '); },
+            limpiarFiltro: function () { $('anMatrizQ').value = ''; pintar(); },
+            hayFiltro: function () { return !!$('anMatrizQ').value.trim(); }
+        });
+        AN.rejilla.opciones('insumos', {
+            archivo: function () { return cat.fuente === 'explosion' ? 'Explosión de insumos ' + H.ctx.codigo : 'Catálogo de insumos'; },
+            limpiarFiltro: function () { $('anInsumosQ').value = ''; cargarCatalogo(false); },
+            hayFiltro: function () { return !!$('anInsumosQ').value.trim(); }
+        });
+    }
 
     // abierta() = la matriz tiene cambios sin guardar (la hoja pregunta antes de cerrar la pestaña del navegador)
     AN.hojaMatriz = { abrir: abrir, abierta: function () { return sucio(); } };

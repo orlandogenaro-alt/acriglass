@@ -47,13 +47,14 @@ $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2
             <button type="button" class="an-btn an-mini" id="anMatrizLibre" title="Agrega un renglón que no está en el catálogo">+ Renglón libre</button>
             <button type="button" class="an-btn an-mini" id="anMatrizActualizar" title="Toma el costo vigente del catálogo de insumos (no se guarda hasta GUARDAR)">Actualizar costos</button>
             <?php endif; ?>
+            <?= $rejilla('matriz', 'anTablaMatriz') ?>
             <button type="button" class="an-btn an-icono an-btn-menu" id="anMatrizMenu" title="Mostrar las acciones" aria-label="Mostrar las acciones" aria-expanded="false" aria-controls="anMatrizRiel">
                 <svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
             </button>
         </div>
         <div class="an-matriz-cuerpo">
         <div class="an-tabla-cont">
-            <table class="an-tabla an-renglones an-matriz">
+            <table class="an-tabla an-renglones an-matriz" id="anTablaMatriz">
                 <thead><tr>
                     <th class="an-col-sel" scope="col"><div class="an-th"><input type="checkbox" id="anMatrizTodos" aria-label="Marcar todos" disabled></div></th>
                     <th scope="col" class="num an-col-n"><div class="an-th"><span>Renglón</span></div></th>
@@ -104,9 +105,10 @@ $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2
             <?php if ($puedeMatriz): ?>
             <button type="button" class="an-btn an-mini an-primario" id="anInsumosCopiar" disabled title="Copia los marcados a la matriz con su «Cantidad a copiar»"><?= $icoCopiar ?> Copiar a la matriz</button>
             <?php endif; ?>
+            <?= $rejilla('insumos', 'anTablaInsumos') ?>
         </div>
         <div class="an-tabla-cont">
-            <table class="an-tabla an-insumos-tabla">
+            <table class="an-tabla an-insumos-tabla" id="anTablaInsumos">
                 <thead><tr>
                     <th class="an-col-sel" scope="col"><div class="an-th"></div></th>
                     <th scope="col"><div class="an-th"><span>Código</span></div></th>
@@ -161,3 +163,27 @@ $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2
     </div>
 </dialog>
 <?php endif; ?>
+
+<!-- «Participa»: en qué conceptos y matrices se usa un insumo (clic derecho en la matriz o en los insumos de abajo) -->
+<dialog class="an-dialogo an-participa" id="anParticipa" aria-labelledby="anParticipaTitulo">
+    <div class="an-titulo-barra"><h2 id="anParticipaTitulo">Participa</h2>
+        <button type="button" class="an-btn-cab an-icono" data-participa-cerrar title="Cerrar" aria-label="Cerrar"><?= anIcono('cerrar') ?></button></div>
+    <div class="an-participa-cuerpo">
+        <p class="an-ayuda" id="anParticipaInsumo"></p>
+        <div class="an-tabla-cont">
+            <table class="an-tabla">
+                <thead><tr>
+                    <th scope="col"><div class="an-th"><span>Concepto</span></div></th>
+                    <th scope="col"><div class="an-th"><span>Descripción</span></div></th>
+                    <th scope="col"><div class="an-th"><span>Matriz</span></div></th>
+                    <th scope="col" class="num"><div class="an-th"><span>Cantidad</span></div></th>
+                    <th scope="col" class="num"><div class="an-th"><span>Cant. en el presupuesto</span></div></th>
+                    <th scope="col"><div class="an-th"></div></th>
+                </tr></thead>
+                <tbody id="anParticipaFilas"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="an-pie"><span class="an-estado" id="anParticipaEstado" role="status"></span>
+        <button type="button" class="an-btn" data-participa-cerrar>CERRAR</button></div>
+</dialog>

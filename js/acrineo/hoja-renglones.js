@@ -541,36 +541,15 @@
         else abrir(st.ultimaCopia);
     }
     // Clic derecho sobre un concepto: su menú (como en Neodata)
-    var ctxRenglon = null, menuCtx = document.createElement('div');
-    menuCtx.className = 'an-menu an-menu-ctx';
-    menuCtx.setAttribute('role', 'menu');
-    menuCtx.hidden = true;
-    document.body.appendChild(menuCtx);
-    var accionesCtx = [];
+    var ctxRenglon = null;
     tbody.addEventListener('contextmenu', function (e) {
         var tr = e.target.closest('tr[data-renglon], tr[data-clave]');
         if (!tr || e.target.closest('input, textarea')) return;
-        e.preventDefault();
         var id = tr.dataset.renglon ? +tr.dataset.renglon : (borrador(tr.dataset.clave) || {}).renglon_id;
         ctxRenglon = st.filas.find(function (x) { return x.renglon_id === id; }) || null;
-        accionesCtx = opcionesConcepto(ctxRenglon);
-        menuCtx.innerHTML = accionesCtx.map(function (a, i) {
-            return a ? '<button type="button" role="menuitem" data-accion="' + i + '"' + (a.desactivado ? ' disabled' : '') + '>' + esc(a.texto) + '</button>' : '<div class="an-sep"></div>';
-        }).join('');
-        menuCtx.hidden = false;
-        menuCtx.style.left = Math.min(e.clientX, window.innerWidth - menuCtx.offsetWidth - 8) + 'px';
-        menuCtx.style.top = Math.min(e.clientY, window.innerHeight - menuCtx.offsetHeight - 8) + 'px';
+        AN.rejilla.contextual('renglones', e, opcionesConcepto(ctxRenglon));
     });
-    menuCtx.addEventListener('click', function (e) {
-        var b = e.target.closest('[data-accion]');
-        if (!b) return;
-        menuCtx.hidden = true;
-        var a = accionesCtx[+b.dataset.accion];
-        if (a && a.accion) a.accion();
-    });
-    document.addEventListener('click', function (e) { if (!menuCtx.hidden && !menuCtx.contains(e.target)) menuCtx.hidden = true; });
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') menuCtx.hidden = true;
         // Ctrl+C / Ctrl+V sobre la cuadrícula (sin estar escribiendo en un campo)
         var a = document.activeElement;
         if (!(e.ctrlKey || e.metaKey) || document.querySelector('dialog[open]') || $('anHoja').hidden) return;

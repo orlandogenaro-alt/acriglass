@@ -83,6 +83,10 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
             <button type="button" role="tab" id="anTabMatriz" aria-controls="anMatriz" aria-selected="false">Matriz</button>
             <button type="button" class="an-tab-cerrar" id="anMatrizCerrar" title="Cerrar la matriz" aria-label="Cerrar la matriz">×</button>
         </span>
+        <span class="an-tab-matriz" id="anTabCompletoCont" hidden>
+            <button type="button" role="tab" id="anTabCompleto" aria-controls="anCompleto" aria-selected="false">Presupuesto completo (F4)</button>
+            <button type="button" class="an-tab-cerrar" id="anCompletoCerrar" title="Cerrar el presupuesto completo" aria-label="Cerrar el presupuesto completo">×</button>
+        </span>
     </div>
 
     <?php
@@ -254,6 +258,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
         <div class="an-grafica-tip" id="anGraficaTip" role="tooltip" hidden></div>
     </dialog>
     <?php require __DIR__ . '/includes/acrineo/vistas/matriz.php'; ?>
+    <?php require __DIR__ . '/includes/acrineo/vistas/completo.php'; ?>
     <?php endif; ?>
 </div>
 <div class="an-toasts" id="anToasts" aria-live="polite"></div>
@@ -283,6 +288,8 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
 <script src="<?= recurso('js/acrineo/hoja-matriz.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-calculo.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-pegado.js') ?>"></script>
+<script src="<?= recurso('js/acrineo/hoja-completo.js') ?>"></script>
+<script src="<?= recurso('js/acrineo/hoja-opciones.js') ?>"></script>
 <?php endif; ?>
 </body>
 </html>

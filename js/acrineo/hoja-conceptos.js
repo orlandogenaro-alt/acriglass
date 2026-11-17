@@ -155,7 +155,11 @@
     }
     if ($('anCopiar')) $('anCopiar').addEventListener('click', copiar);
     // Conceptos marcados (para «Sólo conceptos marcados» de la ventana Cálculo)
-    AN.hojaConceptos = { marcados: function () { return Array.from(st.marcados.keys()); } };
+    AN.hojaConceptos = {
+        marcados: function () { return Array.from(st.marcados.keys()); },
+        // Marca (M) desde el Presupuesto completo: es la misma de este catálogo
+        marcar: function (id, si) { if (si) st.marcados.set(id, st.marcados.get(id) || '1'); else st.marcados.delete(id); pintar(); }
+    };
 
     // Gráfica «Explosión de insumos» (js/acrineo/grafica.js): importe de los conceptos en el presupuesto (precio × cantidad
     // en todas sus partidas) agrupado por tipo; si hay conceptos marcados, solo esos (como en Neodata).

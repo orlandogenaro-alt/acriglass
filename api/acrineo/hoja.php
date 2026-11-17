@@ -3,6 +3,7 @@
 //   GET  ?id=P                                  presupuesto (totales) y partidas en árbol
 //   GET  ?id=P&partida=X                         además, los conceptos de la partida
 //   GET  ?id=P&recurso=conceptos&q=&pagina=      catálogo de conceptos del presupuesto
+//   GET  ?id=P&recurso=completo                   Presupuesto completo (F4) · POST renglon_cambiar {renglon_id, cantidad?, costo?}
 //   GET  ?id=P&recurso=explosion_acoplada&q=&modo=&ver=todos|conceptos|insumos   panel de abajo (insumos de las matrices y conceptos)
 //   GET  ?id=P&recurso=explosion&concepto=C       explosión de insumos de un concepto (con su cantidad en el presupuesto)
 //   GET  ?id=P&recurso=calculo                    opciones de la ventana «Cálculo» · POST calcular {opciones…, marcados} (includes/acrineo/calculo.php)
@@ -25,6 +26,7 @@ require __DIR__ . '/../../includes/acrineo/permisos.php';
 require __DIR__ . '/../../includes/acrineo/hoja.php';
 require __DIR__ . '/../../includes/acrineo/calculo.php';
 require __DIR__ . '/../../includes/acrineo/pegado.php';
+require __DIR__ . '/../../includes/acrineo/completo.php';
 
 acrineoExigir('presupuestos.ver');
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -50,6 +52,8 @@ try {
                 responder(['ok' => true] + acrineoInsumosBuscar((string) ($_GET['q'] ?? ''), (int) ($_GET['pagina'] ?? 1)));
             case 'insumos_tabla':
                 responder(['ok' => true] + acrineoInsumosTabla((string) ($_GET['q'] ?? ''), (int) ($_GET['pagina'] ?? 1), (int) ($_GET['por_pagina'] ?? 100), acrineoModoBusqueda()));
+            case 'completo':
+                responder(['ok' => true] + acrineoPresupuestoCompleto($ctx));
             case 'explosion_acoplada':
                 $ver = in_array($_GET['ver'] ?? '', ['todos', 'conceptos', 'insumos'], true) ? $_GET['ver'] : 'todos';
                 responder(['ok' => true] + acrineoExplosionAcoplada($ctx, (string) ($_GET['q'] ?? ''), acrineoModoBusqueda(), $ver));
@@ -108,6 +112,9 @@ try {
             break;
         case 'calcular':
             $extra['calculo'] = acrineoCalculoEjecutar($ctx, $in, $usuario);
+            break;
+        case 'renglon_cambiar':
+            acrineoRenglonCambiar($ctx, (int) ($in['renglon_id'] ?? 0), $in, $usuario);
             break;
         case 'pegado_especial':
             $extra['pegado'] = acrineoPegadoEspecial($ctx, is_array($in['partidas'] ?? null) ? $in['partidas'] : [], is_array($in['conceptos'] ?? null) ? $in['conceptos'] : [], $partida ?: null, $usuario);

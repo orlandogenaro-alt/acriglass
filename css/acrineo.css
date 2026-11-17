@@ -672,6 +672,43 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-segmento button[aria-pressed=true] { background: var(--azul); color: #fff; }
 .an-tabla tr.an-fila-ins td { color: var(--texto-2); }
 .an-tabla tr.an-fila-ins td:nth-child(2) { color: var(--texto); font-weight: 600; }
+/* Presupuesto completo (F4) */
+.an-completo-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px; }
+.an-completo-panel[hidden] { display: none; }
+.an-completo-panel > .an-ventana { margin: 0; }
+.an-completo .an-desc { white-space: pre-line; min-width: 260px; max-width: 460px; }
+.an-completo .an-desc-corta { max-width: 200px; }
+.an-completo input.an-celda-in { width: 110px; min-width: 90px; }
+
+/* Opciones del presupuesto: pestaña vertical a la izquierda y su panel */
+.an-app:has(> .an-opciones-tab) { padding-left: 28px; }
+.an-opciones-tab {
+    position: fixed; left: 0; top: 180px; z-index: 25;
+    writing-mode: vertical-rl;
+    padding: 14px 5px; border: 1px solid var(--borde-2); border-left: none; border-radius: 0 8px 8px 0;
+    background: var(--tarjeta); color: var(--texto-2); font-size: 13px; font-weight: 700; letter-spacing: .3px; box-shadow: var(--sombra);
+}
+.an-opciones-tab:hover, .an-opciones-tab[aria-expanded=true] { color: var(--azul-texto); background: var(--azul-suave); }
+.an-opciones-velo { position: fixed; inset: 0; z-index: 40; background: var(--velo); }
+.an-opciones-velo[hidden], .an-opciones[hidden] { display: none; }
+.an-opciones {
+    position: fixed; left: 0; top: 0; bottom: 0; z-index: 41; width: min(340px, 90vw); display: flex; flex-direction: column;
+    background: var(--sub); border-right: 1px solid var(--borde-2); box-shadow: var(--sombra-flot); animation: an-entra-izq .18s ease-out;
+}
+@keyframes an-entra-izq { from { transform: translateX(-30px); opacity: 0; } }
+.an-opciones-cab { display: flex; align-items: center; padding: 12px 12px 8px 16px; color: var(--azul-texto); font-size: 15px; border-bottom: 2px solid var(--azul-texto); }
+.an-opciones-buscar { display: flex; align-items: center; gap: 8px; margin: 10px 12px; padding: 0 8px; height: 34px; border-bottom: 1px solid var(--borde-2); color: var(--texto-3); }
+.an-opciones-buscar input { flex: 1; border: none; background: none; outline: none; font-size: 14px; }
+.an-opciones-lista { flex: 1; overflow: auto; padding: 0 12px 16px; display: flex; flex-direction: column; gap: 6px; }
+.an-opciones-lista h3 { display: flex; align-items: center; gap: 10px; margin: 10px 0 2px; font-size: 15px; color: var(--azul-texto); }
+.an-opciones-lista h3 .an-op-ico { background: var(--rojo); }
+.an-opciones-lista button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 10px 6px 18px; border-radius: 8px; background: var(--tarjeta); box-shadow: var(--sombra); text-align: left; font-weight: 700; font-size: 13px; color: var(--texto); }
+.an-opciones-lista button:hover { background: var(--fila-hover); }
+.an-opciones-lista button small { display: block; font-size: 10.5px; font-weight: 600; color: var(--texto-3); }
+.an-opciones-lista [hidden] { display: none; }
+.an-op-ico { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 7px; background: var(--azul); color: #fff; }
+.an-op-ico svg { width: 16px; height: 16px; }
+
 /* Menú del clic derecho sobre los conceptos */
 .an-menu.an-menu-ctx { position: fixed; right: auto; top: 0; left: 0; z-index: 60; }
 .an-sep-barra { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--borde-2); }

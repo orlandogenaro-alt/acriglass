@@ -141,14 +141,15 @@
         window.XlsxSimple.descargar(window.XlsxSimple.crear({ nombre: 'Pegado especial', anchos: [12, 14, 60, 10, 12, 14], filas: filas }), 'Plantilla pegado especial.xlsx');
     }
 
-    function abrir() {
-        $('anPegadoTexto').value = '';
+    function abrir(texto) {
+        $('anPegadoTexto').value = typeof texto === 'string' ? texto : '';
         $('anPegadoResumen').textContent = '';
         $('anPegadoVista').hidden = true;
         $('anPegadoAceptar').disabled = true;
         estado(H.partida() ? '' : 'Sin partida seleccionada: el archivo debe traer la columna Partida.', H.partida() ? '' : 'info');
         dlg.showModal();
         $('anPegadoTexto').focus();
+        if ($('anPegadoTexto').value) analizar();
     }
 
     var analizarPronto = AN.ui.retrasar(analizar, 200);
@@ -164,6 +165,6 @@
     $('anPegadoPlantilla').addEventListener('click', plantilla);
     $('anPegadoAceptar').addEventListener('click', aceptar);
     dlg.querySelectorAll('[data-pegado-cerrar]').forEach(function (b) { b.addEventListener('click', function () { dlg.close(); }); });
-    if ($('anPegadoEspecial')) $('anPegadoEspecial').addEventListener('click', abrir);
+    if ($('anPegadoEspecial')) $('anPegadoEspecial').addEventListener('click', function () { abrir(); });
     AN.hojaPegado = { abrir: abrir };
 })(window.AcriNeo = window.AcriNeo || {});

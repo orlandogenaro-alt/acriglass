@@ -492,15 +492,95 @@
         if (H.puede) {
             op.push({ texto: 'Agregar registro', accion: function () { if (!st.editando) entrarEdicion(); agregar(); }, desactivado: !p || st.guardando });
             op.push(st.editando ? { texto: 'Salir de la edición', accion: cancelarEdicion } : { texto: 'Editar los conceptos', accion: entrarEdicion, desactivado: !p });
-            op.push({ texto: 'Marcar todos', accion: function () { $('anRenglonesTodos').checked = true; $('anRenglonesTodos').dispatchEvent(new Event('change')); }, desactivado: !st.editando });
         }
         var marcado = st.filas.find(function (r) { return r.renglon_id === (borrador(Array.from(st.marcados)[0]) || {}).renglon_id; }) || st.filas[0];
-        op.push({ texto: 'Abrir la matriz (P.U.)' + (marcado ? ' de ' + marcado.codigo : ''), accion: function () { if (marcado && AN.hojaMatriz) AN.hojaMatriz.abrir(marcado.concepto_id); }, desactivado: !marcado || !AN.hojaMatriz });
+        op = op.concat(opcionesConcepto(marcado));
         if (H.puede) op.push(null,
             { texto: 'Editar la partida', accion: function () { H.editarPartida(); }, desactivado: !p || !!H.edicion },
             { texto: 'Copiar la partida', accion: function () { H.copiarPartida(); }, desactivado: !p || !!H.edicion });
         return op;
     }
+    // Opciones de un concepto (las mismas en el ⋮ y en el clic derecho sobre el renglón), como en Neodata
+    function opcionesConcepto(r) {
+        var op = [];
+        op.push({ texto: 'Ver matriz' + (r ? ' de ' + r.codigo : ''), accion: function () { if (r && AN.hojaMatriz) AN.hojaMatriz.abrir(r.concepto_id); }, desactivado: !r || !AN.hojaMatriz });
+        op.push({ texto: 'Explosión de insumos por concepto' + (r ? ' (' + r.codigo + ')' : ''), accion: function () { if (r && AN.hojaCalculo) AN.hojaCalculo.explosionConcepto(r.concepto_id); }, desactivado: !r || !AN.hojaCalculo });
+        if (H.puede) {
+            op.push(null);
+            op.push({ texto: 'Marcar todo', accion: marcarTodo, desactivado: !H.partida() || !st.filas.length });
+            op.push({ texto: 'Desmarcar todo', accion: function () { $('anRenglonesTodos').checked = false; $('anRenglonesTodos').dispatchEvent(new Event('change')); }, desactivado: !st.marcados.size });
+        }
+        op.push({ texto: 'Copiar (Ctrl+C)', accion: function () { copiarConceptos(r); }, desactivado: !st.filas.length });
+        if (H.puede) op.push({ texto: 'Pegar (Ctrl+V)', accion: pegarConceptos, desactivado: !H.partida() || !AN.hojaPegado });
+        return op;
+    }
+    function marcarTodo() {
+        if (!st.editando) entrarEdicion();
+        $('anRenglonesTodos').checked = true;
+        $('anRenglonesTodos').dispatchEvent(new Event('change'));
+    }
+    // Copiar: los marcados (o el renglón del clic derecho, o todos) como celdas de Excel, en el formato del Pegado especial
+    function copiarConceptos(r) {
+        var ids = st.editando && st.marcados.size ? Array.from(st.marcados).map(function (k) { return (borrador(k) || {}).renglon_id; }) : null;
+        var filas = ids ? st.filas.filter(function (x) { return ids.indexOf(x.renglon_id) >= 0; }) : (r && !st.editando && ctxRenglon ? [r] : st.filas);
+        ctxRenglon = null;
+        if (!filas.length) { AN.ui.aviso('Marca los conceptos que quieres copiar (los nuevos sin guardar no se copian).', 'error'); return; }
+        var celda = function (v) { v = String(v == null ? '' : v); return /[\t\n"]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+        var texto = [['Código', 'Descripción completa', 'Unidad', 'Cantidad', 'Costo']].concat(filas.map(function (x) { return [x.codigo, x.descripcion, x.unidad || '', x.cantidad, x.costo]; }))
+            .map(function (f) { return f.map(celda).join('\t'); }).join('\n');
+        var listo = function () { AN.ui.aviso(filas.length + ' concepto' + (filas.length === 1 ? '' : 's') + ' copiado' + (filas.length === 1 ? '' : 's') + ': pégalos en otra partida o en Excel.', 'ok'); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(texto).then(listo, function () { AN.ui.aviso('El navegador no dejó copiar al portapapeles.', 'error'); });
+        else AN.ui.aviso('Este navegador no permite copiar al portapapeles.', 'error');
+        st.ultimaCopia = texto;
+    }
+    // Pegar: lo copiado (de aquí o de Excel) entra por el Pegado especial, en la partida seleccionada
+    function pegarConceptos() {
+        if (!AN.hojaPegado) return;
+        var abrir = function (t) { AN.hojaPegado.abrir(t || ''); };
+        if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(abrir, function () { abrir(st.ultimaCopia); });
+        else abrir(st.ultimaCopia);
+    }
+    // Clic derecho sobre un concepto: su menú (como en Neodata)
+    var ctxRenglon = null, menuCtx = document.createElement('div');
+    menuCtx.className = 'an-menu an-menu-ctx';
+    menuCtx.setAttribute('role', 'menu');
+    menuCtx.hidden = true;
+    document.body.appendChild(menuCtx);
+    var accionesCtx = [];
+    tbody.addEventListener('contextmenu', function (e) {
+        var tr = e.target.closest('tr[data-renglon], tr[data-clave]');
+        if (!tr || e.target.closest('input, textarea')) return;
+        e.preventDefault();
+        var id = tr.dataset.renglon ? +tr.dataset.renglon : (borrador(tr.dataset.clave) || {}).renglon_id;
+        ctxRenglon = st.filas.find(function (x) { return x.renglon_id === id; }) || null;
+        accionesCtx = opcionesConcepto(ctxRenglon);
+        menuCtx.innerHTML = accionesCtx.map(function (a, i) {
+            return a ? '<button type="button" role="menuitem" data-accion="' + i + '"' + (a.desactivado ? ' disabled' : '') + '>' + esc(a.texto) + '</button>' : '<div class="an-sep"></div>';
+        }).join('');
+        menuCtx.hidden = false;
+        menuCtx.style.left = Math.min(e.clientX, window.innerWidth - menuCtx.offsetWidth - 8) + 'px';
+        menuCtx.style.top = Math.min(e.clientY, window.innerHeight - menuCtx.offsetHeight - 8) + 'px';
+    });
+    menuCtx.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-accion]');
+        if (!b) return;
+        menuCtx.hidden = true;
+        var a = accionesCtx[+b.dataset.accion];
+        if (a && a.accion) a.accion();
+    });
+    document.addEventListener('click', function (e) { if (!menuCtx.hidden && !menuCtx.contains(e.target)) menuCtx.hidden = true; });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') menuCtx.hidden = true;
+        // Ctrl+C / Ctrl+V sobre la cuadrícula (sin estar escribiendo en un campo)
+        var a = document.activeElement;
+        if (!(e.ctrlKey || e.metaKey) || document.querySelector('dialog[open]') || $('anHoja').hidden) return;
+        if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
+        if (!a || !a.closest || !a.closest('#anTablaRenglones')) return;
+        var k = e.key.toLowerCase();
+        if (k === 'c' && !String(window.getSelection && window.getSelection())) { e.preventDefault(); copiarConceptos(null); }
+        else if (k === 'v' && H.puede) { e.preventDefault(); pegarConceptos(); }
+    });
+
     var menuLista = $('anRenglonesMenuLista'), menuAcciones = [];
     $('anRenglonesMenu').addEventListener('click', function (e) {
         e.stopPropagation();

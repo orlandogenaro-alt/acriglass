@@ -21,6 +21,13 @@
     var TIPOS = { MAT: 'Materiales', MO: 'Mano de obra', EQ: 'Equipo y maquinaria', HER: 'Herramienta', BAS: 'Básicos', OTR: 'Otros' };
     var BASES = { '': 'Por unidad', pct_mo: '% de M.O.', pct_mat: '% de materiales' };
     var CAMPOS = ['tipo', 'codigo', 'descripcion', 'unidad', 'base', 'cantidad', 'desperdicio_pct', 'costo'];
+    // Tipos con número, como en Neodata (1 materiales, 2 mano de obra, 3 equipo y herramienta, 4 básicos, 5 otros).
+    // Solo en pantalla: por dentro se siguen guardando MAT, MO, EQ, HER, BAS y OTR (los comparte el catálogo de insumos).
+    var NUM_TIPO = { MAT: '1', MO: '2', EQ: '3', HER: '3', BAS: '4', OTR: '5' };
+    var TIPO_NUM = { 1: 'MAT', 2: 'MO', 3: 'EQ', 4: 'BAS', 5: 'OTR' };
+    function tipoTexto(t) { return NUM_TIPO[t] || t || ''; }
+    function tipoDe(v) { v = String(v || '').trim().toUpperCase(); return TIPO_NUM[v] || v; }
+    function tipoCelda(t) { return '<span class="an-tipo an-tipo-' + esc(t) + '" title="' + esc(TIPOS[t] || t) + '">' + esc(tipoTexto(t)) + '</span>'; }
     var ICONO_URL = '<svg class="i" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>';
     var LUPA = '<svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
 
@@ -127,7 +134,7 @@
                 var inp = function (k, tipo, extra, cls) { return '<input class="an-celda-in' + (tipo === 'number' ? ' num' : '') + (cls ? ' ' + cls : '') + '" type="' + tipo + '" data-k="' + k + '" value="' + esc(f[k]) + '"' + (extra || '') + ' placeholder="' + ETIQUETAS[k] + '" aria-label="' + ETIQUETAS[k] + '">'; };
                 celdas = '<td>' + inp('codigo', 'text', ' maxlength="30"') + '</td>'
                     + '<td class="an-desc">' + inp('descripcion', 'text', ' maxlength="250"') + '</td>'
-                    + '<td><span class="an-celda-unidad">' + inp('tipo', 'text', ' maxlength="3" title="' + esc(TIPOS[f.tipo] || 'Tipo no válido') + '"', TIPOS[f.tipo] ? '' : 'invalido')
+                    + '<td><span class="an-celda-unidad"><input class="an-celda-in' + (TIPOS[f.tipo] ? '' : ' invalido') + '" type="text" data-k="tipo" value="' + esc(tipoTexto(f.tipo)) + '" maxlength="3" title="' + esc(TIPOS[f.tipo] || 'Tipo no válido') + '" placeholder="Tipo" aria-label="Tipo">'
                     + '<button type="button" class="an-btn-buscar" data-tipo-insumo title="Catálogo Tipos de insumos" aria-label="Buscar en el catálogo de tipos de insumos">' + LUPA + '</button></span></td>'
                     + '<td><span class="an-celda-unidad">' + inp('unidad', 'text', ' maxlength="20"')
                     + '<button type="button" class="an-btn-buscar" data-unidad title="Catálogo Unidades" aria-label="Buscar en el catálogo de unidades">' + LUPA + '</button></span></td>'
@@ -139,7 +146,7 @@
                     + '<td>' + inp('desperdicio_pct', 'number', ' min="0" max="99.9999" step="any"' + (f.base ? ' readonly tabindex="-1"' : '')) + '</td>';
             } else {
                 celdas = '<td>' + esc(f.codigo) + '</td><td class="an-desc">' + esc(f.descripcion) + '</td>'
-                    + '<td><span class="an-tipo an-tipo-' + esc(f.tipo) + '">' + esc(TIPOS[f.tipo] || f.tipo) + '</span></td><td>' + esc(f.unidad) + '</td>'
+                    + '<td>' + tipoCelda(f.tipo) + '</td><td>' + esc(f.unidad) + '</td>'
                     + '<td class="num">' + AN.ui.dinero(f.base ? f._base : f.costo) + '</td><td>' + esc(BASES[f.base || '']) + '</td>'
                     + '<td class="num">' + cantidadTexto(f.cantidad) + (f.base ? ' %' : '') + '</td><td class="num">' + cantidadTexto(f.desperdicio_pct) + '</td>';
             }
@@ -406,7 +413,7 @@
                 + '<td class="an-cat-codigo">' + esc(i.codigo) + '</td>'
                 + '<td class="num">' + (puede ? '<input class="an-catalogo-cant" type="number" min="0" step="any" inputmode="decimal" data-cant value="' + esc(m ? cat.marcados.get(i.insumo_id).cantidad : '') + '" placeholder="1" aria-label="Cantidad a copiar de ' + esc(i.codigo) + '">' : '') + '</td>'
                 + '<td class="an-desc">' + esc(i.descripcion) + '</td><td>' + esc(i.unidad) + '</td>'
-                + '<td><span class="an-tipo an-tipo-' + esc(i.tipo) + '">' + esc(TIPOS[i.tipo] || i.tipo) + '</span></td>'
+                + '<td>' + tipoCelda(i.tipo) + '</td>'
                 + '<td class="num">' + (i.costo === null ? '<span class="an-ayuda">sin precio</span>' : AN.ui.dinero(i.costo)) + '</td>'
                 + '<td>' + esc(i.familia || '') + '</td><td>' + esc(i.proveedor || '') + '</td>'
                 + '<td>' + esc(AN.ui.fechaCorta(i.fecha)) + (i.moneda && i.moneda !== 'MXN' ? ' <small class="an-ayuda">' + esc(i.moneda) + '</small>' : '') + '</td>'
@@ -456,9 +463,9 @@
             e.target.value = e.target.value.toUpperCase();
             e.target.setSelectionRange(pos, pos);
         }
-        f[k] = e.target.value;
+        f[k] = k === 'tipo' ? tipoDe(e.target.value) : e.target.value;
         e.target.classList.toggle('invalido', k === 'tipo' && !TIPOS[f.tipo]);
-        if (k === 'tipo') e.target.title = TIPOS[f.tipo] || 'Tipo no válido';
+        if (k === 'tipo') e.target.title = TIPOS[f.tipo] ? tipoTexto(f.tipo) + ' · ' + TIPOS[f.tipo] : 'Tipo no válido (1 materiales, 2 mano de obra, 3 equipo y herramienta, 4 básicos, 5 otros)';
         pintarTotales();
     });
     // Lupas de Unidad («Catálogo Unidades») y de Tipo («Catálogo Tipos de insumos»)
@@ -704,6 +711,19 @@
     $('anMatrizAnterior').addEventListener('click', function () { vecino(-1); });
     $('anMatrizSiguiente').addEventListener('click', function () { vecino(1); });
     $('anMatrizRegresar').addEventListener('click', regresar);
+    // «Desacoplar exp. ins.»: oculta (o vuelve a mostrar) el catálogo de insumos de abajo; se recuerda
+    function acoplar(si) {
+        document.querySelector('.an-matriz-catalogo').hidden = !si;
+        $('anMatriz').classList.toggle('desacoplada', !si);
+        $('anMatrizDesacoplar').setAttribute('aria-pressed', String(!si));
+        $('anMatrizDesacoplar').querySelector('span').textContent = si ? 'Desacoplar exp. ins.' : 'Acoplar exp. ins.';
+        $('anMatrizDesacoplar').title = si ? 'Oculta el catálogo de insumos de abajo' : 'Vuelve a mostrar el catálogo de insumos de abajo';
+        try { localStorage.setItem('acrineo.matriz.acoplada', si ? '1' : '0'); } catch (e) { /* sin memoria */ }
+    }
+    var acopladaGuardada = null;
+    try { acopladaGuardada = localStorage.getItem('acrineo.matriz.acoplada'); } catch (e) { /* sin memoria */ }
+    if (acopladaGuardada === '0') acoplar(false);
+    $('anMatrizDesacoplar').addEventListener('click', function () { acoplar(document.querySelector('.an-matriz-catalogo').hidden); });
     // «Pendiente de analizar» del concepto (la misma P.A. de la cuadrícula de conceptos)
     $('anMatrizPendiente').addEventListener('change', async function () {
         if (!st.concepto) return;

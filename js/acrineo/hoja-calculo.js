@@ -99,7 +99,8 @@
     function mostrar(c) {
         ultimo = c;
         var o = c.opciones, x = c.explosion, mon = c.moneda;
-        var html = '<p class="an-explosion-resumen">Se recalcularon las matrices y los totales: <b>' + c.recalculados + '</b> concepto' + (c.recalculados === 1 ? '' : 's') + ' cambiaron de costo'
+        $('anExplosionTitulo').textContent = c.titulo || 'Resultado del cálculo';
+        var html = c.recalculados == null ? '' : '<p class="an-explosion-resumen">Se recalcularon las matrices y los totales: <b>' + c.recalculados + '</b> concepto' + (c.recalculados === 1 ? '' : 's') + ' cambiaron de costo'
             + (o.asignar_fecha || o.ch_misma_tasa ? ' · <b>' + c.actualizados + '</b> insumo' + (c.actualizados === 1 ? '' : 's') + ' tomaron costo del catálogo'
                 + (o.asignar_fecha ? ' al ' + esc(AN.ui.fechaCorta ? AN.ui.fechaCorta(o.fecha_insumos) : o.fecha_insumos) : '') + (o.ch_misma_tasa ? ' (costos horarios al ' + o.ch_tasa + ' %)' : '') : '') + '.</p>';
         if (c.errores) {
@@ -109,7 +110,7 @@
             html += '<section class="an-explosion-errores"><h3>Avisos</h3><ul>' + c.avisos.map(function (a) { return '<li>' + esc(a) + '</li>'; }).join('') + '</ul></section>';
         }
         if (x) {
-            html += '<h3 class="an-explosion-h">Explosión de insumos · ' + (o.tipo_explosion === 'marcados' ? 'conceptos marcados' : 'todo el presupuesto') + ' · ' + esc(mon.descripcion) + '</h3>';
+            html += '<h3 class="an-explosion-h">Explosión de insumos · ' + (c.concepto ? esc(c.concepto.codigo) + ' (cantidad en el presupuesto)' : o.tipo_explosion === 'marcados' ? 'conceptos marcados' : 'todo el presupuesto') + ' · ' + esc(mon.descripcion) + '</h3>';
             if (x.sin_matriz.length) html += '<p class="an-ayuda">Sin matriz (no se explotan): ' + esc(x.sin_matriz.join(', ')) + '.</p>';
             html += x.items.length ? tablaInsumos(x.items, o.decimales_explosion, mon) + '<p class="an-explosion-total">Total <b>' + dinero(x.total, mon) + '</b></p>'
                 : '<p class="an-vacio-texto">Ningún concepto tiene matriz de precio unitario que explotar.</p>';
@@ -144,4 +145,15 @@
     res.querySelectorAll('[data-explosion-cerrar]').forEach(function (b) { b.addEventListener('click', function () { res.close(); }); });
     $('anExplosionExcel').addEventListener('click', exportar);
     $('anCalculoBoton').addEventListener('click', abrir);
+
+    // Explosión de insumos de un concepto (menú de los conceptos); no recalcula nada
+    AN.hojaCalculo = {
+        explosionConcepto: async function (conceptoId) {
+            try {
+                var r = await AN.api.get(H.url({ recurso: 'explosion', concepto: conceptoId }));
+                r.titulo = 'Explosión de insumos por concepto · ' + r.concepto.codigo;
+                mostrar(r);
+            } catch (e) { AN.ui.aviso(e.message, 'error'); }
+        }
+    };
 })(window.AcriNeo = window.AcriNeo || {});

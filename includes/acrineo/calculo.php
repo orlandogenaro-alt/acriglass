@@ -207,6 +207,21 @@ function acrineoCalculoEjecutar(array $ctx, array $in, string $usuario): array
     return $r;
 }
 
+// Explosión de insumos de un solo concepto (menú de los conceptos), con las opciones guardadas del Cálculo y su
+// cantidad en todo el presupuesto. No recalcula ni guarda nada.
+function acrineoExplosionConcepto(array $ctx, int $conceptoId): array
+{
+    $c = acrineoConceptoFila($ctx, $conceptoId);
+    $o = acrineoCalculoOpciones($ctx);
+    $o['tipo_explosion'] = 'marcados';
+    $o['explosion_x_concepto'] = false;
+    $monedas = acrineoHojaMonedas($ctx['id']);
+    $moneda = $monedas[$o['moneda'] - 1] ?? $monedas[0];
+    $tc = $o['moneda'] === 2 ? max(0.000001, (float) $moneda['tipo_cambio']) : 1.0;
+    return ['concepto' => $c, 'opciones' => $o, 'moneda' => $moneda + ['factor' => $tc],
+            'explosion' => acrineoExplosion($ctx, acrineoCalculoMatrices($ctx), $o, [$conceptoId], $tc)];
+}
+
 // Explosión de insumos: [items: [{codigo, descripcion, tipo, unidad, cantidad, costo, importe}], totales por tipo, total, por_concepto?]
 function acrineoExplosion(array $ctx, array $matrices, array $o, array $marcados, float $tc): array
 {

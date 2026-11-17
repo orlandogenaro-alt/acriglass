@@ -77,6 +77,7 @@ $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2
             <?php endif; ?>
             <button type="button" class="an-riel-btn" id="anMatrizAnterior" title="Matriz del concepto anterior de la partida"><svg class="i" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Anterior</span></button>
             <button type="button" class="an-riel-btn" id="anMatrizSiguiente" title="Matriz del concepto siguiente de la partida"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>Siguiente</span></button>
+            <button type="button" class="an-riel-btn" id="anMatrizDesacoplar" aria-pressed="false" title="Oculta el catálogo de insumos de abajo"><svg class="i" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg><span>Desacoplar exp. ins.</span></button>
             <button type="button" class="an-riel-btn" id="anMatrizRegresar" title="Regresar al presupuesto"><svg class="i" viewBox="0 0 24 24"><path d="M20 5v7a3 3 0 0 1-3 3H5M10 10l-5 5 5 5"/></svg><span>Regresar</span></button>
         </nav>
         </div>

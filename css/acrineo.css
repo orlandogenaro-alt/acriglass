@@ -660,6 +660,11 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-matriz-texto p { margin: 0 0 4px; font-size: 13.5px; color: var(--texto); white-space: pre-wrap; max-height: 5.5em; overflow: auto; }
 .an-matriz-panel .an-matriz-insumos { border-top: 3px solid var(--rojo-borde); }
 .an-matriz-panel .an-matriz-catalogo { border-top: 3px solid var(--rojo-borde); }
+/* «Desacoplar exp. ins.»: sin el catálogo de abajo, la matriz ocupa todo */
+.an-matriz-panel.desacoplada { grid-template-rows: auto auto minmax(0, 1fr); }
+.an-matriz-panel .an-matriz-catalogo[hidden] { display: none; }
+/* Menú del clic derecho sobre los conceptos */
+.an-menu.an-menu-ctx { position: fixed; right: auto; top: 0; left: 0; z-index: 60; }
 .an-sep-barra { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--borde-2); }
 .an-matriz .an-col-n { width: 70px; color: var(--texto-2); }
 .an-matriz tr.an-libre td.an-col-n .an-insignia { background: var(--ambar-suave); color: var(--ambar); border-color: var(--ambar-borde); }

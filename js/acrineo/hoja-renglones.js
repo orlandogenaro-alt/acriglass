@@ -490,9 +490,96 @@
         if (AN.rejilla) AN.rejilla.cerrar();
         if (a && a.accion) a.accion();
     });
+    // ---------- Importar PDF ----------
+    // Cotización o presupuesto impreso (Código · Concepto · Unidad · Cantidad · P. Unitario · Importe): js/pdf-tabla.js lee
+    // la tabla de todas las hojas; aquí cada código es un concepto, las líneas sin código siguen su descripción, y se
+    // agregan a la partida en modo edición (si el código ya está en la partida se actualiza). Nada se guarda hasta GUARDAR.
+    function filasTsv(texto) {
+        return texto.split('\n').map(function (l) {
+            var celdas = [], c = '', comillas = false;
+            for (var i = 0; i < l.length; i++) {
+                var ch = l[i];
+                if (comillas) { if (ch === '"' && l[i + 1] === '"') { c += '"'; i++; } else if (ch === '"') comillas = false; else c += ch; }
+                else if (ch === '"' && c === '') comillas = true;
+                else if (ch === '\t') { celdas.push(c); c = ''; }
+                else c += ch;
+            }
+            celdas.push(c);
+            return celdas.map(function (x) { return x.trim(); });
+        });
+    }
+    function numeroPdf(t) {
+        var s = String(t || '').replace(/[$\s]/g, '').replace(/,/g, '');
+        return /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : null;
+    }
+    function conceptosDelPdf(texto) {
+        var filas = filasTsv(texto), enc = filas.shift() || [];
+        var col = function (re) { return enc.findIndex(function (t) { return re.test(t); }); };
+        var iCod = col(/^(c[oó]digo|clave|cve)/i), iCon = col(/^(concepto|descripci)/i), iUni = col(/^(unidad|u\.?\s*m)/i),
+            iCant = col(/^cant/i), iPu = col(/^(p\.?\s*unit|precio\s*unit|p\.?\s*u\.?$|precio$)/i), iImp = col(/^(importe|total)/i);
+        if (iCod < 0 || iCon < 0) throw new Error('No encontré las columnas Código y Concepto en la tabla del PDF.');
+        var lista = [], c = null;
+        var esTotal = /^((sub)?total\b|iva\b|i\.v\.a\.?)|total del presupuesto|importe con letra|\(\*.*m\.n\./i;
+        filas.forEach(function (f) {
+            var cod = (f[iCod] || '').trim(), desc = (f[iCon] || '').trim();
+            if (esTotal.test(cod) || esTotal.test(desc)) { c = null; return; }   // totales, IVA y lo que les sigue
+            if (cod) {
+                var cant = numeroPdf(f[iCant]), pu = numeroPdf(f[iPu]), imp = numeroPdf(f[iImp]);
+                if (pu === null && imp !== null && cant) pu = imp / cant;   // sin precio unitario: importe / cantidad
+                c = { codigo: cod.slice(0, 30), descripcion: desc, unidad: (f[iUni] || '').slice(0, 20), cantidad: cant === null ? 1 : cant, costo: pu === null ? 0 : pu };
+                lista.push(c);
+            } else if (c && desc) c.descripcion = (c.descripcion + ' ' + desc).trim();
+        });
+        lista.forEach(function (x) { x.descripcion = x.descripcion.replace(/\s+/g, ' ').slice(0, 4000); });
+        return lista;
+    }
+    var entradaPdf = document.createElement('input');
+    entradaPdf.type = 'file';
+    entradaPdf.accept = 'application/pdf,.pdf';
+    entradaPdf.hidden = true;
+    entradaPdf.id = 'anImportarPdfArchivo';
+    document.body.appendChild(entradaPdf);
+    function importarPdf() {
+        if (!H.partida()) { AN.ui.aviso('Selecciona primero la partida donde van los conceptos.', 'error'); return; }
+        if (!window.PdfTabla) { AN.ui.aviso('No está disponible el lector de PDF.', 'error'); return; }
+        entradaPdf.value = '';
+        entradaPdf.click();
+    }
+    entradaPdf.addEventListener('change', async function () {
+        var f = entradaPdf.files[0], p = H.partida();
+        if (!f || !p) return;
+        estado('Leyendo el PDF «' + f.name + '»…', 'info');
+        var lista;
+        try { lista = conceptosDelPdf(await window.PdfTabla.leer(f)); }
+        catch (e) { estado('No se pudo leer el PDF: ' + (e && e.message || e), 'error'); return; }
+        if (!lista.length) { estado('El PDF no trae conceptos con código que se puedan importar.', 'error'); return; }
+        if (!st.editando) entrarEdicion();
+        guardarFoto();   // se puede deshacer todo junto
+        var nuevos = 0, cambiados = 0;
+        lista.forEach(function (x) {
+            var b = st.borradores.find(function (y) { return !(y.renglon_id && st.quitar.has(y.renglon_id)) && String(y.codigo).trim().toUpperCase() === x.codigo.toUpperCase(); });
+            if (!b) {
+                b = { clave: 'n' + (++st.sec), renglon_id: null, matriz: false, codigo: x.codigo, descripcion: '', unidad: '', cantidad: '1', costo: '0', precio_alzado: false, precio_fijo: '', url: '', tipo: '4' };
+                st.borradores.push(b);
+                nuevos++;
+            } else cambiados++;
+            b.descripcion = x.descripcion;
+            if (x.unidad) b.unidad = x.unidad;
+            b.cantidad = String(x.cantidad);
+            if (!b.matriz) b.costo = String(H.redondear(x.costo, 6));
+        });
+        pintar();
+        estado('PDF «' + f.name + '»: ' + nuevos + ' concepto' + (nuevos === 1 ? '' : 's') + ' nuevo' + (nuevos === 1 ? '' : 's')
+            + (cambiados ? ' y ' + cambiados + ' actualizado' + (cambiados === 1 ? '' : 's') : '') + ' en ' + p.codigo
+            + '. El P. Unitario quedó como costo' + (H.ctx.sobrecosto_pct ? ' (el precio lleva el ' + H.ctx.sobrecosto_pct + ' % de sobrecosto)' : '')
+            + '. Revisa y da GUARDAR.', 'info');
+        AN.ui.aviso(lista.length + ' concepto' + (lista.length === 1 ? '' : 's') + ' leído' + (lista.length === 1 ? '' : 's') + ' del PDF.', 'ok');
+    });
+
     if (AN.rejilla) AN.rejilla.opciones('renglones', {
         fijas: 3,
-        archivo: function () { var p = H.partida(); return 'Conceptos ' + (p ? p.codigo : ''); }
+        archivo: function () { var p = H.partida(); return 'Conceptos ' + (p ? p.codigo : ''); },
+        trasExportar: function () { return H.puede ? [{ texto: 'Importar PDF', accion: importarPdf, desactivado: !H.partida() || st.guardando }] : []; }
     });
 
     AN.hojaRenglones = { editando: function () { return st.editando; } };

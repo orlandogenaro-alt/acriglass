@@ -2,7 +2,8 @@
 // a la izquierda al desplazarse (con cuántas) y ⋮ = más opciones (las propias de la cuadrícula, exportar a Excel y
 // restablecer las columnas). Cada cuadrícula se declara en el HTML con
 //   <span class="an-rejilla-btns" data-rejilla="nombre" data-tabla="idDeLaTabla"> [data-cols] [data-fijas] [data-menu] </span>
-// y su módulo puede agregar opciones: AN.rejilla.opciones('nombre', { fijas: 1, archivo: 'Partidas', extras: fn → [{texto, accion}] }).
+// y su módulo puede agregar opciones: AN.rejilla.opciones('nombre', { fijas: 1, archivo: 'Partidas', extras: fn → [{texto, accion}],
+// trasExportar: fn → [{texto, accion}] (van justo debajo de «Exportar a Excel») }).
 // Lo que elige cada usuario se recuerda en este navegador.
 (function (AN) {
     'use strict';
@@ -138,7 +139,8 @@
         cerrarPop();
         var extras = r.cfg.extras ? r.cfg.extras() : [];
         r.acciones = extras.concat([null,
-            { texto: 'Exportar a Excel', accion: function () { exportar(r); } },
+            { texto: 'Exportar a Excel', accion: function () { exportar(r); } }],
+            r.cfg.trasExportar ? r.cfg.trasExportar() : [], [
             { texto: 'Mostrar todas las columnas', accion: function () { r.ocultas = []; escribir(r); aplicar(r); }, desactivado: !r.ocultas.length },
             { texto: 'Quitar las columnas fijas', accion: function () { r.fijas = 0; escribir(r); aplicar(r); }, desactivado: !r.fijas }]);
         if (r.acciones[0] === null) r.acciones.shift();

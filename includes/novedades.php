@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-11-17',
+        'cambios' => [
+            ['nuevo', 'ACRINEO: importar conceptos desde un PDF', 'En el ⋮ de los conceptos de la partida, debajo de «Exportar a Excel», está «Importar PDF»: se sube la cotización o presupuesto impreso completo (por ejemplo el de Acristala) y se lee la tabla de todas las hojas (Código, Concepto, Unidad, Cantidad, P. Unitario). Cada código queda como un concepto de la partida seleccionada con su descripción completa (las líneas del concepto se juntan) y el P. Unitario como costo; se ignoran encabezados, pies de página, totales e IVA. Si el código ya está en la partida se actualiza. Queda en modo edición para revisar: nada se guarda hasta GUARDAR, y ↶ deshace toda la importación.'],
+        ],
+    ],
+    [
         'fecha' => '2026-11-13',
         'cambios' => [
             ['nuevo', 'ACRINEO: ventana «Cálculo» del presupuesto y explosión de insumos', 'El botón de cuadrícula (arriba a la derecha de la hoja) abre «Cálculo: <presupuesto>», como en Neodata: tipo de explosión (todo el presupuesto, sólo los conceptos marcados en el catálogo o no explotar), errores potenciales, costos horarios con la misma tasa, asignar fecha a insumos (toman el precio vigente en esa fecha), moneda 1 o 2, decimales de costos y de explosión, explosión por concepto, explotar el equipo con costo horario y no explotar insumos integrados. ACEPTAR guarda las opciones con el presupuesto, recalcula todas las matrices (de las submatrices hacia arriba) y los totales, y muestra la explosión de insumos por tipo (exportable a Excel). «Enviar respaldo por correo» se verá desactivado hasta que el sistema envíe correos. Requiere la migración 030.'],

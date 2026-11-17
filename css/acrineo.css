@@ -865,3 +865,10 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-participa { width: min(920px, 96vw); }
 .an-participa-cuerpo { padding: 10px 14px; }
 .an-participa-cuerpo .an-tabla-cont { max-height: 55vh; overflow: auto; }
+.an-reportes-dlg { width: min(620px, 96vw); }
+.an-reportes-dlg form { display: flex; flex-direction: column; min-height: 0; }
+.an-rp-cuerpo { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; }
+.an-rp-opcion { display: flex; align-items: flex-start; gap: 10px; padding: 7px 4px; border-radius: 6px; cursor: pointer; }
+.an-rp-opcion:hover { background: var(--fila-hover); }
+.an-rp-opcion input { margin-top: 3px; }
+.an-rp-opcion span { display: flex; flex-direction: column; gap: 2px; }

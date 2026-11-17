@@ -190,9 +190,9 @@ window.XlsxSimple = (function () {
     function descargar(blob, nombre) {
         var enlace = document.createElement('a');
         enlace.href = URL.createObjectURL(blob);
-        enlace.download = String(nombre).replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.xlsx';
+        enlace.download = String(nombre).replace(/\.xlsx$/i, '').replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.xlsx';
         enlace.click();
-        setTimeout(function () { URL.revokeObjectURL(enlace.href); }, 1000);
+        setTimeout(function () { URL.revokeObjectURL(enlace.href); }, 60000);   // la descarga puede tardar en tomar el archivo
     }
 
     return { crear: crear, leer: leer, aTexto: aTexto, descargar: descargar };

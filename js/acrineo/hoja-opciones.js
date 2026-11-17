@@ -1,5 +1,5 @@
 // ACRINEO · «Opciones del presupuesto» (pestaña vertical de la izquierda, como en Neodata) y sus teclas rápidas:
-// F4 Presupuesto completo · F10 Cálculo · F12 Detalle del presupuesto · Ctrl+Shift+S Sobrecosto. «Buscar opción» filtra la lista.
+// F4 Presupuesto completo · F10 Cálculo · F12 Detalle del presupuesto · Ctrl+Shift+S Sobrecosto · Ctrl+P Imprimir reportes. «Buscar opción» filtra la lista.
 (function (AN) {
     'use strict';
 
@@ -14,7 +14,8 @@
         detalle: function () { var b = $('anHojaDetalle'); if (b) b.click(); },
         pegado: function () { if (AN.hojaPegado) AN.hojaPegado.abrir(); },
         grafica: function () { var b = $('anConceptosGrafica'); if (b) b.click(); },
-        sobrecosto: function () { if (AN.hojaSobrecosto) AN.hojaSobrecosto.abrir(); }
+        sobrecosto: function () { if (AN.hojaSobrecosto) AN.hojaSobrecosto.abrir(); },
+        reportes: function () { if (AN.hojaReportes) AN.hojaReportes.abrir(); }
     };
     var TECLAS = { F4: 'completo', F10: 'calculo', F12: 'detalle' };
 

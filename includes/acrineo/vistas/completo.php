@@ -63,6 +63,7 @@ require_once __DIR__ . '/campos.php';
         <h3><span class="an-op-ico">1×</span>Factores</h3>
         <button type="button" data-opcion="sobrecosto"><span class="an-op-ico">$</span><span>Sobrecosto (Ctrl + Shift + S)<small>Factores</small></span></button>
         <h3><span class="an-op-ico"><?= anIcono('grafica') ?></span>Reporte</h3>
+        <button type="button" data-opcion="reportes"><span class="an-op-ico"><?= anIcono('imprimir') ?></span><span>Imprimir reportes (Ctrl + P)<small>Presupuesto, análisis de P.U., explosión de insumos</small></span></button>
         <button type="button" data-opcion="grafica"><span class="an-op-ico"><?= anIcono('grafica') ?></span><span>Gráfica de la explosión de insumos<small>Reporte</small></span></button>
     </nav>
 </aside>

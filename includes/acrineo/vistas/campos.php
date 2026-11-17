@@ -30,6 +30,7 @@ const AN_ICONOS = [
     'portapapeles' => '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 2h6v4H9zM8.5 11h7M8.5 15h5"/>',
     'cuadricula'=> '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/>',
     'grafica'   => '<path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/>',
+    'imprimir'  => '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>',
     'enviar'    => '<path d="M3 11.5 21 4l-7.5 18-2.5-8z"/>',
     'guardar'   => '<path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/>',
     'subpartida'=> '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/>',

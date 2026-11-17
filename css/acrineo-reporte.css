@@ -1,0 +1,68 @@
+/* ACRINEO · reportes impresos (acrineo-reporte.php): hoja carta con la Hoja Membretada */
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #e9edf2; color: #111; font: 10px/1.35 Arial, Helvetica, sans-serif; }
+.rp-barra {
+    position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 8px 16px;
+    background: #1f5fae; color: #fff; font-size: 13px;
+}
+.rp-flex { flex: 1; }
+.rp-barra button { height: 30px; padding: 0 14px; border: 1px solid rgba(255, 255, 255, .6); border-radius: 15px; background: transparent; color: #fff; font-weight: 700; cursor: pointer; }
+.rp-barra button.rp-primario { background: #fff; color: #1f5fae; }
+.rp-aviso { margin: 40px auto; max-width: 600px; padding: 16px; background: #fff; border-radius: 8px; font-size: 14px; }
+
+.rp { width: 216mm; max-width: 100%; margin: 16px auto; padding: 12mm 10mm; background: #fff; box-shadow: 0 2px 12px rgba(0, 0, 0, .15); }
+.rp table { border-collapse: collapse; width: 100%; }
+.rp .num { text-align: right; white-space: nowrap; }
+.rp-hoja > thead > tr > td, .rp-hoja > tbody > tr > td { padding: 0; }
+.rp-enc { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; padding-bottom: 4px; border-bottom: 2px solid #aaa; }
+.rp-empresa { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.rp-sub { color: #888; font-size: 9.5px; }
+.rp-mini { width: auto !important; margin-top: 4px; }
+.rp-mini td { padding: 1px 0; }
+.rp-mini td:first-child { width: 24mm; }
+.rp-logo { width: 42mm; min-height: 20mm; display: flex; align-items: center; justify-content: center; padding: 3px; }
+.rp-logo img { max-width: 100%; max-height: 22mm; object-fit: contain; }
+.rp-datos { margin-top: 8px; background: #f2f2f2; border: 2px solid #aaa; }
+.rp-datos th, .rp-datos td { padding: 2px 4px; text-align: left; vertical-align: top; }
+.rp-datos th { width: 22mm; white-space: nowrap; }
+.rp-titulo { margin: 12px 0 8px; text-align: center; font-size: 13.5px; }
+.rp-titulo small { font-size: 10px; font-weight: 400; }
+
+.rp-tabla { table-layout: fixed; }
+.rp-cols th { padding: 4px 3px; background: var(--rp-color, #000); color: #fff; font-size: 9.5px; text-align: center; border-right: 1px solid #fff; }
+.rp-tabla td { padding: 2px 3px; vertical-align: top; overflow-wrap: anywhere; }
+.rp-texto { text-align: justify; }
+.rp-presupuesto .rp-concepto td { padding-bottom: 8px; }
+.rp-concepto { break-inside: avoid; }
+.rp-partida td { padding-top: 6px; font-weight: 700; border-bottom: 1px solid #999; }
+.rp-partida.rp-nivel-0 td { font-size: 10.5px; background: #eef1f5; }
+.rp-subtotal td { font-weight: 700; border-top: 1px solid #999; padding-bottom: 6px; }
+.rp-grupo td { padding-top: 6px; font-weight: 700; text-transform: uppercase; border-bottom: 1px solid #bbb; }
+.rp-vacio { color: #666; font-style: italic; padding: 6px 3px; }
+.rp-totales { margin-top: 8px; font-size: 11px; font-weight: 700; break-inside: avoid; }
+.rp-totales td { padding: 1px 0; }
+.rp-totales td.num { width: 32mm; }
+.rp-letra { padding-top: 4px; font-weight: 700; }
+.rp-cond { margin-top: 14mm; font-size: 10px; line-height: 1.4; break-inside: avoid; }
+.rp-cond > b { display: block; font-size: 10.5px; margin-bottom: 1px; }
+.rp-pie { margin-top: 12mm; text-align: center; font-size: 9px; }
+
+.rp-analisis { margin-bottom: 14px; break-inside: avoid-page; }
+.rp-analisis + .rp-analisis { padding-top: 10px; border-top: 2px solid #aaa; }
+.rp-ap-concepto td { padding: 4px 3px 6px; font-size: 10.5px; }
+.rp-ap-unidad { float: right; font-weight: 700; }
+.rp-resumen { width: 62% !important; margin: 6px 0 0 auto; break-inside: avoid; }
+.rp-resumen td { padding: 1px 3px; }
+.rp-resumen td:nth-child(2) { width: 22%; }
+.rp-resumen td:nth-child(3) { width: 30%; }
+.rp-fuerte td { font-weight: 700; }
+.rp-pu td { font-weight: 700; font-size: 11px; border-top: 2px solid #333; padding-top: 3px; }
+
+@page { size: letter; margin: 10mm 9mm 12mm; }
+@media print {
+    body { background: #fff; }
+    .rp-barra { display: none; }
+    .rp { width: auto; margin: 0; padding: 0; box-shadow: none; }
+    .rp-cols th, .rp-partida.rp-nivel-0 td, .rp-datos { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

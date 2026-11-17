@@ -13,7 +13,7 @@
     var esc = AN.ui.esc;
     var tbody = $('anRenglones');
     var COLS = 12;
-    var CAMPOS = ['codigo', 'descripcion', 'unidad', 'cantidad', 'costo', 'precio_alzado', 'precio_fijo', 'url', 'tipo'];
+    var CAMPOS = ['codigo', 'descripcion', 'unidad', 'cantidad', 'costo', 'precio_alzado', 'precio_fijo', 'url', 'tipo', 'pendiente_analizar'];
     var ICONO_URL = '<svg class="i" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>';
     var urlValida = function (u) { return /^https?:\/\/\S+$/i.test(String(u || '').trim()); };
 
@@ -30,10 +30,8 @@
     function partidaTexto(p) { return p ? p.codigo + '-' + p.descripcion : 'Selecciona una partida'; }
 
     // Filtro de conceptos de la barra de arriba (código, descripción o unidad); en edición se ven todos
-    function sinAcentos(t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
     function pasaFiltro(r) {
-        var q = sinAcentos(H.filtro && H.filtro.q);
-        return !q || [r.codigo, r.descripcion, r.unidad].some(function (v) { return sinAcentos(v).indexOf(q) >= 0; });
+        return AN.ui.coincide([r.codigo, r.descripcion, r.unidad], H.filtro && H.filtro.q, AN.ui.modo($('anFiltroQ')));
     }
     function txt(v) { return v === true ? '1' : v === false ? '' : String(v == null ? '' : v).trim(); }
 
@@ -113,7 +111,7 @@
                 html += '<tr class="an-fila' + (!b.renglon_id ? ' nuevo-renglon' : modificado(b) ? ' modificado' : '') + '" data-clave="' + b.clave + '">'
                     + '<td class="an-col-sel"><input type="checkbox" data-marcar="' + b.clave + '"' + (st.marcados.has(b.clave) ? ' checked' : '') + ' aria-label="Marcar renglón"></td>'
                     + '<td><input class="an-celda-in" type="url" data-k="url" value="' + esc(b.url) + '" maxlength="500" placeholder="https://…" aria-label="URL del concepto"></td>'
-                    + '<td class="an-col-pa"><input type="checkbox" data-k="precio_alzado"' + (b.precio_alzado ? ' checked' : '') + ' aria-label="Precio alzado (P.A.)" title="P.A.: precio unitario fijo"></td>'
+                    + '<td class="an-col-pa"><input type="checkbox" data-k="pendiente_analizar"' + (b.pendiente_analizar ? ' checked' : '') + ' aria-label="Pendiente de analizar (P.A.)" title="P.A.: pendiente de analizar"></td>'
                     + celda(b, 'codigo', 'text', 30) + celda(b, 'descripcion', 'text', 4000)
                     // Unidad: se escribe o se elige con la lupa del «Catálogo Unidades»
                     + '<td><span class="an-celda-unidad"><input class="an-celda-in" type="text" data-k="unidad" value="' + esc(b.unidad) + '" maxlength="20" aria-label="Unidad">'
@@ -132,10 +130,10 @@
             st.filas.forEach(function (r) {
                 if (!pasaFiltro(r)) return;
                 html += '<tr class="an-fila" data-renglon="' + r.renglon_id + '">'
-                    + '<td class="an-col-sel"></td><td class="an-col-url">' + botonUrl(r.url) + '</td><td class="an-col-pa">' + (r.precio_alzado ? '<span class="an-pa" title="Precio alzado">✕</span>' : '') + '</td>'
+                    + '<td class="an-col-sel"></td><td class="an-col-url">' + botonUrl(r.url) + '</td><td class="an-col-pa">' + (r.pendiente_analizar ? '<span class="an-pa si" title="Pendiente de analizar">✓</span>' : '<span class="an-pa" title="Analizado (no pendiente)">✕</span>') + '</td>'
                     + '<td>' + esc(r.codigo) + '</td><td class="an-desc">' + esc(r.descripcion) + '</td><td>' + esc(r.unidad || '') + '</td>'
                     + '<td class="num">' + cantidad(r.cantidad) + '</td><td class="num">' + AN.ui.dinero(r.costo) + (r.matriz ? '<span class="an-insignia" title="Costo de su matriz de P.U.">M</span>' : '') + '</td>'
-                    + '<td class="num">' + AN.ui.dinero(r.precio) + '</td><td class="num">' + AN.ui.dinero(r.importe) + '</td>'
+                    + '<td class="num">' + AN.ui.dinero(r.precio) + (r.precio_alzado ? '<span class="an-insignia" title="Precio fijo (capturado, no sale de costo × sobrecosto)">Fijo</span>' : '') + '</td><td class="num">' + AN.ui.dinero(r.importe) + '</td>'
                     + '<td class="num">' + esc(r.tipo) + '</td><td>' + botonPU(r) + '</td></tr>';
             });
         }
@@ -216,6 +214,7 @@
             b.precio_fijo = r.precio_fijo == null ? '' : String(r.precio_fijo);
             b.url = r.url || '';
             b.tipo = String(r.tipo == null ? 4 : r.tipo);
+            b.pendiente_analizar = !!r.pendiente_analizar;
             b.original = Object.assign({}, b);
             return b;
         });
@@ -235,7 +234,7 @@
 
     function agregar() {
         guardarFoto();
-        var b = { clave: 'n' + (++st.sec), renglon_id: null, matriz: false, codigo: '', descripcion: '', unidad: '', cantidad: '1', costo: '0', precio_alzado: false, precio_fijo: '', url: '', tipo: '4' };
+        var b = { clave: 'n' + (++st.sec), renglon_id: null, matriz: false, codigo: '', descripcion: '', unidad: '', cantidad: '1', costo: '0', precio_alzado: false, precio_fijo: '', url: '', tipo: '4', pendiente_analizar: false };
         st.borradores.push(b);
         pintar();
         var input = tbody.querySelector('tr[data-clave="' + b.clave + '"] input[data-k="codigo"]');
@@ -308,7 +307,7 @@
             var r = await AN.api.post(H.url(), {
                 accion: 'renglones_guardar', partida_id: p.id,
                 filas: enviar.map(function (b) {
-                    var f = { renglon_id: b.renglon_id, precio_alzado: !!b.precio_alzado, precio_fijo: b.precio_alzado ? String(b.precio_fijo).trim() : null };
+                    var f = { renglon_id: b.renglon_id, precio_alzado: !!b.precio_alzado, precio_fijo: b.precio_alzado ? String(b.precio_fijo).trim() : null, pendiente_analizar: !!b.pendiente_analizar };
                     ['codigo', 'descripcion', 'unidad', 'cantidad', 'costo', 'url', 'tipo'].forEach(function (k) { f[k] = String(b[k]).trim(); });
                     return f;
                 }),
@@ -371,6 +370,13 @@
         var tr = e.target.closest('tr[data-clave]');
         if (!tr) return;
         if (e.target.dataset.k === 'codigo') completarPorCodigo(borrador(tr.dataset.clave), tr);
+        if (e.target.dataset.k === 'pendiente_analizar') {
+            guardarFoto();
+            var bp = borrador(tr.dataset.clave);
+            bp.pendiente_analizar = e.target.checked;
+            tr.classList.toggle('modificado', !!bp.renglon_id && modificado(bp));
+            botones();
+        }
         if (e.target.dataset.k === 'precio_alzado') {
             guardarFoto();
             var b = borrador(tr.dataset.clave);
@@ -465,8 +471,24 @@
         });
     }
 
+    // Áreas de la hoja que se ocultan desde el ⋮ de los conceptos (como en Neodata); se recuerda en este navegador
+    function verArea(area, si) {
+        var cont = area === 'partidas' ? $('anHoja') : $('anHojaDerecha');
+        cont.classList.toggle(area === 'partidas' ? 'sin-partidas' : 'sin-catalogo', !si);
+        try { localStorage.setItem('acrineo.hoja.' + area, si ? '1' : '0'); } catch (e) { /* sin memoria */ }
+    }
+    function areaVisible(area) { return area === 'partidas' ? !$('anHoja').classList.contains('sin-partidas') : !$('anHojaDerecha').classList.contains('sin-catalogo'); }
+    ['partidas', 'catalogo'].forEach(function (a) {
+        var v = null;
+        try { v = localStorage.getItem('acrineo.hoja.' + a); } catch (e) { /* sin memoria */ }
+        if (v === '0') verArea(a, false);
+    });
+
     function opcionesPartida() {
         var p = H.partida(), op = [];
+        op.push({ texto: (areaVisible('partidas') ? 'Ocultar' : 'Mostrar') + ' el área de partidas', accion: function () { verArea('partidas', !areaVisible('partidas')); } });
+        op.push({ texto: (areaVisible('catalogo') ? 'Ocultar' : 'Mostrar') + ' la explosión de insumos (abajo)', accion: function () { verArea('catalogo', !areaVisible('catalogo')); } });
+        op.push(null);
         if (H.puede) {
             op.push({ texto: 'Agregar registro', accion: function () { if (!st.editando) entrarEdicion(); agregar(); }, desactivado: !p || st.guardando });
             op.push(st.editando ? { texto: 'Salir de la edición', accion: cancelarEdicion } : { texto: 'Editar los conceptos', accion: entrarEdicion, desactivado: !p });
@@ -476,7 +498,7 @@
         op.push({ texto: 'Abrir la matriz (P.U.)' + (marcado ? ' de ' + marcado.codigo : ''), accion: function () { if (marcado && AN.hojaMatriz) AN.hojaMatriz.abrir(marcado.concepto_id); }, desactivado: !marcado || !AN.hojaMatriz });
         if (H.puede) op.push(null,
             { texto: 'Editar la partida', accion: function () { H.editarPartida(); }, desactivado: !p || !!H.edicion },
-            { texto: 'Copiar la partida', accion: function () { $('anPartidaCopiar').click(); }, desactivado: !p || !!H.edicion });
+            { texto: 'Copiar la partida', accion: function () { H.copiarPartida(); }, desactivado: !p || !!H.edicion });
         return op;
     }
     var menuLista = $('anRenglonesMenuLista'), menuAcciones = [];

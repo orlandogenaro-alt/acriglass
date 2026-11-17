@@ -107,7 +107,7 @@
     // ---------- Pintar la matriz ----------
     function coincide(f, q) {
         if (!q) return true;
-        return [f.codigo, f.descripcion, f.unidad, TIPOS[f.tipo]].join(' ').toLowerCase().indexOf(q) >= 0;
+        return AN.ui.coincide([f.codigo, f.descripcion, f.unidad, TIPOS[f.tipo]], q, AN.ui.modo($('anMatrizQ')));
     }
     function cantidadTexto(n) { return (Number(n) || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 6 }); }
 
@@ -218,6 +218,8 @@
         st.original = huella();
         st.guardadas = JSON.stringify(st.filas);
         var c = r.concepto;
+        $('anMatrizPendiente').checked = !!c.pendiente_analizar;
+        $('anMatrizPendiente').disabled = !H.puede;
         st.padre = r.padre_id || null;
         st.ruta = r.ruta || [];
         st.submatriz = !!r.submatriz;
@@ -382,7 +384,7 @@
         var pagina = mas ? cat.pagina + 1 : 1;
         if (!mas) cuerpoCat.innerHTML = '<tr class="an-vacio"><td colspan="11">Cargando…</td></tr>';
         try {
-            var r = await AN.api.get(H.url({ recurso: 'insumos_tabla', q: $('anInsumosQ').value.trim(), pagina: pagina, por_pagina: 100 }), { signal: cat.ctrl.signal });
+            var r = await AN.api.get(H.url({ recurso: 'insumos_tabla', q: $('anInsumosQ').value.trim(), modo: AN.ui.modo($('anInsumosQ')), pagina: pagina, por_pagina: 100 }), { signal: cat.ctrl.signal });
             cat.cargado = true;
             cat.pagina = r.pagina;
             cat.total = r.total;
@@ -502,6 +504,7 @@
         entrarEdicion();
     });
     $('anMatrizQ').addEventListener('input', pintar);
+    $('anMatrizQ').addEventListener('modo', pintar);
     if ($('anMatrizTodos')) $('anMatrizTodos').addEventListener('change', function () {
         var si = this.checked;
         st.marcados.clear();
@@ -512,6 +515,7 @@
 
     // ---------- Eventos del catálogo ----------
     $('anInsumosQ').addEventListener('input', cargarCatalogoPronto);
+    $('anInsumosQ').addEventListener('modo', cargarCatalogoPronto);
     $('anInsumosMas').addEventListener('click', function () { cargarCatalogo(true); });
     cuerpoCat.addEventListener('change', function (e) {
         var tr = e.target.closest('tr[data-insumo]');
@@ -700,6 +704,16 @@
     $('anMatrizAnterior').addEventListener('click', function () { vecino(-1); });
     $('anMatrizSiguiente').addEventListener('click', function () { vecino(1); });
     $('anMatrizRegresar').addEventListener('click', regresar);
+    // «Pendiente de analizar» del concepto (la misma P.A. de la cuadrícula de conceptos)
+    $('anMatrizPendiente').addEventListener('change', async function () {
+        if (!st.concepto) return;
+        var si = this.checked, caja = this;
+        try {
+            H.aplicar(await AN.api.post(H.url(), { accion: 'concepto_pendiente', concepto_id: st.concepto.concepto_id, pendiente: si, partida_id: H.sel || 0 }));
+            st.concepto.pendiente_analizar = si;
+            AN.ui.aviso(st.concepto.codigo + (si ? ' quedó pendiente de analizar.' : ' ya no está pendiente de analizar.'), 'ok');
+        } catch (e) { caja.checked = !si; AN.ui.aviso(e.message, 'error'); }
+    });
     // Gráfica de la matriz abierta: importe de sus insumos por tipo (los marcados, si hay)
     $('anMatrizGrafica').addEventListener('click', function () {
         if (!AN.grafica || !st.concepto) return;

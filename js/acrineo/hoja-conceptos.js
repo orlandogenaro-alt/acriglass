@@ -18,7 +18,7 @@
         if (st.ctrl) st.ctrl.abort();
         st.ctrl = new AbortController();
         try {
-            var r = await AN.api.get(H.url({ recurso: 'conceptos', q: $('anConceptosQ').value.trim(), por_pagina: 300 }), { signal: st.ctrl.signal });
+            var r = await AN.api.get(H.url({ recurso: 'conceptos', q: $('anConceptosQ').value.trim(), modo: AN.ui.modo($('anConceptosQ')), por_pagina: 300 }), { signal: st.ctrl.signal });
             st.items = r.items;
             st.total = r.total;
             pintar();
@@ -37,7 +37,7 @@
                 + '<td class="num"><input class="an-catalogo-cant" type="number" min="0" step="any" data-cant="' + c.id + '" value="' + esc(m ? st.marcados.get(c.id) : '1') + '"' + (H.puede ? '' : ' disabled') + ' aria-label="Cantidad a copiar de ' + esc(c.codigo) + '"></td>'
                 + '<td class="an-desc" title="' + esc(c.descripcion) + '">' + esc(c.descripcion) + '</td><td>' + esc(c.unidad || '') + '</td>'
                 + '<td class="num">' + AN.ui.dinero(c.costo) + (c.matriz ? '<span class="an-insignia" title="Costo de su matriz de P.U.">M</span>' : '') + '</td>'
-                + '<td class="num">' + AN.ui.dinero(c.precio) + (c.precio_alzado ? '<span class="an-insignia" title="Precio alzado">P.A.</span>' : '') + '</td>'
+                + '<td class="num">' + AN.ui.dinero(c.precio) + (c.precio_alzado ? '<span class="an-insignia" title="Precio fijo">Fijo</span>' : '') + (c.pendiente_analizar ? '<span class="an-insignia an-insignia-pa" title="Pendiente de analizar">P.A.</span>' : '') + '</td>'
                 + '<td class="num" title="Cantidad total en el presupuesto: ' + c.cantidad_total + '">' + c.usos + '</td>'
                 + '<td class="num">' + esc(c.tipo) + '</td>'
                 + '<td>' + (/^https?:\/\/\S+$/i.test(c.url || '') ? '<a class="an-btn-url" href="' + esc(c.url) + '" target="_blank" rel="noopener noreferrer" title="' + esc(c.url) + '" aria-label="Abrir el enlace de ' + esc(c.codigo) + '">' + DOC + '</a>' : '') + '</td>'
@@ -88,6 +88,7 @@
         else botones();
     });
     $('anConceptosQ').addEventListener('input', cargarPronto);
+    $('anConceptosQ').addEventListener('modo', cargar);
     tbody.addEventListener('change', function (e) {
         var id = +(e.target.dataset.marcar || 0);
         if (id) {

@@ -105,8 +105,38 @@
         });
     }
 
+    // Botón azul de los filtros (como en Neodata): «Contiene» (a) o «Comienza con» (A…). Al cambiar dispara el evento
+    // 'modo' en su <input>. modo(input) → 'contiene' | 'comienza'; coincide(textos, q, modo) para filtrar en el navegador.
+    function modo(input) {
+        var b = input && input.closest('.an-buscar') && input.closest('.an-buscar').querySelector('.an-buscar-modo');
+        return b && b.dataset.modo === 'comienza' ? 'comienza' : 'contiene';
+    }
+    function sinAcentos(t) { return String(t == null ? '' : t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+    function coincide(textos, q, m) {
+        q = sinAcentos(String(q || '').trim());
+        if (!q) return true;
+        return textos.some(function (t) { t = sinAcentos(t); return m === 'comienza' ? t.indexOf(q) === 0 : t.indexOf(q) >= 0; });
+    }
+    function pintarModo(b) {
+        var com = b.dataset.modo === 'comienza';
+        b.innerHTML = com ? '<span class="an-modo-txt">A…</span>' : '<span class="an-modo-txt an-modo-a">a</span>';
+        b.title = (com ? 'Comienza con' : 'Contiene') + ' · clic para cambiar a «' + (com ? 'Contiene' : 'Comienza con') + '»';
+        b.setAttribute('aria-label', 'Modo de búsqueda: ' + (com ? 'comienza con' : 'contiene'));
+    }
+    document.querySelectorAll('.an-buscar-modo').forEach(pintarModo);
+    document.addEventListener('click', function (e) {
+        var b = e.target.closest('.an-buscar-modo');
+        if (!b) return;
+        e.preventDefault();
+        b.dataset.modo = b.dataset.modo === 'comienza' ? 'contiene' : 'comienza';
+        pintarModo(b);
+        var input = b.closest('.an-buscar').querySelector('input');
+        if (input) { input.dispatchEvent(new Event('modo')); input.focus(); }
+    });
+
     AN.ui = {
         esc: esc, dinero: dinero, pct: pct, hoy: hoy, fechaTerminacion: fechaTerminacion, fechaCorta: fechaCorta,
-        obtener: obtener, poner: poner, retrasar: retrasar, aviso: aviso, confirmar: confirmar, cerrables: cerrables
+        obtener: obtener, poner: poner, retrasar: retrasar, aviso: aviso, confirmar: confirmar, cerrables: cerrables,
+        modo: modo, coincide: coincide
     };
 })(window.AcriNeo = window.AcriNeo || {});

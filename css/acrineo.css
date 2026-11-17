@@ -426,6 +426,17 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-buscar-azul { padding-left: 2px; }
 .an-buscar-azul .an-buscar-ico { display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 6px; background: var(--azul); }
 .an-buscar-azul .an-buscar-ico svg { color: #fff; width: 15px; height: 15px; }
+/* Botón «Contiene (a) / Comienza con (A…)» de los filtros */
+.an-buscar-modo { border: none; padding: 0; cursor: pointer; color: #fff; }
+.an-buscar-modo:hover { background: var(--azul-hover); }
+.an-buscar-modo:focus-visible { outline: 2px solid var(--azul-texto); outline-offset: 2px; }
+.an-modo-txt { font-size: 12px; font-weight: 800; line-height: 1; letter-spacing: -.3px; }
+.an-modo-a { display: grid; place-items: center; width: 14px; height: 14px; border: 1.5px solid #fff; border-radius: 3px; font-size: 11px; }
+/* Áreas que se ocultan con el ⋮ de los conceptos */
+.an-hoja.sin-partidas { grid-template-columns: minmax(0, 1fr); }
+.an-hoja.sin-partidas > .an-panel-partidas { display: none; }
+.an-hoja-derecha.sin-catalogo { grid-template-rows: minmax(0, 1fr); }
+.an-hoja-derecha.sin-catalogo > .an-panel-catalogo { display: none; }
 .an-check { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap; }
 .an-check input { width: 16px; height: 16px; accent-color: var(--azul); }
 .an-btn.an-icono.an-redondo { width: 34px; border-radius: 8px; }
@@ -461,6 +472,22 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-calculo-num input:disabled { color: var(--texto-3); }
 .an-calculo-num input.invalido { border-bottom-color: var(--rojo); }
 .an-calculo-pie { display: flex; align-items: center; gap: 8px; padding: 8px 18px 12px; border-top: 1px solid var(--linea); }
+
+/* Pegado especial (desde Excel) */
+.an-pegado-dlg { width: min(1000px, 96vw); max-height: 92vh; }
+.an-pegado-dlg .an-titulo-barra > svg.i { width: 18px; height: 18px; }
+.an-pegado-cuerpo { display: flex; flex-direction: column; gap: 10px; padding: 12px 18px; overflow: auto; min-height: 0; flex: 1; }
+.an-pegado-ayuda { font-size: 12.5px; color: var(--texto-2); line-height: 1.5; }
+.an-pegado-ayuda kbd { padding: 0 4px; border: 1px solid var(--borde-2); border-radius: 3px; background: var(--sub); font-size: 11px; }
+.an-pegado-botones { display: flex; align-items: center; gap: 8px; }
+.an-pegado-botones label.an-btn { cursor: pointer; }
+#anPegadoTexto { width: 100%; min-height: 110px; height: 140px; resize: vertical; padding: 8px; border: 1px solid var(--borde-2); border-radius: 6px; background: var(--input); font: 12px/1.4 ui-monospace, Consolas, monospace; white-space: pre; }
+#anPegadoTexto:focus { outline: none; border-color: var(--azul-texto); box-shadow: 0 0 0 3px var(--foco); }
+.an-pegado-vista { border: 1px solid var(--borde); border-radius: 6px; overflow: auto; max-height: 320px; }
+.an-pegado-vista th { position: sticky; }
+.an-pegado-vista .an-desc { white-space: pre-line; min-width: 280px; max-width: 520px; }
+.an-pegado-vista tr.an-pegado-partida td { background: var(--azul-suave); color: var(--azul-texto); font-weight: 700; }
+.an-pegado-vista td.an-falta { background: var(--rojo-suave); }
 
 /* Resultado del cálculo: explosión de insumos */
 .an-explosion-dlg { width: min(1100px, 96vw); height: min(760px, 92vh); }
@@ -578,6 +605,10 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-btn-url.vacia { background: var(--sub); color: var(--texto-3); border: 1px solid var(--borde); cursor: default; }
 .an-renglones td.an-col-pa { text-align: center; }
 .an-pa { color: var(--rojo); font-weight: 800; }
+.an-pa.si { color: var(--ambar); }   /* P.A.: pendiente de analizar */
+.an-insignia-pa { background: var(--ambar-suave); color: var(--ambar); border-color: var(--ambar-borde); }
+.an-cab-check { color: #fff; font-size: 13px; margin-left: 6px; }
+.an-cab-check input { accent-color: #fff; }
 .an-insignia { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 7px; font-size: 10px; font-weight: 800; background: var(--azul-suave); color: var(--azul-texto); border: 1px solid var(--azul-borde); vertical-align: middle; }
 .an-btn-pu { display: inline-grid; place-items: center; height: 22px; padding: 0 8px; border-radius: 11px; background: var(--azul); color: #fff; font-size: 11px; font-weight: 800; }
 .an-btn-pu:hover { background: var(--azul-hover); }

@@ -168,7 +168,6 @@
         $('anSubpartidaNueva').disabled = editando || !p;
         $('anPartidaEditar').disabled = editando || !p;
         $('anPartidaEliminar').disabled = editando || !p;
-        $('anPartidaCopiar').disabled = editando || !p;
         document.querySelectorAll('[data-mover]').forEach(function (b) { b.disabled = editando || !p; });
     }
 
@@ -259,7 +258,7 @@
         H.filtro.visibles = null;
         if (q && $('anFiltroTodo').checked) {
             try {
-                var r = await AN.api.get(H.url({ recurso: 'filtrar', q: q }));
+                var r = await AN.api.get(H.url({ recurso: 'filtrar', q: q, modo: AN.ui.modo($('anFiltroQ')) }));
                 if (H.filtro.q !== q) return;
                 H.filtro.ids = new Set(r.partidas);
                 calcularVisibles();
@@ -280,7 +279,7 @@
     var refrescarFiltro = AN.ui.retrasar(async function () {
         if (!H.filtro.ids || !H.filtro.q) return;
         try {
-            var r = await AN.api.get(H.url({ recurso: 'filtrar', q: H.filtro.q }));
+            var r = await AN.api.get(H.url({ recurso: 'filtrar', q: H.filtro.q, modo: AN.ui.modo($('anFiltroQ')) }));
             if (!H.filtro.ids) return;
             H.filtro.ids = new Set(r.partidas);
             calcularVisibles();
@@ -329,7 +328,6 @@
         $('anSubpartidaNueva').addEventListener('click', function () { if (H.sel) nueva(H.sel); });
         $('anPartidaEditar').addEventListener('click', editar);
         $('anPartidaEliminar').addEventListener('click', eliminar);
-        $('anPartidaCopiar').addEventListener('click', copiarPartida);
         document.querySelectorAll('[data-mover]').forEach(function (b) { b.addEventListener('click', function () { mover(b.dataset.mover); }); });
     }
 
@@ -347,6 +345,7 @@
     $('anFiltroQ').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); aplicarFiltro(); } });
     $('anFiltroQ').addEventListener('input', function () { if (!this.value.trim() && H.filtro.q) aplicarFiltro(); });
     $('anFiltroAplicar').addEventListener('click', aplicarFiltro);
+    $('anFiltroQ').addEventListener('modo', function () { if (H.filtro.q) aplicarFiltro(); });
     $('anFiltroTodo').addEventListener('change', function () { if (H.filtro.q) aplicarFiltro(); });
 
     // ⋮ del árbol de partidas
@@ -361,11 +360,13 @@
                 { texto: 'Nueva partida', accion: function () { nueva(null); }, desactivado: !!H.edicion },
                 { texto: 'Nueva subpartida', accion: function () { if (H.sel) nueva(H.sel); }, desactivado: !!H.edicion || !p },
                 { texto: 'Editar partida', accion: editar, desactivado: !!H.edicion || !p },
-                { texto: 'Copiar partida', accion: copiarPartida, desactivado: !!H.edicion || !p });
+                { texto: 'Copiar partida', accion: copiarPartida, desactivado: !!H.edicion || !p },
+                { texto: 'Pegado especial (desde Excel)', accion: function () { if (AN.hojaPegado) AN.hojaPegado.abrir(); }, desactivado: !!H.edicion });
             return op;
         }
     });
     H.editarPartida = editar;
+    H.copiarPartida = copiarPartida;
 
     $('anHojaDetalle').addEventListener('click', function () {
         AN.detalle.abrir(H.id, { alGuardar: function () { H.recargar(); } });

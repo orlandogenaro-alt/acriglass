@@ -30,10 +30,17 @@ function acrineoCatalogo(string $clave): array
     return ACRINEO_CATALOGOS[$clave];
 }
 
-// Texto de búsqueda para ILIKE, con % y _ escapados
-function acrineoPatron(string $q): string
+// Texto de búsqueda para ILIKE, con % y _ escapados. $modo: 'contiene' (en cualquier parte) o 'comienza' (al inicio)
+function acrineoPatron(string $q, string $modo = 'contiene'): string
 {
-    return '%' . strtr(mb_substr(trim($q), 0, 100), ['\\' => '\\\\', '%' => '\\%', '_' => '\\_']) . '%';
+    $t = strtr(mb_substr(trim($q), 0, 100), ['\\' => '\\\\', '%' => '\\%', '_' => '\\_']);
+    return ($modo === 'comienza' ? '' : '%') . $t . '%';
+}
+
+// Modo de búsqueda pedido por el botón azul de los filtros (?modo=comienza|contiene)
+function acrineoModoBusqueda(): string
+{
+    return ($_GET['modo'] ?? '') === 'comienza' ? 'comienza' : 'contiene';
 }
 
 // Búsqueda paginada: { titulo, extra_titulo, items: [{id, nombre, extra}], total, alta }

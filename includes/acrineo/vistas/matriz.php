@@ -20,6 +20,7 @@ $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2
         <button type="button" class="an-btn-cab" id="anMatrizOcultarTexto" aria-pressed="false">Ocultar texto</button>
         <?php if ($puedeMatriz): ?>
         <button type="button" class="an-btn-cab an-icono" id="anMatrizGuardarCab" title="Guardar la matriz" aria-label="Guardar la matriz" disabled><?= $icoGuardar ?></button>
+        <label class="an-check an-cab-check" title="Al concepto le falta terminar su análisis (columna P.A. de los conceptos)"><input type="checkbox" id="anMatrizPendiente"> Pendiente de analizar</label>
         <?php endif; ?>
     </div>
     <div class="an-matriz-texto" id="anMatrizTexto">
@@ -30,8 +31,8 @@ $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2
     <!-- Insumos de la matriz -->
     <section class="an-ventana an-matriz-insumos" aria-label="Insumos de la matriz">
         <div class="an-barra an-barra-chica">
-            <label class="an-buscar">
-                <?= anIcono('buscar') ?>
+            <label class="an-buscar an-buscar-azul">
+                <button type="button" class="an-buscar-ico an-buscar-modo" data-modo="contiene"></button>
                 <input type="search" id="anMatrizQ" placeholder="Filtrar por código, descripción completa, unidad" aria-label="Filtrar los insumos de la matriz">
             </label>
             <span class="an-flex"></span>
@@ -89,8 +90,8 @@ $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2
     <!-- Catálogo de insumos del sistema -->
     <section class="an-ventana an-matriz-catalogo" aria-label="Catálogo de insumos">
         <div class="an-barra an-barra-chica">
-            <label class="an-buscar">
-                <?= anIcono('buscar') ?>
+            <label class="an-buscar an-buscar-azul">
+                <button type="button" class="an-buscar-ico an-buscar-modo" data-modo="contiene"></button>
                 <input type="search" id="anInsumosQ" placeholder="Filtrar por código, descripción, unidad, familia…" aria-label="Filtrar el catálogo de insumos">
             </label>
             <span class="an-ayuda" id="anInsumosConteo"></span>

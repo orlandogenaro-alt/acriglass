@@ -99,7 +99,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
         <!-- Filtro de conceptos en todo el presupuesto, totales y vista -->
         <div class="an-hoja-filtro">
             <label class="an-buscar an-buscar-azul">
-                <span class="an-buscar-ico"><?= anIcono('buscar') ?></span>
+                <button type="button" class="an-buscar-ico an-buscar-modo" data-modo="contiene"></button>
                 <input type="search" id="anFiltroQ" placeholder="Conceptos a filtrar en todo el presupuesto" aria-label="Conceptos a filtrar en todo el presupuesto">
             </label>
             <span class="an-flex"></span>
@@ -117,7 +117,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
                 <button type="button" class="an-btn an-primario an-icono an-redondo" id="anPartidaNueva" title="Nueva partida" aria-label="Nueva partida">+</button>
                 <button type="button" class="an-btn an-primario an-icono an-redondo" id="anSubpartidaNueva" title="Nueva subpartida de la seleccionada" aria-label="Nueva subpartida"><?= anIcono('subpartida') ?></button>
                 <button type="button" class="an-btn an-primario an-icono an-redondo" id="anPartidaEliminar" title="Eliminar la partida seleccionada" aria-label="Eliminar partida"><?= anIcono('borrar') ?></button>
-                <button type="button" class="an-btn an-primario an-icono an-redondo" id="anPartidaCopiar" title="Copiar la partida seleccionada (con sus subpartidas y conceptos)" aria-label="Copiar partida"><?= anIcono('portapapeles') ?></button>
+                <button type="button" class="an-btn an-primario an-icono an-redondo" id="anPegadoEspecial" title="Pegado especial: partidas y conceptos desde Excel" aria-label="Pegado especial"><?= anIcono('portapapeles') ?></button>
                 <button type="button" class="an-btn an-icono an-redondo" id="anPartidaEditar" title="Editar la partida seleccionada (F2 o doble clic)" aria-label="Editar partida"><?= anIcono('editar') ?></button>
                 <?php endif; ?>
                 <span class="an-flex"></span>
@@ -150,7 +150,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
             <section class="an-ventana an-panel-renglones" aria-label="Conceptos de la partida">
                 <div class="an-barra an-barra-chica">
                     <span class="an-menu-cont">
-                        <button type="button" class="an-btn an-primario an-icono an-redondo" id="anRenglonesMenu" title="Opciones de la partida" aria-label="Opciones de la partida" aria-haspopup="true" aria-expanded="false"><?= anIcono('mas') ?></button>
+                        <button type="button" class="an-btn an-primario an-icono an-redondo" id="anRenglonesMenu" title="Mostrar u ocultar áreas y más opciones" aria-label="Mostrar u ocultar áreas y más opciones" aria-haspopup="true" aria-expanded="false"><?= anIcono('mas') ?></button>
                         <div class="an-menu an-menu-izq" id="anRenglonesMenuLista" role="menu" hidden></div>
                     </span>
                     <b class="an-partida-actual" id="anPartidaActual">Selecciona una partida</b>
@@ -171,7 +171,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
                         <thead><tr>
                             <th class="an-col-sel" scope="col"><div class="an-th"><input type="checkbox" id="anRenglonesTodos" aria-label="Marcar todos"></div></th>
                             <th scope="col" class="an-col-url" title="Enlace del concepto (ficha técnica, plano…)"><div class="an-th"><span>URL</span></div></th>
-                            <th scope="col" class="an-col-pa" title="Precio alzado: el precio unitario se captura fijo"><div class="an-th"><span>P.A.</span></div></th>
+                            <th scope="col" class="an-col-pa" title="Pendiente de analizar"><div class="an-th"><span>P.A.</span></div></th>
                             <th scope="col"><div class="an-th"><span>Código</span></div></th>
                             <th scope="col"><div class="an-th"><span>Descripción completa</span></div></th>
                             <th scope="col"><div class="an-th"><span>Unidad</span></div></th>
@@ -192,7 +192,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
             <section class="an-ventana an-panel-catalogo" id="anPanelCatalogo" aria-label="Catálogo de conceptos del presupuesto">
                 <div class="an-barra an-barra-chica">
                     <label class="an-buscar an-buscar-azul">
-                        <span class="an-buscar-ico"><?= anIcono('buscar') ?></span>
+                        <button type="button" class="an-buscar-ico an-buscar-modo" data-modo="contiene"></button>
                         <input type="search" id="anConceptosQ" placeholder="Filtrar por código, descripción, unidad…" aria-label="Filtrar conceptos">
                     </label>
                     <span class="an-ayuda" id="anConceptosConteo"></span>
@@ -254,6 +254,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
 <?php require __DIR__ . '/includes/acrineo/vistas/dialogos.php'; ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/catalogos-chicos.php'; ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/calculo.php'; ?>
+<?php require __DIR__ . '/includes/acrineo/vistas/pegado.php'; ?>
 <script>
     window.ACRINEO = <?= json_encode($cfgCliente, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_PRESERVE_ZERO_FRACTION) ?>;
 </script>
@@ -272,6 +273,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
 <script src="<?= recurso('js/acrineo/hoja-conceptos.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-matriz.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-calculo.js') ?>"></script>
+<script src="<?= recurso('js/acrineo/hoja-pegado.js') ?>"></script>
 <?php endif; ?>
 </body>
 </html>

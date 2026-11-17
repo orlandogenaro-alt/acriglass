@@ -663,6 +663,15 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 /* «Desacoplar exp. ins.»: sin el catálogo de abajo, la matriz ocupa todo */
 .an-matriz-panel.desacoplada { grid-template-rows: auto auto minmax(0, 1fr); }
 .an-matriz-panel .an-matriz-catalogo[hidden] { display: none; }
+/* Explosión de insumos acoplada: «Ver» de la hoja y origen de los insumos de la matriz */
+.an-ver { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--texto-2); white-space: nowrap; }
+.an-ver select { height: 28px; padding: 0 6px; border: 1px solid var(--borde-2); border-radius: 5px; background: var(--input); font-size: 12px; }
+.an-segmento { display: inline-flex; flex: none; border: 1px solid var(--azul-borde); border-radius: 15px; overflow: hidden; }
+.an-segmento button { height: 28px; padding: 0 11px; font-size: 11.5px; font-weight: 700; color: var(--azul-texto); background: var(--tarjeta); white-space: nowrap; }
+.an-segmento button + button { border-left: 1px solid var(--azul-borde); }
+.an-segmento button[aria-pressed=true] { background: var(--azul); color: #fff; }
+.an-tabla tr.an-fila-ins td { color: var(--texto-2); }
+.an-tabla tr.an-fila-ins td:nth-child(2) { color: var(--texto); font-weight: 600; }
 /* Menú del clic derecho sobre los conceptos */
 .an-menu.an-menu-ctx { position: fixed; right: auto; top: 0; left: 0; z-index: 60; }
 .an-sep-barra { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--borde-2); }

@@ -189,12 +189,18 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
             </section>
 
             <!-- Catálogo de conceptos del presupuesto -->
-            <section class="an-ventana an-panel-catalogo" id="anPanelCatalogo" aria-label="Catálogo de conceptos del presupuesto">
+            <section class="an-ventana an-panel-catalogo" id="anPanelCatalogo" aria-label="Explosión de insumos acoplada: conceptos e insumos del presupuesto">
                 <div class="an-barra an-barra-chica">
                     <label class="an-buscar an-buscar-azul">
                         <button type="button" class="an-buscar-ico an-buscar-modo" data-modo="contiene"></button>
                         <input type="search" id="anConceptosQ" placeholder="Filtrar por código, descripción, unidad…" aria-label="Filtrar conceptos">
                     </label>
+                    <label class="an-ver" title="Qué se ve en este panel">Ver
+                        <select id="anConceptosVer" aria-label="Qué se ve en el panel de abajo">
+                            <option value="todos">Todos</option>
+                            <option value="conceptos">Conceptos del presupuesto</option>
+                            <option value="insumos">Solo explosión (insumos)</option>
+                        </select></label>
                     <span class="an-ayuda" id="anConceptosConteo"></span>
                     <span class="an-flex"></span>
                     <button type="button" class="an-btn an-primario an-icono an-redondo" id="anConceptosGrafica" title="Gráfica: importe de los conceptos en el presupuesto" aria-label="Gráfica de los conceptos"><?= anIcono('grafica') ?></button>
@@ -215,6 +221,9 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
                             <th scope="col" class="num"><div class="an-th"><span>Precio</span></div></th>
                             <th scope="col" class="num"><div class="an-th"><span>En partidas</span></div></th>
                             <th scope="col" class="num"><div class="an-th"><span>Tipo</span></div></th>
+                            <th scope="col" class="num" title="Niveles de análisis que tiene debajo (matriz, básico, cuadrilla…)"><div class="an-th"><span>N</span></div></th>
+                            <th scope="col" class="num" title="Cantidad que lleva todo el presupuesto"><div class="an-th"><span>Cant. exp. ins.</span></div></th>
+                            <th scope="col" class="num" title="Cantidad × costo"><div class="an-th"><span>Importe</span></div></th>
                             <th scope="col"><div class="an-th"><span>URL</span></div></th>
                             <th scope="col"><div class="an-th"><span>P.U.</span></div></th>
                         </tr></thead>

@@ -3,6 +3,7 @@
 //   GET  ?id=P                                  presupuesto (totales) y partidas en árbol
 //   GET  ?id=P&partida=X                         además, los conceptos de la partida
 //   GET  ?id=P&recurso=conceptos&q=&pagina=      catálogo de conceptos del presupuesto
+//   GET  ?id=P&recurso=explosion_acoplada&q=&modo=&ver=todos|conceptos|insumos   panel de abajo (insumos de las matrices y conceptos)
 //   GET  ?id=P&recurso=explosion&concepto=C       explosión de insumos de un concepto (con su cantidad en el presupuesto)
 //   GET  ?id=P&recurso=calculo                    opciones de la ventana «Cálculo» · POST calcular {opciones…, marcados} (includes/acrineo/calculo.php)
 //   GET  ?id=P&recurso=filtrar&q=                partidas con conceptos que coinciden (filtro de todo el presupuesto)
@@ -49,6 +50,9 @@ try {
                 responder(['ok' => true] + acrineoInsumosBuscar((string) ($_GET['q'] ?? ''), (int) ($_GET['pagina'] ?? 1)));
             case 'insumos_tabla':
                 responder(['ok' => true] + acrineoInsumosTabla((string) ($_GET['q'] ?? ''), (int) ($_GET['pagina'] ?? 1), (int) ($_GET['por_pagina'] ?? 100), acrineoModoBusqueda()));
+            case 'explosion_acoplada':
+                $ver = in_array($_GET['ver'] ?? '', ['todos', 'conceptos', 'insumos'], true) ? $_GET['ver'] : 'todos';
+                responder(['ok' => true] + acrineoExplosionAcoplada($ctx, (string) ($_GET['q'] ?? ''), acrineoModoBusqueda(), $ver));
             case 'explosion':
                 responder(['ok' => true] + acrineoExplosionConcepto($ctx, (int) ($_GET['concepto'] ?? 0)));
             case 'calculo':

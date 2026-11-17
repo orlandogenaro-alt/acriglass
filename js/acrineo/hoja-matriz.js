@@ -33,7 +33,10 @@
 
     var st = { concepto: null, filas: [], guardadas: '[]', original: '', sec: 0, marcados: new Set(), guardando: false, abierta: false,
                editando: false, deshacer: [], rehacer: [], fotoPendiente: null, padre: null, ruta: [] };
-    var cat = { items: [], total: 0, pagina: 1, marcados: new Map(), cargado: false, ctrl: null };
+    var cat = { items: [], total: 0, pagina: 1, marcados: new Map(), cargado: false, ctrl: null, fuente: 'catalogo' };
+    try { if (localStorage.getItem('acrineo.matriz.fuente') === 'explosion') cat.fuente = 'explosion'; } catch (e) { /* sin memoria */ }
+    // Clave de un insumo del panel de abajo: del catálogo, su insumo_id; de la explosión, la que manda el servidor
+    function claveIns(i) { return i.clave || String(i.insumo_id); }
 
     function nueva(datos) {
         var f = { clave: 'm' + (++st.sec), insumo_id: null, tipo: 'MAT', codigo: '', descripcion: '', unidad: '', base: '', cantidad: '1', desperdicio_pct: '0', costo: '0' };
@@ -352,6 +355,7 @@
             cargar(r.matriz);
             H.aplicar(r);
             estado('Guardado correctamente', 'ok');
+            if (cat.fuente === 'explosion' && cat.cargado) cargarCatalogo(false);   // la explosión cambió
             var ruta = [r.matriz.concepto.codigo].concat((r.matriz.ruta || []).map(function (x) { return x.codigo || x.descripcion; })).join(' -> ');
             AN.ui.aviso('Matriz de ' + ruta + ' guardada: ' + (r.matriz.padre_id ? 'total ' : 'costo directo ') + AN.ui.dinero(r.matriz.total) + '.', 'ok');
             return true;
@@ -391,7 +395,14 @@
         var pagina = mas ? cat.pagina + 1 : 1;
         if (!mas) cuerpoCat.innerHTML = '<tr class="an-vacio"><td colspan="11">Cargando…</td></tr>';
         try {
-            var r = await AN.api.get(H.url({ recurso: 'insumos_tabla', q: $('anInsumosQ').value.trim(), modo: AN.ui.modo($('anInsumosQ')), pagina: pagina, por_pagina: 100 }), { signal: cat.ctrl.signal });
+            var r;
+            if (cat.fuente === 'explosion') {
+                var x = await AN.api.get(H.url({ recurso: 'explosion_acoplada', ver: 'insumos', q: $('anInsumosQ').value.trim(), modo: AN.ui.modo($('anInsumosQ')) }), { signal: cat.ctrl.signal });
+                r = { pagina: 1, total: x.insumos.length, items: x.insumos };
+                mas = false;
+            } else {
+                r = await AN.api.get(H.url({ recurso: 'insumos_tabla', q: $('anInsumosQ').value.trim(), modo: AN.ui.modo($('anInsumosQ')), pagina: pagina, por_pagina: 100 }), { signal: cat.ctrl.signal });
+            }
             cat.cargado = true;
             cat.pagina = r.pagina;
             cat.total = r.total;
@@ -406,26 +417,31 @@
 
     function pintarCatalogo() {
         var puede = H.puede;
+        var exp = cat.fuente === 'explosion';
+        document.querySelectorAll('.an-insumos-tabla [data-cat]').forEach(function (s) { s.textContent = exp ? s.dataset.exp : s.dataset.cat; });
         cuerpoCat.innerHTML = cat.items.map(function (i) {
-            var m = cat.marcados.has(i.insumo_id);
-            return '<tr class="an-fila' + (m ? ' marcado' : '') + '" data-insumo="' + i.insumo_id + '">'
-                + '<td class="an-col-sel">' + (puede ? '<input type="checkbox" data-marcar-ins' + (m ? ' checked' : '') + ' aria-label="Marcar ' + esc(i.codigo) + '">' : '') + '</td>'
+            var k = claveIns(i), m = cat.marcados.has(k), copiable = puede && !i.pct;
+            return '<tr class="an-fila' + (m ? ' marcado' : '') + '" data-insumo="' + esc(k) + '">'
+                + '<td class="an-col-sel">' + (copiable ? '<input type="checkbox" data-marcar-ins' + (m ? ' checked' : '') + ' aria-label="Marcar ' + esc(i.codigo) + '">' : '') + '</td>'
                 + '<td class="an-cat-codigo">' + esc(i.codigo) + '</td>'
-                + '<td class="num">' + (puede ? '<input class="an-catalogo-cant" type="number" min="0" step="any" inputmode="decimal" data-cant value="' + esc(m ? cat.marcados.get(i.insumo_id).cantidad : '') + '" placeholder="1" aria-label="Cantidad a copiar de ' + esc(i.codigo) + '">' : '') + '</td>'
+                + '<td class="num">' + (copiable ? '<input class="an-catalogo-cant" type="number" min="0" step="any" inputmode="decimal" data-cant value="' + esc(m ? cat.marcados.get(k).cantidad : '') + '" placeholder="1" aria-label="Cantidad a copiar de ' + esc(i.codigo) + '">' : '') + '</td>'
                 + '<td class="an-desc">' + esc(i.descripcion) + '</td><td>' + esc(i.unidad) + '</td>'
                 + '<td>' + tipoCelda(i.tipo) + '</td>'
-                + '<td class="num">' + (i.costo === null ? '<span class="an-ayuda">sin precio</span>' : AN.ui.dinero(i.costo)) + '</td>'
-                + '<td>' + esc(i.familia || '') + '</td><td>' + esc(i.proveedor || '') + '</td>'
-                + '<td>' + esc(AN.ui.fechaCorta(i.fecha)) + (i.moneda && i.moneda !== 'MXN' ? ' <small class="an-ayuda">' + esc(i.moneda) + '</small>' : '') + '</td>'
-                + '<td>' + esc(i.clave_microsip || '') + '</td></tr>';
-        }).join('') || '<tr class="an-vacio"><td colspan="11">' + ($('anInsumosQ').value.trim() ? 'Ningún insumo coincide con el filtro.' : 'El catálogo de insumos está vacío.') + '</td></tr>';
+                + '<td class="num">' + (i.pct ? '—' : i.costo === null ? '<span class="an-ayuda">sin precio</span>' : AN.ui.dinero(i.costo)) + '</td>'
+                + (exp
+                    ? '<td class="num">' + i.n + '</td><td class="num">' + (i.pct ? '—' : cantidadTexto(i.cantidad)) + '</td><td class="num">' + AN.ui.dinero(i.importe) + '</td><td class="num">' + i.matrices + '</td></tr>'
+                    : '<td>' + esc(i.familia || '') + '</td><td>' + esc(i.proveedor || '') + '</td>'
+                      + '<td>' + esc(AN.ui.fechaCorta(i.fecha)) + (i.moneda && i.moneda !== 'MXN' ? ' <small class="an-ayuda">' + esc(i.moneda) + '</small>' : '') + '</td>'
+                      + '<td>' + esc(i.clave_microsip || '') + '</td></tr>');
+        }).join('') || '<tr class="an-vacio"><td colspan="11">' + ($('anInsumosQ').value.trim() ? 'Ningún insumo coincide con el filtro.'
+            : exp ? 'Las matrices de este presupuesto todavía no tienen insumos: tómalos del «Catálogo de insumos».' : 'El catálogo de insumos está vacío.') + '</td></tr>';
         $('anInsumosConteo').textContent = cat.total ? (cat.items.length < cat.total ? cat.items.length + ' de ' : '') + cat.total + ' insumo(s)' : '';
         $('anInsumosPie').hidden = cat.items.length >= cat.total;
         botones();
     }
 
     function marcarInsumo(id, si, cantidad) {
-        var item = cat.items.find(function (i) { return i.insumo_id === id; });
+        var item = cat.items.find(function (i) { return claveIns(i) === id; });
         if (si && item) cat.marcados.set(id, { item: item, cantidad: cantidad == null ? (cat.marcados.has(id) ? cat.marcados.get(id).cantidad : '') : cantidad });
         else cat.marcados.delete(id);
         var tr = cuerpoCat.querySelector('tr[data-insumo="' + id + '"]');
@@ -522,17 +538,33 @@
 
     // ---------- Eventos del catálogo ----------
     $('anInsumosQ').addEventListener('input', cargarCatalogoPronto);
+    // Origen de los insumos de abajo: «Explosión del presupuesto» o «Catálogo de insumos» (se recuerda)
+    function pintarFuente() {
+        document.querySelectorAll('.an-matriz-catalogo [data-fuente]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.fuente === cat.fuente)); });
+        $('anInsumosQ').placeholder = cat.fuente === 'explosion' ? 'Filtrar los insumos del presupuesto por código, descripción, unidad…' : 'Filtrar por código, descripción, unidad, familia…';
+    }
+    pintarFuente();
+    document.querySelectorAll('.an-matriz-catalogo [data-fuente]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            if (cat.fuente === b.dataset.fuente) return;
+            cat.fuente = b.dataset.fuente;
+            cat.marcados.clear();
+            try { localStorage.setItem('acrineo.matriz.fuente', cat.fuente); } catch (e) { /* sin memoria */ }
+            pintarFuente();
+            cargarCatalogo(false);
+        });
+    });
     $('anInsumosQ').addEventListener('modo', cargarCatalogoPronto);
     $('anInsumosMas').addEventListener('click', function () { cargarCatalogo(true); });
     cuerpoCat.addEventListener('change', function (e) {
         var tr = e.target.closest('tr[data-insumo]');
-        if (tr && e.target.matches('[data-marcar-ins]')) marcarInsumo(+tr.dataset.insumo, e.target.checked);
+        if (tr && e.target.matches('[data-marcar-ins]')) marcarInsumo(tr.dataset.insumo, e.target.checked);
     });
     cuerpoCat.addEventListener('input', function (e) {
         var tr = e.target.closest('tr[data-insumo]');
         if (!tr || !e.target.matches('[data-cant]')) return;
         var v = e.target.value.trim();
-        marcarInsumo(+tr.dataset.insumo, v !== '' && Number(v) > 0, v);
+        marcarInsumo(tr.dataset.insumo, v !== '' && Number(v) > 0, v);
     });
     cuerpoCat.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' && e.target.matches('[data-cant]')) { e.preventDefault(); copiar(); }
@@ -542,7 +574,8 @@
         if (!H.puede || !st.concepto || e.target.closest('input, button, a')) return;
         var tr = e.target.closest('tr[data-insumo]');
         if (!tr) return;
-        var id = +tr.dataset.insumo;
+        var id = tr.dataset.insumo;
+        if (!tr.querySelector('[data-cant]')) return;   // un % no se copia
         if (!cat.marcados.has(id)) marcarInsumo(id, true, tr.querySelector('[data-cant]').value.trim());
         copiar();
     });

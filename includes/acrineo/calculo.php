@@ -207,6 +207,75 @@ function acrineoCalculoEjecutar(array $ctx, array $in, string $usuario): array
     return $r;
 }
 
+// Explosión de insumos acoplada (panel de abajo de la hoja y de la matriz), como en Neodata: todos los insumos de las
+// matrices del presupuesto (y de sus submatrices), cada uno con su N (niveles de análisis que tiene debajo), la cantidad
+// que lleva todo el presupuesto (Cant. exp. ins.) y su importe; y los conceptos del presupuesto.
+//   $ver: 'todos' | 'conceptos' | 'insumos'
+function acrineoExplosionAcoplada(array $ctx, string $q, string $modo = 'contiene', string $ver = 'todos'): array
+{
+    $conceptos = [];
+    if ($ver !== 'insumos') {
+        $conceptos = acrineoConceptosCatalogo($ctx, $q, 1, 500, $modo)['items'];
+    }
+    $insumos = [];
+    if ($ver !== 'conceptos') {
+        $matrices = acrineoCalculoMatrices($ctx);
+        $cant = [];
+        foreach (bd_filas('AW', 'select r.concepto_id, sum(r.cantidad) as c from acrineo_partida_conceptos r join acrineo_partidas p on p.partida_id = r.partida_id
+                                  where p.presupuesto_id = ? group by r.concepto_id', [$ctx['id']]) as $r) $cant[(int) $r['concepto_id']] = (float) $r['c'];
+        $mapa = [];
+        // Profundidad de análisis debajo de un renglón (0 = insumo simple)
+        $nivel = function (array $niveles, int $id) use (&$nivel): int {
+            if (!isset($niveles[$id])) return 0;
+            $max = 0;
+            foreach ($niveles[$id] as $f) $max = max($max, $nivel($niveles, $f['matriz_id']));
+            return 1 + $max;
+        };
+        $recorrer = function (array $niveles, int $padre, float $factor, int $cid) use (&$recorrer, &$mapa, $nivel, $ctx) {
+            foreach (acrineoCalcularMatriz($niveles[$padre] ?? [], $ctx['dec_costos'])['filas'] as $f) {
+                $k = $f['insumo_id'] ? 'i' . $f['insumo_id'] : 'l' . mb_strtoupper(trim((string) $f['codigo']) . '|' . trim($f['descripcion']) . '|' . trim((string) $f['unidad']) . '|' . $f['tipo']);
+                if (!isset($mapa[$k])) {
+                    $mapa[$k] = ['clave' => $k, 'clase' => 'insumo', 'insumo_id' => $f['insumo_id'], 'codigo' => $f['codigo'], 'descripcion' => $f['descripcion'],
+                                 'unidad' => $f['base'] ? '%' : $f['unidad'], 'tipo' => $f['tipo'], 'costo' => (float) $f['costo'], 'cantidad' => 0.0, 'importe' => 0.0,
+                                 'n' => 0, 'pct' => (bool) $f['base'], 'matrices' => []];
+                }
+                $m = &$mapa[$k];
+                $m['n'] = max($m['n'], $nivel($niveles, $f['matriz_id']));
+                $m['matrices'][$cid] = true;
+                if ($f['base']) {
+                    $m['importe'] += $f['importe'] * $factor;
+                } else {
+                    $q = (float) $f['cantidad_efectiva'] * $factor;
+                    $m['cantidad'] += $q;
+                    $m['importe'] += $q * (float) $f['costo'];
+                    if (!$m['n']) $m['costo'] = (float) $f['costo'];
+                }
+                unset($m);
+                if (isset($niveles[$f['matriz_id']])) $recorrer($niveles, $f['matriz_id'], $f['base'] ? 0.0 : (float) $f['cantidad_efectiva'] * $factor, $cid);
+            }
+        };
+        foreach ($matrices as $cid => $niveles) if (isset($niveles[0])) $recorrer($niveles, 0, $cant[$cid] ?? 0.0, $cid);
+        $dq = acrineoCalculoOpciones($ctx)['decimales_explosion'];
+        foreach ($mapa as $m) {
+            if (trim($q) !== '') {
+                $t = mb_strtolower(trim($q));
+                $ok = false;
+                foreach ([$m['codigo'], $m['descripcion'], $m['unidad']] as $v) {
+                    $p = mb_stripos((string) $v, $t);
+                    if ($p !== false && ($modo !== 'comienza' || $p === 0)) { $ok = true; break; }
+                }
+                if (!$ok) continue;
+            }
+            $m['cantidad'] = round($m['cantidad'], $dq);
+            $m['importe'] = round($m['importe'], $ctx['dec_costos']);
+            $m['matrices'] = count($m['matrices']);
+            $insumos[] = $m;
+        }
+        usort($insumos, fn($a, $b) => [(string) $a['codigo'], $a['descripcion']] <=> [(string) $b['codigo'], $b['descripcion']]);
+    }
+    return ['conceptos' => $conceptos, 'insumos' => $insumos];
+}
+
 // Explosión de insumos de un solo concepto (menú de los conceptos), con las opciones guardadas del Cálculo y su
 // cantidad en todo el presupuesto. No recalcula ni guarda nada.
 function acrineoExplosionConcepto(array $ctx, int $conceptoId): array

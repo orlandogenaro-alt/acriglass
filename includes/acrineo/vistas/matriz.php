@@ -89,8 +89,12 @@ $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2
     </section>
 
     <!-- Catálogo de insumos del sistema -->
-    <section class="an-ventana an-matriz-catalogo" aria-label="Catálogo de insumos">
+    <section class="an-ventana an-matriz-catalogo" aria-label="Insumos para la matriz">
         <div class="an-barra an-barra-chica">
+            <span class="an-segmento" role="group" aria-label="De dónde se toman los insumos">
+                <button type="button" data-fuente="explosion" aria-pressed="false" title="Los insumos que ya usan las matrices de este presupuesto (explosión de insumos acoplada)">Explosión del presupuesto</button>
+                <button type="button" data-fuente="catalogo" aria-pressed="true" title="El catálogo de insumos del sistema, con su precio vigente (el «maestro»)">Catálogo de insumos</button>
+            </span>
             <label class="an-buscar an-buscar-azul">
                 <button type="button" class="an-buscar-ico an-buscar-modo" data-modo="contiene"></button>
                 <input type="search" id="anInsumosQ" placeholder="Filtrar por código, descripción, unidad, familia…" aria-label="Filtrar el catálogo de insumos">
@@ -111,10 +115,10 @@ $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2
                     <th scope="col"><div class="an-th"><span>Unidad</span></div></th>
                     <th scope="col"><div class="an-th"><span>Tipo</span></div></th>
                     <th scope="col" class="num"><div class="an-th"><span>Costo</span></div></th>
-                    <th scope="col"><div class="an-th"><span>Familia</span></div></th>
-                    <th scope="col"><div class="an-th"><span>Proveedor</span></div></th>
-                    <th scope="col"><div class="an-th"><span>Fecha precio</span></div></th>
-                    <th scope="col"><div class="an-th"><span>Clave Microsip</span></div></th>
+                    <th scope="col"><div class="an-th"><span data-cat="Familia" data-exp="N">Familia</span></div></th>
+                    <th scope="col"><div class="an-th"><span data-cat="Proveedor" data-exp="Cant. exp. ins.">Proveedor</span></div></th>
+                    <th scope="col"><div class="an-th"><span data-cat="Fecha precio" data-exp="Importe">Fecha precio</span></div></th>
+                    <th scope="col"><div class="an-th"><span data-cat="Clave Microsip" data-exp="En matrices">Clave Microsip</span></div></th>
                 </tr></thead>
                 <tbody id="anInsumosFilas"></tbody>
             </table>

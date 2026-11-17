@@ -12,18 +12,33 @@
     var BORRAR = '<svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
 
     var DOC = '<svg class="i" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>';
-    var st = { items: [], total: 0, marcados: new Map(), ctrl: null };   // marcados: concepto_id → cantidad
+    var st = { items: [], insumos: [], total: 0, marcados: new Map(), ctrl: null };   // marcados: concepto_id → cantidad
+    var COLS = 14;
+    // Tipo de insumo con número, como en Neodata (por dentro siguen MAT, MO…)
+    var NUM_TIPO = { MAT: '1', MO: '2', EQ: '3', HER: '3', BAS: '4', OTR: '5' };
+    function cantidadExp(n) { return (Number(n) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 6 }); }
+    // «Ver»: Todos (conceptos e insumos de las matrices) / Conceptos del presupuesto / Solo explosión (insumos); se recuerda
+    try { var verGuardado = localStorage.getItem('acrineo.hoja.ver'); if (verGuardado) $('anConceptosVer').value = verGuardado; } catch (e) { /* sin memoria */ }
 
     async function cargar() {
         if (st.ctrl) st.ctrl.abort();
         st.ctrl = new AbortController();
+        var ver = $('anConceptosVer').value;
         try {
-            var r = await AN.api.get(H.url({ recurso: 'conceptos', q: $('anConceptosQ').value.trim(), modo: AN.ui.modo($('anConceptosQ')), por_pagina: 300 }), { signal: st.ctrl.signal });
-            st.items = r.items;
-            st.total = r.total;
+            if (ver === 'conceptos') {
+                var r = await AN.api.get(H.url({ recurso: 'conceptos', q: $('anConceptosQ').value.trim(), modo: AN.ui.modo($('anConceptosQ')), por_pagina: 300 }), { signal: st.ctrl.signal });
+                st.items = r.items;
+                st.total = r.total;
+                st.insumos = [];
+            } else {
+                var x = await AN.api.get(H.url({ recurso: 'explosion_acoplada', ver: ver, q: $('anConceptosQ').value.trim(), modo: AN.ui.modo($('anConceptosQ')) }), { signal: st.ctrl.signal });
+                st.items = x.conceptos;
+                st.total = x.conceptos.length;
+                st.insumos = x.insumos;
+            }
             pintar();
         } catch (e) {
-            if (e.name !== 'AbortError') tbody.innerHTML = '<tr class="an-vacio"><td colspan="11">' + esc(e.message) + '</td></tr>';
+            if (e.name !== 'AbortError') tbody.innerHTML = '<tr class="an-vacio"><td colspan="' + COLS + '">' + esc(e.message) + '</td></tr>';
         }
     }
     var cargarPronto = AN.ui.retrasar(cargar, 250);
@@ -40,11 +55,24 @@
                 + '<td class="num">' + AN.ui.dinero(c.precio) + (c.precio_alzado ? '<span class="an-insignia" title="Precio fijo">Fijo</span>' : '') + (c.pendiente_analizar ? '<span class="an-insignia an-insignia-pa" title="Pendiente de analizar">P.A.</span>' : '') + '</td>'
                 + '<td class="num" title="Cantidad total en el presupuesto: ' + c.cantidad_total + '">' + c.usos + '</td>'
                 + '<td class="num">' + esc(c.tipo) + '</td>'
+                + '<td class="num">' + (c.matriz ? 1 : 0) + '</td>'
+                + '<td class="num">' + cantidadExp(c.cantidad_total) + '</td>'
+                + '<td class="num">' + AN.ui.dinero(H.redondear(c.costo * c.cantidad_total, H.ctx.dec_costos)) + '</td>'
                 + '<td>' + (/^https?:\/\/\S+$/i.test(c.url || '') ? '<a class="an-btn-url" href="' + esc(c.url) + '" target="_blank" rel="noopener noreferrer" title="' + esc(c.url) + '" aria-label="Abrir el enlace de ' + esc(c.codigo) + '">' + DOC + '</a>' : '') + '</td>'
                 + '<td><span class="an-acciones"><button type="button" class="an-btn-pu' + (c.matriz ? '' : ' vacia') + '" data-pu="' + c.id + '" title="Matriz de precio unitario">' + (c.matriz ? 'P.U.' : '+ P.U.') + '</button>'
                 + (H.puede && !c.usos ? '<button type="button" class="an-borrar" data-borrar="' + c.id + '" title="Quitar del catálogo" aria-label="Quitar ' + esc(c.codigo) + ' del catálogo">' + BORRAR + '</button>' : '') + '</span></td></tr>';
-        }).join('') || '<tr class="an-vacio"><td colspan="11">' + ($('anConceptosQ').value.trim() ? 'Ningún concepto coincide con el filtro.' : 'La cuadrícula no tiene datos: los conceptos que guardes en las partidas aparecen aquí.') + '</td></tr>';
-        $('anConceptosConteo').textContent = st.total + ' concepto' + (st.total === 1 ? '' : 's') + (st.marcados.size ? ' · ' + st.marcados.size + ' marcado' + (st.marcados.size === 1 ? '' : 's') : '');
+        }).join('') + st.insumos.map(function (i) {
+            // Insumo de las matrices del presupuesto (explosión): solo se consulta aquí; a una matriz se manda desde la matriz
+            return '<tr class="an-fila an-fila-ins" data-ins="' + esc(i.clave) + '" title="Insumo de ' + i.matrices + ' matriz(ces) del presupuesto">'
+                + '<td class="an-col-sel"></td><td>' + esc(i.codigo || '') + '</td><td></td>'
+                + '<td class="an-desc" title="' + esc(i.descripcion) + '">' + esc(i.descripcion) + '</td><td>' + esc(i.unidad || '') + '</td>'
+                + '<td class="num">' + (i.pct ? '—' : AN.ui.dinero(i.costo)) + '</td><td class="num">—</td><td class="num">—</td>'
+                + '<td class="num" title="' + esc(i.tipo) + '">' + esc(NUM_TIPO[i.tipo] || i.tipo) + '</td>'
+                + '<td class="num">' + i.n + '</td>'
+                + '<td class="num">' + (i.pct ? '—' : cantidadExp(i.cantidad)) + '</td>'
+                + '<td class="num">' + AN.ui.dinero(i.importe) + '</td><td></td><td></td></tr>';
+        }).join('') || '<tr class="an-vacio"><td colspan="' + COLS + '">' + ($('anConceptosQ').value.trim() ? 'Nada coincide con el filtro.' : 'La cuadrícula no tiene datos: los conceptos que guardes en las partidas (y los insumos de sus matrices) aparecen aquí.') + '</td></tr>';
+        pintarConteo();
         botones();
     }
 
@@ -88,6 +116,10 @@
         else botones();
     });
     $('anConceptosQ').addEventListener('input', cargarPronto);
+    $('anConceptosVer').addEventListener('change', function () {
+        try { localStorage.setItem('acrineo.hoja.ver', this.value); } catch (e) { /* sin memoria */ }
+        cargar();
+    });
     $('anConceptosQ').addEventListener('modo', cargar);
     tbody.addEventListener('change', function (e) {
         var id = +(e.target.dataset.marcar || 0);
@@ -115,7 +147,10 @@
         if (pu && AN.hojaMatriz) AN.hojaMatriz.abrir(+pu.dataset.pu);
     });
     function pintarConteo() {
-        $('anConceptosConteo').textContent = st.total + ' concepto' + (st.total === 1 ? '' : 's') + (st.marcados.size ? ' · ' + st.marcados.size + ' marcado' + (st.marcados.size === 1 ? '' : 's') : '');
+        var ver = $('anConceptosVer').value;
+        $('anConceptosConteo').textContent = (ver !== 'insumos' ? st.total + ' concepto' + (st.total === 1 ? '' : 's') : '')
+            + (ver !== 'conceptos' ? (ver === 'todos' ? ' · ' : '') + st.insumos.length + ' insumo' + (st.insumos.length === 1 ? '' : 's') : '')
+            + (st.marcados.size ? ' · ' + st.marcados.size + ' marcado' + (st.marcados.size === 1 ? '' : 's') : '');
         botones();
     }
     if ($('anCopiar')) $('anCopiar').addEventListener('click', copiar);

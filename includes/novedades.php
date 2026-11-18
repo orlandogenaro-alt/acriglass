@@ -6,6 +6,7 @@ return [
     [
         'fecha' => '2026-11-18',
         'cambios' => [
+            ['nuevo', 'ACRINEO: Importar mis presupuestos de Neodata', 'En el Panel de usuario (⚙ Importar mis presupuestos) y en el Catálogo de presupuestos («Importar de Neodata») cada usuario elige la carpeta de archivos de intercambio de su Neodata (C:\\NEODATAWinPlus\\Archivos Intercambio) o sube los .zip. Sale una obra por renglón con su respaldo más reciente y si ya está en ACRINEO; al importarla se crea un presupuesto a nombre de ese usuario con sus partidas (árbol por WBS), conceptos y cantidades, matrices con básicos y cuadrillas (submatrices), % de herramienta y equipo de seguridad, costos de los insumos, IVA, decimales y % de sobrecosto. El costo directo queda igual al de Neodata. La carpeta se recuerda en ese navegador; nada se borra de Neodata.'],
             ['mejora', 'ACRINEO: Alt+N agrega renglones', 'En los conceptos de la partida y en la matriz, Alt+N agrega un renglón nuevo (entra al modo edición si hace falta) y deja el cursor en él; se puede presionar varias veces para ir agregando renglones uno tras otro, también cuando la cuadrícula está vacía.'],
         ],
     ],

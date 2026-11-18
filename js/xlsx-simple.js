@@ -132,7 +132,30 @@ window.XlsxSimple = (function () {
     // elegir (opcional): function (filas, nombreHoja) → true para la hoja que se quiere. Se prueban en el orden del
     // libro; si ninguna cumple (o no se pasa), se devuelve la primera hoja.
     function leer(archivo, elegir) {
-        return archivo.arrayBuffer().then(function (buf) {
+        return archivo.arrayBuffer().then(function (buf) { return libroDe(buf, elegir); });
+    }
+    // Todas las hojas del libro: { nombreHoja: [[texto…]] }
+    function hojas(datos) {
+        var buf = datos instanceof ArrayBuffer ? datos : datos.buffer.slice(datos.byteOffset, datos.byteOffset + datos.byteLength);
+        var todas = {};
+        return Promise.resolve().then(function () {
+            return libroDe(buf, function (filas, nombre) { todas[nombre] = filas; return false; });
+        }).then(function () { return todas; });
+    }
+    // Un .zip cualquiera: { nombres: [...], leer(nombre) → Promise de Uint8Array (null si no está) }
+    function abrirZip(buf) {
+        var lista = archivosZip(buf);
+        return {
+            nombres: Object.keys(lista),
+            leer: function (nombre) {
+                var a = lista[nombre];
+                if (!a) return Promise.resolve(null);
+                return a.metodo === 8 ? inflar(a.datos) : Promise.resolve(a.datos);
+            }
+        };
+    }
+    function libroDe(buf, elegir) {
+        {
             var lista = archivosZip(buf);
             return Promise.all([texto(lista, 'xl/workbook.xml'), texto(lista, 'xl/_rels/workbook.xml.rels'), texto(lista, 'xl/sharedStrings.xml')]).then(function (t) {
                 var dp = new DOMParser();
@@ -177,7 +200,7 @@ window.XlsxSimple = (function () {
                     return filas;
                 }); }
             });
-        });
+        }
     }
 
     // Filas → texto con tabuladores y comillas (como lo que se copia de Excel), para las ventanas de importar
@@ -195,5 +218,5 @@ window.XlsxSimple = (function () {
         setTimeout(function () { URL.revokeObjectURL(enlace.href); }, 60000);   // la descarga puede tardar en tomar el archivo
     }
 
-    return { crear: crear, leer: leer, aTexto: aTexto, descargar: descargar };
+    return { crear: crear, leer: leer, hojas: hojas, abrirZip: abrirZip, aTexto: aTexto, descargar: descargar };
 })();

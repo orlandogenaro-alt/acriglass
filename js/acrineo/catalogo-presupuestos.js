@@ -457,7 +457,12 @@
         } catch (e) { /* el filtro de ciudad queda vacío; el resto funciona */ }
     })();
 
+    // «Importar de Neodata» (js/acrineo/importar-neodata.js; se carga después de este archivo)
+    if ($('anImportarNeodata')) $('anImportarNeodata').addEventListener('click', function () { if (AN.importarNeodata) AN.importarNeodata.abrir(); });
+    AN.catalogo = { recargar: function () { return cargar(); } };
+
     cargar().then(function () {
         if (cfg.abrir) abrirDetalle(cfg.abrir);
+        else if (cfg.importar && AN.importarNeodata) AN.importarNeodata.abrir();
     });
 })(window.AcriNeo = window.AcriNeo || {});

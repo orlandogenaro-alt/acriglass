@@ -54,6 +54,22 @@ try {
         exit;
     }
 
+    // ----- Importar de Neodata (archivo de intercambio leído en el navegador) -----
+    //   POST ?recurso=neodata  {accion: 'existen', nombres: [...]}  → los que ya tiene el usuario
+    //   POST ?recurso=neodata  {nombre, descripcion, generales, catalogo, partidas, conceptos, matrices, …} → crea el presupuesto
+    if ($recurso === 'neodata' && !$id) {
+        if ($metodo !== 'POST') error('Método no permitido.', 405);
+        necesita($puede, 'presupuestos.crear');
+        require_once __DIR__ . '/../../includes/acrineo/neodata.php';
+        $in = entrada();
+        if (($in['accion'] ?? '') === 'existen') {
+            responder(['ok' => true, 'existen' => (object) acrineoNeodataExistentes(is_array($in['nombres'] ?? null) ? $in['nombres'] : [], $usuario)]);
+        }
+        @set_time_limit(120);
+        $r = acrineoImportarNeodata($in, $usuario);
+        responder(['ok' => true, 'importado' => $r, 'mensaje' => "Presupuesto {$r['codigo']} importado de Neodata."], 201);
+    }
+
     // ----- Catálogo / alta / eliminar varios -----
     if (!$id) {
         if ($recurso !== '') error('Falta el presupuesto.', 400);

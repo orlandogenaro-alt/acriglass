@@ -872,3 +872,21 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-rp-opcion:hover { background: var(--fila-hover); }
 .an-rp-opcion input { margin-top: 3px; }
 .an-rp-opcion span { display: flex; flex-direction: column; gap: 2px; }
+
+/* ---------- Importar de Neodata (includes/acrineo/vistas/neodata.php) ---------- */
+.an-neodata-dlg { width: min(1000px, 96vw); max-height: 92vh; }
+.an-neodata-dlg .an-titulo-barra > svg.i { width: 18px; height: 18px; }
+.an-neodata-dlg code { font-size: 11.5px; padding: 0 4px; border-radius: 3px; background: var(--sub); }
+.an-neo-filtro { height: 30px; padding: 0 10px; border: 1px solid var(--borde-2); border-radius: 6px; font: inherit; font-size: 12.5px; min-width: 200px; background: var(--fondo, #fff); color: inherit; }
+.an-neo-lista { max-height: 52vh; border: 1px solid var(--borde); border-radius: 6px; }
+.an-neo-lista td { vertical-align: middle; }
+.an-neo-sel { width: 34px; text-align: center; }
+.an-neo-sel input { width: 16px; height: 16px; accent-color: var(--azul); }
+.an-neo-archivo { display: block; font-size: 11px; }
+.an-neo-est { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 700; background: var(--sub); }
+.an-neo-est.ok { color: var(--verde); }
+.an-neo-est.ya { color: var(--ambar); background: var(--ambar-suave); }
+.an-neo-est.error { color: var(--rojo); background: var(--rojo-suave); max-width: 320px; white-space: normal; font-weight: 600; }
+.an-neo-est.trabajando { color: var(--azul); }
+.an-neo-soltar { outline: 2px dashed var(--azul); outline-offset: -6px; }
+.an-neo-lista th.num, .an-neo-lista td.num { padding-right: 16px; }

@@ -24,6 +24,7 @@ $cfgCliente = [
     'permisos' => $puede,
     'esquema'  => acrineoEsquemaCliente(),
     'abrir'    => max(0, (int) ($_GET['id'] ?? 0)),
+    'importar' => ($_GET['importar'] ?? '') === 'neodata',
     'docMaxMb' => ACRINEO_DOC_MAX / 1024 / 1024,
     'docExt'   => array_keys(ACRINEO_DOC_EXTENSIONES),
 ];
@@ -77,6 +78,7 @@ $cfgCliente = [
             <span class="an-flex"></span>
             <?php if ($puede['presupuestos.crear']): ?>
             <button type="button" class="an-btn an-primario" id="anNuevo"><?= anIcono('nuevo') ?>Nuevo</button>
+            <button type="button" class="an-btn" id="anImportarNeodata" title="Trae tus obras de Neodata PU Win+ desde sus archivos de intercambio"><?= anIcono('subir') ?>Importar de Neodata</button>
             <?php endif; ?>
             <?php if ($puede['presupuestos.compartir']): ?>
             <button type="button" class="an-btn" id="anCompartir" disabled title="Selecciona un presupuesto"><?= anIcono('compartir') ?>Compartir</button>
@@ -122,6 +124,7 @@ $cfgCliente = [
 <?php if ($aviso === ''): ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/detalle.php'; ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/dialogos.php'; ?>
+<?php if ($puede['presupuestos.crear']) require __DIR__ . '/includes/acrineo/vistas/neodata.php'; ?>
 <script>
     window.ACRINEO = <?= json_encode($cfgCliente, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_PRESERVE_ZERO_FRACTION) ?>;
 </script>
@@ -132,6 +135,7 @@ $cfgCliente = [
 <script src="<?= recurso('js/acrineo/documentos.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/detalle-presupuesto.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/catalogo-presupuestos.js') ?>"></script>
+<?php if ($puede['presupuestos.crear']): ?><script src="<?= recurso('js/acrineo/importar-neodata.js') ?>"></script><?php endif; ?>
 <?php endif; ?>
 </body>
 </html>

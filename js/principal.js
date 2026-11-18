@@ -642,6 +642,13 @@
         w.acriAgregar();
     });
     $('btnEditarUsuario').addEventListener('click', pendiente);
+    // ⚙ Importar mis presupuestos de Neodata (abre el catálogo de ACRINEO con la ventana de importar)
+    if ($('btnImportarNeodata')) $('btnImportarNeodata').addEventListener('click', function () {
+        panelU.hidden = true;
+        var p = pestanas['pag-neodata'];
+        if (p) { activar('pag-neodata'); if (p.iframe) p.iframe.contentWindow.location.reload(); return; }
+        abrirPestana('pag-neodata', 'Importar de Neodata', { url: 'acrineo-presupuestos.php?importar=neodata', oscuro: true });
+    });
 
     // Cuenta regresiva de la sesión
     var fin = Date.now() + parseInt($('reloj').dataset.restante, 10) * 1000;

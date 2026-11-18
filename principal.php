@@ -235,6 +235,16 @@ function idItem(string $nombre): string
                 </div>
             </section>
 
+            <?php if (acrineoPuede('presupuestos.crear')): ?>
+            <section class="pu-caja">
+                <h3>⚙️ NEODATA</h3>
+                <div class="pu-etiqueta">Trae a ACRINEO las obras de tu Neodata (C:\NEODATAWinPlus)</div>
+                <div class="pu-botones">
+                    <button class="btn-borde" id="btnImportarNeodata" title="Lee la carpeta de archivos de intercambio de Neodata de esta computadora">⚙ Importar mis presupuestos</button>
+                </div>
+            </section>
+            <?php endif; ?>
+
             <section class="pu-caja">
                 <h3>🏢 EMPRESA</h3>
                 <div class="pu-empresa">

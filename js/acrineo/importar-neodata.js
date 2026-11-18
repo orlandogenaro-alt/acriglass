@@ -111,7 +111,13 @@
         if (o.estado === 'error') return '<span class="an-neo-est error" title="' + esc(o.mensaje) + '">' + esc(o.mensaje) + '</span>';
         if (o.importado) return '<span class="an-neo-est ok">Importada · <a href="acrineo-hoja.php?id=' + o.importado.id + '">' + esc(o.importado.codigo) + '</a></span>'
             + '<small class="an-ayuda"> ' + o.importado.conceptos + ' conceptos · ' + AN.ui.dinero(o.importado.precio_venta) + '</small>';
-        if (o.existe) return '<span class="an-neo-est ya">Ya está en ACRINEO · <a href="acrineo-hoja.php?id=' + o.existe.id + '">' + esc(o.existe.codigo) + '</a></span>';
+        if (o.existe) {
+            var c = comparar(o), e = o.existe;
+            return '<span class="an-neo-est ya">Ya está · <a href="acrineo-hoja.php?id=' + e.id + '">' + esc(e.codigo) + '</a></span>'
+                + (c ? ' <span class="an-neo-ver ' + c + '">' + (c === 'nueva' ? 'Esta es más reciente' : c === 'vieja' ? 'Esta es más vieja' : 'Misma versión') + '</span>' : '')
+                + '<small class="an-ayuda an-neo-archivo">' + (e.version ? 'Versión del ' + esc(fecha(new Date(e.version))) : 'Sin fecha de versión')
+                + ' · subió ' + esc(e.tuyo ? 'tú' : (e.propietario || '¿?')) + '</small>';
+        }
         return '<span class="an-neo-est">Nueva</span>';
     }
     function pintar() {
@@ -272,30 +278,57 @@
         };
     }
 
+    // Compara la versión del archivo con la que ya está en ACRINEO: 'nueva' | 'vieja' | 'igual' | ''
+    function comparar(o) {
+        if (!o.existe || !o.existe.version) return '';
+        var a = o.archivos[0].fecha.getTime(), b = new Date(o.existe.version).getTime();
+        if (!a || !b) return '';
+        return Math.abs(a - b) < 60000 ? 'igual' : (a > b ? 'nueva' : 'vieja');
+    }
+    var TXT_COMPARA = { nueva: 'MÁS RECIENTE que la que está en ACRINEO', vieja: 'MÁS VIEJA que la que está en ACRINEO', igual: 'LA MISMA versión que ya está en ACRINEO' };
+
     async function importar(lista) {
         if (ocupado || !lista.length) return;
-        var repetidas = lista.filter(function (o) { return o.existe || o.importado; });
-        if (repetidas.length && !(await AN.ui.confirmar({ titulo: 'Ya están en ACRINEO',
-            mensaje: repetidas.map(function (o) { return o.nombre; }).join(', ') + (repetidas.length === 1 ? ' ya está' : ' ya están') + ' en ACRINEO.\nSi sigues se crea otro presupuesto con lo del archivo más reciente.',
-            aceptar: 'Importar de todos modos' }))) return;
+        // Si la obra ya está (la haya subido quien sea), se pregunta por cada una con las fechas de las dos versiones
+        var subir = [];
+        for (var k = 0; k < lista.length; k++) {
+            var o = lista[k], e = o.existe;
+            if (!e) { subir.push(o); continue; }
+            var c = comparar(o);
+            var ok = await AN.ui.confirmar({
+                titulo: 'Ya existe ' + o.nombre + ' en ACRINEO',
+                mensaje: 'En ACRINEO ya está ' + o.nombre + ' (' + e.codigo + '), subida por ' + (e.tuyo ? 'ti' : (e.propietario || 'otro usuario'))
+                    + (e.subido ? ' el ' + fecha(new Date(e.subido)) : '') + (e.copias > 1 ? ' (hay ' + e.copias + ' copias)' : '') + ',\n'
+                    + (e.version ? 'con la versión de Neodata del ' + fecha(new Date(e.version)) : 'sin fecha de versión de Neodata') + '\n\n'
+                    + 'La versión que vas a subir es del ' + fecha(o.archivos[0].fecha) + (c ? ' → ' + TXT_COMPARA[c] : '') + '\n\n'
+                    + '¿Deseas subir esta versión? Se crea un presupuesto nuevo; el que ya está no se toca.',
+                aceptar: 'Subir esta versión',
+                peligro: c === 'vieja' || c === 'igual'
+            });
+            if (ok) subir.push(o);
+        }
+        if (!subir.length) return;
         ocupado = true;
         var bien = 0, mal = 0;
-        for (var i = 0; i < lista.length; i++) {
-            var o = lista[i];
+        for (var i = 0; i < subir.length; i++) {
+            o = subir[i];
             o.estado = 'importando';
-            estado('Importando ' + o.nombre + ' (' + (i + 1) + ' de ' + lista.length + ')…', 'info');
+            estado('Importando ' + o.nombre + ' (' + (i + 1) + ' de ' + subir.length + ')…', 'info');
             pintar();
             try {
                 var datos = await datosObra(o.archivos[0].file);
+                datos.obra = o.nombre;
+                datos.version_fecha = o.archivos[0].fecha.getTime() ? o.archivos[0].fecha.toISOString() : null;
                 var r = await AN.api.post(AN.api.url(AN.api.PRESUPUESTOS, { recurso: 'neodata' }), datos);
                 o.importado = r.importado;
-                o.existe = { id: r.importado.id, codigo: r.importado.codigo };
+                o.existe = { id: r.importado.id, codigo: r.importado.codigo, propietario: '', tuyo: true, version: datos.version_fecha, subido: new Date().toISOString(),
+                             copias: (o.existe ? o.existe.copias : 0) + 1 };
                 o.estado = 'ok';
                 marcadas.delete(o.nombre.toUpperCase());
                 bien++;
-            } catch (e) {
+            } catch (e2) {
                 o.estado = 'error';
-                o.mensaje = e.message || 'No se pudo importar.';
+                o.mensaje = e2.message || 'No se pudo importar.';
                 mal++;
             }
         }

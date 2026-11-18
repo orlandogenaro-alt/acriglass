@@ -87,13 +87,18 @@ foreach ($servidor in $servidores) {
                     from PuMatrices m join PuExpIns em on em.IdExpIns = m.IdCodigoMatriz join PuCatalogo cm on cm.IdCodigo = em.IdCodigo
                     join PuExpIns ei on ei.IdExpIns = m.IdCodigoInsumo join PuCatalogo ci on ci.IdCodigo = ei.IdCodigo
                     where em.IdPresupuesto = $id for json path"
+                # Fecha de la versión: la última vez que se tocó un costo de la obra en Neodata (o ahora, si no hay)
+                $mod = Valor $cn "select convert(varchar(19), max(k.Fecha), 126) from PuExpInsCostos k join PuExpIns e on e.IdExpIns = k.IdExpIns where e.IdPresupuesto = $id"
+                $fv = $ahora
+                if ($mod -ne '') { try { $fv = [datetime]::ParseExact($mod, 'yyyy-MM-ddTHH:mm:ss', [Globalization.CultureInfo]::InvariantCulture) } catch { $fv = $ahora } }
+                $selloObra = '{0}-{1}-{2}_Hr{3}Mn{4}' -f $fv.Day, $fv.Month, $fv.Year, $fv.Hour, $fv.Minute
                 $archivoNombre = Seguro $nombre
                 if ($archivoNombre -eq '') { $archivoNombre = "OBRA $id" }
                 if ($usados.ContainsKey($archivoNombre.ToUpper())) { $archivoNombre = Seguro "$nombre ($corto)" }
                 $usados[$archivoNombre.ToUpper()] = $true
-                $texto = '{"formato":"acrineo-neodata","version":1,"base":' + (ConvertTo-Json $corto) + ',"exportado":"' + $ahora.ToString('s') + '"' +
+                $texto = '{"formato":"acrineo-neodata","version":1,"base":' + (ConvertTo-Json $corto) + ',"exportado":"' + $ahora.ToString('s') + '","modificado":"' + $fv.ToString('s') + '"' +
                          ',"obra":' + $obra + ',"catalogo":' + $catalogo + ',"partidas":' + $partidas + ',"conceptos":' + $conceptos + ',"matrices":' + $matrices + '}'
-                [IO.File]::WriteAllText((Join-Path $destino ("{0}_{1}.neodata.json" -f $archivoNombre, $sello)), $texto, $utf8)
+                [IO.File]::WriteAllText((Join-Path $destino ("{0}_{1}.neodata.json" -f $archivoNombre, $selloObra)), $texto, $utf8)
                 $total++
             }
         } catch {

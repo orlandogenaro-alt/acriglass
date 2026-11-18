@@ -28,7 +28,7 @@ require_once __DIR__ . '/campos.php';
         </div>
         <div class="an-tabla-cont an-neo-lista">
             <table class="an-tabla" aria-label="Obras de Neodata">
-                <thead><tr><th class="an-neo-sel"><input type="checkbox" id="anNeoTodas" aria-label="Marcar todas"></th><th>Obra</th><th>Último respaldo</th><th class="num">Respaldos</th><th>Estado</th><th></th></tr></thead>
+                <thead><tr><th class="an-neo-sel"><input type="checkbox" id="anNeoTodas" aria-label="Marcar todas"></th><th>Obra</th><th>Versión de Neodata</th><th class="num">Respaldos</th><th>Estado</th><th></th></tr></thead>
                 <tbody id="anNeoFilas"><tr class="an-vacio"><td colspan="6">Elige la carpeta de Neodata o arrastra aquí los archivos .zip de intercambio.</td></tr></tbody>
             </table>
         </div>

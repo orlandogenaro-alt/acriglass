@@ -892,3 +892,7 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-neo-lista th.num, .an-neo-lista td.num { padding-right: 16px; }
 .an-neo-paso { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 12px; border: 1px solid var(--ambar-borde); background: var(--ambar-suave); border-radius: 6px; font-size: 12.5px; line-height: 1.5; }
 .an-neo-paso .an-btn { margin-left: auto; text-decoration: none; }
+.an-neo-ver { display: inline-block; margin-left: 4px; padding: 1px 7px; border-radius: 10px; font-size: 11.5px; font-weight: 700; }
+.an-neo-ver.nueva { color: var(--verde); background: var(--sub); }
+.an-neo-ver.vieja { color: var(--rojo); background: var(--rojo-suave); }
+.an-neo-ver.igual { color: var(--texto-2); background: var(--sub); }

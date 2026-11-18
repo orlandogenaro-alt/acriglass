@@ -32,16 +32,47 @@ function acrineoNeoFecha($v): ?string
     return preg_match('/^\d{4}-\d{2}-\d{2}$/', $t) && checkdate((int) substr($t, 5, 2), (int) substr($t, 8, 2), (int) substr($t, 0, 4)) ? $t : null;
 }
 
-// Nombres (en mayúsculas) de los presupuestos del usuario que ya existen: [NOMBRE => [id, codigo]]
+function acrineoNeodataOrigenDisponible(): bool
+{
+    static $si = null;
+    if ($si === null) $si = bd_tiene_columna('AW', 'acrineo_presupuestos', 'neodata_fecha');
+    return $si;
+}
+
+// Fecha y hora (ISO, con o sin zona) → 'aaaa-mm-dd hh:mm:ss+00:00' en UTC, o null
+function acrineoNeoFechaHora($v): ?string
+{
+    $t = trim((string) ($v ?? ''));
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}/', $t)) return null;
+    $s = strtotime($t);
+    return $s === false || $s < 0 ? null : gmdate('Y-m-d H:i:s', $s) . '+00:00';
+}
+
+// Obras de Neodata que ya están en ACRINEO (de cualquier usuario), por nombre de obra en mayúsculas:
+//   [OBRA => ['id', 'codigo', 'propietario', 'version' (fecha de la versión de Neodata), 'subido' (cuándo), 'archivo', 'copias']]
+// Se regresa la versión más reciente que haya; 'copias' cuenta cuántas veces está.
 function acrineoNeodataExistentes(array $nombres, string $usuario): array
 {
     $nombres = array_values(array_unique(array_filter(array_map(fn($n) => mb_strtoupper(acrineoNeoTexto($n, 150)), $nombres), 'strlen')));
     if (!$nombres) return [];
     $nombres = array_slice($nombres, 0, 1000);
-    $filas = bd_filas('AW', 'select presupuesto_id, codigo, nombre from acrineo_presupuestos where deleted_at is null and propietario = ? and upper(nombre) in ('
-        . implode(',', array_fill(0, count($nombres), '?')) . ') order by presupuesto_id', array_merge([mb_substr($usuario, 0, 50)], $nombres));
+    $marcas = implode(',', array_fill(0, count($nombres), '?'));
+    $origen = acrineoNeodataOrigenDisponible();
+    $obra = $origen ? 'upper(coalesce(neodata_obra, nombre))' : 'upper(nombre)';
+    $filas = bd_filas('AW', "select presupuesto_id, codigo, propietario, created_at, $obra as obra"
+        . ($origen ? ', neodata_fecha, neodata_archivo, neodata_obra' : ', null as neodata_fecha, null as neodata_archivo, null as neodata_obra')
+        . " from acrineo_presupuestos where deleted_at is null and $obra in ($marcas)"
+        . ($origen ? '' : " and observaciones ilike '%Importado de Neodata%'")
+        . ' order by ' . ($origen ? 'neodata_fecha desc nulls last, ' : '') . 'created_at desc', $nombres);
     $r = [];
-    foreach ($filas as $f) $r[mb_strtoupper($f['nombre'])] = ['id' => (int) $f['presupuesto_id'], 'codigo' => $f['codigo']];
+    foreach ($filas as $f) {
+        $k = $f['obra'];
+        if (isset($r[$k])) { $r[$k]['copias']++; continue; }
+        $r[$k] = ['id' => (int) $f['presupuesto_id'], 'codigo' => $f['codigo'], 'propietario' => $f['propietario'],
+                  'version' => $f['neodata_fecha'] ? date('c', strtotime($f['neodata_fecha'])) : null,
+                  'subido' => $f['created_at'] ? date('c', strtotime($f['created_at'])) : null,
+                  'archivo' => $f['neodata_archivo'], 'neodata' => $f['neodata_obra'] !== null, 'copias' => 1, 'tuyo' => mb_strtoupper((string) $f['propietario']) === mb_strtoupper($usuario)];
+    }
     return $r;
 }
 
@@ -98,6 +129,10 @@ function acrineoImportarNeodata(array $in, string $usuario): array
     } catch (Throwable $e) {
         try { acrineoEliminar([$id], $usuario); } catch (Throwable $e2) { /* ya no existe */ }
         throw $e;
+    }
+    if (acrineoNeodataOrigenDisponible()) {
+        bd_ejecutar('AW', 'update acrineo_presupuestos set neodata_obra = ?, neodata_fecha = ?, neodata_archivo = ? where presupuesto_id = ?',
+            [acrineoNeoTexto($in['obra'] ?? '', 150) ?: $nombre, acrineoNeoFechaHora($in['version_fecha'] ?? null), $archivo !== '' ? mb_substr($archivo, 0, 250) : null, $id]);
     }
     $fila = bd_fila('AW', 'select codigo, nombre, costo_directo, precio_venta, sobrecosto_pct from acrineo_presupuestos where presupuesto_id = ?', [$id]);
     return ['id' => $id, 'codigo' => $fila['codigo'], 'nombre' => $fila['nombre'], 'costo_directo' => (float) $fila['costo_directo'],

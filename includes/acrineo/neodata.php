@@ -198,6 +198,31 @@ function acrineoNeodataContenido(array $ctx, array $in, string $usuario, string 
             $filas[] = $f;
             $ids[] = $id;
         }
+        // Sin «Tipo %» (lo exportado directo de la base de Neodata no lo trae): se deduce con el costo que Neodata guardó
+        // para esta matriz, probando sobre qué tipo (mano de obra, materiales…) da ese costo.
+        $desconocidos = array_keys(array_filter($porcentajes, fn($p) => $p[1] <= 0));
+        if ($desconocidos) {
+            $conocido = acrineoNeoNumero($cat[mb_strtoupper($codigoM)]['costo'] ?? 0);
+            $tipos = array_values(array_unique(array_merge([2, 1, 3, 4, 5], array_keys($sumaNeo))));
+            $mejor = array_fill(0, count($desconocidos), 2);
+            if ($conocido > 0 && count($desconocidos) <= 3) {
+                $normal = array_sum($sumaNeo);
+                $fijos = 0.0;
+                foreach ($porcentajes as $k => $p) if ($p[1] > 0) $fijos += round($p[2] * ($sumaNeo[$p[1]] ?? 0), $dc);
+                $menor = null;
+                $combo = array_fill(0, count($desconocidos), 0);
+                while (true) {
+                    $tot = $normal + $fijos;
+                    foreach ($desconocidos as $j => $k) $tot += round($porcentajes[$k][2] * ($sumaNeo[$tipos[$combo[$j]]] ?? 0), $dc);
+                    $dif = abs($tot - $conocido);
+                    if ($menor === null || $dif < $menor - 0.000001) { $menor = $dif; $mejor = array_map(fn($c) => $tipos[$c], $combo); }
+                    $j = 0;
+                    while ($j < count($combo) && ++$combo[$j] >= count($tipos)) { $combo[$j] = 0; $j++; }
+                    if ($j >= count($combo)) break;
+                }
+            }
+            foreach ($desconocidos as $j => $k) $porcentajes[$k][1] = $mejor[$j];
+        }
         foreach ($porcentajes as [$i, $tipoPct, $q]) {
             if ($tipoPct === 1 || $tipoPct === 2) {
                 $filas[$i]['base'] = $tipoPct === 2 ? 'pct_mo' : 'pct_mat';

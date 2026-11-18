@@ -890,3 +890,5 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-neo-est.trabajando { color: var(--azul); }
 .an-neo-soltar { outline: 2px dashed var(--azul); outline-offset: -6px; }
 .an-neo-lista th.num, .an-neo-lista td.num { padding-right: 16px; }
+.an-neo-paso { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 12px; border: 1px solid var(--ambar-borde); background: var(--ambar-suave); border-radius: 6px; font-size: 12.5px; line-height: 1.5; }
+.an-neo-paso .an-btn { margin-left: auto; text-decoration: none; }

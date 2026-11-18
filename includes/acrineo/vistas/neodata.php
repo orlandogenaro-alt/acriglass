@@ -10,11 +10,17 @@ require_once __DIR__ . '/campos.php';
         <p class="an-pegado-ayuda">Elige la carpeta de los <b>archivos de intercambio</b> de tu Neodata (normalmente
             <code>C:\NEODATAWinPlus\Archivos Intercambio</code>, o <code>C:\NEODATAWinPlus</code>). Cada obra aparece con su respaldo más reciente;
             al importarla se crea un presupuesto nuevo <b>a tu nombre</b> con sus partidas, conceptos, cantidades, matrices (con básicos y cuadrillas),
-            insumos y % de sobrecosto. Si a una obra le falta su archivo, respáldala primero en Neodata. Nada se borra de tu Neodata.</p>
+            insumos y % de sobrecosto. Nada se borra de tu Neodata.</p>
+        <div class="an-neo-paso">
+            <b>¿No aparecen todas tus obras?</b> Descarga el <b>exportador</b> y ábrelo (doble clic) en la computadora donde tienes Neodata: lee directo
+            las bases de Neodata de esa PC (<code>C:\NeodataWinPlusObras</code>), sin cambiar nada, y deja todas tus obras en
+            <code>C:\NEODATAWinPlus\Archivos Intercambio\ACRINEO</code>. Luego da <b>«Volver a leer»</b> aquí.
+            <a class="an-btn an-mini" id="anNeoExportador" href="acrineo-neodata-exportador.php" download><?= anIcono('descargar') ?>Descargar exportador (.bat)</a>
+        </div>
         <div class="an-pegado-botones">
             <button type="button" class="an-btn an-primario an-mini" id="anNeoCarpeta"><?= anIcono('abrir') ?>Elegir carpeta</button>
             <button type="button" class="an-btn an-mini" id="anNeoReleer" hidden><?= anIcono('refrescar') ?>Volver a leer</button>
-            <label class="an-btn an-mini"><?= anIcono('subir') ?>Subir archivos .zip<input type="file" id="anNeoArchivos" accept=".zip" multiple hidden></label>
+            <label class="an-btn an-mini"><?= anIcono('subir') ?>Subir archivos<input type="file" id="anNeoArchivos" accept=".zip,.json" multiple hidden></label>
             <input type="file" id="anNeoDirInput" webkitdirectory multiple hidden>
             <span class="an-ayuda" id="anNeoRuta"></span>
             <span class="an-flex"></span>

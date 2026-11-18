@@ -38,17 +38,18 @@
     }
 
     // ---------- Archivos → obras ----------
-    var PATRON = /^(.*)_(\d{1,2})-(\d{1,2})-(\d{4})_Hr(\d{1,2})Mn(\d{1,2})\.zip$/i;
+    var PATRON = /^(.*)_(\d{1,2})-(\d{1,2})-(\d{4})_Hr(\d{1,2})Mn(\d{1,2})\.(zip|neodata\.json)$/i;
+    var ES_ARCHIVO = /\.(zip|neodata\.json)$/i;
     function datosArchivo(file) {
         var m = PATRON.exec(file.name);
         if (m) return { obra: m[1].trim(), fecha: new Date(+m[4], +m[3] - 1, +m[2], +m[5], +m[6]) };
-        return { obra: file.name.replace(/\.zip$/i, '').trim(), fecha: new Date(file.lastModified || 0) };
+        return { obra: file.name.replace(/\.(zip|neodata\.json|json)$/i, '').trim(), fecha: new Date(file.lastModified || 0) };
     }
     function agrupar(files) {
         var porObra = {};
         obras.forEach(function (o) { porObra[o.nombre.toUpperCase()] = o; });
         files.forEach(function (f) {
-            if (!/\.zip$/i.test(f.name)) return;
+            if (!ES_ARCHIVO.test(f.name)) return;
             var d = datosArchivo(f), k = d.obra.toUpperCase();
             var o = porObra[k] || (porObra[k] = { nombre: d.obra, archivos: [], estado: 'nueva', mensaje: '', existe: null, importado: null });
             if (!o.archivos.some(function (a) { return a.file.name === f.name && a.file.size === f.size; })) o.archivos.push({ file: f, fecha: d.fecha });
@@ -64,7 +65,7 @@
     async function leerCarpeta(handle, profundidad, salida) {
         for await (var entrada of handle.values()) {
             if (salida.length > 5000) break;
-            if (entrada.kind === 'file' && /\.zip$/i.test(entrada.name)) salida.push(await entrada.getFile());
+            if (entrada.kind === 'file' && ES_ARCHIVO.test(entrada.name)) salida.push(await entrada.getFile());
             else if (entrada.kind === 'directory' && profundidad < 2) await leerCarpeta(entrada, profundidad + 1, salida);
         }
         return salida;
@@ -166,6 +167,7 @@
     }
 
     async function datosObra(file) {
+        if (/\.json$/i.test(file.name)) return datosJson(file);
         var z = XlsxSimple.abrirZip(await file.arrayBuffer());
         var nombre = z.nombres.find(function (n) { return /(^|\/)xn_presupuesto\.xlsx$/i.test(n); });
         if (!nombre) throw new Error('No es un archivo de intercambio de Neodata (no trae Xn_Presupuesto.xlsx).');
@@ -227,6 +229,46 @@
                          explosion: g.decimalesredondeoexplosion !== undefined ? num(g.decimalesredondeoexplosion) : 8 },
             sobrecosto_pct: sobrecosto,
             catalogo: catalogo, partidas: partidas, conceptos: conceptos, matrices: matrices
+        };
+    }
+
+    // Archivo del exportador de ACRINEO (*.neodata.json): lo leído directo de la base de Neodata de la computadora
+    async function datosJson(file) {
+        var j;
+        try { j = JSON.parse((await file.text()).replace(/^﻿/, '')); } catch (e) { throw new Error('El archivo ' + file.name + ' está dañado.'); }
+        if (!j || j.formato !== 'acrineo-neodata') throw new Error('No es un archivo del exportador de Neodata de ACRINEO.');
+        var o = j.obra || {}, par = {};
+        (o.parametros || []).forEach(function (p) { if (p && p.parametro) par[clave(p.parametro)] = limpio(p.valor); });
+        var t = function (v) { return limpio(v); };
+        var conceptos = (j.conceptos || []).map(function (c) {
+            return { wbs: t(c.wbs), partida: '', codigo: t(c.codigo), renglon: num(c.renglon), cantidad: num(c.cantidad), costo: num(c.costo), precio: num(c.precio) };
+        }).filter(function (c) { return c.codigo; });
+        var costo = 0, precio = 0;
+        conceptos.forEach(function (c) { costo += c.cantidad * c.costo; precio += c.cantidad * c.precio; });
+        var dec = function (k, d) { return par[k] !== undefined && par[k] !== '' ? num(par[k]) : d; };
+        return {
+            archivo: file.name + (j.base ? ' (base ' + j.base + ')' : ''),
+            nombre: t(o.nombre) || datosArchivo(file).obra,
+            descripcion: t(o.descripcion),
+            generales: {
+                direccion: t(o.direccion), colonia: t(o.colonia), codigo_postal: t(o.codigo_postal), estado: '', observaciones: t(o.observaciones),
+                numero_licitacion: par.opnumerolicitacion || '', lugar_celebracion: par.oplugarcelebracion || '', numero_convocatoria: par.opnumeroconvocatoria || '',
+                fecha_licitacion: fechaExcel(par.opfechalicitacion), fecha_publicacion: fechaExcel(par.opfechapublicacion),
+                fecha_inicio: fechaExcel(par.opfechainicio), dias: num(par.opplazo)
+            },
+            iva: o.iva !== undefined && o.iva !== null ? num(o.iva) : 16,
+            decimales: { costos: dec('decimalesredondeo', 2), cantidades: dec('decimalesredondeoconceptos', 4), explosion: dec('decimalesredondeoexpins', 8) },
+            sobrecosto_pct: costo > 0 && precio > 0 ? Math.round((precio / costo - 1) * 1e6) / 1e4 : null,
+            catalogo: (j.catalogo || []).map(function (c) {
+                return { codigo: t(c.codigo), descripcion_completa: t(c.descripcion_completa), descripcion: t(c.descripcion), unidad: t(c.unidad),
+                         tipo: num(c.tipo), pct: num(c.pct) || (num(c.tipo) === 3 && t(c.unidad) === '%') ? 1 : 0, tipo_pct: 0, costo: num(c.costo) };
+            }).filter(function (c) { return c.codigo; }),
+            partidas: (j.partidas || []).map(function (p) {
+                return { padre_wbs: t(p.padre_wbs), wbs: t(p.wbs), codigo: t(p.codigo), renglon: num(p.renglon), descripcion: t(p.descripcion), descripcion_larga: t(p.descripcion_larga) };
+            }),
+            conceptos: conceptos,
+            matrices: (j.matrices || []).map(function (m) { return { m: t(m.m), i: t(m.i), renglon: num(m.renglon), op: m.op === '/' ? '/' : '*', cantidad: num(m.cantidad) }; })
+                .filter(function (m) { return m.m && m.i; })
         };
     }
 

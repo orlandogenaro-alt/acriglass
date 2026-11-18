@@ -166,7 +166,7 @@
         }
         if (!html) {
             html = '<tr class="an-vacio' + (ed && !st.filas.length ? ' an-vacio-grande' : '') + '"><td colspan="' + COLS + '">' + (st.filas.length ? 'Ningún insumo coincide con el filtro.'
-                : ed ? 'La cuadrícula no tiene datos.<br><button type="button" class="an-btn an-mini an-primario an-agregar-registro" data-agregar-registro>Agregar registro</button>'
+                : ed ? 'La cuadrícula no tiene datos.<br><button type="button" class="an-btn an-mini an-primario an-agregar-registro" data-agregar-registro title="Alt+N">Agregar registro</button>'
                 : 'La cuadrícula no tiene datos: el costo del concepto es el que se captura en la hoja.'
                   + (H.puede ? '<br><small class="an-ayuda">Copia insumos del catálogo de abajo (marca y pon la «Cantidad a copiar», luego ➤) o agrega un renglón libre; al guardar, el costo directo saldrá de la matriz.</small>' : '')) + '</td></tr>';
         }
@@ -607,6 +607,13 @@
             if (i) i.focus();
         }
         $('anMatrizLibre').addEventListener('click', agregarLibre);
+        // Alt+N en la pestaña Matriz: agrega un renglón (entra al modo edición si hace falta)
+        document.addEventListener('keydown', function (e) {
+            if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.key.toLowerCase() !== 'n') return;
+            if (panel.hidden || !st.concepto || document.querySelector('dialog[open]')) return;
+            e.preventDefault();
+            agregarLibre();
+        });
         tbody.addEventListener('click', function (e) {
             if (e.target.closest('[data-agregar-registro]')) agregarLibre();
             else if (e.target.closest('[data-aplicar]')) guardar();

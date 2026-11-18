@@ -160,7 +160,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
                     <b class="an-partida-actual" id="anPartidaActual">Selecciona una partida</b>
                     <span class="an-flex"></span>
                     <?php if ($puede['presupuestos.editar']): ?>
-                    <button type="button" class="an-btn an-mini" id="anAgregarRenglon" hidden>+ Agregar registro</button>
+                    <button type="button" class="an-btn an-mini" id="anAgregarRenglon" title="Alt+N" hidden>+ Agregar registro</button>
                     <button type="button" class="an-btn an-icono" id="anEditarRenglones" title="Editar los conceptos" aria-label="Editar los conceptos" aria-pressed="false" disabled><?= anIcono('editar') ?></button>
                     <button type="button" class="an-btn an-icono" id="anDeshacer" title="Deshacer (Ctrl+Z)" aria-label="Deshacer" disabled>↶</button>
                     <button type="button" class="an-btn an-icono" id="anRehacer" title="Rehacer (Ctrl+Y)" aria-label="Rehacer" disabled>↷</button>

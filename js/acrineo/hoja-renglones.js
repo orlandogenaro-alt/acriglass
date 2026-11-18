@@ -141,7 +141,7 @@
             html = '<tr class="an-vacio"><td colspan="' + COLS + '">Ningún concepto de esta partida coincide con «' + esc(H.filtro.q) + '».</td></tr>';
         } else if (!html) {
             html = '<tr class="an-vacio"><td colspan="' + COLS + '">' + (p ? 'La cuadrícula no tiene datos.' : 'Selecciona o crea una partida a la izquierda.')
-                + (p && st.editando ? '<br><button type="button" class="an-btn an-primario" data-agregar>Agregar registro</button>'
+                + (p && st.editando ? '<br><button type="button" class="an-btn an-primario" data-agregar title="Alt+N">Agregar registro</button>'
                     : p && H.puede ? '<br><small class="an-ayuda">Usa el lápiz para agregar conceptos, o cópialos del catálogo de abajo.</small>' : '')
                 + '</td></tr>';
         }
@@ -449,6 +449,15 @@
         var k = e.key.toLowerCase();
         if (k === 'z' && !e.shiftKey) { e.preventDefault(); st.fotoPendiente = null; deshacer(); }
         else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); rehacer(); }
+    });
+
+    // Alt+N: agrega un renglón (entra al modo edición si hace falta), uno tras otro
+    if (H.puede) document.addEventListener('keydown', function (e) {
+        if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.key.toLowerCase() !== 'n') return;
+        if (document.querySelector('dialog[open]') || $('anHoja').hidden || !H.partida() || st.guardando) return;
+        e.preventDefault();
+        if (!st.editando) entrarEdicion();
+        agregar();
     });
 
     if (H.puede) {

@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-11-18',
+        'cambios' => [
+            ['mejora', 'ACRINEO: Alt+N agrega renglones', 'En los conceptos de la partida y en la matriz, Alt+N agrega un renglón nuevo (entra al modo edición si hace falta) y deja el cursor en él; se puede presionar varias veces para ir agregando renglones uno tras otro, también cuando la cuadrícula está vacía.'],
+        ],
+    ],
+    [
         'fecha' => '2026-11-17',
         'cambios' => [
             ['nuevo', 'ACRINEO: Imprimir reportes (Ctrl+P)', 'Como en Neodata, «Opciones del Presupuesto › Reporte › Imprimir reportes» (o Ctrl+P en la hoja) imprime, guarda como PDF o baja a Excel tres reportes con la Hoja Membretada: Presupuesto (partidas con sus conceptos, código, concepto, unidad, cantidad, P.U. e importe, total de cada partida, subtotal, IVA del presupuesto, total con letra y condiciones comerciales), Análisis de precios unitarios (la matriz de cada concepto por tipo de insumo, costo directo, indirectos, financiamiento, utilidad, cargos adicionales y precio unitario con letra) y Explosión de insumos (todos los insumos de las matrices, con submatrices, por tipo con su total). El presupuesto y el análisis pueden salir solo con los conceptos marcados del catálogo.'],

@@ -14,22 +14,17 @@ $colsGasto    = ['CONCEPTO_ID', 'CLAVE', 'NOMBRE', 'DESCRIPCION', 'ESTATUS'];
 
 $menu = [
     [
-        'id' => 'documentos', 'titulo' => 'Documentos', 'icono' => '📁', 'abierto' => true,
-        'items' => [
-            ['Presupuestos de Obra',         '🧾', 'modulo', ['DOCTO_SUGERIDO_OBRA_ID', 'FOLIO', 'ESTATUS', 'FECHA', 'CLIENTE', 'PROYECTO', 'VENDEDOR', 'OBRA']],
-            ['Obras',                        '🏗️', 'modulo', ['OBRA_ID', 'FOLIO', 'ESTATUS', 'FECHA', 'CLIENTE', 'PROYECTO', 'UBICACION']],
-            ['Orden de Fabricacion',         '⚙️', 'modulo', ['ORDEN_FABRICACION_ID', 'FOLIO', 'ESTATUS', 'FECHA', 'OBRA', 'CLIENTE']],
-            ['Gastos de Obra',               '💵', 'modulo', ['GASTO_OBRA_ID', 'FOLIO', 'FECHA', 'OBRA', 'CONCEPTO', 'IMPORTE']],
-            ['Salidas de Personal a Obra',   '👷', 'modulo', ['SALIDA_PERSONAL_ID', 'FOLIO', 'FECHA', 'OBRA', 'EMPLEADO', 'ESTATUS']],
-            ['Salidas de Materiales',        '📦', 'modulo', ['SALIDA_MATERIAL_ID', 'FOLIO', 'FECHA', 'OBRA', 'ESTATUS']],
-            ['Consumibles de Material en Obra', '🧰', 'modulo', ['CONSUMO_MATERIAL_ID', 'FOLIO', 'FECHA', 'OBRA', 'ESTATUS']],
-        ],
-    ],
-    [
         // ACRINEO: sistema propio de presupuestos y control de costos; sus opciones se agregan por etapas
         'id' => 'acrineo', 'titulo' => 'ACRINEO', 'icono' => '🧮',
         'items' => [
             ['Catálogo de presupuestos', '📐', 'pagina', 'acrineo-presupuestos.php'],
+        ],
+    ],
+    [
+        'id' => 'documentos', 'titulo' => 'Documentos', 'icono' => '📁', 'abierto' => true,
+        'items' => [
+            ['Presupuestos de Obra',         '🧾', 'modulo', ['DOCTO_SUGERIDO_OBRA_ID', 'FOLIO', 'ESTATUS', 'FECHA', 'CLIENTE', 'PROYECTO', 'VENDEDOR', 'OBRA']],
+            ['Obras',                        '🏗️', 'modulo', ['OBRA_ID', 'FOLIO', 'ESTATUS', 'FECHA', 'CLIENTE', 'PROYECTO', 'UBICACION']],
         ],
     ],
     [
@@ -141,11 +136,18 @@ function idItem(string $nombre): string
     </div>
 
     <nav class="menu" id="menu">
+        <?php
+        // ACRINEO va hasta arriba; Favoritos justo debajo (o arriba si no hay ACRINEO)
+        $favoritosPuestos = false;
+        $pintarFavoritos = function () { ?>
         <!-- Favoritos (se llena con JS) -->
         <div class="grupo abierto" id="grupoFavoritos" hidden>
             <button class="grupo-titulo"><span class="g-icono">⭐</span><span class="g-texto">Favoritos</span><span class="g-flecha">▸</span></button>
             <div class="grupo-items" id="itemsFavoritos"></div>
         </div>
+        <?php };
+        if (($menu[0]['id'] ?? '') !== 'acrineo') { $pintarFavoritos(); $favoritosPuestos = true; }
+        ?>
 
         <?php foreach ($menu as $g): ?>
         <div class="grupo<?= !empty($g['abierto']) ? ' abierto' : '' ?>" data-grupo="<?= $g['id'] ?>">
@@ -168,6 +170,7 @@ function idItem(string $nombre): string
                 <?php endforeach; ?>
             </div>
         </div>
+        <?php if (!$favoritosPuestos) { $pintarFavoritos(); $favoritosPuestos = true; } ?>
         <?php endforeach; ?>
 
         <div class="item suelto" data-id="manual" data-nombre="Manual de uso" data-tipo="pendiente" tabindex="0">

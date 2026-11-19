@@ -2,9 +2,15 @@
 // XlsxSimple.crear({ nombre, anchos: [n…], filas: [[celda…]] }) → Blob
 //   celda: texto, número, null, o { v, e } con e = 'titulo' (negritas con fondo), 'texto' (ajustar texto, arriba),
 //          'dinero' (#,##0.00), 'cantidad' (0.0000), 'pct' (0.00%), 'negrita', 'total' (negritas #,##0.00)
+//          y para formatos impresos: 'grande' (título 14 centrado), 'empresa' (13 negritas), 'sub' (8 gris), 'encabezado'
+//          (barra de columnas: blanco sobre h.colorEncabezado, negro por omisión), 'caja' / 'cajaNegrita' (fondo gris con
+//          borde), 'totalTexto' / 'totalGrande' (11 negritas, $#,##0.00), 'pesos' ($#,##0.00), 'justificado', 'centro'
+//   opcionales: combinar: ['A1:F1'…], altos: { fila (1…): puntos }, sinCuadricula, ajustarPagina (una página de ancho,
+//               carta vertical), imagen: { datos: Uint8Array PNG, col, fila (desde 0), ancho, alto (px) }
 // XlsxSimple.leer(archivo) → Promise de [[texto…]] (la primera hoja, con los valores como se ven en las celdas)
 window.XlsxSimple = (function () {
-    var ESTILOS = { titulo: 1, texto: 2, dinero: 3, cantidad: 4, pct: 5, negrita: 6, total: 7 };
+    var ESTILOS = { titulo: 1, texto: 2, dinero: 3, cantidad: 4, pct: 5, negrita: 6, total: 7, grande: 8, empresa: 9, sub: 10,
+                    encabezado: 11, caja: 12, cajaNegrita: 13, totalTexto: 14, totalGrande: 15, pesos: 16, justificado: 17, centro: 18 };
 
     function esc(s) {
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -14,8 +20,10 @@ window.XlsxSimple = (function () {
 
     function hojaXml(h) {
         var cols = (h.anchos || []).map(function (a, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + a + '" customWidth="1"/>'; }).join('');
+        var altos = h.altos || {};
         var filas = h.filas.map(function (f, r) {
-            return '<row r="' + (r + 1) + '">' + f.map(function (c, i) {
+            var ht = altos[r + 1] ? ' ht="' + altos[r + 1] + '" customHeight="1"' : '';
+            return '<row r="' + (r + 1) + '"' + ht + '>' + f.map(function (c, i) {
                 if (c == null || c === '') return '';
                 var v = typeof c === 'object' ? c.v : c, s = typeof c === 'object' && ESTILOS[c.e] ? ' s="' + ESTILOS[c.e] + '"' : '';
                 var ref = columna(i) + (r + 1);
@@ -24,21 +32,55 @@ window.XlsxSimple = (function () {
                 return '<c r="' + ref + '"' + s + ' t="inlineStr"><is><t xml:space="preserve">' + esc(v) + '</t></is></c>';
             }).join('') + '</row>';
         }).join('');
+        var combinar = h.combinar || [];
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-            '<sheetViews><sheetView workbookViewId="0">' + (h.fijarFila ? '<pane ySplit="' + h.fijarFila + '" topLeftCell="A' + (h.fijarFila + 1) + '" activePane="bottomLeft" state="frozen"/>' : '') +
-            '</sheetView></sheetViews>' + (cols ? '<cols>' + cols + '</cols>' : '') + '<sheetData>' + filas + '</sheetData></worksheet>';
+            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+            (h.ajustarPagina ? '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' : '') +
+            '<sheetViews><sheetView workbookViewId="0"' + (h.sinCuadricula ? ' showGridLines="0"' : '') + '>' + (h.fijarFila ? '<pane ySplit="' + h.fijarFila + '" topLeftCell="A' + (h.fijarFila + 1) + '" activePane="bottomLeft" state="frozen"/>' : '') +
+            '</sheetView></sheetViews>' + (cols ? '<cols>' + cols + '</cols>' : '') + '<sheetData>' + filas + '</sheetData>' +
+            (combinar.length ? '<mergeCells count="' + combinar.length + '">' + combinar.map(function (m) { return '<mergeCell ref="' + m + '"/>'; }).join('') + '</mergeCells>' : '') +
+            (h.ajustarPagina ? '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>'
+                + '<pageSetup paperSize="1" orientation="portrait" fitToWidth="1" fitToHeight="0"/>' : '') +
+            (h.imagen && h.imagen.datos ? '<drawing r:id="rId1"/>' : '') + '</worksheet>';
     }
 
-    var ESTILOS_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    // Logo: un dibujo con la imagen anclada en una celda (tamaño en píxeles → EMU)
+    function dibujoXml(im) {
+        var emu = function (px) { return Math.round(px * 9525); };
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+            '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+            '<xdr:oneCellAnchor><xdr:from><xdr:col>' + (im.col || 0) + '</xdr:col><xdr:colOff>' + emu(im.dx || 0) + '</xdr:colOff><xdr:row>' + (im.fila || 0) + '</xdr:row><xdr:rowOff>' + emu(im.dy || 0) + '</xdr:rowOff></xdr:from>' +
+            '<xdr:ext cx="' + emu(im.ancho) + '" cy="' + emu(im.alto) + '"/>' +
+            '<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="Logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>' +
+            '<xdr:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>' +
+            '<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + emu(im.ancho) + '" cy="' + emu(im.alto) + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>' +
+            '</xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>';
+    }
+
+    function estilosXml(color) {
+        var fondo = 'FF' + (/^#?[0-9a-f]{6}$/i.test(color || '') ? color.replace('#', '').toUpperCase() : '000000');
+        var linea = function (lado) { return '<' + lado + ' style="thin"><color rgb="FF999999"/></' + lado + '>'; };
+        var xf = function (num, font, fill, borde, alin) {
+            return '<xf numFmtId="' + num + '" fontId="' + font + '" fillId="' + fill + '" borderId="' + borde + '" xfId="0" applyNumberFormat="1"'
+                + ' applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment ' + alin + '/></xf>';
+        };
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
         '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-        '<numFmts count="2"><numFmt numFmtId="164" formatCode="#,##0.00"/><numFmt numFmtId="165" formatCode="0.0000"/></numFmts>' +
-        '<fonts count="2"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font></fonts>' +
-        '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
-        '<fill><patternFill patternType="solid"><fgColor rgb="FFDCE6F1"/><bgColor indexed="64"/></patternFill></fill></fills>' +
-        '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+        '<numFmts count="3"><numFmt numFmtId="164" formatCode="#,##0.00"/><numFmt numFmtId="165" formatCode="0.0000"/>' +
+            '<numFmt numFmtId="166" formatCode="&quot;$&quot;#,##0.00"/></numFmts>' +
+        '<fonts count="7"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font>' +
+            '<font><b/><sz val="14"/><name val="Arial"/></font><font><b/><sz val="13"/><name val="Arial"/></font>' +
+            '<font><sz val="8"/><color rgb="FF888888"/><name val="Arial"/></font>' +
+            '<font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><name val="Arial"/></font></fonts>' +
+        '<fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
+        '<fill><patternFill patternType="solid"><fgColor rgb="FFDCE6F1"/><bgColor indexed="64"/></patternFill></fill>' +
+        '<fill><patternFill patternType="solid"><fgColor rgb="' + fondo + '"/><bgColor indexed="64"/></patternFill></fill>' +
+        '<fill><patternFill patternType="solid"><fgColor rgb="FFF2F2F2"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+        '<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border>' +
+            '<border>' + linea('left') + linea('right') + linea('top') + linea('bottom') + '<diagonal/></border>' +
+            '<border><left/><right style="thin"><color rgb="FFFFFFFF"/></right><top/><bottom/><diagonal/></border></borders>' +
         '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-        '<cellXfs count="8">' +
+        '<cellXfs count="19">' +
             '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"><alignment vertical="top"/></xf>' +
             '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
             '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>' +
@@ -47,7 +89,19 @@ window.XlsxSimple = (function () {
             '<xf numFmtId="10" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment vertical="top"/></xf>' +
             '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="top"/></xf>' +
             '<xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyNumberFormat="1" applyAlignment="1"><alignment vertical="top"/></xf>' +
+            xf(0, 2, 0, 0, 'horizontal="center" vertical="center"') +              // 8 grande
+            xf(0, 3, 0, 0, 'vertical="center"') +                                  // 9 empresa
+            xf(0, 4, 0, 0, 'vertical="center"') +                                  // 10 sub
+            xf(0, 5, 3, 2, 'horizontal="center" vertical="center" wrapText="1"') + // 11 encabezado
+            xf(0, 0, 4, 1, 'vertical="center"') +                                  // 12 caja
+            xf(0, 1, 4, 1, 'vertical="center"') +                                  // 13 cajaNegrita
+            xf(0, 6, 0, 0, 'vertical="center"') +                                  // 14 totalTexto
+            xf(166, 6, 0, 0, 'horizontal="right" vertical="center"') +             // 15 totalGrande
+            xf(166, 0, 0, 0, 'horizontal="right" vertical="top"') +                // 16 pesos
+            xf(0, 0, 0, 0, 'horizontal="justify" vertical="top" wrapText="1"') +   // 17 justificado
+            xf(0, 0, 0, 0, 'horizontal="center" vertical="top"') +                 // 18 centro
         '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+    }
 
     // ---------- ZIP (sin compresión) ----------
     var TABLA_CRC = (function () {
@@ -61,7 +115,7 @@ window.XlsxSimple = (function () {
         function u16(v) { return [v & 255, (v >>> 8) & 255]; }
         function u32(v) { return [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255]; }
         archivos.forEach(function (a) {
-            var nombre = enc.encode(a.nombre), datos = enc.encode(a.texto), crc = crc32(datos);
+            var nombre = enc.encode(a.nombre), datos = a.bytes || enc.encode(a.texto), crc = crc32(datos);
             var comun = [].concat(u16(20), u16(0x0800), u16(0), u16(0), u16(0x21), u32(crc), u32(datos.length), u32(datos.length), u16(nombre.length), u16(0));
             var local = new Uint8Array([].concat(u32(0x04034b50), comun));
             partes.push(local, nombre, datos);
@@ -75,13 +129,25 @@ window.XlsxSimple = (function () {
 
     function crear(h) {
         var nombre = esc(String(h.nombre || 'Hoja1').replace(/[\\\/?*\[\]:]/g, ' ').slice(0, 31));
+        var im = h.imagen && h.imagen.datos ? h.imagen : null;
+        var rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+        var R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
+        // Logo: el dibujo de la hoja con su imagen
+        var extra = im ? [
+            { nombre: 'xl/worksheets/_rels/sheet1.xml.rels', texto: rels + '<Relationship Id="rId1" Type="' + R + 'drawing" Target="../drawings/drawing1.xml"/></Relationships>' },
+            { nombre: 'xl/drawings/drawing1.xml', texto: dibujoXml(im) },
+            { nombre: 'xl/drawings/_rels/drawing1.xml.rels', texto: rels + '<Relationship Id="rId1" Type="' + R + 'image" Target="../media/image1.png"/></Relationships>' },
+            { nombre: 'xl/media/image1.png', bytes: im.datos }
+        ] : [];
         return zip([
             { nombre: '[Content_Types].xml', texto: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
                 '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
                 '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
                 '<Default Extension="xml" ContentType="application/xml"/>' +
+                (im ? '<Default Extension="png" ContentType="image/png"/>' : '') +
                 '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
                 '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+                (im ? '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>' : '') +
                 '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>' },
             { nombre: '_rels/.rels', texto: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
                 '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
@@ -93,9 +159,9 @@ window.XlsxSimple = (function () {
                 '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
                 '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
                 '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
-            { nombre: 'xl/styles.xml', texto: ESTILOS_XML },
+            { nombre: 'xl/styles.xml', texto: estilosXml(h.colorEncabezado) },
             { nombre: 'xl/worksheets/sheet1.xml', texto: hojaXml(h) }
-        ]);
+        ].concat(extra));
     }
 
     // ---------- Leer: zip (guardado o deflate) → primera hoja ----------

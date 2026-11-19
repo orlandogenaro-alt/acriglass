@@ -63,6 +63,8 @@ function acrineoReporteEncabezado(array $ctx): array
         'codigo' => $ctx['codigo'], 'nombre' => $ctx['nombre'], 'descripcion' => (string) ($pr['descripcion'] ?? ''),
         'cliente' => (string) ($g['cliente_nombre'] ?? ''), 'contacto' => (string) ($g['contacto_cliente'] ?? ''),
         'empresa' => (string) ($g['empresa_nombre'] ?? ''), 'lugar' => $lugar,
+        // «Lugar» del formato PRESUPUESTO DE OBRA: la ciudad (o el domicilio si no tiene ciudad)
+        'ciudad' => trim((string) ($pr['ciudad_nombre'] ?? '')) !== '' ? trim((string) $pr['ciudad_nombre']) : $lugar,
         'iva_pct' => (float) ($p['calculo']['iva'] ?? 16), 'fecha' => date('Y-m-d'),
         'sobrecosto_pct' => $ctx['sobrecosto_pct'],
     ];

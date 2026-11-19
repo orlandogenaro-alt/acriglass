@@ -71,6 +71,15 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
         </a>
         <button type="button" class="an-btn an-mini" id="anHojaDetalle"><?= anIcono('editar') ?>Detalle</button>
         <button type="button" class="an-btn an-mini" id="anHojaLigados" title="Facturas y pedidos de Microsip y presupuestos de Easy-Glass ligados a este presupuesto"><?= anIcono('ligar') ?>Facturas y Easy-Glass</button>
+        <span class="an-menu-cont">
+            <button type="button" class="an-btn an-mini" id="anHojaImprimir" aria-haspopup="menu" aria-expanded="false" title="Imprimir el presupuesto o exportarlo a Excel con la Hoja Membretada"><?= anIcono('imprimir') ?>Imprimir ▾</button>
+            <div class="an-menu an-menu-izq" id="anHojaImprimirMenu" role="menu" hidden>
+                <button type="button" role="menuitem" data-imprimir="imprimir"><?= anIcono('imprimir') ?>Imprimir</button>
+                <button type="button" role="menuitem" data-imprimir="excel"><?= anIcono('descargar') ?>Exportar a Excel</button>
+                <div class="an-sep"></div>
+                <button type="button" role="menuitem" data-imprimir="otros">Otros reportes… <small class="an-ayuda">Ctrl+P</small></button>
+            </div>
+        </span>
         <span class="an-flex"></span>
         <label class="an-sobrecosto" title="Se captura directo o se calcula con los factores (Opciones del presupuesto › Sobrecosto, Ctrl+Shift+S)">% Sobrecosto
             <input type="number" id="anSobrecosto" step="0.0001" min="-99.9999" max="1000" inputmode="decimal"<?= $puede['presupuestos.editar'] ? '' : ' disabled' ?>>

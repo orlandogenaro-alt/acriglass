@@ -22,6 +22,10 @@ try {
     $aviso = 'No hay conexión con la base de datos. Intenta de nuevo en un momento.';
 }
 $m = membreteImpresion();
+// Condiciones comerciales de la Hoja Membretada, un renglón por viñeta (*texto* = negritas)
+$lineasCond = array_values(array_filter(array_map(fn($l) => trim(preg_replace('/^\s*[•\-]\s*/u', '', $l)), preg_split('/\r?\n/', (string) $m['cc_condiciones']))));
+// Con una sola partida, el presupuesto sale como el formato PRESUPUESTO DE OBRA: solo los conceptos, sin el renglón ni el total de la partida
+if ($r && $tipo === 'presupuesto') $r['sin_partidas'] = count($r['partidas']) === 1;
 $din = fn($v) => $v === null ? '' : '$' . number_format((float) $v, 2);
 $cant = fn($v, $d = 4) => $v === null ? '' : number_format((float) $v, $d);
 $pct = fn($v) => rtrim(rtrim(number_format((float) $v, 4), '0'), '.') . ' %';
@@ -60,16 +64,16 @@ $titulo = $r ? $r['titulo'] . ' · ' . $enc['codigo'] : 'Reporte';
                     <?php if ($m['cc_subtitulo']): ?><div class="rp-sub"><?= e($m['cc_subtitulo']) ?></div><?php endif; ?>
                     <table class="rp-mini">
                         <tr><td>Fecha:</td><td><?= e($fecha($enc['fecha'])) ?></td></tr>
-                        <tr><td>Presupuesto:</td><td><?= e($enc['codigo']) ?></td></tr>
+                        <tr><td>Cotización:</td><td><?= e($enc['codigo']) ?></td></tr>
                     </table>
                 </div>
                 <div class="rp-logo"><?php if ($m['logo']): ?><img src="<?= e($m['logo']) ?>" alt=""><?php endif; ?></div>
             </header>
             <table class="rp-datos">
-                <tr><th>Obra:</th><td><?= e($enc['nombre']) ?></td><th>Cliente:</th><td><?= e($enc['cliente']) ?></td></tr>
-                <tr><th>Lugar:</th><td><?= e($enc['lugar']) ?></td><th>En atención a:</th><td><?= e($enc['contacto']) ?></td></tr>
+                <tr><th>Empresa:</th><td><?= e($enc['cliente']) ?></td><th>Obra:</th><td><?= e($enc['nombre']) ?></td></tr>
+                <tr><th>En atención a:</th><td><?= e($enc['contacto']) ?></td><th>Lugar:</th><td><?= e($tipo === 'presupuesto' ? $enc['ciudad'] : $enc['lugar']) ?></td></tr>
             </table>
-            <h1 class="rp-titulo"><?= e(mb_strtoupper($r['titulo'])) ?><?= $r['marcados'] ? ' <small>(' . $r['marcados'] . ' concepto(s) marcados)</small>' : '' ?></h1>
+            <h1 class="rp-titulo"><?= e($tipo === 'presupuesto' ? ($m['cc_titulo'] ?: 'PRESUPUESTO DE OBRA') : mb_strtoupper($r['titulo'])) ?><?= $r['marcados'] ? ' <small>(' . $r['marcados'] . ' concepto(s) marcados)</small>' : '' ?></h1>
         </td></tr></thead>
         <tbody><tr><td>
 <?php if ($tipo === 'presupuesto'): ?>
@@ -78,6 +82,10 @@ $titulo = $r ? $r['titulo'] . ' · ' . $enc['codigo'] : 'Reporte';
                 <thead><tr class="rp-cols"><th>Código</th><th>Concepto</th><th>Unidad</th><th>Cantidad</th><th>P. Unitario</th><th>Importe</th></tr></thead>
                 <tbody>
                 <?php foreach ($r['partidas'] as $p): ?>
+                    <?php if ($r['sin_partidas']): foreach ($p['conceptos'] as $c): ?>
+                    <tr class="rp-concepto"><td><?= e($c['codigo']) ?></td><td class="rp-texto"><?= nl2br(e($c['descripcion'])) ?></td><td><?= e($c['unidad']) ?></td>
+                        <td class="num"><?= $cant($c['cantidad']) ?></td><td class="num"><?= $din($c['precio']) ?></td><td class="num"><?= $din($c['importe']) ?></td></tr>
+                    <?php endforeach; continue; endif; ?>
                     <tr class="rp-partida rp-nivel-<?= min(3, $p['nivel']) ?>"><td><?= e($p['codigo']) ?></td><td colspan="4" style="padding-left:<?= 4 + $p['nivel'] * 12 ?>px"><?= e($p['descripcion']) ?></td><td class="num"><?= $din($p['importe']) ?></td></tr>
                     <?php foreach ($p['conceptos'] as $c): ?>
                     <tr class="rp-concepto"><td><?= e($c['codigo']) ?></td><td class="rp-texto"><?= nl2br(e($c['descripcion'])) ?></td><td><?= e($c['unidad']) ?></td>
@@ -89,13 +97,13 @@ $titulo = $r ? $r['titulo'] . ' · ' . $enc['codigo'] : 'Reporte';
                 </tbody>
             </table>
             <table class="rp-totales">
-                <tr><td>TOTAL DEL PRESUPUESTO SIN IVA:</td><td class="num"><?= $din($r['subtotal']) ?></td></tr>
-                <tr><td>IVA <?= number_format($r['iva_pct'], 2) ?> %</td><td class="num"><?= $din($r['iva']) ?></td></tr>
-                <tr><td>TOTAL DEL PRESUPUESTO:</td><td class="num"><?= $din($r['total']) ?></td></tr>
+                <tr><td>TOTAL DEL PRESUPUESTO MOSTRADO SIN IVA:</td><td class="num"><?= $din($r['subtotal']) ?></td></tr>
+                <tr><td>IVA <?= number_format($r['iva_pct'], 2) ?>%</td><td class="num"><?= $din($r['iva']) ?></td></tr>
+                <tr><td>TOTAL DEL PRESUPUESTO MOSTRADO:</td><td class="num"><?= $din($r['total']) ?></td></tr>
                 <tr><td colspan="2" class="rp-letra">(* <?= e(trim($r['letra'], '()')) ?> *)</td></tr>
             </table>
             <?php
-            $lineas = array_values(array_filter(array_map(fn($l) => trim(preg_replace('/^\s*[•\-]\s*/u', '', $l)), preg_split('/\r?\n/', (string) $m['cc_condiciones']))));
+            $lineas = $lineasCond;
             if ($lineas): ?>
             <div class="rp-cond"><b><?= e($m['cc_condiciones_titulo'] ?: 'CONDICIONES COMERCIALES') ?></b>
                 <?php foreach ($lineas as $l): ?><div>• <?= preg_replace('/\*([^*]+)\*/', '<b>$1</b>', e($l)) ?></div><?php endforeach; ?>
@@ -157,7 +165,13 @@ $titulo = $r ? $r['titulo'] . ' · ' . $enc['codigo'] : 'Reporte';
     </table>
     <?php if ($m['cc_pie']): ?><div class="rp-pie"><?= e($m['cc_pie']) ?></div><?php endif; ?>
 </main>
-<script>window.ACRINEO_REPORTE = <?= json_encode($r, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;</script>
+<script>
+    window.ACRINEO_REPORTE = <?= json_encode($r, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+    // Hoja Membretada para el Excel del presupuesto (mismo formato que la impresión)
+    window.ACRINEO_MEMBRETE = <?= json_encode(['empresa' => $m['cc_empresa'], 'subtitulo' => $m['cc_subtitulo'], 'titulo' => $m['cc_titulo'] ?: 'PRESUPUESTO DE OBRA',
+        'condiciones_titulo' => $m['cc_condiciones_titulo'] ?: 'CONDICIONES COMERCIALES', 'condiciones' => $lineasCond, 'pie' => $m['cc_pie'],
+        'color' => $m['cc_color'] ?: '#000000', 'logo' => $m['logo']], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+</script>
 <script src="<?= recurso('js/xlsx-simple.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/reporte.js') ?>"></script>
 <?php endif; ?>

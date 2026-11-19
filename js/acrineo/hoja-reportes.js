@@ -50,5 +50,28 @@
     document.addEventListener('keydown', function (e) {
         if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'p' && !document.querySelector('dialog[open]')) { e.preventDefault(); abrir(); }
     });
+    // Botón «Imprimir ▾» junto a «Facturas y Easy-Glass»: el presupuesto (formato PRESUPUESTO DE OBRA) a la
+    // impresora / PDF o a Excel, sin pasar por la ventana de reportes
+    var btnImp = $('anHojaImprimir'), menuImp = $('anHojaImprimirMenu');
+    function menuImprimir(abierto) {
+        menuImp.hidden = !abierto;
+        btnImp.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+        if (abierto) menuImp.querySelector('button').focus();
+    }
+    if (btnImp && menuImp) {
+        btnImp.addEventListener('click', function (e) { e.stopPropagation(); menuImprimir(menuImp.hidden); });
+        menuImp.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-imprimir]');
+            if (!b) return;
+            menuImprimir(false);
+            if (b.dataset.imprimir === 'otros') { abrir(); return; }
+            if (H.renglonesPendientes && H.renglonesPendientes()) { AN.ui.aviso('Guarda o cancela primero los cambios de los conceptos de la partida.', 'error'); return; }
+            var w = window.open('acrineo-reporte.php?' + new URLSearchParams({ id: H.ctx.id, tipo: 'presupuesto' }) + '&' + b.dataset.imprimir + '=1', '_blank');
+            if (!w) AN.ui.aviso('El navegador bloqueó la ventana nueva: permite las ventanas emergentes de este sitio.', 'error');
+        });
+        document.addEventListener('click', function (e) { if (!menuImp.hidden && !e.target.closest('#anHojaImprimirMenu')) menuImprimir(false); });
+        menuImp.addEventListener('keydown', function (e) { if (e.key === 'Escape') { menuImprimir(false); btnImp.focus(); } });
+    }
+
     AN.hojaReportes = { abrir: abrir };
 })(window.AcriNeo = window.AcriNeo || {});

@@ -89,6 +89,8 @@ $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2
         </div>
     </section>
 
+    <div class="an-divisor an-divisor-y" data-divisor="matriz" data-eje="y" aria-label="Alto de los insumos de la matriz"></div>
+
     <!-- Catálogo de insumos del sistema -->
     <section class="an-ventana an-matriz-catalogo" aria-label="Insumos para la matriz">
         <div class="an-barra an-barra-chica">

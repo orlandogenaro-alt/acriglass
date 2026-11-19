@@ -150,6 +150,9 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
             <?php endif; ?>
         </section>
 
+        <!-- Línea entre paneles: se arrastra para cambiar su tamaño (js/acrineo/divisores.js) -->
+        <div class="an-divisor an-divisor-x" data-divisor="hoja-partidas" data-eje="x" aria-label="Ancho del área de partidas"></div>
+
         <div class="an-hoja-derecha" id="anHojaDerecha">
             <!-- Conceptos de la partida -->
             <section class="an-ventana an-panel-renglones" aria-label="Conceptos de la partida">
@@ -192,6 +195,8 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
                 </div>
                 <div class="an-pie"><span id="anRenglonesEstado" class="an-estado" role="status"></span><span class="an-flex"></span>Σ <b id="anRenglonesTotal">$ 0.00</b></div>
             </section>
+
+            <div class="an-divisor an-divisor-y" data-divisor="hoja-conceptos" data-eje="y" aria-label="Alto de los conceptos de la partida"></div>
 
             <!-- Catálogo de conceptos del presupuesto -->
             <section class="an-ventana an-panel-catalogo" id="anPanelCatalogo" aria-label="Explosión de insumos acoplada: conceptos e insumos del presupuesto">
@@ -297,6 +302,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
 <script src="<?= recurso('js/acrineo/hoja-reportes.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-ligados.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-opciones.js') ?>"></script>
+<script src="<?= recurso('js/acrineo/divisores.js') ?>"></script>
 <?php endif; ?>
 </body>
 </html>

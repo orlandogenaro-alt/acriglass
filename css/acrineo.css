@@ -413,7 +413,10 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-totales b { color: var(--enfasis); font-variant-numeric: tabular-nums; }
 
 .an-hoja {
-    flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(320px, 38%) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 8px; padding: 8px;
+    flex: 1; min-height: 0; display: grid; gap: 8px 0; padding: 8px;
+    /* partidas | línea arrastrable | conceptos (el tamaño lo deja js/acrineo/divisores.js) */
+    grid-template-columns: minmax(160px, var(--an-hoja-partidas-a, 38fr)) 8px minmax(0, var(--an-hoja-partidas-b, 62fr));
+    grid-template-rows: auto minmax(0, 1fr);
 }
 /* Filtro de conceptos en todo el presupuesto, totales y vista (arriba de los paneles) */
 .an-hoja-filtro {
@@ -434,9 +437,20 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-modo-a { display: grid; place-items: center; width: 14px; height: 14px; border: 1.5px solid #fff; border-radius: 3px; font-size: 11px; }
 /* Áreas que se ocultan con el ⋮ de los conceptos */
 .an-hoja.sin-partidas { grid-template-columns: minmax(0, 1fr); }
-.an-hoja.sin-partidas > .an-panel-partidas { display: none; }
+.an-hoja.sin-partidas > .an-panel-partidas, .an-hoja.sin-partidas > .an-divisor { display: none; }
 .an-hoja-derecha.sin-catalogo { grid-template-rows: minmax(0, 1fr); }
-.an-hoja-derecha.sin-catalogo > .an-panel-catalogo { display: none; }
+.an-hoja-derecha.sin-catalogo > .an-panel-catalogo, .an-hoja-derecha.sin-catalogo > .an-divisor { display: none; }
+/* Líneas entre paneles: al pasar el puntero se marcan en rojo y se arrastran para cambiar el tamaño (como Neodata/Excel) */
+.an-divisor { position: relative; z-index: 3; touch-action: none; outline: none; }
+.an-divisor-x { cursor: col-resize; }
+.an-divisor-y { cursor: row-resize; }
+.an-divisor::after { content: ''; position: absolute; border-radius: 2px; background: transparent; transition: background .12s; }
+.an-divisor-x::after { top: 0; bottom: 0; left: 50%; width: 4px; margin-left: -2px; }
+.an-divisor-y::after { left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; }
+.an-divisor:hover::after, .an-divisor:focus-visible::after, .an-divisor.arrastrando::after { background: var(--rojo); }
+body.an-redimensionando, body.an-redimensionando * { user-select: none !important; }
+body.an-redim-x, body.an-redim-x * { cursor: col-resize !important; }
+body.an-redim-y, body.an-redim-y * { cursor: row-resize !important; }
 .an-check { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap; }
 .an-check input { width: 16px; height: 16px; accent-color: var(--azul); }
 .an-btn.an-icono.an-redondo { width: 34px; border-radius: 8px; }
@@ -541,7 +555,10 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-grafica-tip { position: absolute; z-index: 5; max-width: 320px; padding: 6px 9px; border-radius: 6px; background: var(--tarjeta); border: 1px solid var(--borde-2); box-shadow: var(--sombra-flot); font-size: 12px; color: var(--texto); white-space: pre-line; pointer-events: none; }
 .an-vacio-texto { padding: 30px 10px; text-align: center; color: var(--texto-3); }
 .an-hoja .an-ventana { margin: 0; min-height: 0; }
-.an-hoja-derecha { display: grid; grid-template-rows: minmax(0, 1.25fr) minmax(0, 1fr); gap: 8px; min-height: 0; }
+.an-hoja-derecha {
+    display: grid; min-height: 0; gap: 0;
+    grid-template-rows: minmax(0, var(--an-hoja-conceptos-a, 1.25fr)) 8px minmax(0, var(--an-hoja-conceptos-b, 1fr));
+}
 .an-barra-chica { padding: 5px 8px; gap: 6px; flex-wrap: nowrap; }
 .an-barra-chica .an-buscar { height: 30px; flex: 1 1 260px; }
 .an-partida-actual { font-size: 14px; color: var(--azul-texto); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
@@ -636,9 +653,17 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 /* Pestaña Matriz: encabezado del concepto, insumos de la matriz arriba y catálogo de insumos abajo */
 .an-matriz-panel {
     flex: 1; min-height: 0; display: grid; gap: 8px; padding: 8px;
-    grid-template-rows: auto auto minmax(0, 1.3fr) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, var(--an-matriz-a, 1.3fr)) minmax(0, var(--an-matriz-b, 1fr));
 }
 .an-matriz-panel > .an-ventana { margin: 0; min-height: 0; }
+/* Filas fijas: el texto del concepto puede ocultarse y la línea arrastrable va sobre el hueco entre insumos y catálogo */
+.an-matriz-panel > .an-matriz-cab { grid-row: 1; }
+.an-matriz-panel > .an-matriz-texto { grid-row: 2; }
+.an-matriz-panel > .an-matriz-insumos { grid-row: 3; }
+.an-matriz-panel > .an-matriz-catalogo { grid-row: 4; }
+.an-matriz-panel > .an-divisor { grid-row: 4; align-self: start; height: 8px; margin-top: -8px; }
+.an-matriz-panel:has(> .an-matriz-texto[hidden]) > .an-matriz-cab { margin-bottom: -16px; }
+.an-matriz-panel.desacoplada > .an-divisor { display: none; }
 .an-matriz-cab {
     display: flex; align-items: center; gap: 10px; padding: 7px 14px; border-radius: 8px 8px 0 0;
     background: var(--azul); color: #fff; margin-bottom: -8px;
@@ -774,7 +799,9 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 #anInsumosCopiar svg { width: 13px; height: 13px; }
 
 @media (max-width: 1000px) {
-    .an-hoja { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-rows: auto; overflow: auto; }
+    .an-hoja { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-rows: auto; gap: 8px; overflow: auto; }
+    .an-hoja .an-divisor { display: none; }
+    .an-hoja-derecha { gap: 8px; }
     .an-hoja > .an-panel-partidas, .an-hoja > .an-hoja-derecha { min-height: 260px; }
     .an-hoja-filtro .an-buscar { flex: 1 1 100%; }
     .an-hoja-derecha { grid-template-rows: minmax(320px, auto) minmax(280px, auto); }

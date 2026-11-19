@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-11-19',
+        'cambios' => [
+            ['mejora', 'ACRINEO: los paneles de la hoja se agrandan o achican arrastrando la línea', 'Como en Neodata y en Excel, al pasar el puntero sobre la línea entre dos paneles se marca en rojo y arrastrándola se cambia su tamaño: el ancho de las partidas contra los conceptos, el alto de los conceptos de la partida contra la explosión de insumos de abajo y, en la Matriz, el alto de los insumos de la matriz contra el catálogo de abajo. Doble clic sobre la línea la regresa a su tamaño normal; con el teclado se llega con Tab y se mueve con las flechas. El tamaño se recuerda en ese navegador.'],
+        ],
+    ],
+    [
         'fecha' => '2026-11-18',
         'cambios' => [
             ['nuevo', 'ACRINEO: Facturas y Easy-Glass ligados al presupuesto', 'En la hoja del presupuesto, junto a Detalle, el botón «Facturas y Easy-Glass» abre una ventana donde se buscan (por folio con o sin ceros, cliente o descripción) facturas y pedidos de Microsip y presupuestos de Easy-Glass de los últimos 24 meses, con la misma búsqueda de Asignar Cotización de Obras, y se ligan al presupuesto. Arriba se ve el precio de venta, el precio con IVA, lo facturado (y su % de avance), lo que falta por facturar y los totales de pedidos y de Easy-Glass. Si un folio ya está ligado a otro presupuesto lo avisa y pregunta antes de ligarlo también. Quitar un folio no lo borra de Microsip ni de Easy-Glass. Queda en el historial del presupuesto. Ligar y quitar piden el permiso de documentos del presupuesto. Requiere la migración 034.'],

@@ -6,6 +6,7 @@ return [
     [
         'fecha' => '2026-11-19',
         'cambios' => [
+            ['correccion', 'ACRINEO: la Matriz ya no se parte en dos columnas', 'Con la nueva línea arrastrable, la pestaña Matriz podía acomodarse en dos columnas (los insumos de la matriz angostos a la izquierda y el catálogo abajo a la derecha). Ahora todo queda en una sola columna, uno debajo del otro.'],
             ['mejora', 'ACRINEO: los paneles de la hoja se agrandan o achican arrastrando la línea', 'Como en Neodata y en Excel, al pasar el puntero sobre la línea entre dos paneles se marca en rojo y arrastrándola se cambia su tamaño: el ancho de las partidas contra los conceptos, el alto de los conceptos de la partida contra la explosión de insumos de abajo y, en la Matriz, el alto de los insumos de la matriz contra el catálogo de abajo. Doble clic sobre la línea la regresa a su tamaño normal; con el teclado se llega con Tab y se mueve con las flechas. El tamaño se recuerda en ese navegador.'],
         ],
     ],

@@ -654,7 +654,11 @@ body.an-redim-y, body.an-redim-y * { cursor: row-resize !important; }
 .an-matriz-panel {
     flex: 1; min-height: 0; display: grid; gap: 8px; padding: 8px;
     grid-template-rows: auto auto minmax(0, var(--an-matriz-a, 1.3fr)) minmax(0, var(--an-matriz-b, 1fr));
+    grid-template-columns: minmax(0, 1fr);
 }
+/* Una sola columna: la línea arrastrable comparte la fila 4 con el catálogo y, sin esto, la cuadrícula abría
+   una segunda columna (matriz angosta a la izquierda y catálogo abajo a la derecha). */
+.an-matriz-panel > * { grid-column: 1; }
 .an-matriz-panel > .an-ventana { margin: 0; min-height: 0; }
 /* Filas fijas: el texto del concepto puede ocultarse y la línea arrastrable va sobre el hueco entre insumos y catálogo */
 .an-matriz-panel > .an-matriz-cab { grid-row: 1; }

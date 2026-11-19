@@ -54,9 +54,20 @@ $menu = [
     ],
     [
         'id' => 'catalogos', 'titulo' => 'Catalogos', 'icono' => '🗂️',
+        // Los catálogos generales de ACRINEO (acrineo-catalogos.php) van primero, en el orden de Neodata
         'items' => [
+            ['Unidades',           '📏', 'pagina', 'acrineo-catalogos.php?c=unidades'],
+            ['Tipos de insumos',   '🔢', 'pagina', 'acrineo-catalogos.php?c=tipos_insumo'],
+            ['Familias',           '👪', 'pagina', 'acrineo-catalogos.php?c=familias'],
+            ['Estados',            '🗺️', 'pagina', 'acrineo-catalogos.php?c=estados'],
+            ['Ciudades',           '🏙️', 'pagina', 'acrineo-catalogos.php?c=ciudades'],
+            ['Proveedores',        '🚚', 'pagina', 'acrineo-catalogos.php?c=proveedores'],
+            ['Responsables',       '🧑‍💼', 'pagina', 'acrineo-catalogos.php?c=responsables'],
             ['Clientes',           '🤝', 'modulo', ['CLAVE_CLIENTE', 'NOMBRE', 'CONTACTO', 'TELEFONO', 'EMAIL', 'CIUDAD', 'VENDEDOR']],
+            ['Empresas',           '🏬', 'pagina', 'acrineo-catalogos.php?c=empresas'],
             ['Vendedores de Obra', '🏢', 'modulo', ['VENDEDOR_OBRA_ID', 'NOMBRE', 'ESTATUS']],
+            ['Tipos de licitaciones', '💲', 'pagina', 'acrineo-catalogos.php?c=tipos_licitacion'],
+            ['Regiones',           '🌎', 'pagina', 'acrineo-catalogos.php?c=regiones'],
             ['Empleados',          '🧑‍🔧', 'modulo', ['NUMERO_EMPLEADO', 'NOMBRE', 'TIPO_EMPLEADO', 'TELEFONO', 'SUELDO_DIARIO', 'ESTATUS']],
             ['Tipos de Empleados', '🪪', 'modulo', ['TIPO_EMPLEADO_ID', 'CLAVE', 'NOMBRE', 'PORCENTAJE']],
             ['Insumos',            '🧱', 'modulo', ['CLAVE', 'DESCRIPCION', 'TIPO', 'UNIDAD', 'FAMILIA', 'PRECIO', 'VIGENCIA', 'COSTO', 'ESTATUS']],
@@ -99,6 +110,11 @@ if (!tienePermiso('MODULO_SUGERIDOS_OBRA', 'NUEVO_OBRA', 'MODIFICAR_OBRA', 'CERR
 // ACRINEO: ACRINEO_VER + ACRINEO_PRESUPUESTOS_VER (o ADMIN_USER)
 if (!acrineoPuede('presupuestos.ver')) {
     $menu = array_values(array_filter($menu, fn($g) => $g['id'] !== 'acrineo'));
+    // ni sus catálogos generales
+    foreach ($menu as &$g) {
+        $g['items'] = array_values(array_filter($g['items'], fn($it) => !is_string($it[3] ?? null) || strncmp($it[3], 'acrineo-', 8) !== 0));
+    }
+    unset($g);
 }
 // Administrador solo con el permiso ADMIN_USER de AW
 if (!tienePermiso('ADMIN_USER')) {

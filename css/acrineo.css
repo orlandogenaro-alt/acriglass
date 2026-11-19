@@ -955,3 +955,21 @@ body.an-redim-y, body.an-redim-y * { cursor: row-resize !important; }
 .an-lg-tambien { display: block; font-size: 11px; color: var(--ambar); font-weight: 600; }
 .an-lg-ya { font-size: 12px; font-weight: 700; color: var(--verde); }
 .an-lg-exacto td { background: var(--fila-hover); }
+
+/* ---------- Catálogos generales (acrineo-catalogos.php) ---------- */
+.an-catgen .an-catgen-sub { font-size: 11.5px; font-weight: 700; opacity: .85; }
+.an-catgen-nota { margin: 8px 12px 0; padding: 8px 12px; font-size: 12px; }
+.an-catgen-tabla td { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.an-catgen-tabla td.an-cat-clave { background: var(--azul) !important; color: #fff; font-weight: 700; }
+.an-catgen-tabla tr.sel td.an-cat-clave { background: var(--azul-hover) !important; }
+.an-catgen-tabla td.an-centro { text-align: center; color: var(--verde); font-weight: 800; }
+.an-catgen-tabla td a { color: var(--azul-texto); }
+.an-catgen-tabla tr.an-bloqueado td:not(.an-cat-clave) { color: var(--texto-2); }
+.an-catgen-tabla tr.an-editando td { padding-top: 3px; padding-bottom: 3px; overflow: visible; }
+.an-catgen-tabla tr.an-editando td.an-cat-clave { background: var(--azul-suave) !important; color: var(--texto); }
+.an-catgen-in { width: 100%; min-width: 70px; height: 26px; padding: 0 6px; border: 1px solid var(--borde-2); border-radius: 4px; background: var(--input); }
+.an-catgen-in:focus { outline: none; border-color: var(--azul-texto); box-shadow: 0 0 0 3px var(--foco); }
+.an-catgen-in[readonly] { background: var(--sub); color: var(--texto-3); }
+.an-catgen-in.invalido { border-color: var(--rojo); background: var(--rojo-suave); }
+.an-catgen-in.an-mayus { text-transform: uppercase; }
+.an-catgen-tabla th.an-col-acc, .an-catgen-tabla td.an-col-acc { width: 84px; text-align: right; padding: 2px 8px; }

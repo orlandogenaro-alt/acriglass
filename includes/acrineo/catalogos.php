@@ -52,7 +52,11 @@ function acrineoBuscarCatalogo(string $clave, string $q, int $pagina = 1, int $p
 
     if (!empty($c['fijo'])) {
         $items = [];
-        foreach (ACRINEO_TIPOS_LICITACION as $t) {
+        // Catálogo Tipos de licitaciones (migración 035); sin ella, los cinco fijos
+        $tipos = bd_tiene_tabla('AW', 'acrineo_tipos_licitacion')
+            ? array_map(fn($t) => trim($t), array_column(bd_filas('AW', 'select descripcion from acrineo_tipos_licitacion order by tipo_licitacion_id'), 'descripcion'))
+            : ACRINEO_TIPOS_LICITACION;
+        foreach ($tipos as $t) {
             if ($q === '' || mb_stripos($t, trim($q)) !== false) $items[] = ['id' => $t, 'nombre' => $t, 'extra' => null];
         }
         return ['titulo' => $c['titulo'], 'extra_titulo' => '', 'items' => array_slice($items, ($pagina - 1) * $porPagina, $porPagina),

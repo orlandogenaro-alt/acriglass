@@ -17,7 +17,7 @@ $ruta = ltrim(rawurldecode((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PH
 if ($ruta === '') $ruta = 'index.php';
 
 // ACRINEO: rutas limpias de su API (api/acrineo/presupuestos/15/historial → presupuestos.php?id=15&recurso=historial)
-if (preg_match('#^api/acrineo/presupuestos(?:/(\d+))?(?:/(historial|documentos))?/?$#', $ruta, $m)) {
+if (preg_match('#^api/acrineo/presupuestos(?:/(\d+))?(?:/(historial|documentos|ligados))?/?$#', $ruta, $m)) {
     if (!empty($m[1])) $_GET['id'] = $m[1];
     if (!empty($m[2])) $_GET['recurso'] = $m[2];
     $ruta = 'api/acrineo/presupuestos.php';

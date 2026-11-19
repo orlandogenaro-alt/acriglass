@@ -10,6 +10,8 @@
 //   POST   api/acrineo/presupuestos/{id}/documentos      subir (multipart: tipo, moneda, archivo)
 //   DELETE api/acrineo/presupuestos/{id}/documentos?doc={n}
 //   GET    api/acrineo/presupuestos/respaldo?ids=1,2     descarga el respaldo JSON
+//   GET    api/acrineo/presupuestos/{id}/ligados         facturas y folios de Easy-Glass ligados  ·  &q=texto  busca para ligar
+//   POST   api/acrineo/presupuestos/{id}/ligados         liga un folio de la búsqueda  ·  DELETE …/ligados?ligado={n}
 // Equivalente sin rutas limpias: api/acrineo/presupuestos.php?id={id}&recurso=historial|documentos|respaldo
 define('ACRI_API', true);
 require __DIR__ . '/../../includes/sesion.php';
@@ -130,6 +132,26 @@ try {
                 if (!$doc) error('Falta el documento.', 400);
                 responder(['ok' => true, 'documentos' => acrineoDocEliminar($id, $doc, $usuario), 'mensaje' => 'Documento eliminado.']);
             }
+            break;
+
+        case 'ligados':   // Facturas y folios de Easy-Glass ligados (includes/acrineo/ligados.php)
+            require_once __DIR__ . '/../../includes/acrineo/ligados.php';
+            if (!acrineoObtener($id)) error('El presupuesto no existe o fue eliminado.', 404);
+            if ($metodo === 'GET') {
+                if (isset($_GET['q'])) {
+                    @set_time_limit(60);
+                    responder(['ok' => true, 'filas' => acrineoLigadosBuscar($id, (string) $_GET['q'])]);
+                }
+                if (!empty($_GET['precargar'])) {   // al abrir la ventana: deja listo el índice de facturas de Microsip
+                    require_once __DIR__ . '/../../includes/folios-easyglass.php';
+                    try { facturasMicrosipIndice(); } catch (Throwable $e) {}
+                    responder(['ok' => true]);
+                }
+                responder(['ok' => true] + acrineoLigadosListar($id));
+            }
+            necesita($puede, 'presupuestos.documentos');
+            if ($metodo === 'POST') responder(['ok' => true, 'mensaje' => 'Folio ligado.'] + acrineoLigar($id, entrada(), $usuario));
+            if ($metodo === 'DELETE') responder(['ok' => true, 'mensaje' => 'Folio quitado.'] + acrineoDesligar($id, (int) ($_GET['ligado'] ?? 0), $usuario));
             break;
 
         default:

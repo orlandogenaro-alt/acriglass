@@ -896,3 +896,31 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 .an-neo-ver.nueva { color: var(--verde); background: var(--sub); }
 .an-neo-ver.vieja { color: var(--rojo); background: var(--rojo-suave); }
 .an-neo-ver.igual { color: var(--texto-2); background: var(--sub); }
+
+/* ---------- Facturas y Easy-Glass del presupuesto (includes/acrineo/vistas/ligados.php) ---------- */
+.an-ligados-dlg { width: min(1180px, 96vw); max-height: 94vh; }
+.an-ligados-dlg .an-titulo-barra > svg.i { width: 18px; height: 18px; }
+.an-lg-cuerpo { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; overflow: auto; min-height: 0; }
+.an-lg-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.an-lg-dato { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border: 1px solid var(--borde); border-radius: 8px; background: var(--sub); }
+.an-lg-dato span { font-size: 11.5px; color: var(--texto-2); }
+.an-lg-dato b { font-size: 15px; }
+.an-lg-dato small { font-size: 11px; color: var(--texto-2); }
+.an-lg-dato.fac b { color: var(--verde); }
+.an-lg-dato.mas b { color: var(--rojo); }
+.an-lg-dato.ped b, .an-lg-dato.eg b { color: var(--azul); }
+.an-lg-seccion h3 { margin: 0 0 6px; font-size: 13px; }
+.an-lg-lista { max-height: 30vh; border: 1px solid var(--borde); border-radius: 6px; }
+.an-lg-lista td { vertical-align: middle; }
+.an-lg-det { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.an-lg-lista td:nth-child(4) { max-width: 200px; white-space: normal; }
+.an-lg-lista td:last-child { width: 1%; white-space: nowrap; }
+.an-lg-buscar { display: flex; margin-bottom: 6px; }
+.an-lg-buscar input { flex: 1; }
+.an-lg-origen { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11.5px; font-weight: 700; white-space: nowrap; background: var(--sub); }
+.an-lg-origen.fac { color: var(--verde); }
+.an-lg-origen.ped { color: var(--azul); }
+.an-lg-origen.eg { color: var(--ambar); background: var(--ambar-suave); }
+.an-lg-tambien { display: block; font-size: 11px; color: var(--ambar); font-weight: 600; }
+.an-lg-ya { font-size: 12px; font-weight: 700; color: var(--verde); }
+.an-lg-exacto td { background: var(--fila-hover); }

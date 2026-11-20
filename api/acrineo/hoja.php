@@ -10,6 +10,7 @@
 //   GET  ?id=P&recurso=calculo                    opciones de la ventana «Cálculo» · POST calcular {opciones…, marcados} (includes/acrineo/calculo.php)
 //   GET  ?id=P&recurso=filtrar&q=                partidas con conceptos que coinciden (filtro de todo el presupuesto)
 //   GET  ?id=P&recurso=codigo&padre=X           código sugerido para una partida nueva
+//   GET  ?id=P&recurso=renglon_codigo&codigo=X   renglón de matriz ya capturado con ese código (o insumo del catálogo), para llenarlo solo
 //   POST ?id=P  { accion, … }                    cambios (regresa el estado de la hoja):
 //        partida_crear {padre_id, codigo, descripcion} · partida_guardar {partida_id, codigo, descripcion}
 //        partida_eliminar {partida_id} · partida_duplicar {partida_id} · partida_mover {partida_id, direccion: arriba|abajo|izquierda|derecha}
@@ -61,6 +62,8 @@ try {
             case 'explosion_acoplada':
                 $ver = in_array($_GET['ver'] ?? '', ['todos', 'conceptos', 'insumos'], true) ? $_GET['ver'] : 'todos';
                 responder(['ok' => true] + acrineoExplosionAcoplada($ctx, (string) ($_GET['q'] ?? ''), acrineoModoBusqueda(), $ver));
+            case 'renglon_codigo':
+                responder(['ok' => true] + acrineoRenglonPorCodigo($ctx, (string) ($_GET['codigo'] ?? '')));
             case 'participa':
                 responder(['ok' => true] + acrineoParticipa($ctx, (string) ($_GET['clave'] ?? '')));
             case 'explosion':

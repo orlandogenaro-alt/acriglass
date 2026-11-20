@@ -4,6 +4,13 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-11-20',
+        'cambios' => [
+            ['nuevo', 'ACRINEO: copiar y pegar renglones de la matriz entre conceptos', 'En la matriz, «Copiar renglones» (en las acciones de la derecha, en el clic derecho o con Ctrl+C) copia los renglones marcados (en edición) o, si no hay marcados, todos; con el clic derecho también se copia solo ese renglón. En la matriz de otro concepto, aunque sea de otro presupuesto, «Pegar renglones» (o Ctrl+V) los agrega con su código, descripción, tipo, unidad, costo, cálculo, cantidad y % de desperdicio; quedan en edición hasta GUARDAR. Un renglón que tiene su propia submatriz se pega con su costo, sin la submatriz. Lo copiado también se puede pegar en Excel.'],
+            ['mejora', 'ACRINEO: el renglón de la matriz se llena solo con su código', 'Al escribir en un renglón de la matriz un código que ya se usó (en otro renglón de la misma matriz, en la matriz de otro concepto del presupuesto, de otro presupuesto o en el catálogo de insumos), al salir del código el renglón se llena con su tipo, descripción, unidad, cálculo, cantidad, % de desperdicio y costo, y el cursor queda en la cantidad para ajustarla. Ctrl+Z (↶) lo deshace.'],
+        ],
+    ],
+    [
         'fecha' => '2026-11-19',
         'cambios' => [
             ['nuevo', 'ACRINEO: botón «Imprimir» en la hoja del presupuesto', 'Junto a «Facturas y Easy-Glass» hay un botón Imprimir ▾ con Imprimir (o guardar como PDF) y Exportar a Excel del presupuesto en el formato PRESUPUESTO DE OBRA de la Hoja Membretada; «Otros reportes…» abre la ventana de siempre (Ctrl+P) con el análisis de precios unitarios y la explosión de insumos. El formato quedó como el de Excel que se usaba: empresa, subtítulo y logo arriba, Fecha y Cotización, la caja con Empresa (el cliente), Obra, En atención a y Lugar (la ciudad), la barra negra de columnas, los conceptos (con una sola partida ya no sale el renglón ni el total de la partida), TOTAL DEL PRESUPUESTO MOSTRADO SIN IVA, IVA, TOTAL DEL PRESUPUESTO MOSTRADO, el importe con letra y las condiciones comerciales. El Excel sale con ese mismo diseño (logo, celdas combinadas, sin cuadrícula y ajustado a una hoja carta de ancho) en lugar de la lista simple de antes.'],

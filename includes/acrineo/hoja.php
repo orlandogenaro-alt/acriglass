@@ -706,6 +706,37 @@ function acrineoInsumosTabla(string $q, int $pagina = 1, int $porPagina = 100, s
     return ['items' => $items, 'total' => $total, 'pagina' => $pagina, 'por_pagina' => $porPagina];
 }
 
+// Renglón de matriz con ese código, para llenar solo el renglón que se captura en otra matriz: primero el más
+// reciente de este presupuesto, luego el de cualquier otro presupuesto vigente y al final el insumo del catálogo.
+// Regresa { renglon: {tipo, codigo, descripcion, unidad, base, cantidad, desperdicio_pct, costo, insumo_id} | null, origen }
+function acrineoRenglonPorCodigo(array $ctx, string $codigo): array
+{
+    $codigo = trim($codigo);
+    if ($codigo === '' || mb_strlen($codigo) > 30) return ['renglon' => null, 'origen' => null];
+    $f = bd_fila('AW', "select m.insumo_id, m.tipo, m.codigo, m.descripcion, m.unidad, m.base, m.cantidad, m.desperdicio_pct, m.costo,
+                               c.codigo as concepto, p.presupuesto_id, p.codigo as presupuesto
+                          from acrineo_matriz m
+                          join acrineo_conceptos c on c.concepto_id = m.concepto_id
+                          join acrineo_presupuestos p on p.presupuesto_id = c.presupuesto_id and p.deleted_at is null
+                         where upper(btrim(m.codigo)) = upper(?)
+                         order by (p.presupuesto_id = ?) desc, m.matriz_id desc limit 1", [$codigo, $ctx['id']]);
+    if ($f) {
+        $mismo = (int) $f['presupuesto_id'] === (int) $ctx['id'];
+        return ['renglon' => [
+            'insumo_id' => $f['insumo_id'] === null ? null : (int) $f['insumo_id'], 'tipo' => trim($f['tipo']), 'codigo' => trim((string) $f['codigo']),
+            'descripcion' => $f['descripcion'], 'unidad' => (string) $f['unidad'], 'base' => (string) ($f['base'] ?? ''),
+            'cantidad' => (float) $f['cantidad'], 'desperdicio_pct' => (float) $f['desperdicio_pct'], 'costo' => (float) $f['costo'],
+        ], 'origen' => 'la matriz de ' . $f['concepto'] . ($mismo ? '' : ' (presupuesto ' . $f['presupuesto'] . ')')];
+    }
+    foreach (acrineoInsumosTabla($codigo, 1, 20, 'comienza')['items'] as $i) {
+        if (mb_strtoupper(trim($i['codigo'])) !== mb_strtoupper($codigo)) continue;
+        return ['renglon' => ['insumo_id' => $i['insumo_id'], 'tipo' => $i['tipo'], 'codigo' => $i['codigo'], 'descripcion' => $i['descripcion'],
+                              'unidad' => $i['unidad'], 'base' => '', 'cantidad' => 1, 'desperdicio_pct' => 0, 'costo' => $i['costo'] ?? 0],
+                'origen' => 'el catálogo de insumos'];
+    }
+    return ['renglon' => null, 'origen' => null];
+}
+
 // Guarda un nivel completo de la matriz: la del concepto ($padreId null) o la submatriz del renglón $padreId.
 // Los renglones que traen su matriz_id se actualizan (y conservan su submatriz); los que faltan se borran (con la
 // suya) y los nuevos se agregan. El costo de un renglón con submatriz es el total de ella, y el total sube nivel por

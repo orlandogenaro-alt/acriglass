@@ -33,6 +33,9 @@
 
     var st = { concepto: null, filas: [], guardadas: '[]', original: '', sec: 0, marcados: new Set(), guardando: false, abierta: false,
                editando: false, deshacer: [], rehacer: [], fotoPendiente: null, padre: null, ruta: [] };
+    // Portapapeles de renglones de matriz de ACRINEO (Copiar / Pegar renglones entre conceptos)
+    var PORTA = 'acrineo.matriz.renglones';
+    function portapapeles() { try { return JSON.parse(localStorage.getItem(PORTA)) || null; } catch (e) { return null; } }
     var cat = { items: [], total: 0, pagina: 1, marcados: new Map(), cargado: false, ctrl: null, fuente: 'catalogo' };
     try { if (localStorage.getItem('acrineo.matriz.fuente') === 'explosion') cat.fuente = 'explosion'; } catch (e) { /* sin memoria */ }
     // Clave de un insumo del panel de abajo: del catálogo, su insumo_id; de la explosión, la que manda el servidor
@@ -193,7 +196,12 @@
         var s = sucio(), ed = editable();
         panel.classList.toggle('con-cambios', s);
         $('anTabMatriz').classList.toggle('con-cambios', s);
+        $('anMatrizCopiarRen').disabled = !st.filas.length;
+        $('anMatrizCopiarRen').querySelector('span').textContent = st.marcados.size ? 'Copiar marcados (' + st.marcados.size + ')' : 'Copiar renglones';
         if (!H.puede) return;
+        var pp = ((portapapeles() || {}).filas || []).length;
+        $('anMatrizPegarRen').disabled = !st.concepto || !pp;
+        $('anMatrizPegarRen').querySelector('span').textContent = 'Pegar renglones' + (pp ? ' (' + pp + ')' : '');
         $('anMatrizEditar').setAttribute('aria-pressed', String(ed));
         $('anMatrizEditar').title = ed ? 'Salir de la edición' : 'Editar la matriz';
         $('anMatrizGuardar').disabled = $('anMatrizGuardarCab').disabled = st.guardando || !s;
@@ -467,6 +475,80 @@
         estado(nuevas.length + ' insumo(s) copiados a la matriz' + (sinPrecio.length ? ' · sin precio vigente, captura su costo: ' + sinPrecio.join(', ') : '') + '. Revisa y GUARDA.', sinPrecio.length ? 'error' : 'info');
     }
 
+    // ---------- Llenar el renglón con su código ----------
+    // Al escribir un código que ya se usó (en otro renglón de esta matriz, en la matriz de otro concepto o en el catálogo
+    // de insumos), el renglón se llena con su tipo, descripción, unidad, cálculo, cantidad, % desp. y costo. Ctrl+Z lo deshace.
+    var LLENAR = ['insumo_id', 'tipo', 'codigo', 'descripcion', 'unidad', 'base', 'cantidad', 'desperdicio_pct', 'costo'];
+    function mismoCodigo(a, b) { return String(a || '').trim().toUpperCase() === String(b || '').trim().toUpperCase(); }
+    async function llenarPorCodigo(f) {
+        var codigo = String(f.codigo || '').trim();
+        if (!codigo || f.hijos || !editable()) return;
+        var origen = null, datos = null;
+        var otra = st.filas.find(function (x) { return x !== f && mismoCodigo(x.codigo, codigo) && String(x.descripcion || '').trim(); });
+        if (otra) { datos = otra; origen = 'el renglón ' + (st.filas.indexOf(otra) + 1) + ' de esta matriz'; }
+        else {
+            try {
+                var r = await AN.api.get(H.url({ recurso: 'renglon_codigo', codigo: codigo }));
+                if (r.renglon) { datos = r.renglon; origen = r.origen; }
+            } catch (e) { return; }
+        }
+        // El usuario siguió escribiendo o ya salió de edición: no se toca
+        if (!datos || !editable() || st.filas.indexOf(f) < 0 || !mismoCodigo(f.codigo, codigo)) return;
+        if (String(f.descripcion).trim() === String(datos.descripcion).trim() && String(f.unidad).trim() === String(datos.unidad || '').trim()
+            && Number(f.costo) === Number(datos.costo)) return;
+        guardarFoto();
+        LLENAR.forEach(function (k) {
+            var v = datos[k];
+            f[k] = k === 'insumo_id' ? (v || null) : String(v == null ? '' : v);
+        });
+        calcular();
+        pintar();
+        var c = tbody.querySelector('tr[data-clave="' + f.clave + '"] [data-k="cantidad"]');
+        if (c) { c.focus(); c.select(); }
+        estado('Renglón llenado con el código ' + codigo + ' de ' + origen + '. Revisa la cantidad (Ctrl+Z lo deshace).', 'info');
+    }
+
+    // ---------- Copiar y pegar renglones entre matrices ----------
+    // «Copiar renglones» (Ctrl+C) guarda los marcados (o el renglón del clic derecho) en el portapapeles de ACRINEO de este
+    // navegador; en la matriz de otro concepto (aunque sea de otro presupuesto) «Pegar renglones» (Ctrl+V) los agrega
+    // como si se capturaran: quedan en edición hasta GUARDAR. Un renglón con submatriz se pega con su costo, sin la submatriz.
+    function copiarRenglones(filas) {
+        if (!filas.length) return;
+        var datos = filas.map(function (f) {
+            var o = { conMatriz: !!f.hijos };
+            LLENAR.forEach(function (k) { o[k] = k === 'insumo_id' ? (f.insumo_id || null) : String(f[k] == null ? '' : f[k]); });
+            return o;
+        });
+        try { localStorage.setItem(PORTA, JSON.stringify({ concepto: st.concepto ? st.concepto.codigo : '', presupuesto: H.ctx.codigo, filas: datos })); }
+        catch (e) { AN.ui.aviso('El navegador no dejó guardar la copia.', 'error'); return; }
+        // También como texto, para pegarlo en Excel
+        var txt = datos.map(function (d) { return [d.codigo, d.descripcion, tipoTexto(d.tipo), d.unidad, d.costo, BASES[d.base || ''], d.cantidad, d.desperdicio_pct].join('\t'); }).join('\r\n');
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).catch(function () { /* solo el de ACRINEO */ });
+        AN.ui.aviso(datos.length + ' renglón(es) copiados. Abre la matriz de otro concepto y usa «Pegar renglones» (Ctrl+V).', 'ok', 5000);
+        botones();
+    }
+    function aCopiar(f) {
+        if (st.marcados.size) return st.filas.filter(function (x) { return st.marcados.has(x.clave); });
+        return f ? [f] : [];
+    }
+    function pegarRenglones() {
+        var p = portapapeles();
+        if (!H.puede || !st.concepto || !p || !p.filas || !p.filas.length) return;
+        var conMatriz = p.filas.filter(function (d) { return d.conMatriz; }).length;
+        agregarFilas(p.filas.map(function (d) {
+            var o = {};
+            LLENAR.forEach(function (k) { o[k] = d[k]; });
+            return o;
+        }));
+        estado(p.filas.length + ' renglón(es) pegados de ' + (p.concepto || 'otra matriz') + (p.presupuesto && p.presupuesto !== H.ctx.codigo ? ' (' + p.presupuesto + ')' : '')
+            + (conMatriz ? ' · ' + conMatriz + ' tenía(n) submatriz: se pegaron con su costo, sin la submatriz' : '') + '. Revisa y GUARDA.', 'info');
+    }
+
+    $('anMatrizCopiarRen').addEventListener('click', function () { copiarRenglones(st.marcados.size ? aCopiar(null) : st.filas.slice()); });
+    if ($('anMatrizPegarRen')) $('anMatrizPegarRen').addEventListener('click', pegarRenglones);
+    // Lo copiado en otra pestaña del navegador también se puede pegar aquí
+    window.addEventListener('storage', function (e) { if (e.key === PORTA) botones(); });
+
     // ---------- Eventos de la matriz ----------
     tbody.addEventListener('focusin', function (e) { if (e.target.dataset.k && st.editando) st.fotoPendiente = foto(); });
     tbody.addEventListener('input', function (e) {
@@ -512,6 +594,7 @@
             botones();
             return;
         }
+        if (e.target.dataset.k === 'codigo') { llenarPorCodigo(f); return; }
         if (e.target.tagName === 'SELECT') {
             guardarFoto(st.fotoPendiente || undefined);
             st.fotoPendiente = null;
@@ -911,6 +994,12 @@
             { texto: 'Ver matriz', atajo: 'Ctrl+M', desactivado: !f || !!f.base, accion: function () { verMatrizDe(f); } },
             { texto: 'Participa', desactivado: !f, accion: function () { participa(claveExplosion(f), f.codigo || f.descripcion); } },
             null,
+            { texto: st.marcados.size ? 'Copiar renglones marcados (' + st.marcados.size + ')' : 'Copiar renglón', atajo: 'Ctrl+C',
+              desactivado: !aCopiar(f).length, accion: function () { copiarRenglones(aCopiar(f)); } },
+            { texto: 'Copiar todos los renglones', desactivado: !st.filas.length, accion: function () { copiarRenglones(st.filas.slice()); } },
+            { texto: 'Pegar renglones' + ((portapapeles() || {}).filas ? ' (' + portapapeles().filas.length + ')' : ''), atajo: 'Ctrl+V',
+              desactivado: !H.puede || !st.concepto || !((portapapeles() || {}).filas || []).length, accion: pegarRenglones },
+            null,
             { texto: 'Marcar todo', desactivado: !H.puede || !st.filas.length, accion: function () { marcarTodo(true); } },
             { texto: 'Desmarcar todo', desactivado: !H.puede || !st.marcados.size, accion: function () { marcarTodo(false); } }
         ]);
@@ -938,6 +1027,14 @@
                    && !(window.getSelection && String(window.getSelection()))) {
             e.preventDefault();
             copiarAbajo(clavesAbajo(ultimo.clave));
+        } else if (k === 'c' && ultimo.donde === 'matriz' && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== 'checkbox')
+                   && !(window.getSelection && String(window.getSelection()))) {
+            var fc = st.filas.find(function (x) { return x.clave === ultimo.clave; });
+            if (aCopiar(fc).length) { e.preventDefault(); copiarRenglones(aCopiar(fc)); }
+        } else if (k === 'v' && ultimo.donde !== 'insumos' && H.puede && st.concepto && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== 'checkbox')
+                   && ((portapapeles() || {}).filas || []).length) {
+            e.preventDefault();
+            pegarRenglones();
         }
     });
     if (AN.rejilla) {

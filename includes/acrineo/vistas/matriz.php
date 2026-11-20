@@ -76,6 +76,10 @@ $icoCopiar = '<svg class="i" viewBox="0 0 24 24"><path d="M3 11.5 21 4l-7.5 18-2
             <?php if ($puedeMatriz): ?>
             <button type="button" class="an-riel-btn an-riel-primario" id="anMatrizAjustar" title="Ajuste del precio unitario"><?= $icoBillete ?><span>Ajustar precio unitario</span></button>
             <?php endif; ?>
+            <button type="button" class="an-riel-btn" id="anMatrizCopiarRen" title="Copiar renglones (Ctrl+C): los marcados o, si no hay, todos; se pegan en la matriz de otro concepto"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg><span>Copiar renglones</span></button>
+            <?php if ($puedeMatriz): ?>
+            <button type="button" class="an-riel-btn" id="anMatrizPegarRen" title="Pegar renglones (Ctrl+V) copiados de otra matriz" disabled><?= anIcono('portapapeles') ?><span>Pegar renglones</span></button>
+            <?php endif; ?>
             <button type="button" class="an-riel-btn" id="anMatrizAnterior" title="Matriz del concepto anterior de la partida"><svg class="i" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Anterior</span></button>
             <button type="button" class="an-riel-btn" id="anMatrizSiguiente" title="Matriz del concepto siguiente de la partida"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>Siguiente</span></button>
             <button type="button" class="an-riel-btn" id="anMatrizDesacoplar" aria-pressed="false" title="Oculta el catálogo de insumos de abajo"><svg class="i" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg><span>Desacoplar exp. ins.</span></button>

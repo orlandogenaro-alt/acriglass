@@ -12,6 +12,8 @@
     var puede = !!(cfg.permisos && cfg.permisos['presupuestos.editar']);
     var API = 'api/acrineo/hoja.php';
     var tbody = $('anPartidas');
+    var COLS = 7;   // Partida, Descripción, Costo, Precio, Costo x M2, Precio x M2, Metros cuadrados
+    var fmtM2 = new Intl.NumberFormat('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
     var CHEVRON = '<svg class="i" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>';
 
     var oyentes = [];
@@ -22,7 +24,7 @@
         sel: null,
         puede: puede,
         cerrados: {},
-        edicion: null,          // { modo: 'nueva'|'editar', padre_id, partida_id, codigo, descripcion }
+        edicion: null,          // { modo: 'nueva'|'editar', padre_id, partida_id, codigo, descripcion, metros_cuadrados }
         filtro: { q: '', ids: null, visibles: null },   // filtro de conceptos: texto y, con «Todo el presupuesto», las partidas que coinciden
         renglonesPendientes: function () { return false; },   // lo reemplaza hoja-renglones.js
         url: function (p) { return AN.api.url(API, Object.assign({ id: H.id }, p || {})); },
@@ -106,8 +108,9 @@
     function filaEdicion(e, nivel) {
         return '<tr class="an-edicion"><td style="padding-left:' + (8 + nivel * 16) + 'px">'
             + '<input id="anPEdCodigo" maxlength="30" value="' + esc(e.codigo) + '" aria-label="Partida"></td>'
-            + '<td colspan="3"><input id="anPEdDesc" maxlength="4000" value="' + esc(e.descripcion) + '" aria-label="Descripción completa"></td></tr>'
-            + '<tr class="an-edicion-botones"><td colspan="4"><small>' + (e.modo === 'nueva' ? (e.padre_id ? 'Nueva subpartida' : 'Nueva partida') : 'Editando partida')
+            + '<td colspan="' + (COLS - 2) + '"><input id="anPEdDesc" maxlength="4000" value="' + esc(e.descripcion) + '" aria-label="Descripción completa"></td>'
+            + '<td><input id="anPEdM2" class="num" inputmode="decimal" value="' + esc(e.metros_cuadrados) + '" aria-label="Metros cuadrados" title="Metros cuadrados de la partida"></td></tr>'
+            + '<tr class="an-edicion-botones"><td colspan="' + COLS + '"><small>' + (e.modo === 'nueva' ? (e.padre_id ? 'Nueva subpartida' : 'Nueva partida') : 'Editando partida')
             + ' · Enter aplica, Esc cancela</small><button type="button" class="an-btn an-texto an-mini" id="anPEdCancelar">Cancelar</button>'
             + '<button type="button" class="an-btn an-primario an-mini" id="anPEdAplicar">Aplicar</button></td></tr>';
     }
@@ -142,14 +145,16 @@
                 html += '<tr class="an-fila' + (p.id === H.sel ? ' sel' : '') + '" data-id="' + p.id + '" tabindex="0" aria-level="' + (p.nivel + 1) + '" aria-selected="' + (p.id === H.sel) + '">'
                     + '<td style="padding-left:' + (8 + p.nivel * 16) + 'px"><span class="an-sangria">' + toggle + esc(p.codigo) + '</span></td>'
                     + '<td title="' + esc(p.descripcion) + '">' + esc(p.descripcion) + '</td>'
-                    + '<td class="num">' + AN.ui.dinero(p.costo) + '</td><td class="num">' + AN.ui.dinero(p.venta) + '</td></tr>';
+                    + '<td class="num">' + AN.ui.dinero(p.costo) + '</td><td class="num">' + AN.ui.dinero(p.venta) + '</td>'
+                    + '<td class="num">' + AN.ui.dinero(p.costo_m2) + '</td><td class="num">' + AN.ui.dinero(p.venta_m2) + '</td>'
+                    + '<td class="num">' + fmtM2.format(Number(p.metros_cuadrados) || 1) + '</td></tr>';
             }
             if (despues === p.id) html += filaEdicion(e, nivelNueva);
         });
         if (!html && H.filtro.visibles && H.partidas.length) {
-            html = '<tr class="an-vacio"><td colspan="4">Ninguna partida tiene conceptos que coincidan con «' + esc(H.filtro.q) + '».</td></tr>';
+            html = '<tr class="an-vacio"><td colspan="' + COLS + '">Ninguna partida tiene conceptos que coincidan con «' + esc(H.filtro.q) + '».</td></tr>';
         } else if (!html) {
-            html = '<tr class="an-vacio"><td colspan="4">El presupuesto todavía no tiene partidas.'
+            html = '<tr class="an-vacio"><td colspan="' + COLS + '">El presupuesto todavía no tiene partidas.'
                 + (puede ? '<br><button type="button" class="an-btn an-primario" data-primera>+ Agregar partida</button>' : '') + '</td></tr>';
         }
         tbody.innerHTML = html;
@@ -177,7 +182,7 @@
         try {
             var r = await AN.api.get(H.url({ recurso: 'codigo', padre: padreId || '' }));
             if (padreId) H.cerrados[padreId] = false;
-            H.edicion = { modo: 'nueva', padre_id: padreId || null, codigo: r.codigo, descripcion: '' };
+            H.edicion = { modo: 'nueva', padre_id: padreId || null, codigo: r.codigo, descripcion: '', metros_cuadrados: '1' };
             pintar();
         } catch (e) { AN.ui.aviso(e.message, 'error'); }
     }
@@ -185,7 +190,7 @@
     function editar() {
         var p = H.partida();
         if (!p || H.edicion) return;
-        H.edicion = { modo: 'editar', partida_id: p.id, codigo: p.codigo, descripcion: p.descripcion };
+        H.edicion = { modo: 'editar', partida_id: p.id, codigo: p.codigo, descripcion: p.descripcion, metros_cuadrados: String(p.metros_cuadrados || 1) };
         pintar();
     }
 
@@ -196,14 +201,18 @@
         if (!e || e.guardando) return;
         e.codigo = $('anPEdCodigo').value.trim();
         e.descripcion = $('anPEdDesc').value.trim();
+        e.metros_cuadrados = $('anPEdM2').value.trim().replace(/,/g, '') || '1';
+        var m2 = Number(e.metros_cuadrados), m2Mal = !isFinite(m2) || m2 <= 0;
         $('anPEdCodigo').classList.toggle('invalido', !e.codigo);
         $('anPEdDesc').classList.toggle('invalido', !e.descripcion);
+        $('anPEdM2').classList.toggle('invalido', m2Mal);
         if (!e.codigo || !e.descripcion) { AN.ui.aviso('La partida necesita código y descripción.', 'error'); return; }
+        if (m2Mal) { AN.ui.aviso('Los metros cuadrados deben ser un número mayor que cero.', 'error'); $('anPEdM2').focus(); return; }
         e.guardando = true;
         try {
             var r = await AN.api.post(H.url(), e.modo === 'nueva'
-                ? { accion: 'partida_crear', padre_id: e.padre_id, codigo: e.codigo, descripcion: e.descripcion }
-                : { accion: 'partida_guardar', partida_id: e.partida_id, codigo: e.codigo, descripcion: e.descripcion });
+                ? { accion: 'partida_crear', padre_id: e.padre_id, codigo: e.codigo, descripcion: e.descripcion, metros_cuadrados: e.metros_cuadrados }
+                : { accion: 'partida_guardar', partida_id: e.partida_id, codigo: e.codigo, descripcion: e.descripcion, metros_cuadrados: e.metros_cuadrados });
             H.edicion = null;
             var nuevaId = r.partida_id || e.partida_id;
             H.aplicar(r);
@@ -214,7 +223,8 @@
             var errs = err.errores || {};
             if (errs.codigo) $('anPEdCodigo').classList.add('invalido');
             if (errs.descripcion) $('anPEdDesc').classList.add('invalido');
-            AN.ui.aviso(errs.codigo || errs.descripcion || err.message, 'error');
+            if (errs.metros_cuadrados) $('anPEdM2').classList.add('invalido');
+            AN.ui.aviso(errs.codigo || errs.descripcion || errs.metros_cuadrados || err.message, 'error');
         }
     }
 
@@ -309,7 +319,7 @@
         if (tr && puede && !H.edicion && +tr.dataset.id === H.sel) editar();
     });
     tbody.addEventListener('keydown', function (e) {
-        if (e.target.id === 'anPEdCodigo' || e.target.id === 'anPEdDesc') {
+        if (e.target.id === 'anPEdCodigo' || e.target.id === 'anPEdDesc' || e.target.id === 'anPEdM2') {
             if (e.key === 'Enter') { e.preventDefault(); aplicarEdicion(); }
             else if (e.key === 'Escape') { e.preventDefault(); cancelar(); }
             return;

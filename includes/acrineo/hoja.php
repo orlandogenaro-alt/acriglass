@@ -43,6 +43,24 @@ function acrineoHojaDisponible(): bool
         && bd_tiene_columna('AW', 'acrineo_conceptos', 'url');
 }
 
+// Metros cuadrados de la partida (migración 036): Costo x M2 y Precio x M2 en el árbol
+function acrineoPartidaM2Disponible(): bool
+{
+    static $si = null;
+    return $si ??= bd_tiene_columna('AW', 'acrineo_partidas', 'metros_cuadrados');
+}
+
+// Metros cuadrados que manda la pantalla: número mayor que cero (vacío = 1)
+function acrineoValidarM2($v): float
+{
+    $v = trim(str_replace(',', '', (string) ($v ?? '')));
+    if ($v === '') return 1.0;
+    if (!is_numeric($v) || (float) $v <= 0 || (float) $v > 99999999) {
+        throw new AcrineoError('Revisa la partida.', 422, ['metros_cuadrados' => 'Los metros cuadrados deben ser un número mayor que cero.']);
+    }
+    return round((float) $v, 4);
+}
+
 // Datos del presupuesto que usa la hoja; 404 si no existe
 function acrineoHojaContexto(int $id): array
 {
@@ -75,12 +93,14 @@ function acrineoHojaMonedas(int $id): array
 // Partidas en orden de árbol, con nivel y totales (los suyos más los de sus subpartidas)
 function acrineoPartidas(array $ctx): array
 {
-    $filas = bd_filas('AW', 'select partida_id as id, padre_id, codigo, descripcion, orden from acrineo_partidas where presupuesto_id = ?', [$ctx['id']]);
+    $m2 = acrineoPartidaM2Disponible() ? 'metros_cuadrados' : '1 as metros_cuadrados';
+    $filas = bd_filas('AW', "select partida_id as id, padre_id, codigo, descripcion, orden, $m2 from acrineo_partidas where presupuesto_id = ?", [$ctx['id']]);
     $padres = [];
     foreach ($filas as &$f) {
         $f['id'] = (int) $f['id'];
         $f['padre_id'] = $f['padre_id'] === null ? null : (int) $f['padre_id'];
         $f['orden'] = (int) $f['orden'];
+        $f['metros_cuadrados'] = (float) $f['metros_cuadrados'] ?: 1.0;
         $padres[$f['id']] = $f['padre_id'];
     }
     unset($f);
@@ -90,7 +110,13 @@ function acrineoPartidas(array $ctx): array
         $propios[$r['partida_id']]['venta'] = ($propios[$r['partida_id']]['venta'] ?? 0) + $r['importe'];
     }
     $tot = acrineoTotalesPartidas($padres, $propios, $ctx['dec_costos']);
-    foreach ($filas as &$f) { $f['costo'] = $tot[$f['id']]['costo']; $f['venta'] = $tot[$f['id']]['venta']; }
+    foreach ($filas as &$f) {
+        $f['costo'] = $tot[$f['id']]['costo'];
+        $f['venta'] = $tot[$f['id']]['venta'];
+        $f['costo_m2'] = round($f['costo'] / $f['metros_cuadrados'], $ctx['dec_costos']);
+        $f['venta_m2'] = round($f['venta'] / $f['metros_cuadrados'], $ctx['dec_costos']);
+    }
+    unset($f);
     return acrineoOrdenArbol($filas);
 }
 
@@ -174,7 +200,8 @@ function acrineoHojaEstado(int $id, ?int $partidaId = null): array
 
 function acrineoPartidaFila(array $ctx, int $partidaId): array
 {
-    $f = bd_fila('AW', 'select partida_id, padre_id, codigo, descripcion, orden from acrineo_partidas where partida_id = ? and presupuesto_id = ?',
+    $m2 = acrineoPartidaM2Disponible() ? 'metros_cuadrados' : '1 as metros_cuadrados';
+    $f = bd_fila('AW', "select partida_id, padre_id, codigo, descripcion, orden, $m2 from acrineo_partidas where partida_id = ? and presupuesto_id = ?",
         [$partidaId, $ctx['id']]);
     if (!$f) throw new AcrineoError('La partida ya no existe.', 404);
     return $f;
@@ -205,11 +232,13 @@ function acrineoPartidaCrear(array $ctx, ?int $padreId, array $in, string $usuar
 {
     if ($padreId) acrineoPartidaFila($ctx, $padreId);
     [$codigo, $desc] = acrineoValidarPartida($in, $ctx);
-    return acrineoTransaccion(function () use ($ctx, $padreId, $codigo, $desc, $usuario) {
+    $m2 = acrineoValidarM2($in['metros_cuadrados'] ?? null);
+    return acrineoTransaccion(function () use ($ctx, $padreId, $codigo, $desc, $m2, $usuario) {
         $orden = (int) bd_valor('AW', 'select coalesce(max(orden), -1) + 1 from acrineo_partidas where presupuesto_id = ? and '
             . ($padreId ? 'padre_id = ?' : 'padre_id is null'), $padreId ? [$ctx['id'], $padreId] : [$ctx['id']]);
-        $id = bd_insertar('AW', 'acrineo_partidas', 'partida_id',
-            ['presupuesto_id' => $ctx['id'], 'padre_id' => $padreId, 'codigo' => $codigo, 'descripcion' => $desc, 'orden' => $orden]);
+        $datos = ['presupuesto_id' => $ctx['id'], 'padre_id' => $padreId, 'codigo' => $codigo, 'descripcion' => $desc, 'orden' => $orden];
+        if (acrineoPartidaM2Disponible()) $datos['metros_cuadrados'] = $m2;
+        $id = bd_insertar('AW', 'acrineo_partidas', 'partida_id', $datos);
         acrineoRegistrar($ctx['id'], $usuario, 'HOJA', [[$padreId ? 'Agregó subpartida' : 'Agregó partida', null, "$codigo · $desc"]]);
         return $id;
     });
@@ -219,10 +248,20 @@ function acrineoPartidaGuardar(array $ctx, int $partidaId, array $in, string $us
 {
     $antes = acrineoPartidaFila($ctx, $partidaId);
     [$codigo, $desc] = acrineoValidarPartida($in, $ctx, $partidaId);
-    if ($codigo === $antes['codigo'] && $desc === $antes['descripcion']) return;
-    acrineoTransaccion(function () use ($ctx, $partidaId, $codigo, $desc, $antes, $usuario) {
-        bd_ejecutar('AW', 'update acrineo_partidas set codigo = ?, descripcion = ?, updated_at = now() where partida_id = ?', [$codigo, $desc, $partidaId]);
-        acrineoRegistrar($ctx['id'], $usuario, 'HOJA', [['Modificó partida', "{$antes['codigo']} · {$antes['descripcion']}", "$codigo · $desc"]]);
+    $m2Antes = (float) $antes['metros_cuadrados'];
+    $m2 = acrineoPartidaM2Disponible() && array_key_exists('metros_cuadrados', $in) ? acrineoValidarM2($in['metros_cuadrados']) : $m2Antes;
+    $cambioM2 = abs($m2 - $m2Antes) > 0.00001;
+    if ($codigo === $antes['codigo'] && $desc === $antes['descripcion'] && !$cambioM2) return;
+    acrineoTransaccion(function () use ($ctx, $partidaId, $codigo, $desc, $m2, $m2Antes, $cambioM2, $antes, $usuario) {
+        if (acrineoPartidaM2Disponible()) {
+            bd_ejecutar('AW', 'update acrineo_partidas set codigo = ?, descripcion = ?, metros_cuadrados = ?, updated_at = now() where partida_id = ?', [$codigo, $desc, $m2, $partidaId]);
+        } else {
+            bd_ejecutar('AW', 'update acrineo_partidas set codigo = ?, descripcion = ?, updated_at = now() where partida_id = ?', [$codigo, $desc, $partidaId]);
+        }
+        $cambios = [];
+        if ($codigo !== $antes['codigo'] || $desc !== $antes['descripcion']) $cambios[] = ['Modificó partida', "{$antes['codigo']} · {$antes['descripcion']}", "$codigo · $desc"];
+        if ($cambioM2) $cambios[] = ["Metros cuadrados de la partida $codigo", (string) $m2Antes, (string) $m2];
+        acrineoRegistrar($ctx['id'], $usuario, 'HOJA', $cambios);
     });
 }
 
@@ -241,7 +280,10 @@ function acrineoPartidaDuplicar(array $ctx, int $partidaId, string $usuario): in
 {
     $p = acrineoPartidaFila($ctx, $partidaId);
     return acrineoTransaccion(function () use ($ctx, $partidaId, $p, $usuario) {
-        $todas = bd_filas('AW', 'select partida_id, padre_id, codigo, descripcion, orden from acrineo_partidas where presupuesto_id = ? order by orden, partida_id', [$ctx['id']]);
+        $conM2 = acrineoPartidaM2Disponible();
+        $todas = bd_filas('AW', 'select partida_id, padre_id, codigo, descripcion, orden' . ($conM2 ? ', metros_cuadrados' : '')
+            . ' from acrineo_partidas where presupuesto_id = ? order by orden, partida_id', [$ctx['id']]);
+        $m2De = fn(array $t): array => $conM2 ? ['metros_cuadrados' => (float) $t['metros_cuadrados']] : [];
         $usados = array_column($todas, 'codigo');
         $padre = $p['padre_id'] === null ? null : (int) $p['padre_id'];
         $padreCodigo = null;
@@ -259,7 +301,7 @@ function acrineoPartidaDuplicar(array $ctx, int $partidaId, string $usuario): in
         bd_ejecutar('AW', 'update acrineo_partidas set orden = orden + 1 where presupuesto_id = ? and orden > ? and '
             . ($padre === null ? 'padre_id is null' : 'padre_id = ?'), $padre === null ? [$ctx['id'], $p['orden']] : [$ctx['id'], $p['orden'], $padre]);
         $mapa = [$partidaId => bd_insertar('AW', 'acrineo_partidas', 'partida_id',
-            ['presupuesto_id' => $ctx['id'], 'padre_id' => $padre, 'codigo' => $raiz, 'descripcion' => $p['descripcion'], 'orden' => (int) $p['orden'] + 1])];
+            ['presupuesto_id' => $ctx['id'], 'padre_id' => $padre, 'codigo' => $raiz, 'descripcion' => $p['descripcion'], 'orden' => (int) $p['orden'] + 1] + $m2De($p))];
         // Subpartidas, de arriba hacia abajo (el padre se copia antes que sus hijas)
         for ($cambio = true; $cambio;) {
             $cambio = false;
@@ -269,7 +311,7 @@ function acrineoPartidaDuplicar(array $ctx, int $partidaId, string $usuario): in
                 $codigo = str_starts_with(mb_strtoupper($t['codigo']), mb_strtoupper($p['codigo']))
                     ? $raiz . mb_substr($t['codigo'], mb_strlen($p['codigo'])) : $t['codigo'] . '-C';
                 $mapa[$id] = bd_insertar('AW', 'acrineo_partidas', 'partida_id',
-                    ['presupuesto_id' => $ctx['id'], 'padre_id' => $mapa[(int) $t['padre_id']], 'codigo' => $libre($codigo), 'descripcion' => $t['descripcion'], 'orden' => (int) $t['orden']]);
+                    ['presupuesto_id' => $ctx['id'], 'padre_id' => $mapa[(int) $t['padre_id']], 'codigo' => $libre($codigo), 'descripcion' => $t['descripcion'], 'orden' => (int) $t['orden']] + $m2De($t));
                 $cambio = true;
             }
         }

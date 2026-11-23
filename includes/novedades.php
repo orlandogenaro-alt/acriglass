@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-11-23',
+        'cambios' => [
+            ['nuevo', 'ACRINEO: Costo x M2, Precio x M2 y Metros cuadrados en las partidas', 'El árbol de partidas de la hoja muestra, a un lado de Precio, las columnas Costo x M2 y Precio x M2 (el costo y el precio de la partida entre sus metros cuadrados) y Metros cuadrados. Los metros cuadrados empiezan en 1 y se cambian al crear o editar la partida (F2 o doble clic). Al copiar una partida se copian también. Necesita la migración 036.'],
+        ],
+    ],
+    [
         'fecha' => '2026-11-20',
         'cambios' => [
             ['nuevo', 'ACRINEO: copiar y pegar renglones de la matriz entre conceptos', 'En la matriz, «Copiar renglones» (en las acciones de la derecha, en el clic derecho o con Ctrl+C) copia los renglones marcados (en edición) o, si no hay marcados, todos; con el clic derecho también se copia solo ese renglón. En la matriz de otro concepto, aunque sea de otro presupuesto, «Pegar renglones» (o Ctrl+V) los agrega con su código, descripción, tipo, unidad, costo, cálculo, cantidad y % de desperdicio; quedan en edición hasta GUARDAR. Un renglón que tiene su propia submatriz se pega con su costo, sin la submatriz. Lo copiado también se puede pegar en Excel.'],

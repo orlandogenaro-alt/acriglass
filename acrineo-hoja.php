@@ -145,6 +145,9 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
                         <th scope="col"><div class="an-th"><span>Descripción completa</span></div></th>
                         <th scope="col" class="num"><div class="an-th"><span>Costo</span></div></th>
                         <th scope="col" class="num"><div class="an-th"><span>Precio</span></div></th>
+                        <th scope="col" class="num" title="Costo de la partida entre sus metros cuadrados"><div class="an-th"><span>Costo x M2</span></div></th>
+                        <th scope="col" class="num" title="Precio de la partida entre sus metros cuadrados"><div class="an-th"><span>Precio x M2</span></div></th>
+                        <th scope="col" class="num" title="Se cambia editando la partida (F2 o doble clic)"><div class="an-th"><span>Metros cuadrados</span></div></th>
                     </tr></thead>
                     <tbody id="anPartidas"></tbody>
                 </table>

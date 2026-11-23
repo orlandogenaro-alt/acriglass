@@ -973,3 +973,4 @@ body.an-redim-y, body.an-redim-y * { cursor: row-resize !important; }
 .an-catgen-in.invalido { border-color: var(--rojo); background: var(--rojo-suave); }
 .an-catgen-in.an-mayus { text-transform: uppercase; }
 .an-catgen-tabla th.an-col-acc, .an-catgen-tabla td.an-col-acc { width: 84px; text-align: right; padding: 2px 8px; }
+#anPEdM2 { text-align: right; min-width: 70px; }

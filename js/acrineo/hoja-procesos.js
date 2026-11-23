@@ -69,12 +69,101 @@
     }
 
     // ---------- Recibir archivo de intercambio ----------
-    // Como en Neodata, crea un presupuesto NUEVO a partir del archivo: abre el importador del catálogo de presupuestos.
-    async function recibir() {
+    // Como en Neodata: ventana con «Buscar archivo» o arrastrar y soltar; cada archivo de intercambio (respaldo .zip de
+    // Neodata o .neodata.json) crea un presupuesto NUEVO (el lector es el del importador, js/acrineo/importar-neodata.js).
+    var dlgR = $('anRecibirDlg');
+    var estadoR = dlgR ? estadoEn('anRecibirEstado') : null;
+    var recibidos = [];   // [File]
+    var recibiendo = false;
+
+    function pintarRecibidos() {
+        $('anRecibirCuenta').textContent = 'Archivos: ' + recibidos.length;
+        $('anRecibirLista').innerHTML = recibidos.map(function (f, i) {
+            return '<li><span title="' + esc(f.name) + '">' + esc(f.name) + '</span><small>' + (f.size / 1024).toFixed(0) + ' KB</small>'
+                + '<button type="button" class="an-btn an-mini an-texto" data-quitar-archivo="' + i + '" title="Quitar" aria-label="Quitar ' + esc(f.name) + '">×</button></li>';
+        }).join('');
+        $('anRecibirAceptar').disabled = !recibidos.length || recibiendo;
+    }
+    function agregarRecibidos(files) {
+        var malos = [];
+        Array.prototype.forEach.call(files || [], function (f) {
+            if (!AN.neodataArchivo.esArchivo(f)) { malos.push(f.name); return; }
+            if (!recibidos.some(function (x) { return x.name === f.name && x.size === f.size; })) recibidos.push(f);
+        });
+        pintarRecibidos();
+        estadoR(malos.length ? 'No son archivos de intercambio (.zip o .neodata.json): ' + malos.join(', ') : '', malos.length ? 'error' : '');
+    }
+
+    function recibir() {
+        if (!dlgR) return;
         if (!(cfg.permisos && cfg.permisos['presupuestos.crear'])) { AN.ui.aviso('No tienes permiso para crear presupuestos (ACRINEO_PRESUPUESTOS_CREAR).', 'error'); return; }
-        if (pendientes()) return;
-        if (!(await AN.ui.confirmar({ titulo: 'Recibir archivo de intercambio', mensaje: 'El archivo de intercambio (respaldo .zip de Neodata) crea un presupuesto nuevo.\nSe abrirá el catálogo de presupuestos con la ventana para elegir el archivo.', aceptar: 'Continuar' }))) return;
-        location.href = 'acrineo-presupuestos.php?importar=neodata';
+        if (!AN.neodataArchivo) { AN.ui.aviso('No se pudo cargar el lector de archivos de intercambio.', 'error'); return; }
+        recibidos = [];
+        pintarRecibidos();
+        estadoR('');
+        dlgR.showModal();
+        $('anRecibirBuscar').focus();
+    }
+
+    async function recibirArchivos() {
+        if (recibiendo || !recibidos.length) return;
+        var url = AN.api.url(AN.api.PRESUPUESTOS, { recurso: 'neodata' });
+        var lista = recibidos.map(function (f) { var d = AN.neodataArchivo.datosArchivo(f); return { file: f, obra: d.obra, fecha: d.fecha }; });
+        // Si la obra ya está en ACRINEO se pregunta (se crea otro presupuesto; el que está no se toca)
+        try {
+            var ex = await AN.api.post(url, { accion: 'existen', nombres: lista.map(function (x) { return x.obra; }) });
+            var subir = [];
+            for (var k = 0; k < lista.length; k++) {
+                var e = ex.existen[lista[k].obra.toUpperCase()];
+                if (!e || await AN.ui.confirmar({ titulo: 'Ya existe ' + lista[k].obra + ' en ACRINEO',
+                    mensaje: 'En ACRINEO ya está ' + lista[k].obra + ' (' + e.codigo + ').\n¿Recibir el archivo de todos modos? Se crea un presupuesto nuevo; el que ya está no se toca.',
+                    aceptar: 'Recibir de todos modos' })) subir.push(lista[k]);
+            }
+            lista = subir;
+        } catch (err) { /* sin la revisión, se reciben todos */ }
+        if (!lista.length) return;
+        recibiendo = true;
+        pintarRecibidos();
+        var hechos = [], errores = [];
+        for (var i = 0; i < lista.length; i++) {
+            var x = lista[i];
+            estadoR('Recibiendo ' + x.file.name + ' (' + (i + 1) + ' de ' + lista.length + ')…', 'info');
+            try {
+                var datos = await AN.neodataArchivo.datosObra(x.file);
+                datos.obra = x.obra;
+                datos.version_fecha = x.fecha && x.fecha.getTime() ? x.fecha.toISOString() : null;
+                var r = await AN.api.post(url, datos);
+                hechos.push(r.importado);
+                recibidos = recibidos.filter(function (f) { return f !== x.file; });
+            } catch (err) { errores.push(x.file.name + ': ' + (err.message || 'no se pudo recibir')); }
+        }
+        recibiendo = false;
+        pintarRecibidos();
+        if (errores.length) estadoR(errores.join(' · '), 'error');
+        if (!hechos.length) return;
+        dlgR.close();
+        var ultimo = hechos[hechos.length - 1];
+        var texto = hechos.length === 1 ? 'Se creó el presupuesto ' + ultimo.codigo + '.' : 'Se crearon ' + hechos.length + ' presupuestos (' + hechos.map(function (h) { return h.codigo; }).join(', ') + ').';
+        if (await AN.ui.confirmar({ titulo: 'Archivo recibido', mensaje: texto + (errores.length ? '\n\nCon error: ' + errores.join('\n') : '') + '\n\n¿Abrir ' + ultimo.codigo + ' ahora?',
+            aceptar: 'Abrir ' + ultimo.codigo, cancelar: 'Quedarme aquí' })) {
+            location.href = 'acrineo-hoja.php?id=' + ultimo.id;
+        }
+    }
+
+    if (dlgR) {
+        $('anRecibirArchivo').addEventListener('change', function () { agregarRecibidos(this.files); this.value = ''; });
+        $('anRecibirBuscar').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('anRecibirArchivo').click(); } });
+        var zonaR = $('anRecibirZona');
+        zonaR.addEventListener('dragover', function (e) { e.preventDefault(); zonaR.classList.add('an-soltar'); });
+        zonaR.addEventListener('dragleave', function () { zonaR.classList.remove('an-soltar'); });
+        zonaR.addEventListener('drop', function (e) { e.preventDefault(); zonaR.classList.remove('an-soltar'); agregarRecibidos(e.dataTransfer.files); });
+        $('anRecibirLista').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-quitar-archivo]');
+            if (b && !recibiendo) { recibidos.splice(+b.dataset.quitarArchivo, 1); pintarRecibidos(); }
+        });
+        $('anRecibirAceptar').addEventListener('click', recibirArchivos);
+        dlgR.querySelectorAll('[data-recibir-cerrar]').forEach(function (b) { b.addEventListener('click', function () { if (!recibiendo) dlgR.close(); }); });
+        dlgR.addEventListener('cancel', function (e) { if (recibiendo) e.preventDefault(); });
     }
 
     // ---------- Depurar presupuesto ----------

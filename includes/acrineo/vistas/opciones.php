@@ -144,3 +144,24 @@ $fNum = function (string $k, string $etiqueta, string $sufijo = '', bool $solo =
         </div>
     </form>
 </dialog>
+
+<dialog class="an-dialogo an-recibir-dlg" id="anRecibirDlg" aria-labelledby="anRecibirTitulo">
+    <div class="an-titulo-barra"><?= anIcono('subir') ?><h2 id="anRecibirTitulo">Recibir archivo de intercambio</h2>
+        <button type="button" class="an-btn-cab an-icono" data-recibir-cerrar title="Cerrar" aria-label="Cerrar"><?= anIcono('cerrar') ?></button></div>
+    <div class="an-recibir-cuerpo">
+        <div class="an-recibir-zona" id="anRecibirZona">
+            <label class="an-btn an-primario an-mini" tabindex="0" role="button" id="anRecibirBuscar"><?= anIcono('subir') ?>Buscar archivo
+                <input type="file" id="anRecibirArchivo" accept=".zip,.json" multiple hidden></label>
+            <b>¡O arrastre y suelte el archivo aquí!</b>
+            <small class="an-ayuda">Respaldo de Neodata (OBRA_d-m-aaaa_HrHMnM.zip o .neodata.json). Cada archivo crea un presupuesto nuevo.</small>
+        </div>
+        <div class="an-recibir-cuenta" id="anRecibirCuenta">Archivos: 0</div>
+        <ul class="an-recibir-lista" id="anRecibirLista"></ul>
+    </div>
+    <div class="an-calculo-pie">
+        <span id="anRecibirEstado" class="an-estado" role="status"></span>
+        <span class="an-flex"></span>
+        <button type="button" class="an-btn an-primario" id="anRecibirAceptar" disabled>Recibir archivo</button>
+        <button type="button" class="an-btn an-texto" data-recibir-cerrar>Cancelar</button>
+    </div>
+</dialog>

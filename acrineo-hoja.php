@@ -315,6 +315,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
 <script src="<?= recurso('js/acrineo/hoja-reportes.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-ligados.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-catalogo-ppto.js') ?>"></script>
+<?php if ($puede['presupuestos.crear']): ?><script src="<?= recurso('js/acrineo/importar-neodata.js') ?>"></script><?php endif; ?>
 <script src="<?= recurso('js/acrineo/hoja-procesos.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-opciones.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/divisores.js') ?>"></script>

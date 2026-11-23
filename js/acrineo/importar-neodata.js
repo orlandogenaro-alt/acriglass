@@ -6,7 +6,7 @@
     'use strict';
 
     var dlg = document.getElementById('anNeodata');
-    if (!dlg || !window.XlsxSimple) return;
+    if (!window.XlsxSimple) return;   // sin la ventana (hoja del presupuesto) solo se ofrece la lectura de archivos
     var $ = function (id) { return document.getElementById(id); };
     var esc = AN.ui.esc;
     var obras = [];        // [{nombre, archivos: [{file, fecha}], estado, mensaje, existe, importado}]
@@ -337,6 +337,10 @@
         estado(bien + ' obra(s) importada(s)' + (mal ? ', ' + mal + ' con error (pasa el puntero sobre el error para leerlo).' : '.'), mal ? 'error' : 'ok');
         if (bien && AN.catalogo && AN.catalogo.recargar) AN.catalogo.recargar();
     }
+
+    // Lectura de archivos para «Recibir archivo de intercambio» de la hoja (js/acrineo/hoja-procesos.js)
+    AN.neodataArchivo = { datosObra: datosObra, datosArchivo: datosArchivo, esArchivo: function (f) { return ES_ARCHIVO.test(f.name); } };
+    if (!dlg) return;
 
     // ---------- Eventos ----------
     $('anNeoCarpeta').addEventListener('click', async function () {

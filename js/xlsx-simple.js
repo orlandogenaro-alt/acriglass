@@ -1,6 +1,6 @@
 // Excel (.xlsx) sin librerías: escribir una hoja con formato y leer la primera hoja de un archivo.
 // XlsxSimple.crear({ nombre, anchos: [n…], filas: [[celda…]] }) → Blob
-//   celda: texto, número, null, o { v, e } con e = 'titulo' (negritas con fondo), 'texto' (ajustar texto, arriba),
+//   celda: texto, número, null, o { v, e, f } (f = fórmula sin «=», v = su valor calculado) con e ='titulo' (negritas con fondo), 'texto' (ajustar texto, arriba),
 //          'dinero' (#,##0.00), 'cantidad' (0.0000), 'pct' (0.00%), 'negrita', 'total' (negritas #,##0.00)
 //          y para formatos impresos: 'grande' (título 14 centrado), 'empresa' (13 negritas), 'sub' (8 gris), 'encabezado'
 //          (barra de columnas: blanco sobre h.colorEncabezado, negro por omisión), 'caja' / 'cajaNegrita' (fondo gris con
@@ -27,6 +27,7 @@ window.XlsxSimple = (function () {
                 if (c == null || c === '') return '';
                 var v = typeof c === 'object' ? c.v : c, s = typeof c === 'object' && ESTILOS[c.e] ? ' s="' + ESTILOS[c.e] + '"' : '';
                 var ref = columna(i) + (r + 1);
+                if (typeof c === 'object' && c.f) return '<c r="' + ref + '"' + s + '><f>' + esc(c.f) + '</f>' + (typeof v === 'number' && isFinite(v) ? '<v>' + v + '</v>' : '') + '</c>';
                 if (v == null || v === '') return s ? '<c r="' + ref + '"' + s + '/>' : '';
                 if (typeof v === 'number' && isFinite(v)) return '<c r="' + ref + '"' + s + '><v>' + v + '</v></c>';
                 return '<c r="' + ref + '"' + s + ' t="inlineStr"><is><t xml:space="preserve">' + esc(v) + '</t></is></c>';

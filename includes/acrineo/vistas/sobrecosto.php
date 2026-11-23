@@ -12,6 +12,17 @@ $campo = function (string $k, string $etiqueta, bool $solo = false): string {
         <div class="an-titulo-barra"><span class="an-sc-signo">$</span><h2 id="anSobrecostoTitulo">Factor de sobrecosto (indirectos, financiamiento y utilidad)</h2>
             <button type="button" class="an-btn-cab an-icono" data-sc-cerrar title="Cerrar" aria-label="Cerrar"><?= anIcono('cerrar') ?></button></div>
         <div class="an-sc-cuerpo">
+            <fieldset class="an-calculo-caja an-sc-libro">
+                <legend>Opciones libro</legend>
+                <div class="an-sc-libro-fila">
+                    <button type="button" class="an-btn an-primario an-icono an-redondo" id="anScPlantilla" title="Descargar el libro para trabajarlo en Excel (con los importes de ahora)" aria-label="Descargar el libro para trabajarlo en Excel"><?= anIcono('editar') ?></button>
+                    <label class="an-btn an-primario an-icono an-redondo" id="anScSubirBtn" title="Subir el libro trabajado: llena los factores con sus resultados" aria-label="Subir el libro trabajado" tabindex="0" role="button"><?= anIcono('subir') ?>
+                        <input type="file" id="anScSubir" accept=".xlsx" hidden></label>
+                    <div class="an-sc-libro-nombre"><small>Libro pie indirectos:</small><b id="anScLibroNombre" class="vacio">Ningún archivo elegido</b></div>
+                    <button type="button" class="an-btn an-primario an-icono an-redondo" id="anScDescargar" title="Descargar el libro guardado con el presupuesto" aria-label="Descargar el libro guardado" disabled><?= anIcono('descargar') ?></button>
+                </div>
+                <small class="an-ayuda">Para darle estilo, descárgalo, trabájalo en Excel y súbelo: los % de indirectos salen de sus importes entre el costo directo de la obra. Al subirlo se guarda en Documentos del presupuesto (moneda 1).</small>
+            </fieldset>
             <fieldset class="an-calculo-caja">
                 <legend>Factores</legend>
                 <div class="an-sc-rejilla">

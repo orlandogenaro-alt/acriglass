@@ -1036,3 +1036,10 @@ body.an-redim-y, body.an-redim-y * { cursor: row-resize !important; }
 .an-fasar-salarios td { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .an-fasar-salarios tr.an-fasar-sin td { color: var(--texto-3); }
 @media (max-width: 760px) { .an-fasar-cuotas, .an-fasar-dos { grid-template-columns: 1fr; } }
+/* Factor de sobrecosto: libro pie de indirectos */
+.an-sc-libro { grid-column: 1 / -1; }
+.an-sc-libro-fila { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.an-sc-libro-nombre { display: grid; flex: 1; min-width: 0; padding: 0 6px; border-bottom: 1px solid var(--borde-2); }
+.an-sc-libro-nombre small { font-size: 11px; color: var(--texto-2); }
+.an-sc-libro-nombre b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.an-sc-libro-nombre b.vacio { font-weight: 600; color: var(--texto-3); }

@@ -70,32 +70,75 @@ require_once __DIR__ . '/campos.php';
     </form>
 </dialog>
 
+<?php
+$fNum = function (string $k, string $etiqueta, string $sufijo = '', bool $solo = false): string {
+    return '<label class="an-fasar-campo"><span>' . $etiqueta . '</span><span class="an-fasar-valor"><input type="text" inputmode="decimal" '
+        . ($solo ? 'readonly tabindex="-1" data-pct="' . $k . '"' : 'data-p="' . $k . '"') . ' aria-label="' . $etiqueta . '">' . ($sufijo ? '<i>' . $sufijo . '</i>' : '') . '</span></label>';
+};
+?>
 <dialog class="an-dialogo an-fasar-dlg" id="anFasarDlg" aria-labelledby="anFasarTitulo">
     <form method="dialog" id="anFasarForm" novalidate>
         <div class="an-titulo-barra"><h2 id="anFasarTitulo">FASAR · Factor de Salario Real</h2>
             <button type="button" class="an-btn-cab an-icono" data-fasar-cerrar title="Cerrar" aria-label="Cerrar"><?= anIcono('cerrar') ?></button></div>
         <div class="an-fasar-cuerpo">
-            <div class="an-fasar-arriba">
-                <label class="an-sc-campo"><span>Días calendario</span><input type="text" inputmode="decimal" id="anFasarDias" aria-label="Días calendario"></label>
-                <label class="an-sc-campo"><span>Tomar los datos de</span><select id="anFasarSistema" aria-label="Tomar los datos de un FASAR del sistema"><option value="">— FASAR del sistema —</option></select></label>
+            <div class="an-fasar-generales">
+                <label class="an-fasar-campo"><span>Año de los % de aplicación</span><span class="an-fasar-valor"><select data-p="anio" id="anFasarAnio" aria-label="Año de los % de aplicación"></select></span></label>
+                <?= $fNum('salario_minimo', 'Salario mínimo') ?>
+                <?= $fNum('uma', 'UMA') ?>
+                <?= $fNum('impuesto_nomina', 'Impuesto sobre nómina', '%') ?>
+                <?= $fNum('otros_cargos', 'Otros cargos', '%') ?>
             </div>
-            <fieldset class="an-calculo-caja"><legend>Días pagados además de los calendario (Tp)</legend><table class="an-fasar-tabla" data-lista="dias_pagados" data-campo="dias"></table>
+            <div class="an-fasar-lado">
+                <fieldset class="an-calculo-caja"><legend>Límite superior (veces la UMA)</legend>
+                    <?= $fNum('grupo1', 'Grupo 1') ?>
+                    <?= $fNum('grupo2', 'Grupo 2') ?>
+                    <small class="an-ayuda">Grupo 1: enfermedades y maternidad, riesgo de trabajo y guarderías. Grupo 2: invalidez y vida, cesantía y vejez, SAR e INFONAVIT.</small>
+                </fieldset>
+                <fieldset class="an-calculo-caja"><legend>Considerar</legend>
+                    <label class="an-check"><input type="radio" name="considerar" value="patron"> Solo % patrón</label>
+                    <label class="an-check"><input type="radio" name="considerar" value="ambos" checked> % patrón + % trabajador</label>
+                </fieldset>
+                <div class="an-fasar-dos"><?= $fNum('sar', 'SAR', '%') ?><?= $fNum('infonavit', 'INFONAVIT', '%') ?></div>
+            </div>
+            <fieldset class="an-calculo-caja an-fasar-ancho"><legend>Porcentajes establecidos para la determinación de las cuotas del año elegido</legend>
+                <div class="an-fasar-cuotas">
+                    <fieldset class="an-calculo-caja"><legend>Enfermedades y maternidad</legend>
+                        <?= $fNum('cuota_fija', 'Cuota fija (sobre la UMA)', '%', true) ?>
+                        <?= $fNum('excedente', 'Excedente de 3 UMA', '%', true) ?>
+                        <?= $fNum('dinero', 'Prestaciones en dinero', '%', true) ?>
+                        <?= $fNum('especie', 'Prestaciones en especie (pensionados)', '%', true) ?>
+                    </fieldset>
+                    <fieldset class="an-calculo-caja"><legend>Otros ramos</legend>
+                        <?= $fNum('riesgo', 'Riesgo de trabajo (el que asignó el IMSS)', '%') ?>
+                        <?= $fNum('guarderias', 'Guarderías', '%', true) ?>
+                        <?= $fNum('invalidez', 'Invalidez y vida', '%', true) ?>
+                        <?= $fNum('cesantia', 'Cesantía en edad avanzada y vejez', '%', true) ?>
+                    </fieldset>
+                </div>
+            </fieldset>
+            <fieldset class="an-calculo-caja"><legend>Días pagados además de los calendario (Tp)</legend>
+                <label class="an-fasar-campo"><span>Días calendario</span><span class="an-fasar-valor"><input type="text" inputmode="decimal" id="anFasarDias" aria-label="Días calendario"></span></label>
+                <table class="an-fasar-tabla" data-lista="dias_pagados" data-campo="dias"></table>
                 <button type="button" class="an-btn an-mini an-texto" data-agregar="dias_pagados">+ Agregar</button></fieldset>
-            <fieldset class="an-calculo-caja"><legend>Días no laborados (Tl = calendario − estos)</legend><table class="an-fasar-tabla" data-lista="dias_no_laborados" data-campo="dias"></table>
-                <button type="button" class="an-btn an-mini an-texto" data-agregar="dias_no_laborados">+ Agregar</button></fieldset>
-            <fieldset class="an-calculo-caja an-fasar-ancho"><legend>Obligaciones obrero-patronales en % del salario (Ps): IMSS, INFONAVIT, SAR, impuesto sobre nómina…</legend>
-                <table class="an-fasar-tabla" data-lista="obligaciones" data-campo="pct"></table>
-                <button type="button" class="an-btn an-mini an-texto" data-agregar="obligaciones">+ Agregar</button></fieldset>
-            <div class="an-sc-resultado an-fasar-ancho"><span>Fsr = Ps × (Tp / Tl) + Tp / Tl</span><b id="anFasarResultado">—</b><small id="anFasarDetalle" class="an-ayuda"></small></div>
-            <fieldset class="an-calculo-caja an-fasar-ancho"><legend>Mano de obra del presupuesto</legend>
-                <label class="an-check"><input type="checkbox" id="anFasarAplicar" checked> Aplicar el FASAR a la mano de obra con salario base (costo = salario base × FASAR + prestaciones)</label>
+            <fieldset class="an-calculo-caja"><legend>Días no laborados (Tl = calendario − estos)</legend>
+                <table class="an-fasar-tabla" data-lista="dias_no_laborados" data-campo="dias"></table>
+                <button type="button" class="an-btn an-mini an-texto" data-agregar="dias_no_laborados">+ Agregar</button>
+                <label class="an-fasar-campo"><span>Tomar los días de</span><span class="an-fasar-valor"><select id="anFasarSistema" aria-label="Tomar los días de un FASAR del sistema"><option value="">— FASAR del sistema —</option></select></span></label>
+            </fieldset>
+            <div class="an-sc-resultado an-fasar-ancho"><span>FASAR con el salario mínimo</span><b id="anFasarResultado">—</b><small id="anFasarDetalle" class="an-ayuda"></small></div>
+            <fieldset class="an-calculo-caja an-fasar-ancho"><legend>Salarios de la mano de obra del presupuesto (cada categoría con su FASAR)</legend>
+                <div class="an-fasar-salarios"><table class="an-tabla" id="anFasarSalarios">
+                    <thead><tr><th scope="col">Código</th><th scope="col">Descripción</th><th scope="col" class="num">Salario base</th><th scope="col" class="num">SBC</th>
+                        <th scope="col" class="num">Ps</th><th scope="col" class="num">FASAR</th><th scope="col" class="num">Salario real</th></tr></thead>
+                    <tbody></tbody></table></div>
+                <label class="an-check"><input type="checkbox" id="anFasarAplicar" checked> Aplicar a la mano de obra con salario base (costo = salario base × su FASAR + prestaciones)</label>
                 <label class="an-check"><input type="checkbox" id="anFasarDesdeCosto"> A la que no tiene salario base, tomar su costo actual como salario base</label>
-                <small class="an-ayuda" id="anFasarMo"></small>
             </fieldset>
         </div>
         <div class="an-calculo-pie">
             <span id="anFasarEstado" class="an-estado" role="status"></span>
             <span class="an-flex"></span>
+            <button type="button" class="an-btn" id="anFasarExcel" title="Libro del FASAR en Excel: datos, porcentajes, días y salarios"><?= anIcono('descargar') ?>Libro FASAR</button>
             <button type="submit" class="an-btn an-primario" id="anFasarAceptar">Aceptar</button>
             <button type="button" class="an-btn an-texto" data-fasar-cerrar>Cancelar</button>
         </div>

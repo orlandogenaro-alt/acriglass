@@ -1018,3 +1018,21 @@ body.an-redim-y, body.an-redim-y * { cursor: row-resize !important; }
 .an-fasar-tabla td.num input { text-align: right; }
 .an-fasar-tabla input:focus { outline: none; border-bottom: 2px solid var(--azul-texto); }
 @media (max-width: 760px) { .an-fasar-cuerpo { grid-template-columns: 1fr; } }
+/* FASAR con las cuotas del IMSS */
+.an-fasar-dlg { width: min(1000px, 97vw); }
+.an-fasar-generales { display: grid; align-content: start; gap: 2px; }
+.an-fasar-lado { display: grid; align-content: start; gap: 8px; }
+.an-fasar-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.an-fasar-campo { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px solid var(--linea); font-size: 13px; font-weight: 600; }
+.an-fasar-valor { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.an-fasar-valor i { font-style: normal; color: var(--texto-2); }
+.an-fasar-valor input { width: 100px; height: 28px; padding: 0 6px; text-align: right; border: none; border-bottom: 1px dashed var(--borde-2); background: none; color: inherit; font: inherit; }
+.an-fasar-valor input:focus { outline: none; border-bottom: 2px solid var(--azul-texto); }
+.an-fasar-valor input[readonly] { color: var(--texto-2); border-bottom-style: solid; border-bottom-color: transparent; }
+.an-fasar-valor input.invalido { border-bottom-color: var(--rojo); }
+.an-fasar-valor select { height: 28px; padding: 0 6px; border: 1px solid var(--borde-2); border-radius: 5px; background: var(--input); color: inherit; }
+.an-fasar-cuotas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.an-fasar-salarios { max-height: 240px; overflow: auto; border: 1px solid var(--borde); border-radius: 6px; }
+.an-fasar-salarios td { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.an-fasar-salarios tr.an-fasar-sin td { color: var(--texto-3); }
+@media (max-width: 760px) { .an-fasar-cuotas, .an-fasar-dos { grid-template-columns: 1fr; } }

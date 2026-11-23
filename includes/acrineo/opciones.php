@@ -456,44 +456,128 @@ function acrineoActualizarEjecutar(array $ctx, array $in, string $usuario): arra
 }
 
 // ---------- FASAR del presupuesto (Ctrl+Shift+F) ----------
+// Como en Neodata: el FASAR sale de las cuotas del IMSS (Ley del Seguro Social), SAR, INFONAVIT, impuesto sobre nómina
+// y otros cargos, y por eso es distinto para cada categoría (la cuota fija y el excedente de 3 UMA no son proporcionales
+// al salario). Para cada salario base SB:
+//   Tp = días calendario + días pagados (aguinaldo, prima vacacional…) · Tl = días calendario − días no laborados
+//   SBC = SB × Tp / días calendario (salario base de cotización; mínimo el salario mínimo), topado a «límite» × UMA
+//         (grupo 1: enfermedades y maternidad, riesgo de trabajo y guarderías; grupo 2: invalidez y vida, cesantía y vejez,
+//         SAR e INFONAVIT)
+//   cuota diaria = cuota fija × UMA + excedente × (SBC1 − 3 UMA) + (dinero + especie + riesgo + guarderías) × SBC1
+//                  + (invalidez y vida + cesantía y vejez + SAR + INFONAVIT) × SBC2
+//   Ps  = cuota diaria × días calendario / (SB × Tp) + impuesto sobre nómina + otros cargos
+//   Fsr = Ps × (Tp / Tl) + Tp / Tl
+// Con «Solo % patrón» las cuotas son las del patrón; con «% patrón + % trabajador», el patrón paga también las del trabajador.
 
+// Salario mínimo general y UMA diaria por año (se pueden cambiar en la ventana)
+const ACRINEO_FASAR_ANIOS = [
+    2026 => ['salario_minimo' => 315.04, 'uma' => 117.31],
+    2025 => ['salario_minimo' => 278.80, 'uma' => 113.14],
+    2024 => ['salario_minimo' => 248.93, 'uma' => 108.57],
+    2023 => ['salario_minimo' => 207.44, 'uma' => 103.74],
+    2022 => ['salario_minimo' => 172.87, 'uma' => 96.22],
+    2021 => ['salario_minimo' => 141.70, 'uma' => 89.62],
+    2020 => ['salario_minimo' => 123.22, 'uma' => 86.88],
+];
+// % de las cuotas (patrón / trabajador), los de la Ley del Seguro Social vigentes desde 2008
+const ACRINEO_FASAR_CUOTAS = [
+    'cuota_fija' => [20.40, 0], 'excedente' => [1.10, 0.40], 'dinero' => [0.70, 0.25], 'especie' => [1.05, 0.375],
+    'guarderias' => [1.00, 0], 'invalidez' => [1.75, 0.625], 'cesantia' => [3.15, 1.125],
+];
+const ACRINEO_FASAR_PARAMETROS = [
+    'anio' => 2026, 'salario_minimo' => 315.04, 'uma' => 117.31, 'impuesto_nomina' => 0.0, 'otros_cargos' => 0.0,
+    'grupo1' => 25.0, 'grupo2' => 25.0, 'considerar' => 'ambos', 'sar' => 2.0, 'infonavit' => 5.0, 'riesgo' => 7.58875,
+];
 const ACRINEO_FASAR_DEFECTO = [
     'dias_calendario' => 365,
     'dias_pagados' => [['concepto' => 'Aguinaldo', 'dias' => 15], ['concepto' => 'Prima vacacional (25 % de 12 días)', 'dias' => 3]],
     'dias_no_laborados' => [['concepto' => 'Domingos', 'dias' => 52], ['concepto' => 'Vacaciones', 'dias' => 12], ['concepto' => 'Días festivos', 'dias' => 7],
                             ['concepto' => 'Mal tiempo', 'dias' => 3], ['concepto' => 'Costumbre (días no laborados por tradición)', 'dias' => 2],
                             ['concepto' => 'Permisos y enfermedad', 'dias' => 2]],
-    'obligaciones' => [['concepto' => 'IMSS · Enfermedades y maternidad', 'pct' => 8.0], ['concepto' => 'IMSS · Riesgo de trabajo', 'pct' => 7.58875],
-                       ['concepto' => 'IMSS · Invalidez y vida', 'pct' => 1.75], ['concepto' => 'IMSS · Guarderías y prestaciones sociales', 'pct' => 1.0],
-                       ['concepto' => 'Retiro (SAR)', 'pct' => 2.0], ['concepto' => 'Cesantía en edad avanzada y vejez', 'pct' => 3.15],
-                       ['concepto' => 'INFONAVIT', 'pct' => 5.0], ['concepto' => 'Impuesto sobre nómina', 'pct' => 3.0]],
+    'parametros' => ACRINEO_FASAR_PARAMETROS,
 ];
+
+// % de cada cuota según «considerar»: ['cuota_fija' => 20.40, 'excedente' => 1.50, …]
+function acrineoFasarPorcentajes(array $p): array
+{
+    $r = [];
+    foreach (ACRINEO_FASAR_CUOTAS as $k => [$patron, $trabajador]) $r[$k] = round($patron + ($p['considerar'] === 'ambos' ? $trabajador : 0), 5);
+    $r['riesgo'] = (float) $p['riesgo'];
+    return $r;
+}
+
+// FASAR de una categoría con salario base $sb
+function acrineoFasarCategoria(array $p, float $dc, float $tp, float $tl, float $sb): array
+{
+    $pc = acrineoFasarPorcentajes($p);
+    $uma = (float) $p['uma'];
+    $sbc = max($sb * $tp / $dc, (float) $p['salario_minimo']);
+    $sbc1 = min($sbc, (float) $p['grupo1'] * $uma);
+    $sbc2 = min($sbc, (float) $p['grupo2'] * $uma);
+    $c = [
+        'cuota_fija' => $pc['cuota_fija'] / 100 * $uma,
+        'excedente'  => $pc['excedente'] / 100 * max(0, $sbc1 - 3 * $uma),
+        'dinero'     => $pc['dinero'] / 100 * $sbc1,
+        'especie'    => $pc['especie'] / 100 * $sbc1,
+        'riesgo'     => $pc['riesgo'] / 100 * $sbc1,
+        'guarderias' => $pc['guarderias'] / 100 * $sbc1,
+        'invalidez'  => $pc['invalidez'] / 100 * $sbc2,
+        'cesantia'   => $pc['cesantia'] / 100 * $sbc2,
+        'sar'        => (float) $p['sar'] / 100 * $sbc2,
+        'infonavit'  => (float) $p['infonavit'] / 100 * $sbc2,
+    ];
+    $diario = array_sum($c);
+    $ps = $sb > 0 ? $diario * $dc / ($sb * $tp) + ((float) $p['impuesto_nomina'] + (float) $p['otros_cargos']) / 100 : 0.0;
+    $fsr = $ps * ($tp / $tl) + $tp / $tl;
+    return ['salario_base' => round($sb, 6), 'sbc' => round($sbc, 4), 'cuota_diaria' => round($diario, 4), 'ps' => round($ps, 6), 'fsr' => round($fsr, 4),
+            'salario_real' => round($sb * round($fsr, 4), 6), 'cuotas' => array_map(fn($v) => round($v, 4), $c)];
+}
+
+function acrineoFasarParametros($in): array
+{
+    $in = is_array($in) ? $in : [];
+    $p = ACRINEO_FASAR_PARAMETROS;
+    $err = [];
+    $anio = (int) ($in['anio'] ?? $p['anio']);
+    $p['anio'] = $anio >= 2000 && $anio <= 2100 ? $anio : $p['anio'];
+    $reglas = ['salario_minimo' => [0.01, 100000], 'uma' => [0.01, 100000], 'impuesto_nomina' => [0, 100], 'otros_cargos' => [0, 100],
+               'grupo1' => [1, 100], 'grupo2' => [1, 100], 'sar' => [0, 100], 'infonavit' => [0, 100], 'riesgo' => [0, 100]];
+    foreach ($reglas as $k => [$min, $max]) {
+        $v = trim(str_replace(',', '', (string) ($in[$k] ?? $p[$k])));
+        if (!is_numeric($v) || (float) $v < $min || (float) $v > $max) $err[$k] = "De $min a $max.";
+        else $p[$k] = round((float) $v, 5);
+    }
+    $p['considerar'] = ($in['considerar'] ?? 'ambos') === 'patron' ? 'patron' : 'ambos';
+    if ($err) throw new AcrineoError('Revisa los datos del FASAR.', 422, $err);
+    return $p;
+}
 
 function acrineoFasarDatos(array $ctx): array
 {
     $d = ACRINEO_FASAR_DEFECTO;
     $guardado = false;
     if (acrineoOpcionesDisponible() && ($f = bd_fila('AW', 'select * from acrineo_presupuesto_fasar where presupuesto_id = ?', [$ctx['id']]))) {
+        $par = json_decode((string) ($f['parametros'] ?? '{}'), true) ?: [];
         $d = ['dias_calendario' => (float) $f['dias_calendario'], 'dias_pagados' => json_decode($f['dias_pagados'], true) ?: [],
-              'dias_no_laborados' => json_decode($f['dias_no_laborados'], true) ?: [], 'obligaciones' => json_decode($f['obligaciones'], true) ?: []];
+              'dias_no_laborados' => json_decode($f['dias_no_laborados'], true) ?: [], 'parametros' => $par + ACRINEO_FASAR_PARAMETROS];
         $guardado = true;
     }
     $sistema = [];
     if (bd_tiene_tabla('AW', 'fasar')) {
-        foreach (bd_filas('AW', "select fasar_id, nombre, dias_calendario, dias_pagados, dias_no_laborados, obligaciones, fsr from fasar where estatus = 'A' order by nombre") as $s) {
+        foreach (bd_filas('AW', "select fasar_id, nombre, dias_calendario, dias_pagados, dias_no_laborados, fsr from fasar where estatus = 'A' order by nombre") as $s) {
             $sistema[] = ['id' => (int) $s['fasar_id'], 'nombre' => $s['nombre'], 'fsr' => (float) $s['fsr'], 'dias_calendario' => (float) $s['dias_calendario'],
-                          'dias_pagados' => json_decode($s['dias_pagados'], true) ?: [], 'dias_no_laborados' => json_decode($s['dias_no_laborados'], true) ?: [],
-                          'obligaciones' => json_decode($s['obligaciones'], true) ?: []];
+                          'dias_pagados' => json_decode($s['dias_pagados'], true) ?: [], 'dias_no_laborados' => json_decode($s['dias_no_laborados'], true) ?: []];
         }
     }
     $mo = array_values(array_filter(acrineoCatalogoPresupuesto($ctx, 'MO')['insumos'], fn($i) => $i['editable']));
     return ['datos' => $d, 'guardado' => $guardado, 'fsr' => acrineoFasarPresupuesto($ctx['id']), 'sistema' => $sistema,
+            'anios' => ACRINEO_FASAR_ANIOS, 'cuotas' => ACRINEO_FASAR_CUOTAS,
             'mano_obra' => array_map(fn($i) => ['clave' => $i['clave'], 'codigo' => $i['codigo'], 'descripcion' => $i['descripcion'], 'unidad' => $i['unidad'],
                                                  'costo' => $i['costo'], 'salario_base' => $i['datos']->salario_base ?? null, 'fasar' => $i['datos']->fasar ?? null], $mo),
             'disponible' => acrineoOpcionesDisponible()];
 }
 
-// Renglones [{concepto, dias|pct}] válidos
+// Renglones [{concepto, dias}] válidos
 function acrineoFasarRenglones($lista, string $campo, string $que): array
 {
     $r = [];
@@ -509,35 +593,41 @@ function acrineoFasarRenglones($lista, string $campo, string $que): array
     return $r;
 }
 
-// Calcula y guarda el FASAR; con aplicar, la mano de obra del presupuesto con salario base toma ese FASAR (y con
-// base_desde_costo, la que no tiene salario base lo toma de su costo actual).
+// Calcula y guarda el FASAR. El FASAR del presupuesto (el que toma la mano de obra sin salario base) es el del salario
+// mínimo. Con aplicar, cada categoría de mano de obra con salario base toma SU FASAR (y con base_desde_costo, la que no
+// tiene salario base lo toma de su costo actual).
 function acrineoFasarGuardar(array $ctx, array $in, string $usuario): array
 {
     acrineoOpcionesExigir();
     require_once ACRI_RAIZ . '/includes/pu.php';
     $dias = $in['dias_calendario'] ?? null;
     if (!is_numeric($dias) || (float) $dias <= 0 || (float) $dias > 400) throw new AcrineoError('Los días calendario deben ser un número de 1 a 400.', 422, ['dias_calendario' => 'De 1 a 400.']);
+    $dc = (float) $dias;
     $pagados = acrineoFasarRenglones($in['dias_pagados'] ?? [], 'dias', 'días pagados');
     $noLab = acrineoFasarRenglones($in['dias_no_laborados'] ?? [], 'dias', 'días no laborados');
-    $oblig = acrineoFasarRenglones($in['obligaciones'] ?? [], 'pct', 'obligaciones');
+    $p = acrineoFasarParametros($in['parametros'] ?? []);
     try {
-        $c = puFsr((float) $dias, $pagados, $noLab, $oblig);
+        $t = puFsr($dc, $pagados, $noLab, []);
     } catch (InvalidArgumentException $e) {
         throw new AcrineoError($e->getMessage(), 422);
     }
-    if ($c['fsr'] <= 0 || $c['fsr'] >= 10) throw new AcrineoError('El FASAR que resulta (' . $c['fsr'] . ') no es válido: revisa los datos.', 422);
+    $ref = acrineoFasarCategoria($p, $dc, $t['tp'], $t['tl'], (float) $p['salario_minimo']);
+    if ($ref['fsr'] <= 0 || $ref['fsr'] >= 10) throw new AcrineoError('El FASAR que resulta (' . $ref['fsr'] . ') no es válido: revisa los datos.', 422);
     $aplicar = in_array($in['aplicar'] ?? false, [true, 1, '1', 'true'], true);
     $desdeCosto = in_array($in['base_desde_costo'] ?? false, [true, 1, '1', 'true'], true);
     $antes = acrineoFasarPresupuesto($ctx['id']);
+    $conParametros = bd_tiene_columna('AW', 'acrineo_presupuesto_fasar', 'parametros');
 
-    return acrineoTransaccion(function () use ($ctx, $dias, $pagados, $noLab, $oblig, $c, $aplicar, $desdeCosto, $antes, $usuario) {
+    return acrineoTransaccion(function () use ($ctx, $dc, $pagados, $noLab, $p, $t, $ref, $aplicar, $desdeCosto, $antes, $conParametros, $usuario) {
         $j = fn($v) => json_encode($v, JSON_UNESCAPED_UNICODE);
-        bd_ejecutar('AW', 'insert into acrineo_presupuesto_fasar (presupuesto_id, dias_calendario, dias_pagados, dias_no_laborados, obligaciones, tp, tl, ps, fsr, updated_at, updated_by)
-                           values (?, ?, cast(? as jsonb), cast(? as jsonb), cast(? as jsonb), ?, ?, ?, ?, now(), ?)
+        $cols = 'presupuesto_id, dias_calendario, dias_pagados, dias_no_laborados, obligaciones, tp, tl, ps, fsr, updated_at, updated_by' . ($conParametros ? ', parametros' : '');
+        $vals = '?, ?, cast(? as jsonb), cast(? as jsonb), cast(? as jsonb), ?, ?, ?, ?, now(), ?' . ($conParametros ? ', cast(? as jsonb)' : '');
+        $params = [$ctx['id'], round($dc, 2), $j($pagados), $j($noLab), '[]', $t['tp'], $t['tl'], $ref['ps'], $ref['fsr'], mb_substr($usuario, 0, 50)];
+        if ($conParametros) $params[] = $j($p);
+        bd_ejecutar('AW', "insert into acrineo_presupuesto_fasar ($cols) values ($vals)
                            on conflict (presupuesto_id) do update set dias_calendario = excluded.dias_calendario, dias_pagados = excluded.dias_pagados,
                                dias_no_laborados = excluded.dias_no_laborados, obligaciones = excluded.obligaciones, tp = excluded.tp, tl = excluded.tl,
-                               ps = excluded.ps, fsr = excluded.fsr, updated_at = now(), updated_by = excluded.updated_by',
-            [$ctx['id'], round((float) $dias, 2), $j($pagados), $j($noLab), $j($oblig), $c['tp'], $c['tl'], $c['ps'], $c['fsr'], mb_substr($usuario, 0, 50)]);
+                               ps = excluded.ps, fsr = excluded.fsr, updated_at = now(), updated_by = excluded.updated_by" . ($conParametros ? ', parametros = excluded.parametros' : ''), $params);
         $aplicados = 0;
         $renglones = 0;
         $recalculados = 0;
@@ -551,15 +641,15 @@ function acrineoFasarGuardar(array $ctx, array $in, string $usuario): array
                     if (!$desdeCosto || $i['costo'] <= 0) continue;
                     $d['salario_base'] = round((float) $i['costo'], 6);
                 }
-                $d['fasar'] = $c['fsr'];
+                $d['fasar'] = acrineoFasarCategoria($p, $dc, $t['tp'], $t['tl'], (float) $d['salario_base'])['fsr'];
                 acrineoInsumoDatosEscribir($ctx['id'], $k, 'MO', $d);
-                $nuevos[$k] = acrineoCostoDeDatos('MO', $d, $c['fsr']);
+                $nuevos[$k] = acrineoCostoDeDatos('MO', $d, $ref['fsr']);
                 $aplicados++;
             }
             [$renglones, $recalculados] = acrineoAplicarCostosInsumos($ctx, $nuevos);
         }
-        acrineoRegistrar($ctx['id'], $usuario, 'HOJA', [['FASAR del presupuesto', $antes === null ? null : (string) $antes,
-            $c['fsr'] . ($aplicar ? " (aplicado a $aplicados categoría(s) de mano de obra)" : '')]]);
-        return $c + ['aplicados' => $aplicados, 'renglones' => $renglones, 'recalculados' => $recalculados];
+        acrineoRegistrar($ctx['id'], $usuario, 'HOJA', [['FASAR del presupuesto (salario mínimo)', $antes === null ? null : (string) $antes,
+            $ref['fsr'] . ($aplicar ? " (cada una de $aplicados categoría(s) de mano de obra con el suyo)" : '')]]);
+        return ['fsr' => $ref['fsr'], 'tp' => $t['tp'], 'tl' => $t['tl'], 'ps' => $ref['ps'], 'aplicados' => $aplicados, 'renglones' => $renglones, 'recalculados' => $recalculados];
     });
 }

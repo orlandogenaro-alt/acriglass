@@ -39,5 +39,9 @@ CREATE TABLE IF NOT EXISTS acrineo_presupuesto_fasar (
     updated_by        VARCHAR(50)
 );
 
+/* Datos del IMSS del FASAR: año, salario mínimo, UMA, límites (grupos 1 y 2), considerar (patron | ambos), SAR,
+   INFONAVIT, riesgo de trabajo, impuesto sobre nómina y otros cargos (includes/acrineo/opciones.php) */
+ALTER TABLE acrineo_presupuesto_fasar ADD COLUMN IF NOT EXISTS parametros JSONB NOT NULL DEFAULT '{}';
+
 ALTER TABLE acrineo_presupuesto_insumos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE acrineo_presupuesto_fasar   ENABLE ROW LEVEL SECURITY;

@@ -111,24 +111,36 @@
     }
 
     // ---------- FASAR ----------
+    // La misma cuenta que acrineoFasarCategoria (includes/acrineo/opciones.php): cuotas del IMSS, SAR, INFONAVIT, impuesto
+    // sobre nómina y otros cargos; el FASAR es distinto para cada salario.
     var dlgF = $('anFasarDlg');
     var estadoF = dlgF ? estadoEn('anFasarEstado') : null;
-    var fasar = { sistema: [] };
+    var fasar = { sistema: [], anios: {}, cuotas: {}, mano_obra: [] };
+    var fmt4 = function (n) { return (Number(n) || 0).toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 5 }); };
 
     function filaFasar(campo, r) {
         return '<tr><td><input data-c="concepto" maxlength="100" value="' + esc(r.concepto || '') + '" aria-label="Concepto"></td>'
-            + '<td class="num"><input data-c="' + campo + '" inputmode="decimal" value="' + esc(r[campo] === undefined || r[campo] === null ? '' : r[campo]) + '" aria-label="' + (campo === 'pct' ? '%' : 'Días') + '"></td>'
+            + '<td class="num"><input data-c="' + campo + '" inputmode="decimal" value="' + esc(r[campo] === undefined || r[campo] === null ? '' : r[campo]) + '" aria-label="Días"></td>'
             + '<td><button type="button" class="an-btn an-mini an-texto" data-quitar title="Quitar" aria-label="Quitar">×</button></td></tr>';
     }
-    function pintarListas(d) {
-        $('anFasarDias').value = d.dias_calendario;
+    function pintarDias(d) {
+        if (d.dias_calendario !== undefined) $('anFasarDias').value = d.dias_calendario;
         dlgF.querySelectorAll('.an-fasar-tabla').forEach(function (t) {
             t.innerHTML = (d[t.dataset.lista] || []).map(function (r) { return filaFasar(t.dataset.campo, r); }).join('');
         });
-        calcular();
+    }
+    function pintarParametros(p) {
+        dlgF.querySelectorAll('[data-p]').forEach(function (i) { if (p[i.dataset.p] !== undefined) i.value = p[i.dataset.p]; });
+        dlgF.querySelector('input[name="considerar"][value="' + (p.considerar === 'patron' ? 'patron' : 'ambos') + '"]').checked = true;
+    }
+    function parametros() {
+        var p = {};
+        dlgF.querySelectorAll('[data-p]').forEach(function (i) { p[i.dataset.p] = String(i.value).trim().replace(/,/g, ''); });
+        p.considerar = dlgF.querySelector('input[name="considerar"]:checked').value;
+        return p;
     }
     function leer() {
-        var d = { dias_calendario: $('anFasarDias').value.trim() };
+        var d = { dias_calendario: $('anFasarDias').value.trim(), parametros: parametros() };
         dlgF.querySelectorAll('.an-fasar-tabla').forEach(function (t) {
             d[t.dataset.lista] = Array.prototype.map.call(t.querySelectorAll('tr'), function (tr) {
                 var o = { concepto: tr.querySelector('[data-c="concepto"]').value.trim() };
@@ -138,14 +150,49 @@
         });
         return d;
     }
-    // La misma cuenta que puFsr en el servidor
+    function porcentajes(p) {
+        var r = {};
+        Object.keys(fasar.cuotas).forEach(function (k) { r[k] = fasar.cuotas[k][0] + (p.considerar === 'ambos' ? fasar.cuotas[k][1] : 0); });
+        r.riesgo = Number(p.riesgo) || 0;
+        return r;
+    }
+    function categoria(p, dc, tp, tl, sb) {
+        var pc = porcentajes(p), n = function (k) { return Number(p[k]) || 0; }, uma = n('uma');
+        var sbc = Math.max(sb * tp / dc, n('salario_minimo')), s1 = Math.min(sbc, n('grupo1') * uma), s2 = Math.min(sbc, n('grupo2') * uma);
+        var diario = pc.cuota_fija / 100 * uma + pc.excedente / 100 * Math.max(0, s1 - 3 * uma)
+            + (pc.dinero + pc.especie + pc.riesgo + pc.guarderias) / 100 * s1 + (pc.invalidez + pc.cesantia + n('sar') + n('infonavit')) / 100 * s2;
+        var ps = sb > 0 ? diario * dc / (sb * tp) + (n('impuesto_nomina') + n('otros_cargos')) / 100 : 0;
+        var fsr = Math.round((ps * (tp / tl) + tp / tl) * 10000) / 10000;
+        return { sbc: sbc, ps: ps, fsr: fsr, real: sb * fsr };
+    }
+    function dias(d) {
+        var suma = function (l) { return l.reduce(function (s, r) { return s + (Number(r.dias) || 0); }, 0); };
+        var dc = Number(d.dias_calendario) || 0;
+        return { dc: dc, tp: dc + suma(d.dias_pagados), tl: dc - suma(d.dias_no_laborados) };
+    }
     function calcular() {
-        var d = leer(), suma = function (l, k) { return l.reduce(function (s, r) { return s + (Number(r[k]) || 0); }, 0); };
-        var dc = Number(d.dias_calendario) || 0, tp = dc + suma(d.dias_pagados, 'dias'), tl = dc - suma(d.dias_no_laborados, 'dias'), ps = suma(d.obligaciones, 'pct') / 100;
-        if (dc <= 0 || tl <= 0) { $('anFasarResultado').textContent = '—'; $('anFasarDetalle').textContent = 'Revisa los días.'; return; }
-        var fsr = ps * (tp / tl) + tp / tl;
-        $('anFasarResultado').textContent = fsr.toFixed(4);
-        $('anFasarDetalle').textContent = 'Tp ' + tp.toFixed(2) + ' · Tl ' + tl.toFixed(2) + ' · Ps ' + (ps * 100).toFixed(4) + ' %';
+        var d = leer(), p = d.parametros, t = dias(d), pc = porcentajes(p);
+        dlgF.querySelectorAll('[data-pct]').forEach(function (i) { i.value = fmt4(pc[i.dataset.pct]); });
+        var cuerpo = $('anFasarSalarios').tBodies[0];
+        if (t.dc <= 0 || t.tl <= 0 || !(Number(p.uma) > 0)) {
+            $('anFasarResultado').textContent = '—';
+            $('anFasarDetalle').textContent = 'Revisa los días, la UMA y el salario mínimo.';
+            cuerpo.innerHTML = '';
+            return null;
+        }
+        var ref = categoria(p, t.dc, t.tp, t.tl, Number(p.salario_minimo) || 0);
+        $('anFasarResultado').textContent = ref.fsr.toFixed(4);
+        $('anFasarDetalle').textContent = 'Tp ' + t.tp.toFixed(2) + ' · Tl ' + t.tl.toFixed(2) + ' · Ps ' + (ref.ps * 100).toFixed(4) + ' % · Tp/Tl ' + (t.tp / t.tl).toFixed(4);
+        var desdeCosto = $('anFasarDesdeCosto').checked;
+        cuerpo.innerHTML = fasar.mano_obra.length ? fasar.mano_obra.map(function (m) {
+            var sb = Number(m.salario_base) || (desdeCosto ? Number(m.costo) || 0 : 0);
+            var c = sb > 0 ? categoria(p, t.dc, t.tp, t.tl, sb) : null;
+            return '<tr' + (c ? '' : ' class="an-fasar-sin"') + '><td>' + esc(m.codigo || '') + '</td><td title="' + esc(m.descripcion) + '">' + esc(m.descripcion) + '</td>'
+                + '<td class="num">' + (c ? AN.ui.dinero(sb) : 'sin salario base') + '</td><td class="num">' + (c ? AN.ui.dinero(c.sbc) : '') + '</td>'
+                + '<td class="num">' + (c ? (c.ps * 100).toFixed(4) + ' %' : '') + '</td><td class="num"><b>' + (c ? c.fsr.toFixed(4) : '') + '</b></td>'
+                + '<td class="num">' + (c ? AN.ui.dinero(c.real) : '') + '</td></tr>';
+        }).join('') : '<tr class="an-vacio"><td colspan="7">No hay mano de obra en las matrices del presupuesto.</td></tr>';
+        return { d: d, t: t, ref: ref };
     }
 
     async function abrirFasar() {
@@ -155,23 +202,32 @@
         try {
             var r = await AN.api.get(H.url({ recurso: 'fasar' }));
             fasar = r;
+            var anios = Object.keys(r.anios).sort().reverse();
+            var anio = String(r.datos.parametros.anio);
+            if (anios.indexOf(anio) < 0) anios.unshift(anio);
+            $('anFasarAnio').innerHTML = anios.map(function (a) { return '<option value="' + esc(a) + '">' + esc(a) + '</option>'; }).join('');
             $('anFasarSistema').innerHTML = '<option value="">— FASAR del sistema —</option>' + r.sistema.map(function (s, i) {
-                return '<option value="' + i + '">' + esc(s.nombre) + ' (' + Number(s.fsr).toFixed(4) + ')</option>';
+                return '<option value="' + i + '">' + esc(s.nombre) + '</option>';
             }).join('');
             $('anFasarSistema').disabled = !r.sistema.length;
-            pintarListas(r.datos);
+            pintarParametros(r.datos.parametros);
+            pintarDias(r.datos);
+            calcular();
             var con = r.mano_obra.filter(function (m) { return Number(m.salario_base) > 0; }).length;
-            $('anFasarMo').textContent = r.mano_obra.length ? r.mano_obra.length + ' categoría(s) de mano de obra en las matrices; ' + con + ' con salario base capturado (Opciones › Mano de obra).'
-                : 'No hay mano de obra en las matrices del presupuesto.';
-            estadoF(r.disponible ? (r.fsr ? 'FASAR actual del presupuesto: ' + Number(r.fsr).toFixed(4) : 'El presupuesto aún no tiene FASAR: estos son valores de ejemplo, revísalos.') : 'Falta aplicar la migración 037 para guardar el FASAR.', r.disponible ? (r.fsr ? '' : 'info') : 'error');
+            estadoF(!r.disponible ? 'Falta aplicar la migración 037 para guardar el FASAR.'
+                : (r.guardado ? 'FASAR guardado del presupuesto (salario mínimo): ' + Number(r.fsr).toFixed(4) : 'El presupuesto aún no tiene FASAR: revisa los datos (sobre todo el riesgo de trabajo).')
+                  + (r.mano_obra.length ? ' · ' + con + ' de ' + r.mano_obra.length + ' categoría(s) con salario base.' : ''),
+                r.disponible ? (r.guardado ? '' : 'info') : 'error');
             $('anFasarAceptar').disabled = !r.disponible;
-            $('anFasarDias').focus();
+            $('anFasarAnio').focus();
         } catch (e) { estadoF(e.message, 'error'); }
     }
 
     async function aceptarFasar(e) {
         e.preventDefault();
+        if (!calcular()) { estadoF('Revisa los días, la UMA y el salario mínimo.', 'error'); return; }
         var cuerpo = Object.assign({ accion: 'fasar_guardar', aplicar: $('anFasarAplicar').checked, base_desde_costo: $('anFasarDesdeCosto').checked, partida_id: H.sel || 0 }, leer());
+        dlgF.querySelectorAll('.invalido').forEach(function (i) { i.classList.remove('invalido'); });
         $('anFasarAceptar').disabled = true;
         estadoF('Guardando…', 'info');
         try {
@@ -179,18 +235,55 @@
             H.aplicar(r);
             dlgF.close();
             var x = r.fasar;
-            AN.ui.aviso('FASAR del presupuesto: ' + Number(x.fsr).toFixed(4) + (cuerpo.aplicar ? '. Aplicado a ' + x.aplicados + ' categoría(s) de mano de obra; ' + x.recalculados + ' concepto(s) cambiaron de costo.' : '.'), 'ok');
-        } catch (err) { estadoF(err.message, 'error'); }
-        finally { $('anFasarAceptar').disabled = false; }
+            AN.ui.aviso('FASAR con el salario mínimo: ' + Number(x.fsr).toFixed(4) + (cuerpo.aplicar ? '. Se aplicó a ' + x.aplicados + ' categoría(s) de mano de obra (cada una con el suyo); ' + x.recalculados + ' concepto(s) cambiaron de costo.' : '.'), 'ok');
+        } catch (err) {
+            Object.keys(err.errores || {}).forEach(function (k) { var i = dlgF.querySelector('[data-p="' + k + '"]') || (k === 'dias_calendario' ? $('anFasarDias') : null); if (i) i.classList.add('invalido'); });
+            estadoF(err.message, 'error');
+        } finally { $('anFasarAceptar').disabled = false; }
+    }
+
+    // Libro del FASAR en Excel: datos generales, % de las cuotas, días y la tabla de salarios
+    function libroFasar() {
+        var c = calcular();
+        if (!c) { estadoF('Revisa los días, la UMA y el salario mínimo.', 'error'); return; }
+        var p = c.d.parametros, pc = porcentajes(p), t = c.t;
+        var filas = [['FASAR · ' + H.ctx.codigo + ' · ' + H.ctx.nombre, ''], ['', ''],
+            ['Año de los % de aplicación', p.anio], ['Salario mínimo', Number(p.salario_minimo)], ['UMA', Number(p.uma)],
+            ['Impuesto sobre nómina %', Number(p.impuesto_nomina)], ['Otros cargos %', Number(p.otros_cargos)],
+            ['Límite superior grupo 1 (UMA)', Number(p.grupo1)], ['Límite superior grupo 2 (UMA)', Number(p.grupo2)],
+            ['Considerar', p.considerar === 'patron' ? 'Solo % patrón' : '% patrón + % trabajador'], ['SAR %', Number(p.sar)], ['INFONAVIT %', Number(p.infonavit)], ['', ''],
+            ['Cuota fija %', pc.cuota_fija], ['Excedente de 3 UMA %', pc.excedente], ['Prestaciones en dinero %', pc.dinero], ['Prestaciones en especie %', pc.especie],
+            ['Riesgo de trabajo %', pc.riesgo], ['Guarderías %', pc.guarderias], ['Invalidez y vida %', pc.invalidez], ['Cesantía en edad avanzada y vejez %', pc.cesantia], ['', ''],
+            ['Días calendario', t.dc]];
+        c.d.dias_pagados.forEach(function (r) { filas.push(['(+) ' + r.concepto, Number(r.dias) || 0]); });
+        filas.push(['Tp (días pagados)', t.tp]);
+        c.d.dias_no_laborados.forEach(function (r) { filas.push(['(−) ' + r.concepto, Number(r.dias) || 0]); });
+        filas.push(['Tl (días laborados)', t.tl], ['FASAR con el salario mínimo', c.ref.fsr], ['', ''], ['Salarios', '']);
+        var tabla = [['Código', 'Descripción', 'Salario base', 'SBC', 'Ps %', 'FASAR', 'Salario real']];
+        fasar.mano_obra.forEach(function (m) {
+            var sb = Number(m.salario_base) || ($('anFasarDesdeCosto').checked ? Number(m.costo) || 0 : 0);
+            if (!(sb > 0)) { tabla.push([m.codigo || '', m.descripcion, 'sin salario base', '', '', '', '']); return; }
+            var x = categoria(p, t.dc, t.tp, t.tl, sb);
+            tabla.push([m.codigo || '', m.descripcion, sb, Math.round(x.sbc * 100) / 100, Math.round(x.ps * 1e6) / 1e4, x.fsr, Math.round(x.real * 100) / 100]);
+        });
+        filas = filas.map(function (f) { return f.concat(['', '', '', '', '']); }).concat(tabla);
+        var blob = window.XlsxSimple.crear({ nombre: 'FASAR', anchos: [38, 50, 14, 14, 12, 10, 14], filas: filas });
+        window.XlsxSimple.descargar(blob, 'FASAR ' + H.ctx.codigo + '.xlsx');
     }
 
     if (dlgF) {
         $('anFasarForm').addEventListener('submit', aceptarFasar);
         $('anFasarForm').addEventListener('input', function (e) { if (e.target.id !== 'anFasarSistema') calcular(); });
+        $('anFasarForm').addEventListener('change', function (e) { if (e.target.name === 'considerar' || e.target.id === 'anFasarDesdeCosto') calcular(); });
+        $('anFasarAnio').addEventListener('change', function () {
+            var a = fasar.anios[this.value];
+            if (a) { pintarParametros({ salario_minimo: a.salario_minimo, uma: a.uma, considerar: parametros().considerar }); calcular(); }
+        });
         $('anFasarSistema').addEventListener('change', function () {
             var s = fasar.sistema[+this.value];
-            if (s) pintarListas(s);
+            if (s) { pintarDias(s); calcular(); }
         });
+        $('anFasarExcel').addEventListener('click', libroFasar);
         dlgF.addEventListener('click', function (e) {
             var a = e.target.closest('[data-agregar]');
             if (a) {

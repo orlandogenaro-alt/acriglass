@@ -307,6 +307,22 @@ body.sb-oculto .sidebar { margin-left: calc(-1 * var(--sb-ancho)); }
     border-bottom: 1px solid var(--borde);
 }
 .avatar.grande { display: flex; width: 74px; height: 74px; font-size: 30px; margin: 0 auto 8px; border-width: 3px; }
+/* Foto del usuario */
+.avatar { overflow: hidden; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pu-foto { position: relative; cursor: pointer; }
+.pu-foto::after {
+    content: '📷'; position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; background: rgba(0, 0, 0, .45); border-radius: 50%;
+    opacity: 0; transition: opacity .15s;
+}
+.pu-foto:hover::after, .pu-foto:focus-visible::after { opacity: 1; }
+.pu-foto.cargando { opacity: .5; pointer-events: none; }
+.pu-foto-acciones { display: flex; justify-content: center; gap: 12px; margin: -2px 0 6px; }
+.pu-enlace { font-size: 11.5px; font-weight: 700; color: #3b82f6; }
+.pu-enlace:hover { text-decoration: underline; }
+#btnQuitarFoto { color: var(--texto-suave); }
 .pu-nombre { text-align: center; font-size: 17px; font-weight: 800; color: var(--texto-fuerte); }
 .pu-etiqueta { text-align: center; color: var(--texto-suave); font-size: 11.5px; margin: 8px 0 4px; }
 .pu-reloj {

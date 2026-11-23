@@ -642,6 +642,50 @@
         w.acriAgregar();
     });
     $('btnEditarUsuario').addEventListener('click', pendiente);
+
+    // ----- Foto del usuario (api/foto-usuario.php) -----
+    function pintarFoto(url) {
+        document.querySelectorAll('.avatar[data-inicial]').forEach(function (a) {
+            a.textContent = '';
+            if (url) {
+                var img = document.createElement('img');
+                img.src = url; img.alt = '';
+                a.appendChild(img);
+            } else a.textContent = a.dataset.inicial;
+        });
+        $('btnCambiarFoto').textContent = url ? '📷 Cambiar foto' : '📷 Subir foto';
+        $('btnQuitarFoto').hidden = !url;
+    }
+    function enviarFoto(datos) {
+        $('btnFotoUsuario').classList.add('cargando');
+        return fetch('api/foto-usuario.php', { method: 'POST', headers: { 'X-Acri-Token': window.ACRI.token }, body: datos })
+            .then(function (r) { return r.json(); })
+            .then(function (r) {
+                if (!r.ok) throw new Error(r.error || 'No se pudo guardar la foto.');
+                pintarFoto(r.foto);
+            })
+            .catch(function (e) { alert(e.message || 'No se pudo guardar la foto.'); })
+            .then(function () { $('btnFotoUsuario').classList.remove('cargando'); });
+    }
+    function elegirFoto() { $('archivoFotoUsuario').click(); }
+    $('btnFotoUsuario').addEventListener('click', elegirFoto);
+    $('btnCambiarFoto').addEventListener('click', elegirFoto);
+    $('archivoFotoUsuario').addEventListener('change', function () {
+        var f = this.files[0];
+        this.value = '';
+        if (!f) return;
+        if (f.size > 3 * 1024 * 1024) { alert('La foto pesa más de 3 MB.'); return; }
+        var datos = new FormData();
+        datos.append('accion', 'subir');
+        datos.append('archivo', f);
+        enviarFoto(datos);
+    });
+    $('btnQuitarFoto').addEventListener('click', function () {
+        if (!confirm('¿Quitar tu foto? Se volverá a mostrar tu inicial.')) return;
+        var datos = new FormData();
+        datos.append('accion', 'quitar');
+        enviarFoto(datos);
+    });
     // ⚙ Importar mis presupuestos de Neodata (abre el catálogo de ACRINEO con la ventana de importar)
     if ($('btnImportarNeodata')) $('btnImportarNeodata').addEventListener('click', function () {
         panelU.hidden = true;

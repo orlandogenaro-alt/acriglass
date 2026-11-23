@@ -110,6 +110,25 @@ function estadoImagenes(): array
     return $estado;
 }
 
+// Foto del usuario (Panel de usuario): config fotos_usuarios = { usuario en minúsculas: ruta o URL }
+function fotoUsuario(string $usuario): ?string
+{
+    try {
+        $ruta = configLeer('fotos_usuarios')[mb_strtolower($usuario)] ?? null;
+    } catch (Throwable $e) {
+        error_log('AcriGlass fotoUsuario: ' . $e->getMessage());
+        return null;
+    }
+    if (!is_string($ruta) || $ruta === '') return null;
+    return preg_match('#^https?://#', $ruta) || is_file(ACRI_RAIZ . '/' . $ruta) ? $ruta : null;
+}
+
+// Contenido de un círculo de avatar: la foto o la inicial
+function avatarContenido(?string $foto, string $inicial): string
+{
+    return $foto ? '<img src="' . e($foto) . '" alt="">' : e($inicial);
+}
+
 // Ruta de un css/js con su fecha de modificación, para que el navegador no use una copia vieja
 function recurso(string $ruta): string
 {

@@ -6,6 +6,8 @@ $cfg      = sistemaConfig();
 $empresa  = $cfg['empresa'];
 $restante = max(0, $_SESSION['expira'] - time());
 $inicial  = mb_strtoupper(mb_substr($usuarioSesion, 0, 1));
+$foto     = fotoUsuario($usuarioSesion);
+$avatar   = avatarContenido($foto, $inicial);
 
 // Menú lateral.
 // tipo: modulo = listado en pestaña (4º dato = columnas del listado)
@@ -146,7 +148,7 @@ function idItem(string $nombre): string
 <aside class="sidebar" id="sidebar" data-recorrido="menu">
     <div class="sb-cabecera">
         <div class="sb-logo"><img id="logoSistema" src="<?= e(imagenSistema('logo', $cfg)) ?>" alt="AcriGlass"></div>
-        <div class="avatar sb-avatar"><?= e($inicial) ?></div>
+        <div class="avatar sb-avatar" data-inicial="<?= e($inicial) ?>"><?= $avatar ?></div>
         <div class="sb-usuario"><?= e($usuarioSesion) ?></div>
         <div class="sb-empresa"><?= e($empresa['nombre']) ?></div>
     </div>
@@ -231,16 +233,22 @@ function idItem(string $nombre): string
                     <button class="am-op" data-ayuda="recorrido">🧭 Iniciar recorrido<small></small></button>
                 </div>
             </div>
-            <button class="avatar tb-avatar" id="btnUsuario" title="Panel de usuario" data-recorrido="usuario"><?= e($inicial) ?></button>
+            <button class="avatar tb-avatar" id="btnUsuario" title="Panel de usuario" data-recorrido="usuario" data-inicial="<?= e($inicial) ?>"><?= $avatar ?></button>
         </div>
 
         <!-- Panel de usuario -->
         <div class="panel-usuario" id="panelUsuario" hidden>
-            <div class="pu-titulo"><span class="avatar mini"><?= e($inicial) ?></span> PANEL DE USUARIO</div>
+            <div class="pu-titulo"><span class="avatar mini" data-inicial="<?= e($inicial) ?>"><?= $avatar ?></span> PANEL DE USUARIO</div>
 
             <section class="pu-caja">
                 <h3>👤 USUARIO</h3>
-                <div class="avatar grande"><?= e($inicial) ?></div>
+                <!-- Foto del usuario (api/foto-usuario.php): clic para cambiarla -->
+                <button class="avatar grande pu-foto" id="btnFotoUsuario" title="Cambiar mi foto" data-inicial="<?= e($inicial) ?>"><?= $avatar ?></button>
+                <input type="file" id="archivoFotoUsuario" accept="image/png,image/jpeg,image/webp" hidden>
+                <div class="pu-foto-acciones">
+                    <button class="pu-enlace" id="btnCambiarFoto">📷 <?= $foto ? 'Cambiar foto' : 'Subir foto' ?></button>
+                    <button class="pu-enlace" id="btnQuitarFoto"<?= $foto ? '' : ' hidden' ?>>Quitar</button>
+                </div>
                 <div class="pu-nombre"><?= e($usuarioSesion) ?></div>
                 <div class="pu-etiqueta">Expiración de sesión</div>
                 <div class="pu-reloj" id="reloj" data-restante="<?= $restante ?>">

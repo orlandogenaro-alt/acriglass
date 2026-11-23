@@ -974,3 +974,47 @@ body.an-redim-y, body.an-redim-y * { cursor: row-resize !important; }
 .an-catgen-in.an-mayus { text-transform: uppercase; }
 .an-catgen-tabla th.an-col-acc, .an-catgen-tabla td.an-col-acc { width: 84px; text-align: right; padding: 2px 8px; }
 #anPEdM2 { text-align: right; min-width: 70px; }
+
+/* Opciones del presupuesto: catálogos del presupuesto, Actualizar costos y matrices, FASAR (js/acrineo/hoja-catalogo-ppto.js, hoja-procesos.js) */
+.an-toast { white-space: pre-line; }
+.an-op-ico { font-size: 11px; font-weight: 800; }
+.an-catppto-dlg { width: min(1280px, 98vw); height: min(820px, 94vh); }
+.an-catppto-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 8px 14px; border-bottom: 1px solid var(--linea); }
+.an-catppto-buscar { display: inline-flex; align-items: center; gap: 6px; flex: 0 1 300px; min-width: 180px; height: 30px; padding: 0 8px; border: 1px solid var(--borde-2); border-radius: 6px; background: var(--input); }
+.an-catppto-buscar svg { width: 15px; height: 15px; color: var(--texto-3); }
+.an-catppto-buscar input { flex: 1; min-width: 0; border: none; background: none; color: inherit; outline: none; }
+.an-catppto-ver { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.an-catppto-ver[hidden], .an-catppto-factor[hidden], #anCatPptoDepurar[hidden] { display: none; }
+.an-catppto-factor { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: var(--texto-2); }
+.an-catppto-factor input { width: 64px; height: 26px; padding: 0 6px; text-align: right; border: 1px solid var(--borde-2); border-radius: 5px; background: var(--input); color: inherit; }
+.an-catppto-factor input.invalido { border-color: var(--rojo); }
+.an-catppto-factor select { height: 26px; border: 1px solid var(--borde-2); border-radius: 5px; background: var(--input); color: inherit; }
+.an-catppto-cont { margin: 0; min-height: 0; }
+.an-catppto-tabla td { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.an-catppto-tabla .an-col-chk { width: 28px; text-align: center; }
+.an-catppto-tabla .an-col-p { width: 26px; text-align: center; }
+.an-catppto-tabla tr.an-catppto-concepto td { color: var(--azul-texto); }
+.an-catppto-tabla td.an-catppto-edit { padding: 1px 3px; }
+.an-catppto-in { width: 100%; min-width: 74px; height: 24px; padding: 0 5px; border: 1px solid transparent; border-radius: 4px; background: var(--azul-suave); color: inherit; font: inherit; }
+.an-catppto-in.num { text-align: right; }
+.an-catppto-in:hover { border-color: var(--borde-2); }
+.an-catppto-in:focus { outline: none; border-color: var(--azul-texto); background: var(--input); box-shadow: 0 0 0 2px var(--foco); }
+.an-catppto-in.invalido { border-color: var(--rojo); background: var(--rojo-suave); }
+.an-actualizar-dlg { width: min(640px, 96vw); max-height: 94vh; }
+.an-actualizar-dlg form, .an-fasar-dlg form { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.an-actualizar-cuerpo { display: grid; gap: 12px; padding: 12px 18px; overflow: auto; }
+.an-actualizar-cuerpo p { margin: 0; }
+.an-fasar-dlg { width: min(920px, 96vw); max-height: 94vh; }
+.an-fasar-cuerpo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; padding: 12px 18px; overflow: auto; }
+.an-fasar-arriba, .an-fasar-ancho { grid-column: 1 / -1; }
+.an-fasar-arriba { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.an-fasar-arriba input { width: 90px; text-align: right; }
+.an-fasar-arriba input, .an-fasar-arriba select { height: 30px; padding: 0 6px; border: 1px solid var(--borde-2); border-radius: 5px; background: var(--input); color: inherit; }
+.an-fasar-tabla { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.an-fasar-tabla td { padding: 2px 3px; }
+.an-fasar-tabla td.num { width: 90px; }
+.an-fasar-tabla td:last-child { width: 30px; }
+.an-fasar-tabla input { width: 100%; height: 26px; padding: 0 6px; border: none; border-bottom: 1px dashed var(--borde-2); background: none; color: inherit; font: inherit; }
+.an-fasar-tabla td.num input { text-align: right; }
+.an-fasar-tabla input:focus { outline: none; border-bottom: 2px solid var(--azul-texto); }
+@media (max-width: 760px) { .an-fasar-cuerpo { grid-template-columns: 1fr; } }

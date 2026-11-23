@@ -54,13 +54,23 @@ require_once __DIR__ . '/campos.php';
         <button type="button" class="an-btn an-icono an-texto" id="anOpcionesCerrar" title="Cerrar" aria-label="Cerrar"><?= anIcono('cerrar') ?></button></div>
     <label class="an-opciones-buscar"><?= anIcono('buscar') ?><input type="search" id="anOpcionesQ" placeholder="Buscar opción" aria-label="Buscar opción"></label>
     <nav class="an-opciones-lista" id="anOpcionesLista">
+        <h3><span class="an-op-ico"><?= anIcono('cuadricula') ?></span>Catálogos</h3>
+        <button type="button" data-opcion="cat_general"><span class="an-op-ico"><?= anIcono('cuadricula') ?></span><span>Catálogo general (F9)<small>Catálogos</small></span></button>
+        <button type="button" data-opcion="cat_MAT"><span class="an-op-ico">M</span><span>Materiales<small>Catálogos</small></span></button>
+        <button type="button" data-opcion="cat_MO"><span class="an-op-ico">MO</span><span>Mano de obra<small>Catálogos</small></span></button>
+        <button type="button" data-opcion="cat_EQ"><span class="an-op-ico">EQ</span><span>Maquinaria<small>Catálogos</small></span></button>
         <h3><span class="an-op-ico"><?= anIcono('buscar') ?></span>Consultas</h3>
         <button type="button" data-opcion="completo"><span class="an-op-ico"><?= anIcono('cuadricula') ?></span><span>Presupuesto completo (F4)<small>Consultas</small></span></button>
         <h3><span class="an-op-ico"><?= anIcono('refrescar') ?></span>Procesos</h3>
+        <button type="button" data-opcion="actualizar"><span class="an-op-ico"><?= anIcono('refrescar') ?></span><span>Actualizar costos y matrices (Ctrl + Shift + U)<small>Procesos</small></span></button>
         <button type="button" data-opcion="calculo"><span class="an-op-ico"><?= anIcono('calc') ?></span><span>Cálculo (F10)<small>Procesos</small></span></button>
         <button type="button" data-opcion="detalle"><span class="an-op-ico"><?= anIcono('aviso') ?></span><span>Detalle del presupuesto (F12)<small>Otros</small></span></button>
         <button type="button" data-opcion="pegado"><span class="an-op-ico"><?= anIcono('portapapeles') ?></span><span>Pegado especial (Excel)<small>Otros</small></span></button>
+        <button type="button" data-opcion="recibir"><span class="an-op-ico"><?= anIcono('subir') ?></span><span>Recibir archivo de intercambio<small>Otros · crea un presupuesto nuevo desde Neodata</small></span></button>
+        <button type="button" data-opcion="depurar"><span class="an-op-ico"><?= anIcono('limpiar') ?></span><span>Depurar presupuesto<small>Otros</small></span></button>
+        <button type="button" data-opcion="renumerar"><span class="an-op-ico">#</span><span>Renumerar control<small>Otros</small></span></button>
         <h3><span class="an-op-ico">1×</span>Factores</h3>
+        <button type="button" data-opcion="fasar"><span class="an-op-ico"><?= anIcono('calc') ?></span><span>FASAR (Ctrl + Shift + F)<small>Factores</small></span></button>
         <button type="button" data-opcion="sobrecosto"><span class="an-op-ico">$</span><span>Sobrecosto (Ctrl + Shift + S)<small>Factores</small></span></button>
         <h3><span class="an-op-ico"><?= anIcono('grafica') ?></span>Reporte</h3>
         <button type="button" data-opcion="reportes"><span class="an-op-ico"><?= anIcono('imprimir') ?></span><span>Imprimir reportes (Ctrl + P)<small>Presupuesto, análisis de P.U., explosión de insumos</small></span></button>

@@ -20,6 +20,11 @@
 //   GET  ?id=P&recurso=matriz&concepto=C[&padre=M][&actualizar=1]  matriz de P.U. del concepto o la del renglón M de ella
 //   GET  ?id=P&recurso=insumos&q=                         catálogo de insumos del sistema, para la matriz
 //   GET  ?id=P&recurso=insumos_tabla&q=&pagina=           catálogo de insumos de la pestaña Matriz (familia, proveedor…)
+//   Opciones del presupuesto (includes/acrineo/opciones.php):
+//   GET  ?id=P&recurso=catalogo_ppto&tipo=general|MAT|MO|EQ&q=   insumos de las matrices del presupuesto (y conceptos en el general)
+//   GET  ?id=P&recurso=depurar · recurso=actualizar · recurso=fasar   lo que muestra cada ventana
+//   POST insumo_guardar {clave, costo?, datos?} · insumos_factor {claves, factor, operacion: multiplicar|dividir}
+//        depurar · renumerar · actualizar {importar, costos} · fasar_guardar {dias_calendario, dias_pagados, dias_no_laborados, obligaciones, aplicar, base_desde_costo}
 define('ACRI_API', true);
 require __DIR__ . '/../../includes/sesion.php';
 require __DIR__ . '/../../includes/respuesta.php';
@@ -30,6 +35,7 @@ require __DIR__ . '/../../includes/acrineo/calculo.php';
 require __DIR__ . '/../../includes/acrineo/pegado.php';
 require __DIR__ . '/../../includes/acrineo/completo.php';
 require __DIR__ . '/../../includes/acrineo/sobrecosto.php';
+require __DIR__ . '/../../includes/acrineo/opciones.php';
 
 acrineoExigir('presupuestos.ver');
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -64,6 +70,14 @@ try {
                 responder(['ok' => true] + acrineoExplosionAcoplada($ctx, (string) ($_GET['q'] ?? ''), acrineoModoBusqueda(), $ver));
             case 'renglon_codigo':
                 responder(['ok' => true] + acrineoRenglonPorCodigo($ctx, (string) ($_GET['codigo'] ?? '')));
+            case 'catalogo_ppto':
+                responder(['ok' => true] + acrineoCatalogoPresupuesto($ctx, (string) ($_GET['tipo'] ?? 'general'), (string) ($_GET['q'] ?? '')));
+            case 'depurar':
+                responder(['ok' => true] + acrineoDepurarVista($ctx));
+            case 'actualizar':
+                responder(['ok' => true] + acrineoActualizarVista($ctx));
+            case 'fasar':
+                responder(['ok' => true] + acrineoFasarDatos($ctx));
             case 'participa':
                 responder(['ok' => true] + acrineoParticipa($ctx, (string) ($_GET['clave'] ?? '')));
             case 'explosion':
@@ -134,6 +148,24 @@ try {
             break;
         case 'concepto_pendiente':
             acrineoConceptoPendiente($ctx, (int) ($in['concepto_id'] ?? 0), in_array($in['pendiente'] ?? false, [true, 1, '1', 'true'], true), $usuario);
+            break;
+        case 'insumo_guardar':
+            $extra['insumo'] = acrineoInsumoGuardar($ctx, $in, $usuario);
+            break;
+        case 'insumos_factor':
+            $extra['factor'] = acrineoInsumosFactor($ctx, is_array($in['claves'] ?? null) ? $in['claves'] : [], $in['factor'] ?? null, (string) ($in['operacion'] ?? ''), $usuario);
+            break;
+        case 'depurar':
+            $extra['depurado'] = acrineoDepurar($ctx, $usuario);
+            break;
+        case 'renumerar':
+            $extra['renumerado'] = acrineoRenumerar($ctx, $usuario);
+            break;
+        case 'actualizar':
+            $extra['actualizado'] = acrineoActualizarEjecutar($ctx, $in, $usuario);
+            break;
+        case 'fasar_guardar':
+            $extra['fasar'] = acrineoFasarGuardar($ctx, $in, $usuario);
             break;
         case 'sobrecosto':
             acrineoSobrecostoGuardar($ctx, $in['sobrecosto_pct'] ?? null, $usuario);

@@ -1,5 +1,6 @@
 // ACRINEO · «Opciones del presupuesto» (pestaña vertical de la izquierda, como en Neodata) y sus teclas rápidas:
-// F4 Presupuesto completo · F10 Cálculo · F12 Detalle del presupuesto · Ctrl+Shift+S Sobrecosto · Ctrl+P Imprimir reportes. «Buscar opción» filtra la lista.
+// F4 Presupuesto completo · F9 Catálogo general · F10 Cálculo · F12 Detalle del presupuesto · Ctrl+Shift+S Sobrecosto ·
+// Ctrl+Shift+U Actualizar costos y matrices · Ctrl+Shift+F FASAR · Ctrl+P Imprimir reportes. «Buscar opción» filtra la lista.
 (function (AN) {
     'use strict';
 
@@ -15,9 +16,19 @@
         pegado: function () { if (AN.hojaPegado) AN.hojaPegado.abrir(); },
         grafica: function () { var b = $('anConceptosGrafica'); if (b) b.click(); },
         sobrecosto: function () { if (AN.hojaSobrecosto) AN.hojaSobrecosto.abrir(); },
-        reportes: function () { if (AN.hojaReportes) AN.hojaReportes.abrir(); }
+        reportes: function () { if (AN.hojaReportes) AN.hojaReportes.abrir(); },
+        cat_general: function () { if (AN.hojaCatalogo) AN.hojaCatalogo.abrir('general'); },
+        cat_MAT: function () { if (AN.hojaCatalogo) AN.hojaCatalogo.abrir('MAT'); },
+        cat_MO: function () { if (AN.hojaCatalogo) AN.hojaCatalogo.abrir('MO'); },
+        cat_EQ: function () { if (AN.hojaCatalogo) AN.hojaCatalogo.abrir('EQ'); },
+        actualizar: function () { if (AN.hojaProcesos) AN.hojaProcesos.actualizar(); },
+        recibir: function () { if (AN.hojaProcesos) AN.hojaProcesos.recibir(); },
+        depurar: function () { if (AN.hojaProcesos) AN.hojaProcesos.depurar(); },
+        renumerar: function () { if (AN.hojaProcesos) AN.hojaProcesos.renumerar(); },
+        fasar: function () { if (AN.hojaProcesos) AN.hojaProcesos.fasar(); }
     };
-    var TECLAS = { F4: 'completo', F10: 'calculo', F12: 'detalle' };
+    var TECLAS = { F4: 'completo', F9: 'cat_general', F10: 'calculo', F12: 'detalle' };
+    var TECLAS_CTRL_SHIFT = { s: 'sobrecosto', u: 'actualizar', f: 'fasar' };
 
     function abrir(si) {
         caja.hidden = !si;
@@ -59,8 +70,9 @@
     });
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && !caja.hidden) { abrir(false); return; }
-        // Ctrl+Shift+S: Sobrecosto
-        if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 's' && !document.querySelector('dialog[open]')) { e.preventDefault(); ejecutar('sobrecosto'); return; }
+        // Ctrl+Shift+S Sobrecosto · Ctrl+Shift+U Actualizar costos y matrices · Ctrl+Shift+F FASAR
+        var cs = (e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && TECLAS_CTRL_SHIFT[(e.key || '').toLowerCase()];
+        if (cs && !document.querySelector('dialog[open]')) { e.preventDefault(); ejecutar(cs); return; }
         var op = TECLAS[e.key];
         if (!op || e.ctrlKey || e.altKey || e.metaKey || document.querySelector('dialog[open]')) return;
         e.preventDefault();

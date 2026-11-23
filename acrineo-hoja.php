@@ -290,6 +290,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
 <?php require __DIR__ . '/includes/acrineo/vistas/sobrecosto.php'; ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/reportes.php'; ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/ligados.php'; ?>
+<?php require __DIR__ . '/includes/acrineo/vistas/opciones.php'; ?>
 <script>
     window.ACRINEO = <?= json_encode($cfgCliente, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_PRESERVE_ZERO_FRACTION) ?>;
 </script>
@@ -313,6 +314,8 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
 <script src="<?= recurso('js/acrineo/hoja-sobrecosto.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-reportes.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-ligados.js') ?>"></script>
+<script src="<?= recurso('js/acrineo/hoja-catalogo-ppto.js') ?>"></script>
+<script src="<?= recurso('js/acrineo/hoja-procesos.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-opciones.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/divisores.js') ?>"></script>
 <?php endif; ?>

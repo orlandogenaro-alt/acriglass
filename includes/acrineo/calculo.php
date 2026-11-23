@@ -84,6 +84,37 @@ function acrineoCalculoMatrices(array $ctx): array
     return $m;
 }
 
+// Recalcula las matrices de abajo hacia arriba (submatrices → renglón → concepto) y guarda lo que cambió: los renglones
+// marcados con 'cambio' (o cuyo costo sale de su submatriz) y el costo directo de cada concepto. Regresa cuántos
+// conceptos cambiaron de costo. $matrices es el de acrineoCalculoMatrices (se actualiza en su lugar).
+function acrineoRecalcularMatrices(array $ctx, array &$matrices): int
+{
+    $dec = $ctx['dec_costos'];
+    $recalculados = 0;
+    foreach ($matrices as $cid => &$niveles) {
+        $total = function (int $padre) use (&$total, &$niveles, $dec): float {
+            foreach ($niveles[$padre] as &$f) {
+                if (isset($niveles[$f['matriz_id']])) {
+                    $c = $total($f['matriz_id']);
+                    if (abs($c - $f['costo']) > 0.0000005) { $f['costo'] = $c; $f['cambio'] = true; }
+                }
+            }
+            unset($f);
+            return acrineoCalcularMatriz($niveles[$padre], $dec)['total'];
+        };
+        if (!isset($niveles[0])) continue;
+        $costo = $total(0);
+        foreach ($niveles as $filas) foreach ($filas as $f) {
+            if (!empty($f['cambio'])) bd_ejecutar('AW', 'update acrineo_matriz set costo = ? where matriz_id = ?', [$f['costo'], $f['matriz_id']]);
+        }
+        $n = bd_ejecutar('AW', "update acrineo_conceptos set costo = ?, costo_origen = 'matriz', updated_at = now()
+                                 where concepto_id = ? and (costo <> ? or costo_origen <> 'matriz')", [$costo, $cid, $costo]);
+        $recalculados += $n ? 1 : 0;
+    }
+    unset($niveles);
+    return $recalculados;
+}
+
 // Costo del catálogo para los insumos de las matrices (precio a la fecha; equipo con costo horario a la tasa dada)
 function acrineoCalculoCostosCatalogo(array $ids, ?string $fecha, ?float $tasaCh): array
 {
@@ -167,28 +198,7 @@ function acrineoCalculoEjecutar(array $ctx, array $in, string $usuario): array
         }
 
         // 3. Matrices de abajo hacia arriba
-        $recalculados = 0;
-        foreach ($matrices as $cid => &$niveles) {
-            $total = function (int $padre) use (&$total, &$niveles, $dec): float {
-                foreach ($niveles[$padre] as &$f) {
-                    if (isset($niveles[$f['matriz_id']])) {
-                        $c = $total($f['matriz_id']);
-                        if (abs($c - $f['costo']) > 0.0000005) { $f['costo'] = $c; $f['cambio'] = true; }
-                    }
-                }
-                unset($f);
-                return acrineoCalcularMatriz($niveles[$padre], $dec)['total'];
-            };
-            if (!isset($niveles[0])) continue;
-            $costo = $total(0);
-            foreach ($niveles as $filas) foreach ($filas as $f) {
-                if (!empty($f['cambio'])) bd_ejecutar('AW', 'update acrineo_matriz set costo = ? where matriz_id = ?', [$f['costo'], $f['matriz_id']]);
-            }
-            $n = bd_ejecutar('AW', "update acrineo_conceptos set costo = ?, costo_origen = 'matriz', updated_at = now()
-                                     where concepto_id = ? and (costo <> ? or costo_origen <> 'matriz')", [$costo, $cid, $costo]);
-            $recalculados += $n ? 1 : 0;
-        }
-        unset($niveles);
+        $recalculados = acrineoRecalcularMatrices($ctx, $matrices);
         acrineoActualizarTotales($ctx['id']);
         acrineoRegistrar($ctx['id'], $usuario, 'HOJA', [['Calculó el presupuesto', null,
             "$recalculados concepto(s) cambiaron de costo; $actualizados insumo(s) tomaron costo del catálogo"

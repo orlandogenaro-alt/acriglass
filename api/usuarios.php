@@ -32,6 +32,7 @@ function listar(): void
     $propios = [];
     foreach (bd_filas('AW', 'select usuario_id, permiso from permisos_usuarios') as $p) $propios[$p['usuario_id']][] = strtoupper($p['permiso']);
 
+    $fotos = configLeer('fotos_usuarios');
     $filas = [];
     foreach (bd_filas('AW',
         "select u.usuario_id, u.login, u.nombre, u.correo, u.estatus, u.rol_id, r.nombre as rol,
@@ -55,6 +56,7 @@ function listar(): void
             'activa'         => strtoupper((string) $u['estatus']) !== 'B',
             'ultimo_acceso'  => $u['ultimo_acceso'] ?? '',
             'fecha_creacion' => $u['fecha_creacion'] ?? '',
+            'foto'           => fotoUsuario((string) $u['login'], $fotos),
         ];
     }
     responder(['ok' => true, 'filas' => $filas, 'roles' => $roles, 'permisos_roles' => $permisosRol, 'permisos' => ACRI_PERMISOS]);

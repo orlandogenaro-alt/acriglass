@@ -111,10 +111,10 @@ function estadoImagenes(): array
 }
 
 // Foto del usuario (Panel de usuario): config fotos_usuarios = { usuario en minúsculas: ruta o URL }
-function fotoUsuario(string $usuario): ?string
+function fotoUsuario(string $usuario, ?array $fotos = null): ?string
 {
     try {
-        $ruta = configLeer('fotos_usuarios')[mb_strtolower($usuario)] ?? null;
+        $ruta = ($fotos ?? configLeer('fotos_usuarios'))[mb_strtolower($usuario)] ?? null;
     } catch (Throwable $e) {
         error_log('AcriGlass fotoUsuario: ' . $e->getMessage());
         return null;

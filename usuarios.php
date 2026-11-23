@@ -10,10 +10,12 @@ $pagina = [
     'descripcion' =>
         'Usuarios que entran al sistema. Cada usuario tiene un <b>rol</b> (Administrador › Roles) que le da sus permisos; ' .
         'además se le pueden marcar <b>permisos sueltos</b> que su rol no trae. Los usuarios dados de baja no pueden iniciar sesión. ' .
-        'Las contraseñas se guardan cifradas y nunca se muestran. Los cambios de permisos se aplican la próxima vez que el usuario inicie sesión.',
+        'Las contraseñas se guardan cifradas y nunca se muestran. Con <b>📷 Foto</b> (o clic en el círculo de la columna Foto) se sube la foto del usuario seleccionado. Los cambios de permisos se aplican la próxima vez que el usuario inicie sesión.',
     'botones' => [
         ['agregar', 'Agregar', true],
         ['activar', 'Alta /<br>Baja'],
+        ['foto', '📷 Foto'],
+        ['quitarfoto', 'Quitar<br>foto'],
         ['refrescar', 'Refrescar'],
     ],
 ];

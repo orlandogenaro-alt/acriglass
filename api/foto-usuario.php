@@ -1,6 +1,7 @@
 <?php
-// Foto del usuario que tiene la sesión (Panel de usuario). Cada quien solo cambia la suya.
+// Foto del usuario (Panel de usuario y Administrador › Usuarios).
 // POST accion=subir + archivo  ·  POST accion=quitar
+// usuario=LOGIN (opcional): de otro usuario; solo con ADMIN_USER. Sin él, la del usuario de la sesión.
 define('ACRI_API', true);
 require __DIR__ . '/../includes/sesion.php';
 
@@ -24,7 +25,13 @@ exigirCsrf();
 $mb    = 1024 * 1024;
 $max   = 3 * $mb;   // Vercel no acepta peticiones de más de 4.5 MB
 $tipos = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp'];
-$clave = mb_strtolower($usuarioSesion);
+$clave = mb_strtolower(trim((string) ($_POST['usuario'] ?? '')));
+if ($clave === '' || $clave === mb_strtolower($usuarioSesion)) {
+    $clave = mb_strtolower($usuarioSesion);
+} else {
+    exigirPermiso('ADMIN_USER');
+    if (!preg_match('/^[\p{L}\p{N}._@-]{1,60}$/u', $clave)) error('Usuario no válido.');
+}
 $fotos = configLeer('fotos_usuarios');
 
 // Borra el archivo anterior (solo si está en uploads/sistema o en el bucket "sistema")

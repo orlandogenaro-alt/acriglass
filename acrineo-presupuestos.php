@@ -17,9 +17,6 @@ try {
 }
 $puede = acrineoPermisosCliente();
 
-// Menú del módulo: se activan conforme se construyen
-$modulos = ['Dashboard', 'Presupuestos', 'Catálogo de conceptos', 'Insumos', 'Matrices', 'Precios unitarios', 'Explosión de insumos',
-            'Proveedores', 'Estimaciones', 'Control de obra', 'Reportes', 'Configuración'];
 $cfgCliente = [
     'permisos' => $puede,
     'esquema'  => acrineoEsquemaCliente(),
@@ -50,13 +47,7 @@ $cfgCliente = [
             <div><b>ACRINEO</b><small>Sistema de presupuestos y control de costos</small></div>
         </div>
         <nav class="an-modulos" aria-label="Módulos de ACRINEO">
-            <?php foreach ($modulos as $m): ?>
-                <?php if ($m === 'Presupuestos'): ?>
-                <a href="acrineo-presupuestos.php" class="activo" aria-current="page"><?= e($m) ?></a>
-                <?php else: ?>
-                <span aria-disabled="true" title="Se activará en una siguiente etapa"><?= e($m) ?><em>Próximamente</em></span>
-                <?php endif; ?>
-            <?php endforeach; ?>
+            <a href="acrineo-presupuestos.php" class="activo" aria-current="page">Presupuestos</a>
         </nav>
     </header>
 

@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-11-24',
+        'cambios' => [
+            ['mejora', 'Bienvenido: los indicadores salen de ACRINEO', 'Las tarjetas de General muestran los presupuestos de ACRINEO: pendientes (borrador, en proceso o enviados), aprobados, nuevos este mes, importe aprobado (precio de venta sin IVA), lo facturado (facturas de Microsip ligadas a los aprobados) y lo que falta por facturar. Proyectos se filtra por año, estatus y presupuesto y muestra costo directo, precio de venta, facturado, sobrecosto, por facturar y pedidos de Microsip, con las gráficas de balance, composición del precio, presupuestado contra facturado por presupuesto y avance de facturación. Ya no se consultan las obras de AW-Management para este tablero.'],
+        ],
+    ],
+    [
         'fecha' => '2026-11-23',
         'cambios' => [
             ['correccion', 'Fotos de usuario: ya se guardan en la nube', 'Al subir o quitar una foto (Panel de usuario o Administrador › Usuarios) en la versión en la nube salía el error «No encontrado. is not valid JSON»: el servidor no tenía dada de alta la ruta que guarda la foto. Ya quedó.'],

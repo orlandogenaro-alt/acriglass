@@ -1,6 +1,7 @@
 <?php
 require __DIR__ . '/includes/sesion.php';
 require __DIR__ . '/includes/acrineo/permisos.php';
+require_once __DIR__ . '/includes/acrineo/esquema.php';   // ACRINEO_ESTATUS (filtro del tablero)
 
 $cfg      = sistemaConfig();
 $empresa  = $cfg['empresa'];
@@ -298,63 +299,68 @@ function idItem(string $nombre): string
                     <h1 class="bv-titulo">General</h1>
                     <span class="bv-periodo" id="txtPeriodo"></span>
                 </div>
+                <!-- Indicadores de los presupuestos de ACRINEO (js/tablero.js, api/acrineo/presupuestos.php?recurso=tablero) -->
+                <?php $conAcrineo = !modoConfiguracion() && acrineoPuede('presupuestos.ver'); ?>
                 <div class="tarjetas" data-recorrido="resumen">
                     <?php foreach ([
-                        ['PRESUPUESTOS PENDIENTES', 'Presupuestos de Obra', 'presupuestos_pendientes'],
-                        ['PRESUPUESTOS APROBADOS',  'Presupuestos de Obra', 'presupuestos_aceptados'],
-                        ['OBRAS EN PROCESO',        'Obras',                'obras_en_proceso'],
-                        ['ÓRDENES DE FABRICACIÓN',  'Orden de Fabricacion', null],
-                        ['GASTOS DE OBRA',          'Gastos de Obra',       null],
-                        ['SALIDAS DE MATERIAL',     'Salidas de Materiales', null],
-                    ] as [$t, $mod, $indicador]):
-                        if (modoConfiguracion()) $indicador = null; ?>
-                    <div class="tarjeta"<?= $indicador ? ' data-indicador="' . $indicador . '"' : '' ?>>
+                        ['PRESUPUESTOS PENDIENTES', 'pendientes',       'Borrador, en proceso o enviados'],
+                        ['PRESUPUESTOS APROBADOS',  'aprobados',        'Aprobados en ACRINEO'],
+                        ['NUEVOS ESTE MES',         'nuevos_mes',       'Capturados o importados de Neodata'],
+                        ['IMPORTE APROBADO',        'importe_aprobado', 'Precio de venta de los aprobados (sin IVA)'],
+                        ['FACTURADO',               'facturado',        'Facturas de Microsip ligadas a los aprobados'],
+                        ['POR FACTURAR',            'por_facturar',     'Aprobado con IVA menos lo facturado'],
+                    ] as [$t, $indicador, $nota]): ?>
+                    <div class="tarjeta"<?= $conAcrineo ? ' data-indicador="' . $indicador . '" data-nota="' . e($nota) . '"' : '' ?>>
                         <h3><?= $t ?></h3>
                         <div class="t-valor">—</div>
-                        <div class="t-nota">Sin datos todavía</div>
-                        <a href="#" class="t-link" data-abrir="<?= idItem($mod) ?>">Ir a <?= e(mb_strtolower($mod)) ?> ›</a>
+                        <div class="t-nota"><?= $conAcrineo ? 'Consultando ACRINEO…' : 'Sin permiso de ACRINEO' ?></div>
+                        <a href="#" class="t-link" data-abrir="<?= idItem('Catálogo de presupuestos') ?>">Ir al catálogo de presupuestos ›</a>
                     </div>
                     <?php endforeach; ?>
                 </div>
 
-                <?php if (!modoConfiguracion()): ?>
-                <!-- Tablero de los proyectos (obras): financiero y presupuesto -->
+                <?php if ($conAcrineo): ?>
+                <!-- Tablero de los proyectos: presupuestos de ACRINEO con lo facturado -->
                 <div class="tablero" id="tablero">
                     <div class="bv-cabecera tb-cabecera">
                         <h2 class="bv-titulo">Proyectos</h2>
                         <div class="tb-filtros">
                             <label>Año <select id="tbAnio"></select></label>
-                            <label>Obra <select id="tbObra"><option value="0">Todas las obras del año</option></select></label>
+                            <label>Estatus <select id="tbEstatus">
+                                <option value="ACTIVOS">Activos (sin rechazados ni cancelados)</option>
+                                <?php foreach (ACRINEO_ESTATUS as $k => $v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?>
+                            </select></label>
+                            <label>Presupuesto <select id="tbObra"><option value="0">Todos los presupuestos</option></select></label>
                         </div>
                     </div>
                     <p class="tb-estado" id="tbEstado"></p>
 
                     <div class="tb-kpis">
-                        <div class="tb-kpi" data-serie="pagado"><h3>COSTO EJERCIDO</h3><b data-kpi="pagado">—</b><small>Material surtido + mano de obra real (no son pagos)</small></div>
-                        <div class="tb-kpi" data-serie="cobrado"><h3>COBRADO</h3><b data-kpi="cobrado">—</b><small>Cobros, anticipos y notas de crédito (con IVA)</small></div>
-                        <div class="tb-kpi" data-serie="otros"><h3>OTROS GASTOS</h3><b data-kpi="otros">—</b><small>Gastos adicionales reales</small></div>
-                        <div class="tb-kpi" data-serie="utilidad"><h3>UTILIDAD / PÉRDIDA</h3><b data-kpi="utilidad">—</b><small>Cobrado sin IVA − costo ejercido − otros gastos</small></div>
+                        <div class="tb-kpi" data-serie="pagado"><h3>COSTO DIRECTO</h3><b data-kpi="costo">—</b><small>Materiales, mano de obra y equipo de la hoja</small></div>
+                        <div class="tb-kpi" data-serie="cobrado"><h3>PRECIO DE VENTA</h3><b data-kpi="venta">—</b><small>Costo directo + sobrecosto (sin IVA)</small></div>
+                        <div class="tb-kpi" data-serie="otros"><h3>FACTURADO</h3><b data-kpi="facturado">—</b><small>Facturas de Microsip ligadas (con IVA)</small></div>
+                        <div class="tb-kpi" data-serie="utilidad"><h3>SOBRECOSTO</h3><b data-kpi="utilidad">—</b><small>Precio de venta − costo directo (indirectos, financiamiento y utilidad)</small></div>
                     </div>
 
                     <div class="tb-fila">
                         <div class="tb-lado">
-                            <div class="tb-kpi"><h3>POR COBRAR</h3><b data-kpi="por_cobrar">—</b><small>Saldo en Microsip y AW</small></div>
-                            <div class="tb-kpi"><h3>POR PAGAR</h3><b data-kpi="por_pagar">—</b><small>Mano de obra y gastos sin importe real</small></div>
+                            <div class="tb-kpi"><h3>POR FACTURAR</h3><b data-kpi="por_facturar">—</b><small>Precio con IVA menos lo facturado</small></div>
+                            <div class="tb-kpi"><h3>PEDIDOS MICROSIP</h3><b data-kpi="pedidos">—</b><small>Pedidos ligados a los presupuestos</small></div>
                         </div>
                         <figure class="tb-grafica"><figcaption>BALANCE FINANCIERO</figcaption><div id="grfFinanciero"></div></figure>
-                        <figure class="tb-grafica"><figcaption>PORCENTAJE FINANCIERO</figcaption><div id="grfFinPct"></div></figure>
+                        <figure class="tb-grafica"><figcaption>COMPOSICIÓN DEL PRECIO</figcaption><div id="grfFinPct"></div></figure>
                     </div>
 
                     <div class="tb-fila tb-fila-2">
-                        <figure class="tb-grafica"><figcaption>BALANCE PRESUPUESTO</figcaption><div id="grfPresupuesto"></div></figure>
-                        <figure class="tb-grafica"><figcaption>PORCENTAJE PRESUPUESTO</figcaption><div id="grfPresPct"></div></figure>
+                        <figure class="tb-grafica"><figcaption>PRESUPUESTADO CONTRA FACTURADO (SIN IVA)</figcaption><div id="grfPresupuesto"></div></figure>
+                        <figure class="tb-grafica"><figcaption>AVANCE DE FACTURACIÓN</figcaption><div id="grfPresPct"></div></figure>
                     </div>
                 </div>
                 <?php endif; ?>
 
                 <p class="bv-nota"><?= modoConfiguracion()
                     ? '⚠ Modo configuración: captura la contraseña de AW en Administrador › Bases de datos y vuelve a iniciar sesión con tu usuario.'
-                    : 'Presupuestos y obras vienen de AW-Management; el resto de los indicadores se conectará después.' ?></p>
+                    : 'Los indicadores vienen de los presupuestos de ACRINEO: estatus, costo directo y precio de venta de la hoja, y las facturas y pedidos de Microsip ligados a cada presupuesto.' ?></p>
             </div>
         </section>
     </div>

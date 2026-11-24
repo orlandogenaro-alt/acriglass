@@ -1,16 +1,14 @@
-// Tablero de los proyectos en Bienvenido: financiero (pagado, cobrado, otros gastos, utilidad,
-// por cobrar / por pagar) y presupuesto contra lo ejercido, por año y por obra.
-// Lo de AW llega en una sola consulta (?accion=tablero); la cobranza se suma obra por obra con
-// ?accion=facturacion porque cada folio se cruza con Microsip.
+// Tablero de Bienvenido con los presupuestos de ACRINEO: llena las tarjetas de General y el de Proyectos
+// (costo directo, precio de venta, sobrecosto, facturado y por facturar), por año, estatus y presupuesto.
+// Todo llega en una sola consulta: api/acrineo/presupuestos.php?recurso=tablero (includes/acrineo/tablero.php).
 (function () {
     var raiz = document.getElementById('tablero');
     if (!raiz) return;
     var $ = function (id) { return document.getElementById(id); };
     var NS = 'http://www.w3.org/2000/svg';
-    var COLOR = { pagado: '#c98500', cobrado: '#199e70', otros: '#d95926', utilidad: '#3987e5', presupuesto: '#3987e5', ejercido: '#c98500', disponible: '#3a4660' };
+    var COLOR = { pagado: '#c98500', cobrado: '#199e70', otros: '#d95926', utilidad: '#3987e5', presupuesto: '#3987e5', ejercido: '#d95926', disponible: '#3a4660' };
     var CLAVE = 'acri-tablero';
     var corrida = 0;   // descarta respuestas de un filtro anterior
-    var IVA = 0.16;    // igual que api/presupuestos.php y Servicios (÷ 1.16)
 
     function pedir(url) {
         return fetch(url).then(function (r) {
@@ -165,117 +163,136 @@
         if (clave === 'utilidad') b.textContent = (valor < 0 ? '▼ ' : '▲ ') + b.textContent;
     }
 
-    // ----- Pintado -----
-    function pintarPresupuesto(d) {
-        var p = d.presupuesto, ppto = p.MP + p.MO + p.GO;
-        var ejer = d.materiales + d.mano_obra + d.gastos;
-        var nombres = { presupuesto: 'Presupuesto', ejercido: 'Ejercido' };
-        graficaBarras($('grfPresupuesto'), [
-            ['Materia prima', p.MP, d.materiales], ['Mano de obra', p.MO, d.mano_obra],
-            ['Gastos de operación', p.GO, d.gastos], ['Total', ppto, ejer]
-        ].map(function (g) {
-            return { etiqueta: g[0], barras: [{ serie: 'presupuesto', nombre: 'Presupuesto', valor: g[1] }, { serie: 'ejercido', nombre: 'Ejercido', valor: g[2] }] };
-        }), nombres);
-        var sobre = ejer - ppto;
-        graficaDona($('grfPresPct'), [
-            { serie: 'ejercido', nombre: 'Ejercido', valor: ejer },
-            { serie: 'disponible', nombre: sobre > 0 ? 'Sobregiro' : 'Disponible', valor: sobre > 0 ? 0 : ppto - ejer }
-        ], ppto ? [pct(ejer / ppto), sobre > 0 ? 'sobregiro ' + corto(sobre) : 'ejercido'] : [corto(ejer), 'sin presupuesto'],
-        'Sin presupuesto');
+    // ----- Tarjetas de General -----
+    function pintarGeneral(g) {
+        document.querySelectorAll('.tarjeta[data-indicador]').forEach(function (t) {
+            var v = g[t.dataset.indicador];
+            t.querySelector('.t-valor').textContent = /importe|facturado|por_facturar/.test(t.dataset.indicador) ? dinero(v) : v;
+            t.querySelector('.t-nota').textContent = t.dataset.nota;
+        });
+    }
+    function errorGeneral(msg) {
+        document.querySelectorAll('.tarjeta[data-indicador]').forEach(function (t) { t.querySelector('.t-nota').textContent = '⚠ ' + msg; });
     }
 
-    function pintarFinanciero(d, cob) {
-        var pagado = d.materiales + d.mano_obra, otros = d.gastos;
-        var cobrado = cob ? cob.cobrado : null;
-        // Lo cobrado trae IVA y los costos no: la utilidad se calcula con lo cobrado sin IVA (igual que Servicios › Estado de resultados)
-        var cobradoNeto = cob ? cobrado / (1 + IVA) : null;
-        var utilidad = cob ? cobradoNeto - pagado - otros : null;
-        kpi('pagado', pagado);
-        kpi('otros', otros);
-        kpi('por_pagar', d.por_pagar);
-        kpi('cobrado', cobrado);
-        kpi('por_cobrar', cob ? cob.por_cobrar : null);
-        kpi('utilidad', utilidad);
-        raiz.querySelector('[data-serie="utilidad"]').classList.toggle('perdida', utilidad < 0);
+    // ----- Proyectos -----
+    // Suma de los presupuestos elegidos; lo facturado trae IVA y se compara sin IVA con el IVA de cada presupuesto
+    function totales(lista) {
+        var t = { costo: 0, venta: 0, con_iva: 0, facturado: 0, facturado_neto: 0, pedidos: 0 };
+        lista.forEach(function (p) {
+            var f = 1 + p.iva / 100;
+            t.costo += p.costo_directo; t.venta += p.precio_venta; t.con_iva += p.precio_venta * f;
+            t.facturado += p.facturado; t.facturado_neto += p.facturado / f; t.pedidos += p.pedidos;
+        });
+        t.sobrecosto = t.venta - t.costo;
+        t.por_facturar = Math.max(0, t.con_iva - t.facturado);
+        return t;
+    }
+
+    function pintar(lista) {
+        var t = totales(lista);
+        kpi('costo', t.costo);
+        kpi('venta', t.venta);
+        kpi('facturado', t.facturado);
+        kpi('utilidad', t.sobrecosto);
+        kpi('por_facturar', t.por_facturar);
+        kpi('pedidos', t.pedidos);
+        raiz.querySelector('[data-serie="utilidad"]').classList.toggle('perdida', t.sobrecosto < 0);
 
         graficaBarras($('grfFinanciero'), [
-            ['Costo ejercido', 'pagado', pagado], ['Cobrado sin IVA', 'cobrado', cobradoNeto || 0],
-            ['Otros gastos', 'otros', otros], [utilidad < 0 ? 'Pérdida' : 'Utilidad', 'utilidad', utilidad || 0]
+            ['Costo directo', 'pagado', t.costo], ['Precio de venta', 'cobrado', t.venta],
+            ['Facturado sin IVA', 'otros', t.facturado_neto], ['Sobrecosto', 'utilidad', t.sobrecosto]
         ].map(function (b) { return { etiqueta: b[0], barras: [{ serie: b[1], nombre: b[0], valor: b[2] }] }; }), { uno: '' });
 
-        // A dónde se fue lo cobrado: pagado, otros gastos y lo que queda de utilidad
+        // De qué se compone el precio de venta: costo directo y sobrecosto
         graficaDona($('grfFinPct'), [
-            { serie: 'pagado', nombre: 'Costo ejercido', valor: pagado },
-            { serie: 'otros', nombre: 'Otros gastos', valor: otros },
-            { serie: 'utilidad', nombre: 'Utilidad', valor: Math.max(0, utilidad || 0) }
-        ], cobradoNeto ? [pct(utilidad / cobradoNeto), utilidad < 0 ? 'de pérdida' : 'de margen'] : ['—', cob ? 'sin cobranza' : 'calculando cobranza…'],
-        'Sin movimientos');
+            { serie: 'pagado', nombre: 'Costo directo', valor: t.costo },
+            { serie: 'utilidad', nombre: 'Sobrecosto', valor: Math.max(0, t.sobrecosto) }
+        ], t.venta ? [pct(t.sobrecosto / t.venta), 'de sobrecosto'] : ['—', 'sin precio'], 'Sin importes');
+
+        // Los presupuestos con mayor precio de venta (hasta 6): presupuestado contra facturado, sin IVA
+        var top = lista.filter(function (p) { return p.precio_venta || p.facturado; }).slice(0, 6);
+        if (top.length) {
+            graficaBarras($('grfPresupuesto'), top.map(function (p) {
+                return { etiqueta: p.codigo || ('#' + p.id), barras: [
+                    { serie: 'presupuesto', nombre: 'Precio de venta', valor: p.precio_venta },
+                    { serie: 'ejercido', nombre: 'Facturado sin IVA', valor: p.facturado / (1 + p.iva / 100) }
+                ] };
+            }), { presupuesto: 'Precio de venta', ejercido: 'Facturado sin IVA' });
+        } else {
+            $('grfPresupuesto').innerHTML = '<p class="tb-estado">Sin presupuestos con importes.</p>';
+        }
+
+        graficaDona($('grfPresPct'), [
+            { serie: 'ejercido', nombre: 'Facturado', valor: Math.min(t.facturado, t.con_iva) },
+            { serie: 'disponible', nombre: 'Por facturar', valor: t.por_facturar }
+        ], t.con_iva ? [pct(t.facturado / t.con_iva), 'facturado'] : ['—', 'sin precio'], 'Sin importes');
     }
 
-    // ----- Cobranza: facturación de cada obra, de 4 en 4 -----
-    function cobranza(ids, id, d) {
-        var acum = { cobrado: 0, por_cobrar: 0 }, listos = 0, fallas = [], cola = ids.slice();
-        if (!ids.length) { pintarFinanciero(d, acum); return; }
-        function estado() {
-            if (id !== corrida) return;
-            $('tbEstado').textContent = listos < ids.length
-                ? '⏳ Calculando cobranza con Microsip… ' + listos + ' de ' + ids.length + (ids.length === 1 ? ' obra' : ' obras')
-                : (fallas.length ? '⚠ No se pudo leer la facturación de ' + fallas.length + ' obra(s): ' + fallas.slice(0, 3).join(' · ') : '');
-            raiz.classList.toggle('cargando-cobranza', listos < ids.length);
-        }
-        function siguiente() {
-            if (id !== corrida || !cola.length) return Promise.resolve();
-            var obra = cola.shift();
-            return pedir('api/obras.php?accion=facturacion&id=' + obra).then(function (j) {
-                var saldo = 0;
-                j.filas.forEach(function (f) { acum.cobrado += +f.creditos || 0; saldo += +f.saldo || 0; });
-                acum.por_cobrar += Math.max(0, saldo);
-            }).catch(function (err) {
-                fallas.push('obra ' + obra + ': ' + err.message);
-            }).then(function () {
-                listos++;
-                estado();
-                return siguiente();
-            });
-        }
-        estado();
-        var hilos = [];
-        for (var i = 0; i < Math.min(4, ids.length); i++) hilos.push(siguiente());
-        Promise.all(hilos).then(function () { if (id === corrida) pintarFinanciero(d, acum); });
+    var datos = null;
+    function mesActual() {
+        var d = new Date(), z = function (n) { return (n < 10 ? '0' : '') + n; };
+        var fin = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+        return [d.getFullYear() + '-' + z(d.getMonth() + 1) + '-01', fin.getFullYear() + '-' + z(fin.getMonth() + 1) + '-' + z(fin.getDate())];
     }
 
     function consultar() {
         var id = ++corrida;
-        var anio = $('tbAnio').value, obra = $('tbObra').value;
-        guardar({ anio: anio, obra: obra });
-        $('tbEstado').textContent = '⏳ Consultando AW-Management…';
-        pedir('api/obras.php?accion=tablero&anio=' + anio + '&obra=' + obra).then(function (d) {
+        var anio = $('tbAnio').value, estatus = $('tbEstatus').value, mes = mesActual();
+        $('tbEstado').textContent = '⏳ Consultando ACRINEO…';
+        pedir('api/acrineo/presupuestos.php?recurso=tablero&anio=' + encodeURIComponent(anio) + '&estatus=' + encodeURIComponent(estatus) +
+              '&ini=' + mes[0] + '&fin=' + mes[1]).then(function (d) {
             if (id !== corrida) return;
-            llenarObras(d.obras, obra);
-            if (d.avisos.length) $('tbEstado').textContent = '⚠ ' + d.avisos.join(' · ');
-            pintarPresupuesto(d);
-            pintarFinanciero(d, null);
-            cobranza(d.ids, id, d);
+            datos = d;
+            pintarGeneral(d.general);
+            llenarAnios(d.anios);
+            llenarPresupuestos(d.presupuestos, leer().obra);
+            $('tbEstado').textContent = d.avisos.length ? '⚠ ' + d.avisos.join(' · ')
+                : (d.presupuestos.length ? '' : 'No hay presupuestos de ACRINEO de ese año con ese estatus.');
+            elegir();
         }).catch(function (err) {
-            if (id === corrida) $('tbEstado').textContent = '⚠ ' + err.message;
+            if (id !== corrida) return;
+            $('tbEstado').textContent = '⚠ ' + err.message;
+            errorGeneral(err.message);
         });
     }
 
-    function llenarObras(obras, elegida) {
+    function elegir() {
+        if (!datos) return;
+        var obra = $('tbObra').value;
+        guardar({ anio: $('tbAnio').value, estatus: $('tbEstatus').value, obra: obra });
+        pintar(obra === '0' ? datos.presupuestos : datos.presupuestos.filter(function (p) { return String(p.id) === obra; }));
+    }
+
+    function opcionAnio(a) {
+        var sel = $('tbAnio');
+        if (sel.querySelector('option[value="' + a + '"]')) return;
+        sel.insertAdjacentHTML('beforeend', '<option value="' + a + '">' + a + '</option>');
+        Array.prototype.slice.call(sel.options).sort(function (x, y) { return y.value - x.value; })
+            .forEach(function (o) { sel.appendChild(o); });
+    }
+    function llenarAnios(anios) {
+        var actual = $('tbAnio').value;
+        anios.forEach(opcionAnio);
+        $('tbAnio').value = actual;
+    }
+
+    function llenarPresupuestos(lista, elegida) {
         var sel = $('tbObra');
-        sel.innerHTML = '<option value="0">Todas las obras del año (' + obras.length + ')</option>' + obras.map(function (o) {
-            var t = (o.folio ? 'Folio ' + o.folio + ' · ' : '') + (o.nom_obra || o.proyecto || 'Obra ' + o.obra_id) + ' · ' + (o.estatus || '');
-            return '<option value="' + o.obra_id + '">' + esc(t) + '</option>';
+        sel.innerHTML = '<option value="0">Todos los presupuestos (' + lista.length + ')</option>' + lista.map(function (p) {
+            return '<option value="' + p.id + '">' + esc((p.codigo ? p.codigo + ' · ' : '') + p.nombre + ' · ' + p.estatus_texto) + '</option>';
         }).join('');
-        sel.value = obras.some(function (o) { return String(o.obra_id) === String(elegida); }) ? elegida : '0';
+        sel.value = lista.some(function (p) { return String(p.id) === String(elegida); }) ? elegida : '0';
     }
 
     // ----- Filtros -----
     var previo = leer(), hoy = new Date().getFullYear();
-    for (var a = hoy; a >= hoy - 8; a--) $('tbAnio').insertAdjacentHTML('beforeend', '<option>' + a + '</option>');
-    $('tbAnio').value = previo.anio && +previo.anio >= hoy - 8 ? previo.anio : hoy;
-    $('tbObra').innerHTML = '<option value="' + esc(previo.obra || 0) + '">…</option>';
-    $('tbAnio').addEventListener('change', function () { $('tbObra').innerHTML = '<option value="0"></option>'; consultar(); });
-    $('tbObra').addEventListener('change', consultar);
+    opcionAnio(hoy);
+    if (/^\d{4}$/.test(previo.anio || '')) opcionAnio(previo.anio);
+    $('tbAnio').value = previo.anio || hoy;
+    if (previo.estatus && $('tbEstatus').querySelector('option[value="' + previo.estatus + '"]')) $('tbEstatus').value = previo.estatus;
+    $('tbAnio').addEventListener('change', consultar);
+    $('tbEstatus').addEventListener('change', consultar);
+    $('tbObra').addEventListener('change', elegir);
     consultar();
 })();

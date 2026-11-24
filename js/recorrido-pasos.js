@@ -64,7 +64,7 @@
             id: 'resumen',
             elemento: '[data-recorrido="resumen"]',
             titulo: 'Resumen general',
-            texto: 'Un vistazo rápido a los presupuestos, obras y demás indicadores. El enlace «Ir a…» de cada tarjeta abre su listado.',
+            texto: 'Un vistazo rápido a los presupuestos de ACRINEO: pendientes, aprobados, importe, facturado y por facturar. El enlace de cada tarjeta abre el catálogo de presupuestos.',
             posicion: 'abajo',
             // Solo si la pestaña Bienvenido está a la vista
             si: function () { return !!document.querySelector('#panel-bienvenido.activo [data-recorrido="resumen"]'); }

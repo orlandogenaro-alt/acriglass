@@ -34,9 +34,6 @@
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    function pedirDatos(accion, ini, fin) {
-        return pedirUrl('api/obras.php?accion=' + accion + '&ini=' + ini + '&fin=' + fin);
-    }
     function pedirUrl(url) {
         return fetch(url).then(function (r) {
             if (r.status === 401) { location.href = 'index.php'; throw new Error('Sesión expirada'); }
@@ -486,20 +483,7 @@
         });
     }
 
-    // ----- Indicadores de Bienvenido -----
-    function cargarIndicadores() {
-        var tarjetas = document.querySelectorAll('.tarjeta[data-indicador]');
-        if (!tarjetas.length) return;
-        var r = rangoPeriodo('mes');
-        pedirDatos('resumen', r[0], r[1]).then(function (j) {
-            tarjetas.forEach(function (t) {
-                t.querySelector('.t-valor').textContent = j[t.dataset.indicador];
-                t.querySelector('.t-nota').textContent = t.dataset.indicador === 'obras_en_proceso' ? 'En planificación o ejecución' : 'En el mes actual';
-            });
-        }).catch(function (err) {
-            tarjetas.forEach(function (t) { t.querySelector('.t-nota').textContent = '⚠ ' + err.message; });
-        });
-    }
+    // Los indicadores de Bienvenido (tarjetas de General) los llena js/tablero.js con los presupuestos de ACRINEO
 
     // Enlaces de las tarjetas de Bienvenido
     document.querySelectorAll('[data-abrir]').forEach(function (a) {
@@ -612,7 +596,6 @@
     // ================= Barra superior =================
     var mes = rangoPeriodo('mes');
     $('txtPeriodo').textContent = 'Periodo: este mes (' + dmy(mes[0]) + ' al ' + dmy(mes[1]) + ')';
-    cargarIndicadores();
 
     $('btnPantalla').addEventListener('click', function () {
         if (document.fullscreenElement) document.exitFullscreen();

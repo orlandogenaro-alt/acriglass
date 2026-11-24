@@ -12,6 +12,7 @@
 //   GET    api/acrineo/presupuestos/respaldo?ids=1,2     descarga el respaldo JSON
 //   GET    api/acrineo/presupuestos/{id}/ligados         facturas y folios de Easy-Glass ligados  ·  &q=texto  busca para ligar
 //   POST   api/acrineo/presupuestos/{id}/ligados         liga un folio de la búsqueda  ·  DELETE …/ligados?ligado={n}
+//   GET    api/acrineo/presupuestos.php?recurso=tablero&anio=AAAA&estatus=ACTIVOS&ini=&fin=   tablero de Bienvenido
 // Equivalente sin rutas limpias: api/acrineo/presupuestos.php?id={id}&recurso=historial|documentos|respaldo
 define('ACRI_API', true);
 require __DIR__ . '/../../includes/sesion.php';
@@ -70,6 +71,15 @@ try {
         @set_time_limit(120);
         $r = acrineoImportarNeodata($in, $usuario);
         responder(['ok' => true, 'importado' => $r, 'mensaje' => "Presupuesto {$r['codigo']} importado de Neodata."], 201);
+    }
+
+    // ----- Tablero de Bienvenido (tarjetas de General y Proyectos) -----
+    if ($recurso === 'tablero' && !$id && $metodo === 'GET') {
+        require_once __DIR__ . '/../../includes/acrineo/tablero.php';
+        $fecha = fn(string $k) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($_GET[$k] ?? '')) ? $_GET[$k] : null;
+        $anio = (int) ($_GET['anio'] ?? 0);
+        responder(['ok' => true] + acrineoTablero($anio >= 2000 && $anio <= 2100 ? $anio : (int) date('Y'),
+            (string) ($_GET['estatus'] ?? 'ACTIVOS'), $fecha('ini') ?? date('Y-m-01'), $fecha('fin') ?? date('Y-m-t')));
     }
 
     // ----- Catálogo / alta / eliminar varios -----

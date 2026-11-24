@@ -136,13 +136,17 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
                 <?php endif; ?>
                 <span class="an-flex"></span>
                 <span class="an-ayuda" id="anPartidasConteo"></span>
-                <?= $rejilla('partidas', 'anTablaPartidas') ?>
+                <?= $rejilla('partidas_v2', 'anTablaPartidas') ?>
             </div>
             <div class="an-tabla-cont">
                 <table class="an-tabla an-arbol" id="anTablaPartidas">
                     <thead><tr>
                         <th scope="col"><div class="an-th"><span>Partida</span></div></th>
+                        <th scope="col" title="Work Breakdown Structure: clic derecho › Regenerar WBS"><div class="an-th"><span>WBS</span></div></th>
                         <th scope="col"><div class="an-th"><span>Descripción completa</span></div></th>
+                        <th scope="col" title="Descripción corta (40 caracteres): se cambia en Detalle"><div class="an-th"><span>Descripción</span></div></th>
+                        <th scope="col" title="Código adicional de la partida: se cambia en Detalle"><div class="an-th"><span>Partida auxiliar</span></div></th>
+                        <th scope="col" class="num" title="Número de orden: clic derecho › Renumerar renglón"><div class="an-th"><span>Renglón</span></div></th>
                         <th scope="col" class="num"><div class="an-th"><span>Costo</span></div></th>
                         <th scope="col" class="num"><div class="an-th"><span>Precio</span></div></th>
                         <th scope="col" class="num" title="Costo de la partida entre sus metros cuadrados"><div class="an-th"><span>Costo x M2</span></div></th>
@@ -287,6 +291,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
 <?php require __DIR__ . '/includes/acrineo/vistas/catalogos-chicos.php'; ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/calculo.php'; ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/pegado.php'; ?>
+<?php require __DIR__ . '/includes/acrineo/vistas/partidas.php'; ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/sobrecosto.php'; ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/reportes.php'; ?>
 <?php require __DIR__ . '/includes/acrineo/vistas/ligados.php'; ?>
@@ -305,6 +310,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
 <script src="<?= recurso('js/acrineo/rejilla.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-renglones.js') ?>"></script>
+<script src="<?= recurso('js/acrineo/hoja-partidas.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/grafica.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-conceptos.js') ?>"></script>
 <script src="<?= recurso('js/acrineo/hoja-matriz.js') ?>"></script>

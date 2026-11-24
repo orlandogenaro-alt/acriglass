@@ -13,7 +13,7 @@ require_once __DIR__ . '/campos.php';
             <span class="an-ayuda" id="anCompletoConteo"></span>
             <span class="an-flex"></span>
             <span class="an-ayuda" id="anCompletoEstado" role="status"></span>
-            <span class="an-rejilla-btns" data-rejilla="completo" data-tabla="anTablaCompleto">
+            <span class="an-rejilla-btns" data-rejilla="completo_v2" data-tabla="anTablaCompleto">
                 <button type="button" class="an-btn an-mini an-btn-cuenta" data-cols title="Columnas ocultas" aria-label="Columnas ocultas" aria-haspopup="true"><?= anIcono('ojo_no') ?><span>0</span></button>
                 <button type="button" class="an-btn an-mini an-btn-cuenta" data-fijas title="Columnas fijas" aria-label="Columnas fijas" aria-haspopup="true"><?= anIcono('fijar') ?><span>0</span></button>
                 <span class="an-menu-cont"><button type="button" class="an-btn an-primario an-icono an-redondo" data-menu title="Más opciones" aria-label="Más opciones" aria-haspopup="true" aria-expanded="false"><?= anIcono('mas') ?></button><div class="an-menu" role="menu" hidden></div></span>
@@ -25,6 +25,7 @@ require_once __DIR__ . '/campos.php';
                     <th class="an-col-sel" scope="col" title="Marca (M): los marcados sirven para el Cálculo «Sólo conceptos marcados»"><div class="an-th"><span>M</span></div></th>
                     <th scope="col" class="an-col-pa" title="Pendiente de analizar"><div class="an-th"><span>P.A.</span></div></th>
                     <th scope="col" class="num" title="Niveles de análisis de su matriz"><div class="an-th"><span>N</span></div></th>
+                    <th scope="col" title="WBS de la partida"><div class="an-th"><span>WBS</span></div></th>
                     <th scope="col"><div class="an-th"><span>Partida</span></div></th>
                     <th scope="col"><div class="an-th"><span>Descripción de la partida</span></div></th>
                     <th scope="col" class="num"><div class="an-th"><span>Renglón</span></div></th>

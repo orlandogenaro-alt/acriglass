@@ -12,7 +12,7 @@
     var tbody = $('anCompletoFilas');
     var panel = $('anCompleto');
     var st = { filas: [], abierta: false, cargando: 0 };
-    var COLS = 16;
+    var COLS = 17;
 
     function cantidad(n) { return (Number(n) || 0).toLocaleString('es-MX', { minimumFractionDigits: H.ctx.dec_cantidades, maximumFractionDigits: H.ctx.dec_cantidades }); }
     function estado(t, tipo) { var e = $('anCompletoEstado'); e.textContent = t || ''; e.className = 'an-ayuda an-estado' + (tipo ? ' ' + tipo : ''); }
@@ -70,7 +70,7 @@
                 + '<td class="an-col-sel"><input type="checkbox" data-marca' + (marcado(r.concepto_id) ? ' checked' : '') + ' aria-label="Marcar ' + esc(r.codigo) + '"></td>'
                 + '<td class="an-col-pa">' + (r.pendiente_analizar ? '<span class="an-pa si" title="Pendiente de analizar">✓</span>' : '<span class="an-pa" title="Analizado">✕</span>') + '</td>'
                 + '<td class="num">' + r.n + '</td>'
-                + '<td>' + esc(r.partida_codigo) + '</td><td class="an-desc-corta" title="' + esc(r.partida_descripcion) + '">' + esc(r.partida_descripcion) + '</td>'
+                + '<td>' + esc(r.partida_wbs || '') + '</td><td>' + esc(r.partida_codigo) + '</td><td class="an-desc-corta" title="' + esc(r.partida_descripcion) + '">' + esc(r.partida_descripcion) + '</td>'
                 + '<td class="num">' + r.renglon + '</td><td>' + esc(r.codigo) + '</td>'
                 + '<td class="an-desc">' + esc(r.descripcion) + '</td><td>' + esc(r.unidad || '') + '</td><td class="num">' + esc(r.tipo) + '</td>'
                 + '<td class="num">' + (puede ? '<input class="an-celda-in num" type="number" min="0" step="any" inputmode="decimal" data-k="cantidad" value="' + esc(r.cantidad) + '" aria-label="Cantidad de ' + esc(r.codigo) + '">' : cantidad(r.cantidad)) + '</td>'
@@ -133,6 +133,6 @@
     // Si cambia algo en la hoja (otra pestaña), al volver se recarga
     H.on(function (evento) { if (evento === 'estado' && st.abierta && panel.hidden) st.filas = []; });
 
-    if (AN.rejilla) AN.rejilla.opciones('completo', { fijas: 0, archivo: function () { return 'Presupuesto completo ' + H.ctx.codigo; } });
+    if (AN.rejilla) AN.rejilla.opciones('completo_v2', { fijas: 0, archivo: function () { return 'Presupuesto completo ' + H.ctx.codigo; } });
     AN.hojaCompleto = { abrir: abrir };
 })(window.AcriNeo = window.AcriNeo || {});

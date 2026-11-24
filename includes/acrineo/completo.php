@@ -21,6 +21,7 @@ function acrineoPresupuestoCompleto(array $ctx): array
     foreach ($partidas as $p) {
         foreach ($porPartida[$p['id']] ?? [] as $n => $r) {
             $r['partida_codigo'] = $p['codigo'];
+            $r['partida_wbs'] = $p['wbs'] ?? null;
             $r['partida_descripcion'] = $p['descripcion'];
             $r['renglon'] = $n + 1;
             $r['n'] = isset($matrices[$r['concepto_id']]) ? $prof($matrices[$r['concepto_id']], 0) : 0;

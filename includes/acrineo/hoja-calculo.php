@@ -103,6 +103,36 @@ function acrineoSiguienteCodigoPartida(?string $padre, array $usados): string
     }
 }
 
+// WBS de cada partida a partir del árbol ya ordenado (acrineoOrdenArbol): raíces 1, 2, 3…; subpartidas 1.1, 1.2, 1.2.1…
+// Regresa [partida_id => 'wbs']
+function acrineoWbsArbol(array $arbol): array
+{
+    $wbs = [];
+    $cuenta = [];
+    foreach ($arbol as $p) {
+        $padre = $p['padre_id'] ?? null;
+        $k = $padre ?? 0;
+        $cuenta[$k] = ($cuenta[$k] ?? 0) + 1;
+        $wbs[$p['id']] = ($padre !== null && isset($wbs[$padre]) ? $wbs[$padre] . '.' : '') . $cuenta[$k];
+    }
+    return $wbs;
+}
+
+// Aplica una expresión a una cantidad (Aplicar expresión de las partidas): multiplicar, dividir, sumar, restar o igualar.
+// Nunca queda negativa; se redondea a los decimales de cantidad del presupuesto.
+function acrineoExpresionCantidad(float $cantidad, string $operacion, float $valor, int $decimales): float
+{
+    switch ($operacion) {
+        case 'multiplicar': $r = $cantidad * $valor; break;
+        case 'dividir':     $r = $valor != 0.0 ? $cantidad / $valor : $cantidad; break;
+        case 'sumar':       $r = $cantidad + $valor; break;
+        case 'restar':      $r = $cantidad - $valor; break;
+        case 'igualar':     $r = $valor; break;
+        default: throw new InvalidArgumentException('Operación no válida.');
+    }
+    return round(max(0.0, $r), $decimales);
+}
+
 // Orden de las partidas como árbol (padre antes que sus hijos, hermanos por orden), con su nivel
 function acrineoOrdenArbol(array $partidas): array
 {

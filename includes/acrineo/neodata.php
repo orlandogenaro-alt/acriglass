@@ -168,7 +168,8 @@ function acrineoNeodataContenido(array $ctx, array $in, string $usuario, string 
     $ordenHijos = [];
     $pendientes = array_values(array_filter($in['partidas'] ?? [], 'is_array'));
     usort($pendientes, fn($a, $b) => acrineoNeoNumero($a['renglon'] ?? 0) <=> acrineoNeoNumero($b['renglon'] ?? 0));
-    $crearPartida = function (?int $padre, string $codigo, string $desc) use ($ctx, &$usados, &$ordenHijos): int {
+    $conWbs = acrineoPartidaWbsDisponible();
+    $crearPartida = function (?int $padre, string $codigo, string $desc, array $extra = []) use ($ctx, &$usados, &$ordenHijos, $conWbs): int {
         $base = mb_substr($codigo !== '' ? $codigo : 'P', 0, 30);
         $cod = $base;
         for ($n = 2; isset($usados[mb_strtoupper($cod)]); $n++) $cod = mb_substr($base, 0, 30 - strlen("-$n")) . "-$n";
@@ -176,7 +177,7 @@ function acrineoNeodataContenido(array $ctx, array $in, string $usuario, string 
         $k = $padre ?? 0;
         $ordenHijos[$k] = ($ordenHijos[$k] ?? -1) + 1;
         return bd_insertar('AW', 'acrineo_partidas', 'partida_id', ['presupuesto_id' => $ctx['id'], 'padre_id' => $padre, 'codigo' => $cod,
-            'descripcion' => $desc !== '' ? $desc : $cod, 'orden' => $ordenHijos[$k]]);
+            'descripcion' => $desc !== '' ? $desc : $cod, 'orden' => $ordenHijos[$k]] + ($conWbs ? $extra : []));
     };
     for ($vuelta = 0; $pendientes && $vuelta < 50; $vuelta++) {
         $quedan = [];
@@ -186,7 +187,12 @@ function acrineoNeodataContenido(array $ctx, array $in, string $usuario, string 
             if ($padreWbs !== '' && !isset($porWbs[$padreWbs]) && $vuelta < 49) { $quedan[] = $p; continue; }
             $codigo = acrineoNeoTexto($p['codigo'] ?? '', 30) ?: $wbs;
             $desc = acrineoNeoTexto($p['descripcion_larga'] ?? '', 4000) ?: acrineoNeoTexto($p['descripcion'] ?? '', 4000);
-            $id = $crearPartida($padreWbs !== '' ? ($porWbs[$padreWbs] ?? null) : null, $codigo, $desc);
+            // WBS de Neodata (el exportador de la base usa ids internos «p123»: esos no se guardan), renglón y descripción corta
+            $corta = acrineoNeoTexto($p['descripcion'] ?? '', 40);
+            $renglon = acrineoNeoNumero($p['renglon'] ?? 0);
+            $extra = ['wbs' => $wbs !== '' && !preg_match('/^p\d+$/i', $wbs) ? mb_substr($wbs, 0, 60) : null,
+                      'descripcion_corta' => $corta !== '' ? $corta : null, 'renglon' => $renglon > 0 && $renglon < 1e9 ? (int) $renglon : null];
+            $id = $crearPartida($padreWbs !== '' ? ($porWbs[$padreWbs] ?? null) : null, $codigo, $desc, $extra);
             if ($wbs !== '') $porWbs[$wbs] = $id;
             if ($codigo !== '' && !isset($porCodigo[mb_strtoupper($codigo)])) $porCodigo[mb_strtoupper($codigo)] = $id;
         }

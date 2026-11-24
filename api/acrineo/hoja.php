@@ -13,7 +13,10 @@
 //   GET  ?id=P&recurso=renglon_codigo&codigo=X   renglón de matriz ya capturado con ese código (o insumo del catálogo), para llenarlo solo
 //   POST ?id=P  { accion, … }                    cambios (regresa el estado de la hoja):
 //        partida_crear {padre_id, codigo, descripcion} · partida_guardar {partida_id, codigo, descripcion}
-//        partida_eliminar {partida_id} · partida_duplicar {partida_id} · partida_mover {partida_id, direccion: arriba|abajo|izquierda|derecha}
+//        partida_eliminar {partida_id} · partida_duplicar {partida_id, veces?} · partida_mover {partida_id, direccion: arriba|abajo|izquierda|derecha}
+//        partidas_agregar {padre_id?, n} · wbs_regenerar · renglon_renumerar {inicio, paso}
+//        expresion {alcance: partida|todo, partida_id, operacion: multiplicar|dividir|sumar|restar|igualar, valor}
+//        (partida_crear y partida_guardar aceptan también codigo_auxiliar, descripcion_corta y renglon)
 //        renglones_guardar {partida_id, filas, quitar} · copiar {partida_id, conceptos: [{concepto_id, cantidad}]}
 //        pegado_especial {partidas, conceptos, partida_id?} (includes/acrineo/pegado.php) ·
 //        concepto_eliminar {concepto_id} · concepto_pendiente {concepto_id, pendiente} · sobrecosto {sobrecosto_pct} · matriz_guardar {concepto_id, padre_id?, filas}
@@ -114,8 +117,25 @@ try {
             $partida = 0;
             break;
         case 'partida_duplicar':
-            $partida = acrineoPartidaDuplicar($ctx, $partida, $usuario);
+            $veces = (int) ($in['veces'] ?? 1);
+            $partida = $veces > 1 ? acrineoPartidaDuplicarVeces($ctx, $partida, $veces, $usuario) : acrineoPartidaDuplicar($ctx, $partida, $usuario);
             $extra['partida_id'] = $partida;
+            break;
+        case 'partidas_agregar':
+            $ids = acrineoPartidasAgregar($ctx, (int) ($in['padre_id'] ?? 0) ?: null, (int) ($in['n'] ?? 0), $usuario);
+            $partida = $ids[0] ?? 0;
+            $extra['partida_id'] = $partida;
+            $extra['agregadas'] = count($ids);
+            break;
+        case 'wbs_regenerar':
+            $extra['cambiadas'] = acrineoRegenerarWbs($ctx, $usuario);
+            break;
+        case 'renglon_renumerar':
+            $extra['renumeradas'] = acrineoRenumerarRenglon($ctx, (int) ($in['inicio'] ?? 10), (int) ($in['paso'] ?? 10), $usuario);
+            break;
+        case 'expresion':
+            $extra['expresion'] = acrineoAplicarExpresion($ctx, ($in['alcance'] ?? '') === 'partida' ? ($partida ?: null) : null,
+                (string) ($in['operacion'] ?? ''), $in['valor'] ?? null, $usuario);
             break;
         case 'partida_mover':
             acrineoPartidaMover($ctx, $partida, (string) ($in['direccion'] ?? ''));

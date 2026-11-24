@@ -50,6 +50,38 @@ function acrineoPartidaM2Disponible(): bool
     return $si ??= bd_tiene_columna('AW', 'acrineo_partidas', 'metros_cuadrados');
 }
 
+// WBS, partida auxiliar, descripción corta y renglón de la partida (migración 038)
+function acrineoPartidaWbsDisponible(): bool
+{
+    static $si = null;
+    return $si ??= bd_tiene_columna('AW', 'acrineo_partidas', 'wbs');
+}
+function acrineoColsPartidaExtra(): string
+{
+    return acrineoPartidaWbsDisponible() ? ', wbs, codigo_auxiliar, descripcion_corta, renglon'
+        : ', null as wbs, null as codigo_auxiliar, null as descripcion_corta, null as renglon';
+}
+
+// Partida auxiliar, descripción corta y renglón que manda la pantalla (solo los que vienen)
+function acrineoValidarPartidaExtra(array $in): array
+{
+    $d = [];
+    $errores = [];
+    foreach (['codigo_auxiliar' => 30, 'descripcion_corta' => 40] as $k => $max) {
+        if (!array_key_exists($k, $in)) continue;
+        $v = trim(preg_replace('/\s+/', ' ', (string) ($in[$k] ?? '')));
+        if (mb_strlen($v) > $max) $errores[$k] = "Máximo $max caracteres.";
+        $d[$k] = $v === '' ? null : $v;
+    }
+    if (array_key_exists('renglon', $in)) {
+        $v = trim((string) ($in['renglon'] ?? ''));
+        if ($v !== '' && (!ctype_digit($v) || (int) $v > 999999999)) $errores['renglon'] = 'El renglón es un número entero positivo.';
+        $d['renglon'] = $v === '' ? null : (int) $v;
+    }
+    if ($errores) throw new AcrineoError('Revisa la partida.', 422, $errores);
+    return $d;
+}
+
 // Metros cuadrados que manda la pantalla: número mayor que cero (vacío = 1)
 function acrineoValidarM2($v): float
 {
@@ -94,13 +126,14 @@ function acrineoHojaMonedas(int $id): array
 function acrineoPartidas(array $ctx): array
 {
     $m2 = acrineoPartidaM2Disponible() ? 'metros_cuadrados' : '1 as metros_cuadrados';
-    $filas = bd_filas('AW', "select partida_id as id, padre_id, codigo, descripcion, orden, $m2 from acrineo_partidas where presupuesto_id = ?", [$ctx['id']]);
+    $filas = bd_filas('AW', "select partida_id as id, padre_id, codigo, descripcion, orden, $m2" . acrineoColsPartidaExtra() . " from acrineo_partidas where presupuesto_id = ?", [$ctx['id']]);
     $padres = [];
     foreach ($filas as &$f) {
         $f['id'] = (int) $f['id'];
         $f['padre_id'] = $f['padre_id'] === null ? null : (int) $f['padre_id'];
         $f['orden'] = (int) $f['orden'];
         $f['metros_cuadrados'] = (float) $f['metros_cuadrados'] ?: 1.0;
+        $f['renglon'] = $f['renglon'] === null ? null : (int) $f['renglon'];
         $padres[$f['id']] = $f['padre_id'];
     }
     unset($f);
@@ -201,7 +234,7 @@ function acrineoHojaEstado(int $id, ?int $partidaId = null): array
 function acrineoPartidaFila(array $ctx, int $partidaId): array
 {
     $m2 = acrineoPartidaM2Disponible() ? 'metros_cuadrados' : '1 as metros_cuadrados';
-    $f = bd_fila('AW', "select partida_id, padre_id, codigo, descripcion, orden, $m2 from acrineo_partidas where partida_id = ? and presupuesto_id = ?",
+    $f = bd_fila('AW', "select partida_id, padre_id, codigo, descripcion, orden, $m2" . acrineoColsPartidaExtra() . " from acrineo_partidas where partida_id = ? and presupuesto_id = ?",
         [$partidaId, $ctx['id']]);
     if (!$f) throw new AcrineoError('La partida ya no existe.', 404);
     return $f;
@@ -233,11 +266,13 @@ function acrineoPartidaCrear(array $ctx, ?int $padreId, array $in, string $usuar
     if ($padreId) acrineoPartidaFila($ctx, $padreId);
     [$codigo, $desc] = acrineoValidarPartida($in, $ctx);
     $m2 = acrineoValidarM2($in['metros_cuadrados'] ?? null);
-    return acrineoTransaccion(function () use ($ctx, $padreId, $codigo, $desc, $m2, $usuario) {
+    $extra = acrineoPartidaWbsDisponible() ? acrineoValidarPartidaExtra($in) : [];
+    return acrineoTransaccion(function () use ($ctx, $padreId, $codigo, $desc, $m2, $extra, $usuario) {
         $orden = (int) bd_valor('AW', 'select coalesce(max(orden), -1) + 1 from acrineo_partidas where presupuesto_id = ? and '
             . ($padreId ? 'padre_id = ?' : 'padre_id is null'), $padreId ? [$ctx['id'], $padreId] : [$ctx['id']]);
         $datos = ['presupuesto_id' => $ctx['id'], 'padre_id' => $padreId, 'codigo' => $codigo, 'descripcion' => $desc, 'orden' => $orden];
         if (acrineoPartidaM2Disponible()) $datos['metros_cuadrados'] = $m2;
+        if (acrineoPartidaWbsDisponible()) $datos += $extra + acrineoPartidaNuevaWbs($ctx, $padreId, $orden);
         $id = bd_insertar('AW', 'acrineo_partidas', 'partida_id', $datos);
         acrineoRegistrar($ctx['id'], $usuario, 'HOJA', [[$padreId ? 'Agregó subpartida' : 'Agregó partida', null, "$codigo · $desc"]]);
         return $id;
@@ -251,8 +286,16 @@ function acrineoPartidaGuardar(array $ctx, int $partidaId, array $in, string $us
     $m2Antes = (float) $antes['metros_cuadrados'];
     $m2 = acrineoPartidaM2Disponible() && array_key_exists('metros_cuadrados', $in) ? acrineoValidarM2($in['metros_cuadrados']) : $m2Antes;
     $cambioM2 = abs($m2 - $m2Antes) > 0.00001;
-    if ($codigo === $antes['codigo'] && $desc === $antes['descripcion'] && !$cambioM2) return;
-    acrineoTransaccion(function () use ($ctx, $partidaId, $codigo, $desc, $m2, $m2Antes, $cambioM2, $antes, $usuario) {
+    $extra = acrineoPartidaWbsDisponible() ? acrineoValidarPartidaExtra($in) : [];
+    $nombres = ['codigo_auxiliar' => 'Partida auxiliar', 'descripcion_corta' => 'Descripción', 'renglon' => 'Renglón'];
+    $cambiosExtra = [];
+    foreach ($extra as $k => $v) {
+        if ((string) ($antes[$k] ?? '') !== (string) ($v ?? '')) $cambiosExtra[] = [$nombres[$k] . " de la partida $codigo", $antes[$k], $v === null ? null : (string) $v];
+    }
+    if ($codigo === $antes['codigo'] && $desc === $antes['descripcion'] && !$cambioM2 && !$cambiosExtra) return;
+    acrineoTransaccion(function () use ($ctx, $partidaId, $codigo, $desc, $m2, $m2Antes, $cambioM2, $antes, $extra, $cambiosExtra, $usuario) {
+        if ($extra) bd_ejecutar('AW', 'update acrineo_partidas set ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($extra)))
+            . ' where partida_id = ?', array_merge(array_values($extra), [$partidaId]));
         if (acrineoPartidaM2Disponible()) {
             bd_ejecutar('AW', 'update acrineo_partidas set codigo = ?, descripcion = ?, metros_cuadrados = ?, updated_at = now() where partida_id = ?', [$codigo, $desc, $m2, $partidaId]);
         } else {
@@ -261,6 +304,7 @@ function acrineoPartidaGuardar(array $ctx, int $partidaId, array $in, string $us
         $cambios = [];
         if ($codigo !== $antes['codigo'] || $desc !== $antes['descripcion']) $cambios[] = ['Modificó partida', "{$antes['codigo']} · {$antes['descripcion']}", "$codigo · $desc"];
         if ($cambioM2) $cambios[] = ["Metros cuadrados de la partida $codigo", (string) $m2Antes, (string) $m2];
+        $cambios = array_merge($cambios, $cambiosExtra);
         acrineoRegistrar($ctx['id'], $usuario, 'HOJA', $cambios);
     });
 }
@@ -281,9 +325,11 @@ function acrineoPartidaDuplicar(array $ctx, int $partidaId, string $usuario): in
     $p = acrineoPartidaFila($ctx, $partidaId);
     return acrineoTransaccion(function () use ($ctx, $partidaId, $p, $usuario) {
         $conM2 = acrineoPartidaM2Disponible();
-        $todas = bd_filas('AW', 'select partida_id, padre_id, codigo, descripcion, orden' . ($conM2 ? ', metros_cuadrados' : '')
+        $conWbs = acrineoPartidaWbsDisponible();
+        $todas = bd_filas('AW', 'select partida_id, padre_id, codigo, descripcion, orden' . ($conM2 ? ', metros_cuadrados' : '') . ($conWbs ? ', codigo_auxiliar, descripcion_corta' : '')
             . ' from acrineo_partidas where presupuesto_id = ? order by orden, partida_id', [$ctx['id']]);
-        $m2De = fn(array $t): array => $conM2 ? ['metros_cuadrados' => (float) $t['metros_cuadrados']] : [];
+        $m2De = fn(array $t): array => ($conM2 ? ['metros_cuadrados' => (float) $t['metros_cuadrados']] : [])
+            + ($conWbs ? ['codigo_auxiliar' => $t['codigo_auxiliar'], 'descripcion_corta' => $t['descripcion_corta']] : []);
         $usados = array_column($todas, 'codigo');
         $padre = $p['padre_id'] === null ? null : (int) $p['padre_id'];
         $padreCodigo = null;
@@ -387,6 +433,130 @@ function acrineoNormalizarOrden(int $presupuestoId, ?int $padre): array
         $padre === null ? [$presupuestoId] : [$presupuestoId, $padre]), 'partida_id'));
     foreach ($ids as $n => $pid) bd_ejecutar('AW', 'update acrineo_partidas set orden = ? where partida_id = ? and orden <> ?', [$n, $pid, $n]);
     return $ids;
+}
+
+// WBS y renglón de una partida nueva: el WBS de su padre + su número entre las hermanas (si el padre tiene WBS; en la
+// raíz, su número) y el renglón siguiente al más alto del presupuesto, de 10 en 10 (si ya se numeraron)
+function acrineoPartidaNuevaWbs(array $ctx, ?int $padreId, int $orden): array
+{
+    $base = $padreId ? (string) bd_valor('AW', 'select wbs from acrineo_partidas where partida_id = ?', [$padreId]) : '';
+    $conWbs = $padreId ? $base !== '' : (bool) bd_valor('AW', 'select 1 from acrineo_partidas where presupuesto_id = ? and wbs is not null limit 1', [$ctx['id']]);
+    $wbs = !$conWbs ? null : ($padreId ? $base . '.' : '') . ($orden + 1);
+    $max = bd_valor('AW', 'select max(renglon) from acrineo_partidas where presupuesto_id = ?', [$ctx['id']]);
+    return ['wbs' => $wbs, 'renglon' => $max === null ? null : (int) $max + 10];
+}
+
+function acrineoPartidaWbsExigir(): void
+{
+    if (!acrineoPartidaWbsDisponible()) throw new AcrineoError('Falta aplicar la migración 038 (WBS, partida auxiliar y renglón de las partidas).', 503);
+}
+
+// Agregar 'n' partidas (en la raíz o dentro de $padreId) con los códigos sugeridos; su descripción es el código
+function acrineoPartidasAgregar(array $ctx, ?int $padreId, int $n, string $usuario): array
+{
+    if ($n < 1 || $n > 200) throw new AcrineoError('Indica de 1 a 200 partidas.', 422);
+    $padre = $padreId ? acrineoPartidaFila($ctx, $padreId) : null;
+    return acrineoTransaccion(function () use ($ctx, $padreId, $padre, $n, $usuario) {
+        $ids = [];
+        for ($i = 0; $i < $n; $i++) {
+            $codigo = acrineoCodigoSugerido($ctx, $padreId);
+            $ids[] = acrineoPartidaCrear($ctx, $padreId, ['codigo' => $codigo, 'descripcion' => $codigo], $usuario);
+        }
+        acrineoRegistrar($ctx['id'], $usuario, 'HOJA', [["Agregó $n partida(s)" . ($padre ? " en {$padre['codigo']}" : ' en la raíz'), null, (string) $n]]);
+        return $ids;
+    });
+}
+
+// Duplicar 'n' veces: cada copia (con sus subpartidas y conceptos) queda debajo de la anterior. Regresa la primera copia
+function acrineoPartidaDuplicarVeces(array $ctx, int $partidaId, int $n, string $usuario): int
+{
+    if ($n < 1 || $n > 50) throw new AcrineoError('Indica de 1 a 50 copias.', 422);
+    return acrineoTransaccion(function () use ($ctx, $partidaId, $n, $usuario) {
+        $ultima = $partidaId;
+        $primera = 0;
+        for ($i = 0; $i < $n; $i++) {
+            $ultima = acrineoPartidaDuplicar($ctx, $ultima, $usuario);
+            $primera = $primera ?: $ultima;
+        }
+        return $primera;
+    });
+}
+
+// Árbol de partidas del presupuesto (solo id, padre y orden), en el orden en que se ve
+function acrineoArbolSimple(array $ctx): array
+{
+    return acrineoOrdenArbol(array_map(fn($f) => ['id' => (int) $f['id'], 'padre_id' => $f['padre_id'] === null ? null : (int) $f['padre_id'], 'orden' => (int) $f['orden']],
+        bd_filas('AW', 'select partida_id as id, padre_id, orden from acrineo_partidas where presupuesto_id = ?', [$ctx['id']])));
+}
+
+// Regenerar WBS: 1, 1.1, 1.2… según el árbol actual. Regresa cuántas cambiaron
+function acrineoRegenerarWbs(array $ctx, string $usuario): int
+{
+    acrineoPartidaWbsExigir();
+    $arbol = acrineoArbolSimple($ctx);
+    return acrineoTransaccion(function () use ($ctx, $arbol, $usuario) {
+        $n = 0;
+        foreach (acrineoWbsArbol($arbol) as $id => $wbs) {
+            $n += bd_ejecutar('AW', 'update acrineo_partidas set wbs = ? where partida_id = ? and wbs is distinct from ?', [$wbs, $id, $wbs]);
+        }
+        acrineoRegistrar($ctx['id'], $usuario, 'HOJA', [['Regeneró el WBS de las partidas', null, "$n partida(s)"]]);
+        return $n;
+    });
+}
+
+// Renumerar renglón: las partidas en el orden del árbol, de $paso en $paso desde $inicio
+function acrineoRenumerarRenglon(array $ctx, int $inicio, int $paso, string $usuario): int
+{
+    acrineoPartidaWbsExigir();
+    if ($inicio < 0 || $inicio > 1000000 || $paso < 1 || $paso > 1000) throw new AcrineoError('Revisa el renglón inicial (0 a 1,000,000) y el incremento (1 a 1,000).', 422);
+    $arbol = acrineoArbolSimple($ctx);
+    return acrineoTransaccion(function () use ($ctx, $arbol, $inicio, $paso, $usuario) {
+        foreach ($arbol as $i => $p) {
+            $r = $inicio + $i * $paso;
+            bd_ejecutar('AW', 'update acrineo_partidas set renglon = ? where partida_id = ? and renglon is distinct from ?', [$r, $p['id'], $r]);
+        }
+        acrineoRegistrar($ctx['id'], $usuario, 'HOJA', [['Renumeró el renglón de las partidas', null, "desde $inicio, de $paso en $paso"]]);
+        return count($arbol);
+    });
+}
+
+// Aplicar expresión: cambia las cantidades de los conceptos de la partida (con sus subpartidas) o de todo el presupuesto
+//   operacion: multiplicar | dividir | sumar | restar | igualar
+function acrineoAplicarExpresion(array $ctx, ?int $partidaId, string $operacion, $valor, string $usuario): array
+{
+    if (!in_array($operacion, ['multiplicar', 'dividir', 'sumar', 'restar', 'igualar'], true)) throw new AcrineoError('Operación no válida.', 422);
+    $v = trim(str_replace(',', '', (string) ($valor ?? '')));
+    if (!is_numeric($v) || abs((float) $v) > 999999999) throw new AcrineoError('Revisa el valor.', 422, ['valor' => 'Escribe un número.']);
+    $v = (float) $v;
+    if ($operacion === 'dividir' && $v == 0.0) throw new AcrineoError('No se puede dividir entre cero.', 422, ['valor' => 'No se puede dividir entre cero.']);
+    if (in_array($operacion, ['igualar'], true) && $v < 0) throw new AcrineoError('La cantidad no puede ser negativa.', 422, ['valor' => 'La cantidad no puede ser negativa.']);
+    $partida = $partidaId ? acrineoPartidaFila($ctx, $partidaId) : null;
+    $ids = null;
+    if ($partida) {
+        $hijos = [];
+        foreach (bd_filas('AW', 'select partida_id, padre_id from acrineo_partidas where presupuesto_id = ?', [$ctx['id']]) as $f) {
+            if ($f['padre_id'] !== null) $hijos[(int) $f['padre_id']][] = (int) $f['partida_id'];
+        }
+        $ids = [$partidaId];
+        for ($i = 0; $i < count($ids); $i++) foreach ($hijos[$ids[$i]] ?? [] as $h) $ids[] = $h;
+    }
+    $where = 'p.presupuesto_id = ?' . ($ids ? ' and r.partida_id in (' . implode(',', array_fill(0, count($ids), '?')) . ')' : '');
+    $filas = bd_filas('AW', "select r.renglon_id, r.cantidad from acrineo_partida_conceptos r join acrineo_partidas p on p.partida_id = r.partida_id where $where",
+        array_merge([$ctx['id']], $ids ?? []));
+    return acrineoTransaccion(function () use ($ctx, $filas, $operacion, $v, $partida, $usuario) {
+        $n = 0;
+        foreach ($filas as $f) {
+            $nueva = acrineoExpresionCantidad((float) $f['cantidad'], $operacion, $v, $ctx['dec_cantidades']);
+            if (abs($nueva - (float) $f['cantidad']) < 1e-9) continue;
+            bd_ejecutar('AW', 'update acrineo_partida_conceptos set cantidad = ? where renglon_id = ?', [$nueva, (int) $f['renglon_id']]);
+            $n++;
+        }
+        $signo = ['multiplicar' => '×', 'dividir' => '÷', 'sumar' => '+', 'restar' => '−', 'igualar' => '='][$operacion];
+        acrineoRegistrar($ctx['id'], $usuario, 'HOJA', [['Aplicó expresión a las cantidades' . ($partida ? " de la partida {$partida['codigo']} y sus subpartidas" : ' de todo el presupuesto'),
+            null, "cantidad $signo $v ($n concepto(s))"]]);
+        acrineoActualizarTotales($ctx['id']);
+        return ['cambiados' => $n, 'revisados' => count($filas)];
+    });
 }
 
 // ---------- Conceptos de una partida ----------

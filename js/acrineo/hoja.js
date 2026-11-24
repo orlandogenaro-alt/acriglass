@@ -12,7 +12,8 @@
     var puede = !!(cfg.permisos && cfg.permisos['presupuestos.editar']);
     var API = 'api/acrineo/hoja.php';
     var tbody = $('anPartidas');
-    var COLS = 7;   // Partida, Descripción, Costo, Precio, Costo x M2, Precio x M2, Metros cuadrados
+    var COLS = 11;  // Partida, WBS, Descripción completa, Descripción, Partida auxiliar, Renglón, Costo, Precio, Costo x M2, Precio x M2, Metros cuadrados
+    var REJILLA = 'partidas_v2';
     var fmtM2 = new Intl.NumberFormat('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
     var CHEVRON = '<svg class="i" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>';
 
@@ -144,7 +145,10 @@
                     + (H.cerrados[p.id] ? 'Mostrar' : 'Ocultar') + ' subpartidas">' + CHEVRON + '</button>' : '<span class="an-hueco"></span>';
                 html += '<tr class="an-fila' + (p.id === H.sel ? ' sel' : '') + '" data-id="' + p.id + '" tabindex="0" aria-level="' + (p.nivel + 1) + '" aria-selected="' + (p.id === H.sel) + '">'
                     + '<td style="padding-left:' + (8 + p.nivel * 16) + 'px"><span class="an-sangria">' + toggle + esc(p.codigo) + '</span></td>'
+                    + '<td>' + esc(p.wbs || '') + '</td>'
                     + '<td title="' + esc(p.descripcion) + '">' + esc(p.descripcion) + '</td>'
+                    + '<td>' + esc(p.descripcion_corta || '') + '</td><td>' + esc(p.codigo_auxiliar || '') + '</td>'
+                    + '<td class="num">' + (p.renglon == null ? '' : p.renglon) + '</td>'
                     + '<td class="num">' + AN.ui.dinero(p.costo) + '</td><td class="num">' + AN.ui.dinero(p.venta) + '</td>'
                     + '<td class="num">' + AN.ui.dinero(p.costo_m2) + '</td><td class="num">' + AN.ui.dinero(p.venta_m2) + '</td>'
                     + '<td class="num">' + fmtM2.format(Number(p.metros_cuadrados) || 1) + '</td></tr>';
@@ -314,6 +318,15 @@
         var tr = e.target.closest('tr[data-id]');
         if (tr && !H.edicion) H.seleccionar(+tr.dataset.id);
     });
+    // Clic derecho sobre una partida: su menú, como en Neodata (js/acrineo/hoja-partidas.js)
+    tbody.addEventListener('contextmenu', function (e) {
+        if (H.edicion || e.target.closest('input, textarea') || !AN.rejilla || !AN.hojaPartidas) return;
+        var tr = e.target.closest('tr[data-id]');
+        var abrir = function () { AN.rejilla.contextual(REJILLA, e, AN.hojaPartidas.menu()); };
+        e.preventDefault();
+        if (tr && +tr.dataset.id !== H.sel) H.seleccionar(+tr.dataset.id).then(function (ok) { if (ok) abrir(); });
+        else abrir();
+    });
     tbody.addEventListener('dblclick', function (e) {
         var tr = e.target.closest('tr[data-id]');
         if (tr && puede && !H.edicion && +tr.dataset.id === H.sel) editar();
@@ -359,8 +372,9 @@
     $('anFiltroTodo').addEventListener('change', function () { if (H.filtro.q) aplicarFiltro(); });
 
     // ⋮ del árbol de partidas
-    if (AN.rejilla) AN.rejilla.opciones('partidas', {
+    if (AN.rejilla) AN.rejilla.opciones(REJILLA, {
         fijas: 1,
+        ocultas: [4, 5, 6],   // Descripción, Partida auxiliar y Renglón (se muestran con el ojo)
         archivo: function () { return 'Partidas ' + H.ctx.codigo; },
         extras: function () {
             var p = H.partida(), op = [
@@ -372,11 +386,20 @@
                 { texto: 'Editar partida', accion: editar, desactivado: !!H.edicion || !p },
                 { texto: 'Copiar partida', accion: copiarPartida, desactivado: !!H.edicion || !p },
                 { texto: 'Pegado especial (desde Excel)', accion: function () { if (AN.hojaPegado) AN.hojaPegado.abrir(); }, desactivado: !!H.edicion });
+            if (puede && AN.hojaPartidas) op.push.apply(op, [null].concat(AN.hojaPartidas.menuExtras()));
             return op;
         }
     });
     H.editarPartida = editar;
     H.copiarPartida = copiarPartida;
+    H.nuevaPartida = nueva;
+    H.eliminarPartida = eliminar;
+    H.pintar = pintar;
+    H.plegarTodas = function (cerrar) {
+        H.cerrados = {};
+        if (cerrar) H.partidas.forEach(function (x) { if (x.hijos) H.cerrados[x.id] = true; });
+        pintar();
+    };
 
     $('anHojaDetalle').addEventListener('click', function () {
         AN.detalle.abrir(H.id, { alGuardar: function () { H.recargar(); } });

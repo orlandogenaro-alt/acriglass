@@ -187,6 +187,19 @@ prueba('hoja: código sugerido de partida y subpartida', function () {
     igual('A12', acrineoSiguienteCodigoPartida('A1', ['A', 'A1', 'a11']));
 });
 
+prueba('hoja: WBS de las partidas y aplicar expresión', function () {
+    $o = acrineoOrdenArbol([
+        ['id' => 5, 'padre_id' => null, 'orden' => 1], ['id' => 1, 'padre_id' => null, 'orden' => 0],
+        ['id' => 3, 'padre_id' => 1, 'orden' => 1], ['id' => 2, 'padre_id' => 1, 'orden' => 0], ['id' => 4, 'padre_id' => 2, 'orden' => 0],
+    ]);
+    igual([1 => '1', 2 => '1.1', 4 => '1.1.1', 3 => '1.2', 5 => '2'], acrineoWbsArbol($o));
+    igual(11.0, acrineoExpresionCantidad(10, 'multiplicar', 1.1, 4));
+    igual(2.5, acrineoExpresionCantidad(10, 'dividir', 4, 4));
+    igual(10.0, acrineoExpresionCantidad(10, 'dividir', 0, 4));
+    igual(0.0, acrineoExpresionCantidad(3, 'restar', 5, 4));
+    igual(7.0, acrineoExpresionCantidad(3, 'igualar', 7, 4));
+});
+
 prueba('hoja: orden de árbol con niveles', function () {
     $o = acrineoOrdenArbol([
         ['id' => 5, 'padre_id' => null, 'orden' => 1], ['id' => 1, 'padre_id' => null, 'orden' => 0],

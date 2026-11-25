@@ -11,6 +11,7 @@ const ACRI_RUTAS = [
     // ACRINEO
     'acrineo-presupuestos.php', 'api/acrineo/presupuestos.php', 'api/acrineo/catalogos.php',
     'acrineo-hoja.php', 'acrineo-reporte.php', 'acrineo-neodata-exportador.php', 'api/acrineo/hoja.php', 'api/acrineo/unidades.php', 'api/acrineo/tipos-insumo.php',
+    'acrineo-catalogos.php', 'api/acrineo/catalogos-generales.php',
 ];
 
 $ruta = ltrim(rawurldecode((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH)), '/');

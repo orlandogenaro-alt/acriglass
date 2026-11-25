@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-11-25',
+        'cambios' => [
+            ['correccion', 'Catalogos: ya abren en la nube', 'Unidades, Tipos de insumos, Familias, Estados, Ciudades, Proveedores, Responsables, Empresas, Tipos de licitaciones y Regiones mostraban «No encontrado.» en la versión en la nube: el servidor no tenía dadas de alta la página de los catálogos generales ni su API. Ya quedó.'],
+        ],
+    ],
+    [
         'fecha' => '2026-11-24',
         'cambios' => [
             ['mejora', 'ACRINEO: sin las pestañas «Próximamente»', 'Arriba del Catálogo de presupuestos ya no aparecen Dashboard, Catálogo de conceptos, Insumos, Matrices, Precios unitarios, Explosión de insumos, Proveedores y demás marcadas «Próximamente»: esas opciones ya están en Opciones del Presupuesto dentro de cada presupuesto. Solo queda «Presupuestos».'],

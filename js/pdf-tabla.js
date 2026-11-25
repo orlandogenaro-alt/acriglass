@@ -23,13 +23,19 @@
 
     // Encabezado de la tabla: trae Concepto (o Descripción) y alguna columna de cantidades
     var ES_ENCABEZADO = function (t) {
-        return /(concepto|descripci[oó]n)/i.test(t) && /(cantidad|unidad|p\.?\s*unit|precio|importe)/i.test(t);
+        return /(concepto|descripci[oó]n)/i.test(t) && /(cantidad|unidad|uds?|p\.?\s*unit|precio|importe)/i.test(t);
     };
+    // Renglón con letra más grande que el texto normal (títulos del concepto en el formato de cotización): termina con
+    // esta marca invisible para que, al importar, el título quede en su propio renglón de la descripción
+    var MARCA_TITULO = '⁣';
     var ES_NUMERO = /^[$\s]*-?[\d,]+(\.\d+)?\s*%?$/;
 
     // Renglones de la hoja: los textos con la misma altura (y) van juntos, ordenados de izquierda a derecha
     function renglones(items) {
-        var lista = items.filter(function (it) { return String(it.str).trim() !== ''; }).map(function (it) {
+        // El texto girado (p. ej. las cotas «V1=2400» de un dibujo) no es parte de la tabla
+        var lista = items.filter(function (it) {
+            return String(it.str).trim() !== '' && Math.abs(it.transform[1]) < 0.01 && Math.abs(it.transform[2]) < 0.01;
+        }).map(function (it) {
             var alto = Math.abs(it.transform[3]) || it.height || 8;
             return { t: String(it.str), x: it.transform[4], y: it.transform[5], fin: it.transform[4] + (it.width || 0), alto: alto };
         });
@@ -91,7 +97,7 @@
             }
             return Promise.all(paginas);
         }).then(function (contenidos) {
-            var hayTexto = false, titulos = null, lim = null, enc = null, paginas = [];
+            var hayTexto = false, titulos = null, lim = null, enc = null, paginas = [], conEnc = 0;
             contenidos.forEach(function (contenido) {
                 var filas = renglones(contenido.items);
                 if (filas.length) hayTexto = true;
@@ -100,6 +106,7 @@
                     if (ES_ENCABEZADO(filas[i].items.map(function (it) { return it.t; }).join(' '))) { iEnc = i; break; }
                 }
                 if (iEnc >= 0) {
+                    conEnc++;
                     var nuevos = juntar(filas[iEnc].items, function (it) { return it.alto * 0.9; });
                     filas = filas.slice(iEnc + 1);
                     // Los límites salen de la primera hoja con encabezado; si las demás repiten el mismo encabezado
@@ -114,23 +121,62 @@
                     }
                 }
                 if (!titulos) return; // hojas antes del encabezado (portada)
+                // Si el PDF repite el encabezado en cada hoja, una hoja sin él no es de la tabla (términos y condiciones, totales)
+                if (iEnc < 0 && conEnc >= 2) return;
                 paginas.push(filas.map(function (f) {
-                    var celdas = titulos.map(function () { return []; });
+                    var celdas = titulos.map(function () { return []; }), altos = titulos.map(function () { return 0; });
                     // Cada texto va a la columna donde cae su centro
                     juntar(f.items, function (it) { return it.alto * 0.6; }).forEach(function (c) {
                         var centro = (c.x + c.fin) / 2, k = 0;
                         while (k < lim.length && centro > lim[k]) k++;
                         celdas[k].push(c.t);
+                        altos[k] = Math.max(altos[k], c.alto);
                     });
-                    return { y: f.y, c: celdas.map(function (c) { return c.join(' '); }) };
+                    return { y: f.y, c: celdas.map(function (c) { return c.join(' '); }), a: altos };
                 }));
             });
             if (!hayTexto) throw new Error('El PDF no trae texto (parece escaneado): no se puede leer.');
             if (!titulos) throw new Error('No encontré el encabezado de la tabla (Código, Concepto, Unidad, Cantidad, P. Unitario…) en el PDF.');
-            var salida = ordenarBloques(paginas, enc);
+            var codigoEnDescripcion = sacarCodigos(paginas, enc);
+            var salida = ordenarBloques(paginas, enc, codigoEnDescripcion);
             subirImportes(salida);
             return salida.map(function (f) { return f.map(celdaTexto).join('\t'); }).join('\n');
         });
+    }
+
+    // Formato de cotización sin columna Código (GRÁFICO · DESCRIPCIÓN · UDS · IMPORTE · TOTAL): el código va arriba de la
+    // descripción con letra grande (C-01, C-02…, o un nombre como «MANILLAS EXT» en el renglón de los importes). Se pasa
+    // a una columna «Código» nueva y los demás renglones con letra grande (el título) se marcan con MARCA_TITULO.
+    function sacarCodigos(paginas, enc) {
+        var col = function (re) { return enc.findIndex(function (t) { return re.test(t); }); };
+        var iCon = col(/^(concepto|descripci)/i);
+        if (col(/^(c[oó]digo|clave|cve)/i) >= 0 || iCon < 0) return false;
+        var nums = enc.map(function (t, i) { return /^(cant|uds?$|p\.?\s*unit|precio|importe|total)/i.test(t) ? i : -1; })
+                      .filter(function (i) { return i >= 0; });
+        var alturas = [];
+        paginas.forEach(function (p) { p.forEach(function (f) { if (f.c[iCon]) alturas.push(f.a[iCon]); }); });
+        alturas.sort(function (a, b) { return a - b; });
+        var normal = alturas.length ? alturas[Math.floor(alturas.length / 2)] : 0;
+        var ES_CODIGO = /^[A-Z]{1,5}-?\d{1,4}[A-Z]?$/;
+        var hay = false;
+        paginas.forEach(function (p) {
+            p.forEach(function (f) {
+                var t = f.c[iCon] || '', grande = normal > 0 && f.a[iCon] > normal * 1.3, cod = '';
+                var conNum = nums.some(function (i) { return ES_NUMERO.test(f.c[i] || ''); });
+                if (ES_CODIGO.test(t)) cod = t;
+                else if (grande && conNum && t.length <= 30 && /[A-Za-zÁÉÍÓÚÑáéíóúñ]{3}/.test(t)) cod = t;
+                if (cod) { hay = true; f.c[iCon] = ''; }
+                else if (grande && t) f.c[iCon] = t + MARCA_TITULO;
+                f.c.push(cod);
+                f.a.push(0);
+            });
+        });
+        if (!hay) {   // no era ese formato: se deja como estaba
+            paginas.forEach(function (p) { p.forEach(function (f) { f.c.pop(); f.a.pop(); f.c[iCon] = (f.c[iCon] || '').replace(MARCA_TITULO, ''); }); });
+            return false;
+        }
+        enc.push('Código');
+        return true;
     }
 
     // Cada concepto es un bloque de renglones juntos (entre conceptos queda un espacio más grande que entre líneas).
@@ -139,10 +185,10 @@
     // - la primera oración (hasta el punto) queda como el concepto y lo demás como continuación (especificación);
     // - el pie de página que se repite en cada hoja (p. ej. «DIRECTOR GENERAL: …») se quita;
     // - una línea suelta de 1 a 4 letras o números en mayúsculas (p. ej. «A») es la partida de los conceptos que siguen.
-    function ordenarBloques(paginas, enc) {
+    function ordenarBloques(paginas, enc, codigoEnDescripcion) {
         var col = function (re) { return enc.findIndex(function (t) { return re.test(t); }); };
         var iCod = col(/^(c[oó]digo|clave|cve)/i), iCon = col(/^(concepto|descripci)/i);
-        var nums = enc.map(function (t, i) { return /^(cant|p\.?\s*unit|precio|importe|total)/i.test(t) ? i : -1; })
+        var nums = enc.map(function (t, i) { return /^(cant|uds?$|p\.?\s*unit|precio|importe|total)/i.test(t) ? i : -1; })
                       .filter(function (i) { return i >= 0; });
         var llave = function (f) { return f.c.join('|') + '@' + Math.round(f.y / 4); };
         var soloConcepto = function (f) { return f.c.every(function (t, i) { return i === iCon || !t; }); };
@@ -181,8 +227,11 @@
                 }
                 var anclas = b.filter(esAncla);
                 if (!anclas.length) {
-                    if (paginas.length > 1) b = b.filter(function (f) { return veces[llave(f)] < 2; });
-                } else if (anclas.length === 1 && iCon >= 0) {
+                    // Pie de página: lo que se repite en el mismo lugar en la mayoría de las hojas (un texto igual en dos
+                    // conceptos parecidos de hojas distintas no cuenta)
+                    var minimo = Math.max(2, Math.ceil(paginas.length * 0.6));
+                    if (paginas.length > 1) b = b.filter(function (f) { return veces[llave(f)] < minimo; });
+                } else if (anclas.length === 1 && iCon >= 0 && !codigoEnDescripcion) {   // (en la cotización el código ya va arriba)
                     var primera = b[0];
                     // Código, unidad e importes del bloque a la primera línea
                     b.slice(1).forEach(function (f) {
@@ -214,7 +263,7 @@
         var enc = filas[0] || [];
         var iCod = enc.findIndex(function (t) { return /^(c[oó]digo|clave|cve)/i.test(t); });
         if (iCod < 0) return;
-        var numericas = enc.map(function (t, i) { return /^(unidad|u\.?m|cant|p\.?\s*unit|precio|importe|total|%)/i.test(t) ? i : -1; })
+        var numericas = enc.map(function (t, i) { return /^(unidad|u\.?m|cant|uds?$|p\.?\s*unit|precio|importe|total|%)/i.test(t) ? i : -1; })
                            .filter(function (i) { return i >= 0; });
         var ultimo = -1;
         for (var r = 1; r < filas.length; r++) {

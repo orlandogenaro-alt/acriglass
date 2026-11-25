@@ -615,23 +615,34 @@
         var filas = filasTsv(texto), enc = filas.shift() || [];
         var col = function (re) { return enc.findIndex(function (t) { return re.test(t); }); };
         var iCod = col(/^(c[oó]digo|clave|cve)/i), iCon = col(/^(concepto|descripci)/i), iUni = col(/^(unidad|u\.?\s*m)/i),
-            iCant = col(/^cant/i), iPu = col(/^(p\.?\s*unit|precio\s*unit|p\.?\s*u\.?$|precio$)/i), iImp = col(/^(importe|total)/i);
+            iCant = col(/^(cant|uds?$)/i), iPu = col(/^(p\.?\s*unit|precio\s*unit|p\.?\s*u\.?$|precio$)/i), iImp = col(/^(importe|total)/i);
+        // Cotización con IMPORTE y TOTAL sin «P. Unitario» (formato GRÁFICO · DESCRIPCIÓN · UDS · IMPORTE · TOTAL): IMPORTE es el precio de una pieza
+        var iTot = col(/^total/i);
+        if (iPu < 0 && iTot >= 0 && iImp >= 0 && iImp !== iTot) { iPu = iImp; iImp = iTot; }
         if (iCod < 0 || iCon < 0) throw new Error('No encontré las columnas Código y Concepto en la tabla del PDF.');
-        var lista = [], c = null;
+        var TITULO = '\u2063';   // js/pdf-tabla.js marca así los renglones con letra grande (el título del concepto)
+        var MEDIDA = /^\d+\s*\.?-/;  // «1.- 3.40 mts de base * 2.40 mts de altura» va en su propio renglón
+        var lista = [], c = null, ultima = '';
         var esTotal = /^((sub)?total\b|iva\b|i\.v\.a\.?)|total del presupuesto|importe con letra|\(\*.*m\.n\./i;
         filas.forEach(function (f) {
             var cod = (f[iCod] || '').trim(), desc = (f[iCon] || '').trim();
             if (esTotal.test(cod) || esTotal.test(desc)) { c = null; return; }   // totales, IVA y lo que les sigue
             if (cod) {
+                ultima = desc;
                 var cant = numeroPdf(f[iCant]), pu = numeroPdf(f[iPu]), imp = numeroPdf(f[iImp]);
                 if (pu === null && imp !== null && cant) pu = imp / cant;   // sin precio unitario: importe / cantidad
                 c = { codigo: cod.slice(0, 30), descripcion: desc, unidad: (f[iUni] || '').slice(0, 20), cantidad: cant === null ? 1 : cant, costo: pu === null ? 0 : pu };
                 lista.push(c);
-            } else if (c && desc) c.descripcion = (c.descripcion + (/[.:]$/.test(c.descripcion) ? '\n' : ' ') + desc).trim();
+            } else if (c && desc) {
+                var salto = /[.:]$/.test(c.descripcion) || MEDIDA.test(desc) || MEDIDA.test(ultima)
+                    || (ultima.slice(-1) === TITULO && desc.slice(-1) !== TITULO);
+                c.descripcion = (c.descripcion + (salto ? '\n' : ' ') + desc).trim();
+                ultima = desc;
+            }
         });
         // Se respetan los renglones del PDF que terminan en punto o dos puntos (6mm. / Correspondiente… / aproximadas: / 2.26 m. x 1.66 m.…);
         // las demás líneas eran solo el ancho de la columna y se unen con espacio
-        lista.forEach(function (x) { x.descripcion = x.descripcion.split('\n').map(function (l) { return l.replace(/\s+/g, ' ').trim(); }).filter(Boolean).join('\n').slice(0, 4000); });
+        lista.forEach(function (x) { x.descripcion = x.descripcion.split(TITULO).join('').split('\n').map(function (l) { return l.replace(/\s+/g, ' ').trim(); }).filter(Boolean).join('\n').slice(0, 4000); });
         return lista;
     }
     var entradaPdf = document.createElement('input');

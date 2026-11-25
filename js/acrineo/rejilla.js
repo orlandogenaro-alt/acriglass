@@ -3,7 +3,8 @@
 // restablecer las columnas). Cada cuadrícula se declara en el HTML con
 //   <span class="an-rejilla-btns" data-rejilla="nombre" data-tabla="idDeLaTabla"> [data-cols] [data-fijas] [data-menu] </span>
 // y su módulo puede agregar opciones: AN.rejilla.opciones('nombre', { fijas: 1, archivo: 'Partidas', extras: fn → [{texto, accion}],
-// trasExportar: fn → [{texto, accion}] (van justo debajo de «Exportar a Excel», antes de «Exportar PDF») }).
+// trasExportar: fn → [{texto, accion}] (van justo debajo de «Exportar a Excel», antes de «Exportar PDF»),
+// exportarPdf: fn (reemplaza la hoja imprimible genérica de «Exportar PDF») }).
 // Lo que elige cada usuario se recuerda en este navegador.
 (function (AN) {
     'use strict';
@@ -225,7 +226,7 @@
             { texto: 'Ajustar', marcado: !!r.ajustar, accion: function () { r.ajustar = !r.ajustar; escribir(r); aplicar(r); } },
             { texto: 'Exportar a Excel', accion: function () { exportar(r); } }],
             r.cfg.trasExportar ? r.cfg.trasExportar() : [],
-            [{ texto: 'Exportar PDF', accion: function () { exportarPdf(r); } }],
+            [{ texto: 'Exportar PDF', accion: function () { if (r.cfg.exportarPdf) r.cfg.exportarPdf(); else exportarPdf(r); } }],
             r.cfg.limpiarFiltro ? [{ texto: 'Limpiar filtro', accion: r.cfg.limpiarFiltro, desactivado: r.cfg.hayFiltro ? !r.cfg.hayFiltro() : false }] : [], [null,
             { texto: 'Mostrar todas las columnas', accion: function () { r.ocultas = []; escribir(r); aplicar(r); }, desactivado: !r.ocultas.length },
             { texto: 'Quitar las columnas fijas', accion: function () { r.fijas = 0; escribir(r); aplicar(r); }, desactivado: !r.fijas },

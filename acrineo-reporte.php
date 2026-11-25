@@ -1,5 +1,6 @@
 <?php
 // ACRINEO › reporte impreso de un presupuesto (?id=N&tipo=presupuesto|analisis|explosion[&marcados=1,2][&imprimir=1|&excel=1]).
+// &formato=cotizacion[&partida=N] = el presupuesto con el formato de cotización (includes/acrineo/reporte-cotizacion.php).
 // Hoja carta con la Hoja Membretada del sistema; «Imprimir» la manda a la impresora o a PDF y «Excel» la baja como .xlsx.
 require __DIR__ . '/includes/sesion.php';
 require_once __DIR__ . '/includes/bd.php';
@@ -31,6 +32,11 @@ $cant = fn($v, $d = 4) => $v === null ? '' : number_format((float) $v, $d);
 $pct = fn($v) => rtrim(rtrim(number_format((float) $v, 4), '0'), '.') . ' %';
 $fecha = fn($f) => preg_match('/^(\d{4})-(\d{2})-(\d{2})/', (string) $f, $x) ? "$x[3]/$x[2]/$x[1]" : '';
 $enc = $r['encabezado'] ?? [];
+// Formato de cotización (Exportar PDF de los conceptos de una partida): otra plantilla con el mismo reporte
+if ($r && $tipo === 'presupuesto' && ($_GET['formato'] ?? '') === 'cotizacion') {
+    require __DIR__ . '/includes/acrineo/reporte-cotizacion.php';
+    exit;
+}
 $titulo = $r ? $r['titulo'] . ' · ' . $enc['codigo'] : 'Reporte';
 ?>
 <!DOCTYPE html>

@@ -67,7 +67,27 @@ function acrineoReporteEncabezado(array $ctx): array
         'ciudad' => trim((string) ($pr['ciudad_nombre'] ?? '')) !== '' ? trim((string) $pr['ciudad_nombre']) : $lugar,
         'iva_pct' => (float) ($p['calculo']['iva'] ?? 16), 'fecha' => date('Y-m-d'),
         'sobrecosto_pct' => $ctx['sobrecosto_pct'],
-    ];
+    ] + acrineoReporteCliente((int) ($g['cliente_id'] ?? 0));
+}
+
+// Domicilio, teléfono y correo del cliente (para el formato de cotización); vacíos si no hay cliente o no se pueden leer
+function acrineoReporteCliente(int $clienteId): array
+{
+    $c = ['cliente_direccion' => '', 'cliente_telefono' => '', 'cliente_email' => ''];
+    if (!$clienteId) return $c;
+    try {
+        $f = bd_fila('AW', 'select cl.direccion, cl.codigo_postal, ci.nombre as ciudad, cl.telefono, cl.email
+                              from clientes cl left join ciudades ci on ci.ciudad_id = cl.ciudad_id where cl.cliente_id = ?', [$clienteId]);
+    } catch (Throwable $e) {
+        error_log('ACRINEO reporte cliente: ' . $e->getMessage());
+        return $c;
+    }
+    if (!$f) return $c;
+    $cp = trim((string) $f['codigo_postal']);
+    $c['cliente_direccion'] = implode(' ', array_filter([trim((string) $f['direccion']), trim(($cp !== '' ? $cp . ' - ' : '') . trim((string) $f['ciudad']), ' -')]));
+    $c['cliente_telefono'] = trim((string) $f['telefono']);
+    $c['cliente_email'] = trim((string) $f['email']);
+    return $c;
 }
 
 // $marcados: ids de concepto (vacío = todos)
@@ -101,7 +121,7 @@ function acrineoReportePresupuesto(array $ctx, array $marcados = []): array
             'id' => $p['id'], 'codigo' => $p['codigo'], 'descripcion' => $p['descripcion'], 'nivel' => $p['nivel'],
             'importe' => round($total[$p['id']] ?? 0, $ctx['dec_costos']),
             'conceptos' => array_map(fn($r) => ['codigo' => $r['codigo'], 'descripcion' => $r['descripcion'], 'unidad' => $r['unidad'],
-                                                'cantidad' => $r['cantidad'], 'precio' => $r['precio'], 'importe' => $r['importe']], $porPartida[$p['id']] ?? []),
+                                                'cantidad' => $r['cantidad'], 'precio' => $r['precio'], 'importe' => $r['importe'], 'url' => $r['url']], $porPartida[$p['id']] ?? []),
         ];
     }
     $enc = acrineoReporteEncabezado($ctx);

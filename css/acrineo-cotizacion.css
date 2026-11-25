@@ -1,0 +1,53 @@
+/* ACRINEO · formato de cotización (includes/acrineo/reporte-cotizacion.php), como el PDF de Acristala */
+.ct { --ct-amarillo: #fbe08a; --ct-gris: #7f7f7f; font-size: 9.5px; }
+.ct-desc-campo { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.ct-desc-campo input { width: 120px; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; font: inherit; color: #111; }
+
+.ct-enc { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.ct-logo { width: 45mm; min-height: 22mm; display: flex; align-items: center; }
+.ct-logo img { max-width: 100%; max-height: 26mm; object-fit: contain; }
+.ct-empresa { width: 54%; text-align: center; font-weight: 700; font-size: 10px; line-height: 1.6; }
+.ct-empresa-nombre { background: var(--ct-gris); color: #fff; font-size: 18px; letter-spacing: .5px; padding: 1px 6px; margin-bottom: 3px; }
+
+.ct-cajas { display: flex; gap: 12px; margin-top: 8px; }
+.ct-caja { flex: 1; border: 1px solid #000; min-height: 30mm; font-size: 10px; }
+.ct-caja > div { padding: 0 4px; }
+.ct-caja h2 { margin: 0 0 2px; padding: 2px; background: var(--ct-amarillo); border-bottom: 1px solid #000; text-align: center; font-size: 10.5px; }
+.ct-subtitulo { margin-top: 8px; text-align: center; font-size: 10.5px; font-weight: 700; text-transform: uppercase; }
+.ct-cliente { text-align: left; font-weight: 700; }
+.ct-cliente-nombre { text-align: center; margin: 4px 0 2px; }
+.ct-cliente-tel { margin-top: 8px; }
+.ct-obra { margin-top: 4px; padding-bottom: 2px; border-bottom: 3px solid var(--ct-gris); font-size: 10.5px; }
+
+.ct-cols, .ct-tabla { table-layout: fixed; }
+.ct-c1 { width: 33%; } .ct-c2 { width: 39%; } .ct-c3 { width: 6%; } .ct-c4 { width: 11%; } .ct-c5 { width: 11%; }
+.ct-cols { margin-top: 4px; }
+.ct-cols th { background: var(--ct-amarillo); border: 1px solid #000; padding: 2px; font-size: 10.5px; }
+.ct-tabla td { border: 1px solid #000; border-top: 0; padding: 3px 4px; vertical-align: top; }
+.ct-concepto { break-inside: avoid; }
+.ct-grafico { text-align: center; vertical-align: middle !important; }
+.ct-grafico img { max-width: 100%; max-height: 75mm; object-fit: contain; }
+.ct-desc { text-align: justify; }
+.ct-desc p { margin: 0 0 6px; }
+.ct-codigo, .ct-titulo { font-size: 13px; font-weight: 700; text-align: left; line-height: 1.2; }
+.ct-titulo { margin-bottom: 3px; }
+.ct-medida { font-weight: 700; }
+.ct-num { text-align: right; white-space: nowrap; }
+.ct-uds { text-align: center; }
+.ct-tabla td:nth-child(3) { border-left: 2px solid #000; }
+
+.ct-terminos { margin-top: 14px; break-inside: avoid; font-size: 9.5px; line-height: 1.45; }
+.ct-terminos h3 { margin: 0 0 4px; text-align: center; font-size: 11px; }
+.ct-totales { width: 64% !important; margin: 14px 0 0 auto; border-top: 3px solid var(--ct-gris); break-inside: avoid; }
+.ct-totales th, .ct-totales td { border: 1px solid #000; padding: 2px 6px; text-align: center; font-size: 12px; font-weight: 400; }
+.ct-totales th { background: var(--ct-amarillo); }
+.ct-totales td { text-align: right; }
+.ct-totales .ct-fuerte { font-weight: 700; }
+
+@page {
+    size: letter; margin: 10mm 9mm 14mm;
+    @bottom-right { content: "Página " counter(page) " / " counter(pages); font: 10px Arial, Helvetica, sans-serif; }
+}
+@media print {
+    .ct-caja h2, .ct-cols th, .ct-totales th, .ct-empresa-nombre { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

@@ -680,8 +680,20 @@
     if (AN.rejilla) AN.rejilla.opciones('renglones', {
         fijas: 3,
         archivo: function () { var p = H.partida(); return 'Conceptos ' + (p ? p.codigo : ''); },
-        trasExportar: function () { return H.puede ? [{ texto: 'Importar PDF', accion: importarPdf, desactivado: !H.partida() || st.guardando }] : []; }
+        trasExportar: function () { return H.puede ? [{ texto: 'Importar PDF', accion: importarPdf, desactivado: !H.partida() || st.guardando }] : []; },
+        exportarPdf: exportarPdf
     });
+
+    // ---------- Exportar PDF ----------
+    // Los conceptos de la partida (con sus subpartidas) con el formato de cotización (gráfico, descripción, UDS, importe,
+    // total, descuento y términos): se abre en otra pestaña y ahí «Imprimir / PDF» → Guardar como PDF
+    function exportarPdf() {
+        var p = H.partida();
+        if (!p) { AN.ui.aviso('Selecciona primero la partida que quieres exportar.', 'error'); return; }
+        if (st.editando) { AN.ui.aviso('Guarda o cancela primero los cambios de los conceptos de la partida.', 'error'); return; }
+        var w = window.open('acrineo-reporte.php?' + new URLSearchParams({ id: H.ctx.id, tipo: 'presupuesto', formato: 'cotizacion', partida: p.id }), '_blank');
+        if (!w) AN.ui.aviso('El navegador bloqueó la ventana nueva: permite las ventanas emergentes de este sitio.', 'error');
+    }
 
     AN.hojaRenglones = { editando: function () { return st.editando; } };
 })(window.AcriNeo = window.AcriNeo || {});

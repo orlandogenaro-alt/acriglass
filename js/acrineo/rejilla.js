@@ -3,7 +3,7 @@
 // restablecer las columnas). Cada cuadrícula se declara en el HTML con
 //   <span class="an-rejilla-btns" data-rejilla="nombre" data-tabla="idDeLaTabla"> [data-cols] [data-fijas] [data-menu] </span>
 // y su módulo puede agregar opciones: AN.rejilla.opciones('nombre', { fijas: 1, archivo: 'Partidas', extras: fn → [{texto, accion}],
-// trasExportar: fn → [{texto, accion}] (van justo debajo de «Exportar a Excel») }).
+// trasExportar: fn → [{texto, accion}] (van justo debajo de «Exportar a Excel», antes de «Exportar PDF») }).
 // Lo que elige cada usuario se recuerda en este navegador.
 (function (AN) {
     'use strict';
@@ -115,8 +115,8 @@
         });
     }
 
-    // Exporta lo que se ve (columnas visibles y renglones pintados) a un .xlsx
-    function exportar(r) {
+    // Lo que se ve (columnas visibles y renglones pintados): { cols, filas } con el encabezado en filas[0]
+    function datosVisibles(r) {
         var cols = conNombre(r).filter(function (c) { return r.ocultas.indexOf(c.n) < 0; });
         var filas = [cols.map(function (c) { return c.texto; })];
         Array.prototype.forEach.call(r.tabla.tBodies[0].rows, function (tr) {
@@ -130,10 +130,49 @@
                 return isNaN(num) || t === '' ? t : num;
             }));
         });
+        return { cols: cols, filas: filas };
+    }
+
+    // Exporta lo que se ve a un .xlsx
+    function exportar(r) {
+        var d = datosVisibles(r), cols = d.cols, filas = d.filas;
         if (filas.length < 2) { AN.ui.aviso('No hay renglones para exportar.', 'error'); return; }
         var nombre = (r.cfg.archivo && r.cfg.archivo()) || r.nombre;
         var blob = window.XlsxSimple.crear({ nombre: nombre, anchos: cols.map(function (c) { return /descrip/i.test(c.texto) ? 50 : 16; }), filas: filas });
         window.XlsxSimple.descargar(blob, nombre.replace(/[\\\/:*?"<>|]+/g, ' ').trim() + '.xlsx');
+    }
+
+    // Exporta lo que se ve a PDF: arma una hoja imprimible (horizontal, encabezado repetido en cada página) y abre
+    // el diálogo de impresión del navegador, donde se elige «Guardar como PDF»
+    function exportarPdf(r) {
+        var d = datosVisibles(r), filas = d.filas;
+        if (filas.length < 2) { AN.ui.aviso('No hay renglones para exportar.', 'error'); return; }
+        var nombre = ((r.cfg.archivo && r.cfg.archivo()) || r.nombre).replace(/[\\\/:*?"<>|]+/g, ' ').trim();
+        var fmt = function (v) { return typeof v === 'number' ? v.toLocaleString('es-MX', { maximumFractionDigits: 6 }) : esc(v).replace(/\n/g, '<br>'); };
+        var html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>' + esc(nombre) + '</title><style>'
+            + '@page { size: landscape; margin: 12mm; }'
+            + 'body { font: 10px/1.35 Arial, Helvetica, sans-serif; color: #000; margin: 0; }'
+            + 'h1 { font-size: 14px; margin: 0 0 2px; } .fecha { color: #555; margin-bottom: 8px; }'
+            + 'table { border-collapse: collapse; width: 100%; } thead { display: table-header-group; } tr { page-break-inside: avoid; }'
+            + 'th, td { border: 1px solid #999; padding: 3px 5px; vertical-align: top; text-align: left; }'
+            + 'th { background: #e6e6e6; -webkit-print-color-adjust: exact; print-color-adjust: exact; } td.num { text-align: right; white-space: nowrap; }'
+            + '</style></head><body><h1>' + esc(nombre) + '</h1><div class="fecha">' + esc(new Date().toLocaleString('es-MX')) + '</div><table><thead><tr>'
+            + filas[0].map(function (t) { return '<th>' + esc(t) + '</th>'; }).join('') + '</tr></thead><tbody>'
+            + filas.slice(1).map(function (f) {
+                return '<tr>' + f.map(function (v) { return '<td' + (typeof v === 'number' ? ' class="num"' : '') + '>' + fmt(v) + '</td>'; }).join('') + '</tr>';
+            }).join('') + '</tbody></table></body></html>';
+        var marco = document.createElement('iframe');
+        marco.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+        document.body.appendChild(marco);
+        var doc = marco.contentWindow.document;
+        doc.open(); doc.write(html); doc.close();
+        var titulo = document.title;
+        document.title = nombre;   // nombre sugerido del archivo PDF
+        setTimeout(function () {
+            marco.contentWindow.focus();
+            marco.contentWindow.print();
+            setTimeout(function () { document.title = titulo; marco.remove(); }, 1000);
+        }, 150);
     }
 
     // Pinta un menú: null = separador; { texto, accion, desactivado, marcado, atajo, sub: [...] }
@@ -186,6 +225,7 @@
             { texto: 'Ajustar', marcado: !!r.ajustar, accion: function () { r.ajustar = !r.ajustar; escribir(r); aplicar(r); } },
             { texto: 'Exportar a Excel', accion: function () { exportar(r); } }],
             r.cfg.trasExportar ? r.cfg.trasExportar() : [],
+            [{ texto: 'Exportar PDF', accion: function () { exportarPdf(r); } }],
             r.cfg.limpiarFiltro ? [{ texto: 'Limpiar filtro', accion: r.cfg.limpiarFiltro, desactivado: r.cfg.hayFiltro ? !r.cfg.hayFiltro() : false }] : [], [null,
             { texto: 'Mostrar todas las columnas', accion: function () { r.ocultas = []; escribir(r); aplicar(r); }, desactivado: !r.ocultas.length },
             { texto: 'Quitar las columnas fijas', accion: function () { r.fijas = 0; escribir(r); aplicar(r); }, desactivado: !r.fijas },

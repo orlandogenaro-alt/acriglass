@@ -6,6 +6,7 @@ return [
     [
         'fecha' => '2026-11-25',
         'cambios' => [
+            ['nuevo', 'ACRINEO: Exportar PDF en las cuadrículas', 'El menú ⋮ de las cuadrículas (conceptos de la partida y las demás) tiene «Exportar PDF», debajo de «Importar PDF»: arma una hoja horizontal con las columnas visibles y los renglones que se ven, con el encabezado repetido en cada página, y abre el diálogo de impresión para elegir «Guardar como PDF».'],
             ['correccion', 'Easy-Glass y Microsip: la búsqueda de folios ya encuentra', 'En «Facturas y Easy-Glass» de ACRINEO (y en Asignar Cotización de Obras) los folios como EG6943 salían «Sin coincidencias»: la API de Easy-Glass estaba dada de alta con http:// y ese servidor solo atiende por https, así que mandaba a su página de inicio y el sistema lo tomaba como respuesta vacía. Ahora se usa https y, si algún servicio redirige a otra página en lugar de responder, se muestra el error en vez de quedarse sin resultados.'],
             ['correccion', 'Catalogos: ya abren en la nube', 'Unidades, Tipos de insumos, Familias, Estados, Ciudades, Proveedores, Responsables, Empresas, Tipos de licitaciones y Regiones mostraban «No encontrado.» en la versión en la nube: el servidor no tenía dadas de alta la página de los catálogos generales ni su API. Ya quedó.'],
         ],

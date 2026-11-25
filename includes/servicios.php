@@ -22,7 +22,7 @@ const ACRI_AUTENTICACION = [
 const ACRI_SERVICIO_EASYGLASS = [
     'nombre'      => 'Easy-Glass · API v1 (presupuestos)',
     'proveedor'   => 'Easy-Glass · Cotizador MegaGlass',
-    'url'         => 'http://cotizador.megaglass.us:8010/api/v1.php',
+    'url'         => 'https://cotizador.megaglass.us:8010/api/v1.php',
     'auth'        => 'bearer',
     'auth_campo'  => '',
     'credencial'  => '',
@@ -48,6 +48,9 @@ function api_config(string $clave): array
     $s = $todos[$clave];
     // Sin credencial capturada: la de la variable de entorno API_<CLAVE>_TOKEN
     if (($s['credencial'] ?? '') === '') $s['credencial'] = acri_env('API_' . $clave . '_TOKEN');
+    // El servidor de Easy-Glass solo atiende por https: a http responde con una redirección a su página de
+    // inicio (pierde la ruta y regresa HTML), así que una URL guardada con http:// se sube a https://
+    $s['url'] = preg_replace('#^http://(cotizador\.megaglass\.us)([:/]|$)#i', 'https://$1$2', (string) ($s['url'] ?? ''));
     return $s;
 }
 
@@ -108,6 +111,7 @@ function api_preparar(string $clave, string $metodo, string $ruta, $datos, array
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_USERAGENT      => 'AcriGlass/1.0',
+        CURLOPT_PRIVATE        => $url,   // para detectar redirecciones que pierden la ruta (api_resultado)
     ];
     if ($datos !== null) {
         if (is_array($datos)) {
@@ -122,14 +126,24 @@ function api_preparar(string $clave, string $metodo, string $ruta, $datos, array
     return $ch;
 }
 
-// Respuesta en la forma de api_http
-function api_resultado($cuerpo, int $codigo, ?string $errCurl, float $inicio): array
+// Respuesta en la forma de api_http. Con $ch se revisa la redirección: si el servidor mandó a otra ruta (p. ej. de
+// http a la página de inicio en https) la respuesta no es la de la API y se marca como error en vez de «sin datos».
+function api_resultado($cuerpo, int $codigo, ?string $errCurl, float $inicio, $ch = null): array
 {
     $ms = (int) round((microtime(true) - $inicio) * 1000);
     if ($cuerpo === false || $cuerpo === null) return ['ok' => false, 'codigo' => 0, 'datos' => null, 'cuerpo' => '', 'error' => 'Sin respuesta: ' . $errCurl, 'ms' => $ms];
     $json = json_decode($cuerpo, true);
     $ok = $codigo >= 200 && $codigo < 300;
-    return ['ok' => $ok, 'codigo' => $codigo, 'datos' => $json ?? $cuerpo, 'cuerpo' => $cuerpo, 'error' => $ok ? null : "El servicio respondió HTTP $codigo", 'ms' => $ms];
+    $error = $ok ? null : "El servicio respondió HTTP $codigo";
+    if ($ok && $ch && (int) curl_getinfo($ch, CURLINFO_REDIRECT_COUNT) > 0) {
+        $pedida = (string) curl_getinfo($ch, CURLINFO_PRIVATE);
+        $final = (string) curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+        if ($pedida !== '' && rtrim((string) parse_url($pedida, PHP_URL_PATH), '/') !== rtrim((string) parse_url($final, PHP_URL_PATH), '/')) {
+            $ok = false;
+            $error = "El servicio redirigió a $final en lugar de responder; revisa la URL base en Administrador › APIs y servicios (¿https?).";
+        }
+    }
+    return ['ok' => $ok, 'codigo' => $codigo, 'datos' => $json ?? $cuerpo, 'cuerpo' => $cuerpo, 'error' => $error, 'ms' => $ms];
 }
 
 function api_http(string $clave, string $metodo = 'GET', string $ruta = '', $datos = null, array $encabezados = []): array
@@ -140,8 +154,9 @@ function api_http(string $clave, string $metodo = 'GET', string $ruta = '', $dat
         $cuerpo = curl_exec($ch);
         $codigo = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $errCurl = curl_errno($ch) ? curl_error($ch) : null;
+        $res = api_resultado($cuerpo, $codigo, $errCurl, $inicio, $ch);
         curl_close($ch);
-        return api_resultado($cuerpo, $codigo, $errCurl, $inicio);
+        return $res;
     } catch (Throwable $e) {
         return ['ok' => false, 'codigo' => 0, 'datos' => null, 'cuerpo' => '', 'error' => $e->getMessage(), 'ms' => (int) round((microtime(true) - $inicio) * 1000)];
     }
@@ -180,7 +195,7 @@ function api_http_varios(string $clave, array $rutas, int $simultaneas = 8): arr
             unset($activos[api_id($ch)]);
             $errCurl = $info['result'] !== CURLE_OK ? curl_error($ch) : null;
             $cuerpo = $info['result'] === CURLE_OK ? curl_multi_getcontent($ch) : false;
-            $res[$k] = api_resultado($cuerpo, (int) curl_getinfo($ch, CURLINFO_HTTP_CODE), $errCurl, $inicio);
+            $res[$k] = api_resultado($cuerpo, (int) curl_getinfo($ch, CURLINFO_HTTP_CODE), $errCurl, $inicio, $ch);
             curl_multi_remove_handle($mh, $ch);
             curl_close($ch);
             if ($pendientes) $agregar();

@@ -119,7 +119,7 @@ $titulo = $ctx ? $ctx['codigo'] . ' · ' . $ctx['nombre'] : 'Presupuesto';
             <span class="an-flex"></span>
             <button type="button" class="an-btn an-icono an-redondo" id="anFiltroAplicar" title="Aplicar el filtro (Enter)" aria-label="Aplicar el filtro" aria-pressed="false"><?= anIcono('filtro') ?></button>
             <label class="an-check"><input type="checkbox" id="anFiltroTodo" checked> Todo el presupuesto</label>
-            <span class="an-totales" id="anTotales" aria-live="polite"></span>
+            <span class="an-totales" id="anTotales" aria-live="polite" tabindex="0"></span>
             <span class="an-flex"></span>
             <button type="button" class="an-btn an-primario an-icono an-redondo" id="anCalculoBoton" title="Cálculo del presupuesto (explosión de insumos)" aria-label="Cálculo del presupuesto" aria-haspopup="dialog"><?= anIcono('cuadricula') ?></button>
         </div>

@@ -97,13 +97,14 @@ function acrineoValidarM2($v): float
 function acrineoHojaContexto(int $id): array
 {
     $f = bd_fila('AW', 'select p.presupuesto_id, p.codigo, p.nombre, p.sobrecosto_pct, p.costo_directo, p.precio_venta,
-                               coalesce(k.decimales_costos, 2) as dc, coalesce(k.decimales_cantidades, 4) as dq
+                               coalesce(k.decimales_costos, 2) as dc, coalesce(k.decimales_cantidades, 4) as dq, coalesce(k.iva, 16) as iva
                           from acrineo_presupuestos p left join acrineo_presupuesto_calculo k on k.presupuesto_id = p.presupuesto_id
                          where p.presupuesto_id = ? and p.deleted_at is null', [$id]);
     if (!$f) throw new AcrineoError('El presupuesto no existe o fue eliminado.', 404);
     return ['id' => (int) $f['presupuesto_id'], 'codigo' => $f['codigo'], 'nombre' => $f['nombre'],
             'sobrecosto_pct' => (float) $f['sobrecosto_pct'], 'costo_directo' => (float) $f['costo_directo'],
-            'precio_venta' => (float) $f['precio_venta'], 'dec_costos' => (int) $f['dc'], 'dec_cantidades' => (int) $f['dq']];
+            'precio_venta' => (float) $f['precio_venta'], 'dec_costos' => (int) $f['dc'], 'dec_cantidades' => (int) $f['dq'],
+            'iva_pct' => (float) $f['iva']];   // % IVA de Detalle › Cálculo (los importes de la hoja van sin IVA)
 }
 
 // Monedas del presupuesto (las del sistema con el tipo de cambio que tenga el presupuesto): [{numero, descripcion, tipo_cambio}]

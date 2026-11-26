@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-11-26',
+        'cambios' => [
+            ['mejora', 'ACRINEO: desglose de los totales Pre y Par', 'Al pasar el mouse (o con Tab) sobre «Pre … / … Par … / …» arriba de la hoja aparece el desglose del presupuesto y de la partida seleccionada: costo directo, sobrecosto (% y monto), precio de venta sin IVA, IVA con su % y total con IVA, con la nota de dónde sale cada cifra (suma de cantidad × costo de los conceptos, % Sobrecosto de la hoja, DETALLE › Cálculo › % IVA). Aclara que las cifras de la hoja no incluyen IVA.'],
+        ],
+    ],
+    [
         'fecha' => '2026-11-25',
         'cambios' => [
             ['mejora', 'ACRINEO: Importar PDF lee las cotizaciones con el código dentro de la descripción', 'Los PDF con columnas GRÁFICO · DESCRIPCIÓN · UDS · IMPORTE · TOTAL (como el presupuesto Serie 4600 de Acristala) ya se importan: el código (C-01, C-02…, o el nombre en letra grande como «MANILLAS EXT») se toma de arriba de la descripción, UDS es la cantidad, IMPORTE el precio de una pieza y TOTAL el importe. La descripción queda con el título en su propio renglón, luego la especificación, las medidas «1.- …» y la nota. Ya no se pierden renglones que se repiten igual en conceptos parecidos de otras hojas, no se cuelan las cotas de los dibujos y se ignora la hoja final de términos y totales.'],

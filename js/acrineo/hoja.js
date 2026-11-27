@@ -79,35 +79,27 @@
             + ' &nbsp; Par <b>' + AN.ui.dinero(p ? p.costo : 0) + '</b> / <b>' + AN.ui.dinero(p ? p.venta : 0) + '</b>'
             + desglose(p);
         $('anTotales').removeAttribute('title');
-    }
-
-    // Desglose al pasar el mouse (o con el foco) sobre «Pre … / … Par … / …»: costo, sobrecosto, precio sin IVA, IVA y
-    // total con IVA del presupuesto y de la partida, y de dónde sale cada cifra
-    function desglose(p) {
-        var d = AN.ui.dinero, iva = Number(H.ctx.iva_pct);
-        if (!isFinite(iva)) iva = 16;
-        var pct = Number(H.ctx.sobrecosto_pct) || 0;
-        var fila = function (t, v, nota, clase) {
-            return '<tr' + (clase ? ' class="' + clase + '"' : '') + '><th>' + t + '</th><td>' + d(v) + '</td><td>' + nota + '</td></tr>';
-        };
-        var bloque = function (titulo, costo, venta) {
-            costo = Number(costo) || 0; venta = Number(venta) || 0;
-            var imp = redondear(venta * iva / 100, 2);
-            return '<tr class="an-desg-titulo"><th colspan="3">' + titulo + '</th></tr>'
-                + fila('Costo directo', costo, 'Suma de cantidad × costo de los conceptos')
-                + fila('Sobrecosto ' + esc(String(pct)) + ' %', venta - costo, '«% Sobrecosto» de arriba a la derecha (los conceptos con precio fijo usan su precio)')
-                + fila('Precio de venta', venta, '<b>Sin IVA</b>: suma de cantidad × precio', 'an-desg-fuerte')
-                + fila('IVA ' + esc(String(iva)) + ' %', imp, 'DETALLE › Cálculo › % IVA')
-                + fila('Total con IVA', redondear(venta + imp, 2), 'Precio de venta + IVA', 'an-desg-fuerte');
-        };
-        return '<span class="an-desglose" role="tooltip"><table>'
-            + bloque('Presupuesto (Pre)', H.ctx.costo_directo, H.ctx.precio_venta)
-            + (p ? bloque('Partida ' + esc(p.codigo) + ' (Par)', p.costo, p.venta) : '<tr class="an-desg-titulo"><th colspan="3">Partida (Par): selecciona una partida</th></tr>')
-            + '</table><small>Las cifras de la hoja (Pre, Par, importes y Σ) <b>no incluyen IVA</b>; el IVA solo se suma en el reporte impreso del Presupuesto (IMPRIMIR).</small></span>';
         var s = $('anSobrecosto');
         if (document.activeElement !== s) s.value = H.ctx.sobrecosto_pct;
         $('anHojaTitulo').textContent = H.ctx.codigo + ' · ' + H.ctx.nombre;
         document.title = H.ctx.codigo + ' · ' + H.ctx.nombre + ' · ACRINEO';
+    }
+
+    // Desglose al pasar el mouse (o con el foco) sobre «Pre … / … Par … / …»: solo lo que trae la hoja (costo, sobrecosto
+    // y precio) del presupuesto y de la partida. No se calcula IVA: las cifras de la hoja van sin IVA.
+    function desglose(p) {
+        var d = AN.ui.dinero, pct = Number(H.ctx.sobrecosto_pct) || 0;
+        var col = function (costo, venta) { costo = Number(costo) || 0; venta = Number(venta) || 0; return [costo, venta - costo, venta]; };
+        var pre = col(H.ctx.costo_directo, H.ctx.precio_venta), par = p ? col(p.costo, p.venta) : null;
+        var fila = function (t, i, clase) {
+            return '<tr' + (clase ? ' class="' + clase + '"' : '') + '><th>' + t + '</th><td>' + d(pre[i]) + '</td>' + (par ? '<td>' + d(par[i]) + '</td>' : '') + '</tr>';
+        };
+        return '<span class="an-desglose" role="tooltip"><table>'
+            + '<tr class="an-desg-titulo"><th></th><th>Presupuesto</th>' + (par ? '<th>Partida ' + esc(p.codigo) + '</th>' : '') + '</tr>'
+            + fila('Costo directo', 0)
+            + fila('Sobrecosto ' + esc(String(pct)) + ' %', 1)
+            + fila('Precio de venta', 2, 'an-desg-fuerte')
+            + '</table><small>Costo = cantidad × costo de los conceptos (lo importado). Precio = costo + % Sobrecosto. <b>Sin IVA</b>: la hoja no suma IVA.</small></span>';
     }
 
     // ---------- Árbol ----------

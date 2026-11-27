@@ -4,6 +4,12 @@
 // tipo: nuevo = se agregó · mejora = se modificó o reforzó · correccion = se arregló una falla
 return [
     [
+        'fecha' => '2026-11-27',
+        'cambios' => [
+            ['correccion', 'ACRINEO: el desglose de Pre / Par ya no inventa IVA y el % Sobrecosto vuelve a verse', 'El recuadro que sale al pasar el mouse sobre «Pre … / … Par …» mostraba un IVA del 16 % y un «Total con IVA» que no vienen del presupuesto (en los presupuestos importados de otra aplicación el precio no incluye IVA). Ahora solo muestra lo que trae la hoja, en dos columnas (presupuesto y partida): costo directo, sobrecosto y precio de venta, sin IVA. Además el campo «% Sobrecosto» de arriba a la derecha y el título de la pestaña habían dejado de llenarse con el cambio anterior; ya se llenan otra vez.'],
+        ],
+    ],
+    [
         'fecha' => '2026-11-26',
         'cambios' => [
             ['mejora', 'ACRINEO: desglose de los totales Pre y Par', 'Al pasar el mouse (o con Tab) sobre «Pre … / … Par … / …» arriba de la hoja aparece el desglose del presupuesto y de la partida seleccionada: costo directo, sobrecosto (% y monto), precio de venta sin IVA, IVA con su % y total con IVA, con la nota de dónde sale cada cifra (suma de cantidad × costo de los conceptos, % Sobrecosto de la hoja, DETALLE › Cálculo › % IVA). Aclara que las cifras de la hoja no incluyen IVA.'],

@@ -412,18 +412,19 @@ svg.i { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentCo
 /* Desglose de Pre / Par al pasar el mouse: costo, sobrecosto, precio sin IVA, IVA y total con IVA */
 .an-totales { position: relative; cursor: help; outline: none; border-radius: 6px; }
 .an-totales:focus-visible { box-shadow: 0 0 0 2px var(--azul-borde, #9ec5fe); }
-.an-desglose { display: none; position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; width: max-content; max-width: min(640px, 92vw);
+.an-desglose { display: none; position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; width: max-content; max-width: min(420px, 92vw);
     padding: 10px 12px; background: var(--tarjeta); color: var(--texto-2); border: 1px solid var(--borde); border-radius: 10px;
     box-shadow: var(--sombra-flot); white-space: normal; font-size: 12px; cursor: default; }
 .an-totales:hover .an-desglose, .an-totales:focus .an-desglose { display: block; }
 .an-desglose table { border-collapse: collapse; }
 .an-desglose th, .an-desglose td { padding: 3px 8px; text-align: left; font-weight: 400; vertical-align: top; }
 .an-desglose td:nth-child(2) { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--enfasis); }
-.an-desglose td:nth-child(3) { color: var(--texto-3, var(--texto-2)); font-size: 11px; max-width: 300px; }
+.an-desglose td { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--enfasis); }
+.an-desglose .an-desg-titulo th:not(:first-child) { text-align: right; }
 .an-desglose .an-desg-titulo th { padding-top: 8px; font-weight: 800; color: var(--enfasis); border-bottom: 1px solid var(--borde); }
 .an-desglose tr:first-child.an-desg-titulo th { padding-top: 0; }
 .an-desglose .an-desg-fuerte th, .an-desglose .an-desg-fuerte td:nth-child(2) { font-weight: 800; }
-.an-desglose small { display: block; margin-top: 8px; color: var(--texto-2); }
+.an-desglose small { display: block; margin-top: 6px; max-width: 340px; color: var(--texto-2); font-size: 11px; }
 
 .an-hoja {
     flex: 1; min-height: 0; display: grid; gap: 8px 0; padding: 8px;
